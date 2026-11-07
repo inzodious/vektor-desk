@@ -16,12 +16,12 @@ Siblings: [architecture.md](architecture.md) (mirror, compose app), [agents.md](
 
 | Source | What the desk takes | Limits and terms | Cadence |
 |---|---|---|---|
-| **Escape Vektor mirror** (read-only service account) | `positions`, `snapshots`, `activity`, `plans`, `transactions`, `paystubs`, `prices/board`, `priceCloses/{SYM}_{YEAR}`, `priceProfiles/{SYM}` | One-way, never writes back | 8:00 and 17:00 ET |
-| **Fidelity lot export** (CSV dropped in a watched folder) | Tax lots: acquired date, shares, cost per lot, term; realized gain/loss export for the year | Manual. SimpleFIN only gives average cost | Monthly, and before any sale |
+| **Escape Vektor mirror** (read-only service account, `/data/mirror.db`, see [architecture.md](architecture.md)) | Every collection under `lockIn/{uid}`; the engine uses `positions`, `snapshots`, `activity`, `plans`, `transactions`, `paystubs`, `prices/board`, `priceCloses/{SYM}_{YEAR}`, `priceProfiles/{SYM}` | One-way, never writes back | 8:00 and 17:00 ET |
+| **Fidelity lot export** (CSV dropped in `/data/inbox/fidelity/`) | Tax lots: acquired date, shares, cost per lot, term; realized gain/loss export for the year | Manual. SimpleFIN only gives average cost | Monthly, and before any sale |
 | **Tiingo** (existing key) | Daily OHLC, `adjClose`, `divCash`, `splitFactor` for benchmarks and comparison symbols not already in the mirror | Free tier is personal use; request and unique-symbol caps apply ([docs](https://api.tiingo.com/documentation)) | Nightly, incremental |
 | **Finnhub** (existing key) | Live quotes in market hours, earnings calendar, basic financials, insider transactions where the free tier allows | 60 calls a minute; some endpoints are premium, checked at build time | Every 5 min in market hours |
-| **SEC EDGAR** | Filings index, XBRL company facts (revenue, margins, share count), Form 4 insider trades, N-PORT fund holdings | Free; a `User-Agent` with contact details is required, at most 10 requests a second | Nightly for holdings and watchlist |
-| **FRED** (free API key) | Risk-free rate (3-month T-bill), 10y and 2y yields, CPI, high-yield spread, VIX close | Free key, generous rate limit | Nightly |
+| **SEC EDGAR** | Filings index, XBRL company facts (revenue, margins, share count), Form 4 insider trades, N-PORT fund holdings | Free; a `User-Agent` with contact details is required (`DESK_SEC_USER_AGENT`), at most 10 requests a second | Nightly for holdings and watchlist |
+| **FRED** (free key, `FRED_API_KEY`) | Risk-free rate (3-month T-bill), 10y and 2y yields, CPI, high-yield spread, VIX close | Free key, generous rate limit | Nightly |
 | **Ken French data library** | Daily and monthly Fama-French 5 factors plus momentum, US market back to 1926 | Free CSV ([library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.French/data_library.html)) | Monthly |
 
 Held symbols already have closes in Escape Vektor's `priceCloses` (with `adjClose`), so the desk reads those from the mirror and only calls Tiingo for symbols Escape Vektor does not price. That keeps the two apps well inside one free key.
@@ -34,15 +34,20 @@ Held symbols already have closes in Escape Vektor's `priceCloses` (with `adjClos
 
 ## Storage
 
-One SQLite file on the TrueNAS dataset, WAL mode. The engine is the only writer; the API and agents open it read-only. Nightly TrueNAS dataset snapshots are the backup.
+Two SQLite files on the TrueNAS dataset, both WAL mode, each with one writer. Nightly TrueNAS dataset snapshots are the backup.
 
-| Layer | Tables | Rule |
-|---|---|---|
-| **raw** | `raw_ev_rows(table, row_id, json, at, pulled_at)`, `raw_lot_files`, `raw_api(source, key, body, fetched_at)` | Verbatim, append-only. Lets any later number be recomputed from what was known on the day |
-| **core** | `accounts`, `holdings_daily(date, account, symbol, shares, close, value, source)`, `lots`, `cash_flows(date, account, amount, kind, external)`, `prices_daily(symbol, date, close, adj_close, div, split)`, `benchmarks`, `factors_daily`, `macro_daily`, `fund_holdings(fund, as_of, holding, weight)`, `quotes_live(symbol, at, price)` | Normalized, deduplicated, one row per fact |
-| **derived** | `metric_values`, `series_daily`, `signals`, `proposals_scored`, `data_health` | Written by the engine run, tagged with `engine_version` |
+- **`/data/mirror.db`** is owned by the mirror ([architecture.md](architecture.md)): `rows(tbl, id, json, at)` is current Firestore state, with one view per table `ev_<tbl>(id, json, at)`; `row_history(seq, tbl, id, json, at, pulled_at, op)` is append-only, one row each time a document changes or disappears; `runs` and `tables` give freshness. The engine never writes to it.
+- **`/data/desk.db`** is owned by the engine, which `ATTACH`es `mirror.db` read-only. The API and the agents' brief builder open `desk.db` read-only.
 
-**Keep every pull.** Escape Vektor collapses synced snapshots to one per week. The desk stores each mirror pull's positions in `holdings_daily`, so from the first day it runs it has a daily history Escape Vektor does not. Earlier history is rebuilt the way Escape Vektor's `market.js` does it: the earliest snapshot's quantities rolled forward by activity rows, priced with daily closes, flagged `pro_forma` where no snapshot confirms it.
+Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deploy waits for them.
+
+| Layer | Where | Tables | Rule |
+|---|---|---|---|
+| **raw** | `mirror.db`, plus `desk.db` | Mirror: `rows`, `row_history`. Engine: `raw_lot_files`, `raw_api(source, key, body, fetched_at)` | Verbatim, append-only. Lets any later number be recomputed from what was known on the day |
+| **core** | `desk.db` | `accounts`, `holdings_daily(date, account, symbol, shares, close, value, source)`, `lots`, `cash_flows(date, account, amount, kind, external)`, `prices_daily(symbol, date, close, adj_close, div, split)`, `benchmarks`, `factors_daily`, `macro_daily`, `fund_holdings(fund, as_of, holding, weight)`, `quotes_live(symbol, at, price)` | Normalized, deduplicated, one row per fact |
+| **derived** | `desk.db` | `metric_values`, `series_daily`, `signals`, `proposals_scored`, `data_health` | Written by the engine run, tagged with `engine_version` |
+
+**Keep every pull.** Escape Vektor collapses synced snapshots to one per week. `row_history` keeps every version of every snapshot and position the mirror saw (`positions.json.snapshotId` joins to `snapshots.json.id`), so the engine rebuilds `holdings_daily` for every pull and, from the first day the mirror runs, has a daily history Escape Vektor does not. Earlier history is rebuilt the way Escape Vektor's `market.js` does it: the earliest snapshot's quantities rolled forward by activity rows, priced with daily closes, flagged `pro_forma` where no snapshot confirms it.
 
 **Cash flows.** External flows are deposits, withdrawals, HSA contributions and 401(k) contributions. Internal moves (the margin and cash sub-account journals, transfers between your own accounts at the portfolio level, core fund sweeps, dividend reinvestment) are not flows. Getting this wrong is the most common way personal return math lies, so the classifier ships with fixtures for every Fidelity action text seen so far.
 
@@ -250,7 +255,7 @@ What the desk will say out loud:
 
 What agents and dashboards build against. Owned by this doc; changes go through it.
 
-**Tables** (read-only to everyone but the engine):
+**Tables** in `desk.db` (read-only to everyone but the engine):
 
 ```
 metric_values(metric_id, scope, scope_id, window, as_of, value, unit, n_obs, quality, engine_version)
