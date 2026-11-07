@@ -188,6 +188,65 @@ CREATE TABLE IF NOT EXISTS triggers (
   fired_at TEXT NOT NULL,
   PRIMARY KEY (as_of, kind, scope_id)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sec_tickers (
+  symbol TEXT PRIMARY KEY,
+  cik INTEGER NOT NULL,
+  title TEXT,
+  fetched_at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS filings (
+  accession TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  cik INTEGER NOT NULL,
+  form TEXT NOT NULL,
+  filed TEXT NOT NULL,
+  report_date TEXT,
+  description TEXT,
+  url TEXT
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS filings_symbol ON filings (symbol, filed);
+CREATE TABLE IF NOT EXISTS fundamentals (
+  symbol TEXT NOT NULL,
+  concept TEXT NOT NULL,
+  start TEXT,
+  period_end TEXT NOT NULL,
+  fy INTEGER,
+  fp TEXT,
+  form TEXT,
+  filed TEXT,
+  value REAL NOT NULL,
+  unit TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fundamentals_symbol ON fundamentals (symbol, concept, period_end);
+CREATE TABLE IF NOT EXISTS macro_daily (
+  series TEXT NOT NULL,
+  date TEXT NOT NULL,
+  value REAL NOT NULL,
+  PRIMARY KEY (series, date)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS earnings (
+  symbol TEXT NOT NULL,
+  date TEXT NOT NULL,
+  hour TEXT,
+  quarter INTEGER,
+  year INTEGER,
+  eps_estimate REAL,
+  eps_actual REAL,
+  revenue_estimate REAL,
+  revenue_actual REAL,
+  PRIMARY KEY (symbol, date)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS insider_trades (
+  symbol TEXT NOT NULL,
+  name TEXT NOT NULL,
+  filing_date TEXT,
+  txn_date TEXT NOT NULL,
+  code TEXT,
+  change REAL,
+  shares_after REAL,
+  price REAL,
+  UNIQUE (symbol, name, txn_date, code, change, shares_after)
+);
 CREATE TABLE IF NOT EXISTS wash_windows (
   as_of TEXT NOT NULL,
   symbol TEXT NOT NULL,

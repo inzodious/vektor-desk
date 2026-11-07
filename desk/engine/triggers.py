@@ -70,6 +70,8 @@ def detect(cfg: Config, conn: sqlite3.Connection, as_of: str, *, now: datetime |
             found.append((as_of, "concentration", r["scope_id"], {"weight_pct": r["value"], "band_pct": cap}))
         if r["metric_id"] == "plan.rules" and r["value"] == 0:
             found.append((as_of, "rule_breach", r["scope_id"], {}))
+    for r in conn.execute("SELECT scope_id FROM metric_values WHERE as_of=? AND metric_id='sig.earnings_reported' AND value=1", (as_of,)):
+        found.append((as_of, "earnings", r["scope_id"], {"surprise_pct": _metric(conn, as_of, "sig.eps_surprise", "holding", r["scope_id"])}))
     total = _metric(conn, as_of, "plan.single_stock")
     if cap is not None and total is not None and total > cap:
         found.append((as_of, "concentration", "satellite", {"weight_pct": total, "band_pct": cap}))
