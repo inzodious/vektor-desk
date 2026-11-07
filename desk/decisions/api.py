@@ -1,10 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from desk.config import Config
 from desk.decisions import profile as profiles
+from desk.decisions import records, tickets
 from desk.decisions import rules as ruleset
 from desk.decisions.store import session
 
@@ -57,3 +59,142 @@ def get_rules_versions(cfg: Cfg) -> JSONResponse:
     profiles.active_profile(cfg)
     with session(cfg) as conn:
         return fresh({"versions": ruleset.versions(conn)})
+
+
+# ---- Decisions ----
+
+
+class Reason(BaseModel):
+    reason: str | None = None
+
+
+class Snooze(BaseModel):
+    days: float = 1
+    reason: str | None = None
+
+
+class Placed(BaseModel):
+    shares: float | None = None
+    price: float | None = None
+
+
+class Note(BaseModel):
+    text: str
+
+
+class LogTrade(BaseModel):
+    thesis: str | None = None
+    reason: str | None = None
+
+
+class Draft(BaseModel):
+    kind: str
+    symbol: str | None = None
+    account: str | None = None
+    amount_usd: float | None = None
+    shares: float | None = None
+    funding: str | None = None
+    title: str | None = None
+    thesis: str | None = None
+    bear_case: str | None = None
+    invalidation: str | None = None
+    horizon: str | None = None
+    rule_served: str | None = None
+    confidence: float | None = None
+    expires: str | None = None
+    order_ticket: dict | None = None
+
+
+def act(fn, *args, **kwargs) -> JSONResponse:
+    try:
+        return fresh(fn(*args, **kwargs))
+    except records.DecisionError as e:
+        raise HTTPException(e.status, str(e)) from e
+
+
+@router.get("/queue")
+def get_queue(cfg: Cfg) -> JSONResponse:
+    return act(records.queue, cfg)
+
+
+@router.get("/summary")
+def get_summary(cfg: Cfg) -> JSONResponse:
+    return act(records.summary, cfg)
+
+
+@router.get("/journal")
+def get_journal(
+    cfg: Cfg,
+    origin: str | None = None,
+    kind: str | None = None,
+    status: str | None = None,
+    symbol: str | None = None,
+    since: Annotated[str | None, Query(alias="from")] = None,
+    until: Annotated[str | None, Query(alias="to")] = None,
+    limit: int = 100,
+) -> JSONResponse:
+    return act(records.journal, cfg, origin=origin, kind=kind, status=status, symbol=symbol, since=since, until=until, limit=limit)
+
+
+@router.get("/unmatched")
+def get_unmatched(cfg: Cfg, days: int = records.UNMATCHED_DAYS) -> JSONResponse:
+    return act(lambda: {"trades": records.unmatched(cfg, days=days)})
+
+
+@router.post("/unmatched/{activity_id}/log")
+def post_log_trade(activity_id: str, body: LogTrade, cfg: Cfg) -> JSONResponse:
+    return act(records.log_trade, cfg, activity_id, thesis=body.thesis, reason=body.reason)
+
+
+@router.post("")
+def post_draft(body: Draft, cfg: Cfg) -> JSONResponse:
+    return act(records.draft, cfg, body.model_dump(exclude_none=True))
+
+
+@router.get("/{decision_id}")
+def get_decision(decision_id: str, cfg: Cfg) -> JSONResponse:
+    return act(records.get, cfg, decision_id)
+
+
+@router.get("/{decision_id}/ticket")
+def get_ticket(decision_id: str, cfg: Cfg) -> JSONResponse:
+    def build():
+        d = records.get(cfg, decision_id)
+        return tickets.ticket(d, profiles.active_profile(cfg).get("tax", "lot_method"))
+
+    return act(build)
+
+
+@router.post("/{decision_id}/approve")
+def post_approve(decision_id: str, body: Reason, cfg: Cfg) -> JSONResponse:
+    return act(records.approve, cfg, decision_id, body.reason)
+
+
+@router.post("/{decision_id}/dismiss")
+def post_dismiss(decision_id: str, body: Reason, cfg: Cfg) -> JSONResponse:
+    return act(records.dismiss, cfg, decision_id, body.reason)
+
+
+@router.post("/{decision_id}/snooze")
+def post_snooze(decision_id: str, body: Snooze, cfg: Cfg) -> JSONResponse:
+    return act(records.snooze, cfg, decision_id, body.days, body.reason)
+
+
+@router.post("/{decision_id}/pass")
+def post_pass(decision_id: str, body: Reason, cfg: Cfg) -> JSONResponse:
+    return act(records.pass_on, cfg, decision_id, body.reason or "")
+
+
+@router.post("/{decision_id}/placed")
+def post_placed(decision_id: str, body: Placed, cfg: Cfg) -> JSONResponse:
+    return act(records.mark_placed, cfg, decision_id, body.shares, body.price)
+
+
+@router.post("/{decision_id}/note")
+def post_note(decision_id: str, body: Note, cfg: Cfg) -> JSONResponse:
+    return act(records.add_note, cfg, decision_id, body.text)
+
+
+@router.post("/{decision_id}/preflight")
+def post_preflight(decision_id: str, cfg: Cfg) -> JSONResponse:
+    return act(records.rerun_preflight, cfg, decision_id)
