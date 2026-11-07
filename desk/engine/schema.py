@@ -257,6 +257,48 @@ CREATE TABLE IF NOT EXISTS wash_windows (
   amount REAL,
   PRIMARY KEY (symbol, kind, date, account)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sec_funds (
+  symbol TEXT PRIMARY KEY,
+  cik INTEGER NOT NULL,
+  series_id TEXT NOT NULL,
+  class_id TEXT,
+  fetched_at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS nport_filings (
+  accession TEXT PRIMARY KEY,
+  cik INTEGER NOT NULL,
+  series_id TEXT NOT NULL,
+  period TEXT,
+  filed TEXT
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS fund_holdings (
+  fund TEXT NOT NULL,
+  as_of TEXT NOT NULL,
+  holding TEXT NOT NULL,
+  name TEXT,
+  cusip TEXT,
+  weight REAL NOT NULL,
+  asset_cat TEXT,
+  country TEXT,
+  accession TEXT,
+  PRIMARY KEY (fund, holding)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sym_profiles (
+  symbol TEXT PRIMARY KEY,
+  name TEXT,
+  industry TEXT,
+  sector TEXT,
+  fetched_at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS lookthrough (
+  as_of TEXT NOT NULL,
+  holding TEXT NOT NULL,
+  name TEXT,
+  weight REAL NOT NULL,
+  direct REAL NOT NULL,
+  via TEXT NOT NULL,
+  PRIMARY KEY (holding)
+) WITHOUT ROWID;
 """
 
 
