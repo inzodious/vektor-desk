@@ -9,7 +9,7 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | # | Phase | Tier | Status | Depends on |
 |---|---|---|---|---|
 | 0 | Planning docs | | ✅ | |
-| 1 | Foundation | 1 | 🚧 (code done, box setup pending) | 0 |
+| 1 | Foundation | 1 | ✅ | 0 |
 | 2 | Bridge and Symbol sheet | 1 | ✅ | 1 |
 | 3 | Engine core and Plan | 1 | ✅ | 2 |
 | 4 | Decisions and Preflight | 1 | ✅ | 3 |
@@ -43,10 +43,10 @@ Concept's success measure is that December's loss-sale plan comes from the desk.
 
 Done when all six are merged and agree with each other.
 
-### 1. Foundation 🚧
+### 1. Foundation ✅
 
 - [x] Compose stack on TrueNAS: Tailscale sidecar, Caddy, api (serves the built UI), cron (scheduler, engine and agents) ([#5])
-- [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate (built in [#5]; needs Joshua's one-time setup steps in `docs/architecture.md`)
+- [x] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate ([#5], [#29], [#60], [#63], [#64], [#67], [#68]; live on the box 2026-11-07)
 - [x] Read-only mirror of every `lockIn/{uid}` collection into SQLite, incremental by change time with a weekly full pass, with change history ([#5])
 - [x] `holdings_daily` built from the mirror history from day one (Statistics) ([#11])
 - [x] Claude Code CLI in the cron service (Hemline's pattern), token in a root-only env file, smoke run with `deploy.sh check` (no `--bare`) ([#5]); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout ([#10])
@@ -55,7 +55,7 @@ Done when all six are merged and agree with each other.
 - [x] Settings: data freshness and token card (`/api/status` in [#5]; page by Design) ([#21])
 - [x] Local lint, test and build scripts; synthetic fixtures ([#14], [#17])
 
-Done when a phone on Tailscale opens the desk and sees the mirror's last run. **Code complete (0.1.0); waiting on Joshua's one-time setup** in `docs/architecture.md`, which also gives the first real `claude -p` smoke run.
+Done when a phone on Tailscale opens the desk and sees the mirror's last run. **Live on the box 2026-11-07 (0.11.0):** `deploy.sh check` passed, and the first mirror run pulled 15 tables.
 
 ### 2. Bridge and Symbol sheet ✅
 
@@ -93,7 +93,7 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run. **
 - [x] Brief card; crew tiles with agent status, run log and usage per run ([#10], [#15], [#44])
 - [x] Tax calendar view ([#44])
 
-Tier 1 code complete: 0.5.0. It runs on demo data until the box setup in [docs/setup.md](docs/setup.md) finishes phase 1.
+Tier 1 code complete: 0.5.0. Live on real data from 0.11.0.
 
 ### 6. Research ✅
 
@@ -143,7 +143,7 @@ Research hypotheses become strategies, tested on history without seeing the futu
 
 ### 1.0 Hardening 📋
 
-- [ ] Restore from backup tested
+- [ ] Restore from backup tested (`deploy.sh restore-test` [#67]; runs after the first nightly backup)
 - [ ] Every page checked at 1920, 1440 and 390 in light and dark
 - [ ] Six months of Flight record reviewed; desks that do not beat following the plan are switched off
 
@@ -207,3 +207,9 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#58]: https://github.com/inzodious/vektor-desk/pull/58
 [#61]: https://github.com/inzodious/vektor-desk/pull/61
 [#65]: https://github.com/inzodious/vektor-desk/pull/65
+[#29]: https://github.com/inzodious/vektor-desk/pull/29
+[#60]: https://github.com/inzodious/vektor-desk/pull/60
+[#63]: https://github.com/inzodious/vektor-desk/pull/63
+[#64]: https://github.com/inzodious/vektor-desk/pull/64
+[#67]: https://github.com/inzodious/vektor-desk/pull/67
+[#68]: https://github.com/inzodious/vektor-desk/pull/68
