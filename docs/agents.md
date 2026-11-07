@@ -8,7 +8,7 @@ Status: plan, November 7, 2026. Nothing built. Base decisions are in fin-dashboa
 
 1. **Advisory only.** Agents write proposals. Joshua approves, dismisses or snoozes, then places any trade at the broker himself. Nothing in the stack holds broker credentials or can place an order.
 2. **The engine computes, agents reason.** Every number an agent uses comes from the Python engine (see `docs/statistics.md`). An agent that cites a number the engine did not produce gets its proposal rejected.
-3. **Rules live in code, not prompts.** Margin, concentration and wash-sale limits are checked by Preflight, engine code that runs on every proposal after the agent answers. A prompt can be talked out of a rule; a function cannot.
+3. **Rules live in code, not prompts.** Margin, concentration and wash-sale limits are checked by Preflight, deterministic engine code (owned by `docs/statistics.md`) that runs on every proposal after the agent answers. A prompt can be talked out of a rule; a function cannot.
 4. **"Follow the plan" is the opponent.** Every proposal is scored against putting the same dollars into the plan mix on the same day. A desk that cannot beat that gets turned off.
 5. **The most valuable agent is the one that says no.** Most good advice on this account is "don't", with the cost in dollars.
 
@@ -21,44 +21,46 @@ scheduler ─▶ brief builder ─▶ claude -p (one desk) ─▶ Preflight ─�
 ```
 
 1. The scheduler picks a desk whose time or trigger has come and checks the usage budget.
-2. The brief builder writes a run folder with `brief.json` (engine output for this desk only), `settings.json` (the active dials and their hash), and `history.json` (the desk's last 20 proposals with Joshua's decisions and reasons).
-3. The adapter runs `claude -p` in that folder and asks for output that matches `agents/schemas/proposal.json`.
+2. The brief builder assembles one prompt: `brief` (engine output for this desk only), `profile` (the active dials and their version), and `history` (the desk's last 20 proposals with Joshua's decisions and reasons).
+3. The adapter pipes that prompt to `claude -p` on stdin and asks for output that matches `desk/agents/schemas/proposal.json`.
 4. The runner validates the JSON and hands it to Preflight, which re-checks every cited number against the brief, applies the hard rules, adds the tax impact, and stores the result as a decision record (`docs/concept.md`). Nothing the agent says reaches the UI without passing through this step.
 
 ### The adapter
 
-All model calls go through one function, so a later move to the API or a local model is a one-file change:
+All model calls go through one function, so a later move to the API or a local model (Ollama already runs on the box) is a one-file change:
 
 ```python
-run_agent(desk: str, run_dir: Path) -> AgentResult
+run_agent(desk: str, prompt: str) -> AgentResult
 ```
 
-The Claude Code CLI implementation, as the agents container runs it:
+The Claude Code CLI implementation follows the pattern Joshua's Hemline app already runs on the same TrueNAS box, so there is one proven way to call Claude there:
 
 ```bash
-CLAUDE_CODE_OAUTH_TOKEN="$(cat /run/secrets/claude_oauth_token)" \
-CLAUDE_CONFIG_DIR=/srv/claude-home \
-claude -p "$(cat /srv/desk/agents/prompts/task.md)" \
-  --append-system-prompt-file /srv/desk/agents/prompts/plan-keeper.md \
+cd "$(mktemp -d)"
+desk_prompt | claude -p \
+  --system-prompt-file /app/desk/agents/prompts/plan-keeper.md \
   --model sonnet --effort medium \
-  --tools "Read,Grep,Glob" \
-  --strict-mcp-config --mcp-config /srv/desk/agents/mcp/none.json \
+  --tools "" \
+  --setting-sources "" --strict-mcp-config \
   --permission-mode dontAsk --permission-prompts none \
-  --max-turns 12 --max-budget-usd 1.00 \
+  --max-turns 12 \
   --no-session-persistence \
-  --output-format json --json-schema "$(cat /srv/desk/agents/schemas/proposal.json)"
+  --output-format json --json-schema "$(cat /app/desk/agents/schemas/proposal.json)"
 ```
 
-Notes on the flags, checked against the Claude Code docs on November 7, 2026:
+Research and Scout swap `--tools ""` for `--tools "WebSearch,WebFetch"` and add `--allowedTools "WebSearch,WebFetch"`.
 
-- **No `--bare`.** Bare mode is the docs' recommendation for scripts, but it does not read `CLAUDE_CODE_OAUTH_TOKEN`, so it would force API billing. Isolation comes from a dedicated `CLAUDE_CONFIG_DIR`, an empty run folder with no `.claude/` or `.mcp.json`, and `--strict-mcp-config`.
-- **`--tools`** removes every tool not listed, so no desk has Bash, Edit or Write. Agents return their work as `structured_output`; they never write files.
-- **`dontAsk` plus `--permission-prompts none`** means anything outside the allow-list is denied and the run carries on, rather than hanging on a prompt nobody will answer.
-- **`--max-turns` and `--max-budget-usd`** cap each run. On a subscription the dollar figure is a client-side estimate, not a bill; the desk uses it as a size meter.
+Notes, checked against the Claude Code docs on November 7, 2026:
+
+- **Auth.** `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, only in the cron service's environment (root-only env file), with `HOME=/data/home`. CLI pinned (2.1.308 at time of writing) with `DISABLE_AUTOUPDATER=1`, so a CLI update never changes behaviour overnight.
+- **No `--bare`.** It is the docs' recommendation for scripts, but bare mode does not read `CLAUDE_CODE_OAUTH_TOKEN`. Isolation instead comes from an empty temp directory, `--setting-sources ""` and `--strict-mcp-config`, so no CLAUDE.md, memory, hooks or MCP servers load.
+- **No file tools at all.** The brief arrives on stdin, so four desks run with `--tools ""` and the two web desks get web tools only. No desk can read the disk, run a shell or write a file; work comes back as `structured_output`.
+- **Replace, don't append, the system prompt.** `--system-prompt-file` drops Claude Code's coding-assistant prompt, which these desks don't need, and keeps every run's instructions in one versioned file.
+- **`dontAsk` plus `--permission-prompts none`** denies anything outside the allow-list and carries on, rather than hanging on a prompt nobody will answer.
+- **Caps.** `--max-turns` per desk, and a 20-minute wall clock. A stuck run gets SIGINT first (SIGTERM drops the turn).
 - **`--model` takes aliases** (`sonnet`, `opus`), so model upgrades need no code change.
-- **Exit handling.** The runner reads `structured_output` from the JSON and treats its absence as a failed run. It stops a stuck run with SIGINT first (SIGTERM drops the turn), after 20 minutes.
-
-The infra thread is confirming how resume-tailor and hemline already call the CLI on horizon; the adapter should match that pattern where it differs from the above.
+- **Reading the result.** Parse stdout as JSON; the answer is `structured_output`, and its absence is a failed run. Usage is logged from input, cache and output token counts. `is_error`, or a result matching usage limit, rate limit, 429 or overloaded, raises `UsageLimitError` and defers the run (see [Usage budget](#usage-budget)). Only dropped connections retry, at 5, 15, 30 and 60 seconds.
+- **One desk at a time.** A single lock serialises desk runs, so a busy night never fans out into parallel usage.
 
 ## Desks
 
@@ -114,7 +116,7 @@ Decisions Joshua makes are stored against the proposal: `approved`, `dismissed`,
 
 ## Guardrails
 
-**Preflight, on every proposal** (desk-written fields are above; Preflight adds the result, tax impact, profile version and status):
+**Preflight checks the agents rely on.** Preflight is engine code owned by `docs/statistics.md` and rendered by `docs/design.md`; the runner calls it and never re-implements it. Desk-written fields are above; Preflight adds the result, tax impact, profile version and status. The agents side needs at least these checks:
 
 | Check | Effect |
 |---|---|
@@ -129,8 +131,8 @@ A blocked proposal still appears, labelled with its cost, because the decision i
 
 **Containment:**
 
-- The agents container mounts only its run folder and its Claude config volume. It has no access to the Firestore service-account key, the SQLite file, market-data keys or Porkbun keys.
-- No shell, no file writes, no MCP servers in Phases 2 and 3. A later read-only `desk-data` MCP server (SELECT on whitelisted views) is optional, in Phase 4 at the earliest.
+- Desks have no file, shell or MCP tools, so they cannot reach the Firestore service-account key, `mirror.db`, `desk.db`, market-data keys or Porkbun keys even though the cron service can. Only the runner, which is plain Python, reads data and writes decision records.
+- No MCP servers before Phase 10. A read-only `desk-data` MCP server (SELECT on whitelisted views) is optional there.
 - Web pages are untrusted data. An injected instruction can at worst bias a memo's text, because the agent has nothing to act with. The Skeptic never sees web text, the runner drops any URL not listed in `sources`, and the UI renders agent text as plain text.
 - Agents never edit their own prompts, dials or history. Prompt changes are pull requests in this repo.
 - Kill switch: `agents.enabled: false` in `desk.yaml`, or the per-desk toggle in the UI, stops all scheduling at once.
@@ -141,13 +143,13 @@ Agent runs share the subscription's 5-hour and weekly limits with Joshua's inter
 
 - **Overnight by default.** Scheduled runs sit between 01:00 and 06:00 ET, except the plan keeper's short daily run.
 - **Priority when the budget is tight:** plan keeper, then tax desk (first in December), risk desk, research desk, scout. The scheduler skips lower-priority runs rather than squeezing them in.
-- **Metered.** Each run logs turns, tokens, the estimated cost figure and wall time. The status page shows usage per desk per week. Start with a small weekly budget and set the real one after two weeks of logs.
+- **Metered.** Each run logs turns, tokens and wall time. The status page shows usage per desk per week. Start with a small weekly budget and set the real one after two weeks of logs.
 - **Rate limits.** If a run fails on a usage or rate limit, it is marked `deferred` and retried once in the next window. No retry loops.
 - **Token health.** The `setup-token` token lasts a year. The status page shows the date it was created and warns 30 days before it expires. An authentication failure pauses every desk and shows a banner instead of failing silently each night.
 
 ## Scorecard
 
-Logged from the first proposal in Phase 2, reported from Phase 4. The method (returns, significance, calibration) is owned by `docs/statistics.md`; this section defines what the agents side must record.
+Logged from the first proposal in Phase 5, reported from Phase 10. The method (returns, significance, calibration) is owned by `docs/statistics.md`; this section defines what the agents side must record.
 
 - **Baseline:** the same dollars into the plan mix on the proposal's date, at that day's close.
 - **Scored at 30 and 90 days:** every proposal, whether approved or not, so a dismissed idea that would have worked still counts.
@@ -162,34 +164,38 @@ Agents do not have memory of their own. Each run's `history.json` carries the de
 
 ## Testing
 
-- **Fake adapter** that returns canned JSON, so the runner, rules and UI can be built and tested without using the subscription.
-- **Unit tests** for every Preflight check, on synthetic briefs only.
+- **Fake adapter** that returns canned JSON, so the runner, Preflight and UI can be built and tested without using the subscription.
+- **Unit tests** for the adapter, brief builder and scheduler, on synthetic briefs only. Preflight's own tests live with the engine.
 - **Scenario set:** about ten synthetic briefs that each tempt a desk to fail, for example a margin-funded buy, a harvest inside a wash-sale window, an over-concentrated add, and a web page with an injected instruction. Run by hand after any prompt change, because each run costs usage.
 
 ## Repo layout
 
 ```
-agents/
-  prompts/        task.md, one file per desk
+desk/agents/
+  prompts/        one system prompt per desk
   schemas/        proposal.json, brief.json
-  desks.yaml      schedule, triggers, model, effort, tools, turn and budget caps
-desk/runner/
+  desks.yaml      triggers, model, effort, tools, turn caps, priority
   adapter.py      run_agent(), Claude Code CLI implementation and the fake
-  briefs.py       builds run folders from engine output
-  preflight.py    hard rules, number check, tax impact
-  scheduler.py    windows, priority, budget, deferrals
+  briefs.py       builds each desk's prompt from engine output
+  scheduler.py    windows, priority, budget, deferrals, the run lock
   score.py        30/90-day scoring
+deploy/crontab    one line per scheduled desk (infra's cron service, America/New_York)
 desk.example.yaml
 ```
 
 ## Phases
 
+Numbering follows `ROADMAP.md`.
+
 | Phase | Agent work | Needs first |
 |---|---|---|
-| **0. Plumbing** | CLI installed in an `agents` container, token as a secret, one `claude -p` smoke test from the container | Compose app, Tailscale, secrets (infra) |
-| **2. Plan keeper and tax desk** | Adapter, fake adapter, brief builder, runner, Preflight, scheduler, proposal schema, plan keeper, tax desk, scorecard logging | Engine outputs for drift, cash, margin, lots and wash-sale windows (statistics); proposals table and decision queue (design); lot import |
-| **3. Research, risk, skeptic** | Three more desks, engine triggers, Console requests, dossiers and source library, usage status in Settings | Market-data and EDGAR fetchers; memo and source views (design) |
-| **4. Scout and scorecard** | Scout, scorecard reports, keep-or-switch-off review; optional read-only MCP server | Six months of logged proposals for the review |
+| **1. Foundation** | One `claude -p` smoke test from the cron service | Image with the pinned CLI, cron service, token env file (infra, `docs/architecture.md`) |
+| **3. Engine core and Plan** | Fake adapter and brief builder against synthetic engine output, so agent work can start alongside the engine | Engine outputs for drift, cash and pending deposits, margin debit and rate, tax lots, wash-sale windows, marginal rate (statistics) |
+| **4. Decisions and Preflight** | Proposal schema agreed with the decision records table | Decision records, queue, overrides, tickets, Preflight (statistics and design) |
+| **5. Plan keeper and tax desk** | Adapter, prompts, scheduler and run lock, crontab lines, plan keeper, tax desk, scorecard logging from the first proposal | Phase 4; the lot import |
+| **6. Research** | Research desk, Skeptic, Console requests, engine triggers, dossiers | Market-data and EDGAR fetchers; dossier and source views (design) |
+| **7. Lab risk** | Risk desk | Correlation and drawdown scenarios (statistics) |
+| **10. Scout** | Scout; keep-or-switch-off review once six months of scores exist; optional read-only MCP server | Scorecard method and reports (statistics) |
 
 ## Before you start
 
