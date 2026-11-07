@@ -6,4 +6,5 @@ JOBS = [
     ("40 0 * * *", "python -m desk.engine research"),
     ("10 2 * * 0", "python -m desk.engine lookthrough"),
     ("55 0 * * *", "python -m desk.engine lab-export"),
+    ("30 3 2 * *", "python -m desk.engine french"),
 ]

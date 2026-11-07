@@ -8,8 +8,8 @@ from pathlib import Path
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine.lab import stats
-from desk.engine.lab.data import LabData, data_path, lab_dir, ledger_path, load
+from desk.engine.lab import factors, rulebook, stats
+from desk.engine.lab.data import FRENCH_KIND, LabData, data_path, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
 from desk.engine.lab.spec import Spec, SpecError, Variant, parse, resolve, variants
 
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS strategies (
   spec_hash TEXT NOT NULL,
   parent_id TEXT,
   title TEXT,
-  status TEXT NOT NULL CHECK (status IN ('lab', 'paper', 'failed', 'inconclusive')),
+  status TEXT NOT NULL CHECK (status IN ('lab', 'paper', 'research', 'failed', 'inconclusive')),
   registered_at TEXT NOT NULL,
   model TEXT,
   written_at TEXT,
@@ -46,7 +46,7 @@ CREATE INDEX IF NOT EXISTS strategy_trials_sid ON strategy_trials (strategy_id, 
 CREATE TABLE IF NOT EXISTS lab_results (
   strategy_id TEXT NOT NULL,
   version INTEGER NOT NULL,
-  kind TEXT NOT NULL CHECK (kind IN ('experiment', 'finalize', 'rejected')),
+  kind TEXT NOT NULL CHECK (kind IN ('experiment', 'finalize', 'rejected', 'rule')),
   result_at TEXT NOT NULL,
   body TEXT NOT NULL,
   PRIMARY KEY (strategy_id, version, kind, result_at)
@@ -59,9 +59,27 @@ CREATE TABLE IF NOT EXISTS queue_done (
 """
 
 
+MIGRATE = {"strategies": "'research'", "lab_results": "'rule'"}
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    for table, marker in MIGRATE.items():
+        row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()
+        if row is None or marker in row[0]:
+            continue
+        with conn:
+            conn.execute(f"ALTER TABLE {table} RENAME TO old_{table}")
+    conn.executescript(LEDGER)
+    for table in MIGRATE:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (f"old_{table}",)).fetchone():
+            with conn:
+                conn.execute(f"INSERT INTO {table} SELECT * FROM old_{table}")
+                conn.execute(f"DROP TABLE old_{table}")
+
+
 def ledger(cfg: Config) -> sqlite3.Connection:
     conn = connect(ledger_path(cfg))
-    conn.executescript(LEDGER)
+    _migrate(conn)
     return conn
 
 
@@ -129,10 +147,13 @@ def family_trials(conn, strategy_id: str) -> int:
 # ---- Walk-forward ----
 
 
-def windows(data: LabData, date_range: dict) -> dict:
-    holdout = _shift(data.end, -HOLDOUT_YEARS)
-    start = max(str(date_range.get("start") or data.calendar[0]), data.calendar[0])
-    end = min(str(date_range.get("end") or data.end), (date.fromisoformat(holdout) - timedelta(days=1)).isoformat())
+def windows(data: LabData, date_range: dict, kind: str | None = None) -> dict:
+    cal, last = data.calendar_for(kind), data.end_for(kind)
+    if not cal:
+        raise SpecError(["there is no data for this universe yet"])
+    holdout = _shift(last, -HOLDOUT_YEARS)
+    start = max(str(date_range.get("start") or cal[0]), cal[0])
+    end = min(str(date_range.get("end") or last), (date.fromisoformat(holdout) - timedelta(days=1)).isoformat())
     span = (date.fromisoformat(end) - date.fromisoformat(start)).days / 365.25 if end > start else 0
     if span >= 4:
         train, test = 3.0, 1.0
@@ -210,7 +231,7 @@ def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: date
         if known and known["status"] != "lab":
             raise SpecError([f"{spec.id} v{spec.version} is finalized ({known['status']}); a change needs a new version"])
         grid_variants = variants(spec, request.get("grid"), int(request.get("trial_budget") or 200), int(request.get("seed") or 0))
-        win = windows(data, request.get("date_range") or {})
+        win = windows(data, request.get("date_range") or {}, spec.universe.get("kind"))
     except SpecError as e:
         return _reject(conn, raw, e.problems, now)
     if not known:
@@ -254,6 +275,7 @@ def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: date
     deploy = json.loads(chosen[-1]) if chosen else None
     favorite = json.loads(Counter(chosen).most_common(1)[0][0]) if chosen else None
     horizons = _horizons(spec, oos_days, oos_vals, oos_bench, favorite, data, win)
+    factor = factors.regress(oos_days, oos_vals, data.factors)
     body = {
         "status": "ok",
         "spec_hash": spec.hash,
@@ -266,8 +288,9 @@ def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: date
         "deflated_sharpe": round(dsr, 4) if dsr is not None else None,
         "pbo": round(pbo, 4) if pbo is not None else None,
         "deploy_params": deploy,
-        "analyses": _analyses(cfg, data, spec, request.get("analyses") or [], full, favorite, win),
-        "caveats": spec.caveats + _caveats(spec),
+        "factor_check": factor,
+        "analyses": _analyses(cfg, data, spec, request.get("analyses") or [], full, favorite, win, factor),
+        "caveats": spec.caveats + _caveats(spec, factor),
     }
     return _record(conn, spec, "experiment", body, now)
 
@@ -308,17 +331,18 @@ def _horizons(spec, oos_days, oos_vals, oos_bench, favorite, data, win) -> list[
     return out
 
 
-def _caveats(spec: Spec) -> list[str]:
-    out = [
-        "Factor check (alpha after the French factors) arrives with phase 11; until then it is not part of the verdict.",
-        "Unrealized gains at the end of a window are not taxed, and the benchmark is untaxed.",
-    ]
+def _caveats(spec: Spec, factor: dict) -> list[str]:
+    out = ["Unrealized gains at the end of a window are not taxed, and the benchmark is untaxed."]
+    if factor.get("status") != "ok":
+        out.append("The factor check could not run, so it is not part of the verdict: " + str(factor.get("note") or "no factor data."))
+    elif factor.get("label") == "factor_in_disguise":
+        out.append(f"After the factors there is no alpha; the return is {', '.join(factor['tilts'])} exposure, which a cheap factor fund also buys.")
     if spec.horizons and 3 in spec.horizons:
         out.append("A 3-year horizon is mostly noise.")
     return out
 
 
-def _analyses(cfg, data, spec, wanted, full, favorite, win) -> dict:
+def _analyses(cfg, data, spec, wanted, full, favorite, win, factor) -> dict:
     out = {}
     if "param_sensitivity" in wanted:
         table = {}
@@ -335,7 +359,7 @@ def _analyses(cfg, data, spec, wanted, full, favorite, win) -> dict:
         res = simulate(data, spec, resolve(spec, favorite), win["start"], win["end"])
         out["regime_split"] = _regimes(data, res)
     if "factor_regression" in wanted:
-        out["factor_regression"] = {"status": "not_available", "note": "French factors arrive with phase 11."}
+        out["factor_regression"] = factor
     return out
 
 
@@ -385,19 +409,22 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
         _close(conn, spec, "failed")
         return _record(conn, spec, "finalize", body, now)
     v = resolve(spec, exp["deploy_params"])
-    hold = simulate(data, spec, v, exp["windows"]["holdout_start"], data.end)
+    last = data.end_for(spec.universe.get("kind"))
+    hold = simulate(data, spec, v, exp["windows"]["holdout_start"], last)
     holdout = stats.summary(hold)
     cutoff = cutoff_for(spec.model)
     post = None
-    if cutoff < data.end:
-        res = simulate(data, spec, v, max(cutoff, exp["windows"]["start"]), data.end)
+    if cutoff < last:
+        res = simulate(data, spec, v, max(cutoff, exp["windows"]["start"]), last)
         post = stats.summary(res) if len(res.days) >= POST_CUTOFF_MIN_DAYS else {"days": len(res.days), "note": "Too short to read yet."}
     with conn:
-        _trial(conn, spec, v, f"{exp['windows']['holdout_start']}..{data.end}", "holdout", holdout, now)
+        _trial(conn, spec, v, f"{exp['windows']['holdout_start']}..{last}", "holdout", holdout, now)
     bars = _bars(spec, exp, holdout)
-    computed = [x for k, x in bars.items() if k != "factor"]
+    factor_ran = bars["factor"] is not None
+    computed = [x for k, x in bars.items() if k != "factor" or factor_ran]
     verdict = "fail" if any(x is False for x in computed) else ("pass" if computed and all(x is True for x in computed) else "inconclusive")
-    status = {"pass": "paper", "fail": "failed", "inconclusive": "inconclusive"}[verdict]
+    research = spec.universe.get("kind") == FRENCH_KIND
+    status = {"pass": "research" if research else "paper", "fail": "failed", "inconclusive": "inconclusive"}[verdict]
     _close(conn, spec, status)
     body = {
         "verdict": verdict,
@@ -406,7 +433,8 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
         "walk_forward": exp.get("walk_forward"),
         "holdout": holdout,
         "post_cutoff": {"cutoff": cutoff, **(post or {"days": 0, "note": "The data ends before the model's training cutoff."})},
-        "paper_start": data.end if verdict == "pass" else None,
+        "paper_start": last if verdict == "pass" and not research else None,
+        "factor_check": exp.get("factor_check"),
         "caveats": exp.get("caveats", []),
     }
     return _record(conn, spec, "finalize", body, now)
@@ -424,7 +452,7 @@ def _bars(spec: Spec, exp: dict, holdout: dict) -> dict:
         "excess_interval": (longest["p5_pts"] > 0) if longest else None,
         "deflated_sharpe": (exp["deflated_sharpe"] > DSR_BAR) if exp.get("deflated_sharpe") is not None else None,
         "pbo": (exp["pbo"] < PBO_BAR) if exp.get("pbo") is not None else None,
-        "factor": None,
+        "factor": factors.bar(exp.get("factor_check")),
     }
     wf_x, h_x = wf.get("excess_pts"), holdout.get("excess_vs_bench_pts")
     bars["holdout"] = None if wf_x is None or h_x is None else bool(wf_x > 0 and h_x > 0 and h_x >= wf_x / 2)
@@ -464,6 +492,8 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
                     status = run_experiment(cfg, conn, data, request, now=now)["kind"]
                 elif kind == "finalize":
                     status = finalize(cfg, conn, data, request, now=now)["kind"]
+                elif kind == "rule":
+                    status = rulebook.run(conn, data, request, now=now)["kind"]
                 else:
                     status = "unknown_request"
             with conn:

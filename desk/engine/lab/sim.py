@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from desk.engine.lab import library as features
-from desk.engine.lab.data import FUND_KINDS, LabData
+from desk.engine.lab.data import FRENCH_KIND, FUND_KINDS, LabData
 from desk.engine.lab.spec import Spec, Variant
 
 START_CASH = 10_000.0
@@ -53,6 +53,8 @@ def universe(data: LabData, spec: Spec, day: str) -> list[str]:
     u = spec.universe
     if u["kind"] == "fund_list":
         return [s for s in u["symbols"] if s in data.series]
+    if u["kind"] == FRENCH_KIND:
+        return data.french(u["set"])
     out = []
     for sym, s in data.series.items():
         if data.kinds.get(sym) in FUND_KINDS or sym in data.plan_mix:
@@ -66,7 +68,7 @@ def universe(data: LabData, spec: Spec, day: str) -> list[str]:
 
 
 def _bps(data: LabData, sym: str, i: int) -> float:
-    if data.kinds.get(sym) in FUND_KINDS or sym in data.plan_mix:
+    if data.kinds.get(sym) in (*FUND_KINDS, FRENCH_KIND) or sym in data.plan_mix:
         return FUND_BPS
     s = data.series[sym]
     vols = [v * p for v, p in zip(s.volume[max(0, i - 20) : i + 1], s.adj[max(0, i - 20) : i + 1], strict=True) if v]
@@ -166,7 +168,9 @@ def _index(data: LabData, weights: dict[str, float], cal: list[str]) -> list[flo
 
 
 def simulate(data: LabData, spec: Spec, v: Variant, start: str, end: str, *, cost_mult: float = 1.0, rate: float | None = None) -> Result:
-    cal = [d for d in data.calendar if start <= d <= end]
+    kind = spec.universe.get("kind")
+    last_day = data.end_for(kind)
+    cal = [d for d in data.calendar_for(kind) if start <= d <= end]
     if len(cal) < 2:
         return Result(cal, [START_CASH] * len(cal), [None] * len(cal), [None] * len(cal))
     rate = rate if rate is not None else float(data.settings.get("marginal_rate_pct") or DEFAULT_RATE * 100) / 100
@@ -181,7 +185,7 @@ def simulate(data: LabData, spec: Spec, v: Variant, start: str, end: str, *, cos
     for k, day in enumerate(cal):
         for sym in list(shares):
             s = data.series[sym]
-            if s.dates[-1] < day and s.dates[-1] < data.end:
+            if s.dates[-1] < day and s.dates[-1] < last_day:
                 px = s.adj[-1] * (1 - DELIST_HAIRCUT)
                 cash += _sell(lots, sym, shares.pop(sym), px, day, realized)
                 out.delisted.append(sym)
@@ -217,9 +221,14 @@ def simulate(data: LabData, spec: Spec, v: Variant, start: str, end: str, *, cos
             traded = 0.0
             pending = None
             out.rebalances += 1
-        rf = data.macro_at("DGS3MO", day)
-        if cash > 0 and rf and k:
-            cash *= 1 + rf / 100 / 252
+        if kind == FRENCH_KIND:
+            rf = data.factors.get("rf", {}).get(day)
+            if cash > 0 and rf and k:
+                cash *= 1 + rf / 100
+        else:
+            rf = data.macro_at("DGS3MO", day)
+            if cash > 0 and rf and k:
+                cash *= 1 + rf / 100 / 252
         value = cash + sum(n * (_price(data, s, day) or 0.0) for s, n in shares.items())
         last_of_year = k == len(cal) - 1 or cal[k + 1][:4] != day[:4]
         if spec.taxable and last_of_year and k < len(cal) - 1:
