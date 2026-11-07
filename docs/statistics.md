@@ -303,7 +303,7 @@ Data the lab needs for 10-year windows, sized for the box (Ryzen 5 5600GT, 6 cor
 | Factor and industry portfolios, 1926 on | Ken French library | Under 100 MB | Minutes |
 | Macro with vintages | FRED and ALFRED | Under 100 MB | Minutes |
 
-**The bottleneck is Tiingo's free tier, not the hardware**: 50 requests an hour, 1,000 a day, and 500 unique symbols a month, shared with Escape Vektor. One request returns a symbol's full history, so the desk takes about 400 new symbols a month overnight and leaves the rest for Escape Vektor. Bars are cached forever and only topped up after that. **Backfill starts in roadmap phase 3**, so the large-cap universe is ready when the lab lands in phase 9. ETF and French-portfolio strategies can run from day one of the lab.
+**The bottleneck is Tiingo's free tier, not the hardware**: 50 requests an hour, 1,000 a day, and 500 unique symbols a month, shared with Escape Vektor. One request returns a symbol's full history, so the desk takes about 400 new symbols a month overnight and leaves the rest for Escape Vektor. Bars are cached forever and only topped up after that. Caps are set by `DESK_TIINGO_HOURLY` (40), `DESK_TIINGO_DAILY` (800) and `DESK_TIINGO_MONTHLY_SYMBOLS` (400); held and benchmark symbols top up daily, universe symbols rotate every 90 days, so a 1,000-stock universe stays inside the monthly cap. **Backfill starts in roadmap phase 3**, so the large-cap universe is ready when the lab lands in phase 9. ETF and French-portfolio strategies can run from day one of the lab.
 
 Storage is Parquet files under `/data/lab/data`, read with DuckDB (free, embedded), so a backtest never loads more than its universe. Totals stay under 5 GiB, well inside the 20 GiB budget.
 

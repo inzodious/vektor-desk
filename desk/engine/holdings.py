@@ -197,7 +197,12 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
     versions = snapshot_versions(mirror)
     anchor_list, records = anchors(versions)
     series = closes(mirror)
-    prices = Prices(series)
+    priced = dict(series)
+    if desk.execute("SELECT 1 FROM sqlite_master WHERE name='price_bars'").fetchone():
+        for r in desk.execute("SELECT symbol, date, close, adj_close FROM price_bars"):
+            if r["symbol"] not in series:
+                priced.setdefault(r["symbol"], {})[r["date"]] = (r["close"], r["adj_close"])
+    prices = Prices(priced)
     activity = activity_by_date(current_rows(mirror, "activity"))
     days = build_days(anchor_list, prices, through)
     rows = holdings_rows(anchor_list, prices, activity, days)

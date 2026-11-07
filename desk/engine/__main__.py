@@ -3,10 +3,14 @@ import json
 import sys
 from datetime import UTC, datetime
 
+import requests
+
 from desk.config import Config
 from desk.db import connect
 from desk.engine import ENGINE_VERSION, schema
+from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
+from desk.engine.live import refresh_quotes
 from desk.engine.lots import import_inbox
 from desk.engine.source import open_mirror
 from desk.runlock import BUSY, Busy, job_lock
@@ -35,21 +39,40 @@ def run_holdings(cfg: Config) -> dict:
 
 
 def run_lots(cfg: Config) -> dict:
+    return _with_desk(cfg, "lots", lambda desk: import_inbox(cfg, desk))
+
+
+def http_session() -> requests.Session:
+    s = requests.Session()
+    s.headers["User-Agent"] = "vektor-desk/" + ENGINE_VERSION
+    return s
+
+
+def _with_desk(cfg: Config, job: str, fn) -> dict:
     desk = connect(cfg.desk_db)
     try:
         schema.apply(desk)
-        result = import_inbox(cfg, desk)
+        started = now_iso()
+        result = fn(desk)
         with desk:
             desk.execute(
-                "INSERT INTO engine_runs (job, started_at, finished_at, ok, detail, engine_version) VALUES ('lots', ?, ?, ?, ?, ?)",
-                (now_iso(), now_iso(), int(result["ok"]), json.dumps(result), ENGINE_VERSION),
+                "INSERT INTO engine_runs (job, started_at, finished_at, ok, detail, engine_version) VALUES (?, ?, ?, ?, ?, ?)",
+                (job, started, now_iso(), int(bool(result.get("ok"))), json.dumps(result), ENGINE_VERSION),
             )
         return result
     finally:
         desk.close()
 
 
-JOBS = {"holdings": run_holdings, "lots": run_lots}
+def run_quotes(cfg: Config, http=None, force: bool = False) -> dict:
+    return _with_desk(cfg, "quotes", lambda desk: refresh_quotes(desk, http or http_session(), force=force))
+
+
+def run_market_backfill(cfg: Config, http=None) -> dict:
+    return _with_desk(cfg, "backfill", lambda desk: run_backfill(desk, http or http_session()))
+
+
+JOBS = {"holdings": run_holdings, "lots": run_lots, "quotes": run_quotes, "backfill": run_market_backfill}
 
 
 def main(argv: list[str] | None = None) -> int:
