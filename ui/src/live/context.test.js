@@ -12,7 +12,8 @@ describe('live grouping', () => {
     expect(ftec.accounts).toHaveLength(2);
     expect(ftec.value).toBeCloseTo(live.rows.filter((r) => r.symbol === 'FTEC').reduce((a, r) => a + r.value, 0));
     expect(symbols.some((s) => s.symbol === 'SPAXX')).toBe(false);
-    expect(cash).toBeCloseTo(203.5);
+    expect(cash).toBeCloseTo(live.rows.filter((r) => r.source === 'cash').reduce((a, r) => a + r.value, 0));
+    expect(cash).toBeGreaterThan(0);
     expect(symbols[0].value).toBeGreaterThanOrEqual(symbols[1].value);
   });
 

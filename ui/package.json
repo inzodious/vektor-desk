@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "fixtures": "node scripts/fixtures.mjs",
     "screens": "node scripts/screens.mjs"
   },
   "dependencies": {

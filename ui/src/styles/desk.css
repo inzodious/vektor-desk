@@ -476,3 +476,40 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 }
 .kpi .spark svg { display: block; width: 100%; height: 26px; }
 .board .tag-nav { white-space: nowrap; }
+
+/* ---------- phase 3: kpi row, gauges, drift ---------- */
+.kpis.kpis-7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.kpis.kpis-7 .kpi .v { font-size: 22px; }
+.kpis.kpis-6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.kpis.kpis-6 .kpi .v { font-size: 24px; }
+.chip-btn { cursor: pointer; font: inherit; font-size: 11.5px; font-weight: 700; }
+.chip-btn:hover { filter: brightness(.96); }
+.gauge-note { color: var(--ink-3); font-size: 11px; }
+.instrument-line { display: flex; gap: 8px; align-items: center; font-size: 12.5px; margin-top: 10px; }
+.instrument-line svg { width: 16px; height: 16px; flex: none; color: var(--teal-ink); }
+.chart .ref-lbl { paint-order: stroke; stroke: var(--card); stroke-width: 5px; stroke-linejoin: round; }
+.drift { display: grid; gap: 2px; }
+.drift-row { display: grid; grid-template-columns: 80px minmax(0, 1fr) 74px; gap: 12px; align-items: center; width: 100%; padding: 8px 4px; border: 0; background: none; border-radius: 10px; cursor: pointer; text-align: left; font: inherit; color: inherit; }
+.drift-row:hover { background: var(--track); }
+.drift-name { font-weight: 800; color: var(--ink); font-size: 13px; white-space: nowrap; }
+.drift-track { position: relative; height: 22px; }
+.drift-line { position: absolute; left: 0; right: 0; top: 10px; height: 2px; background: var(--track); border-radius: 2px; }
+.drift-band { position: absolute; top: 5px; height: 12px; border-radius: 6px; background: var(--teal-soft); border: 1px solid color-mix(in srgb, var(--teal) 45%, transparent); }
+.drift-target { position: absolute; top: 1px; width: 2px; height: 20px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.drift-dot { position: absolute; top: 4px; width: 14px; height: 14px; border-radius: 50%; background: var(--teal); border: 2px solid var(--card); box-shadow: 0 0 0 1.5px var(--teal-ink); }
+.drift-row.over .drift-dot { background: var(--mustard); box-shadow: 0 0 0 1.5px var(--mustard-ink); }
+.drift-num { text-align: right; font-weight: 800; color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; }
+.drift-num small { display: block; font-weight: 700; font-size: 11px; color: var(--ink-3); }
+.drift-row.over .drift-num small { color: var(--watch); }
+.drift-legend { margin: 8px 0 0 4px; }
+.legend i.band { width: 18px; height: 10px; border-radius: 5px; background: var(--teal-soft); border: 1px solid var(--teal); }
+@media (max-width: 1500px) {
+  .kpis.kpis-7 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .kpis.kpis-7 > :last-child { grid-column: span 2; }
+  .kpis.kpis-6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .kpis.kpis-7, .kpis.kpis-6 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis.kpis-7 > :last-child { grid-column: span 2; }
+  .drift-row { grid-template-columns: 64px minmax(0, 1fr) 64px; gap: 8px; }
+}
