@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
+from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
 from desk.engine import ENGINE_VERSION
 from desk.engine.flows import classify, income
@@ -14,6 +15,7 @@ from desk.engine.lots import current_lots
 from desk.engine.returns import WINDOWS, annualize, base_index, daily_returns, drawdowns, period_mwr, twr_index, volatility
 from desk.engine.shadows import TotalReturn, deposit_split, shadow
 from desk.engine.source import closes, current_rows
+from desk.engine.tax import held_long, realized, wash_windows
 
 UNITS = {"usd": 2, "pct": 4, "pts": 2, "ratio": 4, "days": 0, "count": 0}
 SP500 = ("SPY", "FXAIX", "VOO", "IVV")
@@ -32,6 +34,7 @@ class Out:
     metrics: list[tuple] = field(default_factory=list)
     series: list[tuple] = field(default_factory=list)
     health: list[tuple] = field(default_factory=list)
+    wash: list[tuple] | None = None
 
     def m(
         self,
@@ -59,7 +62,7 @@ class Out:
         self.health.append((self.as_of, check, status, detail))
 
 
-def _env_float(name: str) -> float | None:
+def env_float(name: str) -> float | None:
     raw = os.environ.get(name, "").strip()
     try:
         return float(raw) if raw else None
@@ -215,6 +218,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _margin_metrics(out, now_rows, total)
     _risk_metrics(out, now_rows, total, index, days, values, flows_on, q_now)
     _cost_metrics(out, plan, now_rows, total)
+    _tax_metrics(out, cfg, desk, activity, now_rows, now)
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:
         out.m("cash.pending_days", (date.fromisoformat(when) - date.fromisoformat(as_of)).days, "days", quality="modelled")
@@ -301,7 +305,7 @@ def _shadow_metrics(out: Out, days, values, flows_on, targets, tr):
             )
 
 
-def _symbol_weights(rows, total) -> dict[str, float]:
+def symbol_weights(rows, total) -> dict[str, float]:
     w = defaultdict(float)
     for h in rows:
         if not h["is_cash"] and total:
@@ -310,7 +314,7 @@ def _symbol_weights(rows, total) -> dict[str, float]:
 
 
 def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, days, activity, q, amount):
-    weights = _symbol_weights(rows, total)
+    weights = symbol_weights(rows, total)
     if targets:
         drifts = {}
         for s, t in sorted(targets.items()):
@@ -370,8 +374,8 @@ def _rule_ok(rule, weights, singles, targets, debit, holdings, days, activity, k
 
 
 def _margin_metrics(out: Out, rows, total):
-    rate = _env_float("DESK_MARGIN_RATE_PCT")
-    maint = _env_float("DESK_MARGIN_MAINT_PCT") or 30.0
+    rate = env_float("DESK_MARGIN_RATE_PCT")
+    maint = env_float("DESK_MARGIN_MAINT_PCT") or 30.0
     by_acct = defaultdict(lambda: {"debit": 0.0, "value": 0.0})
     for h in rows:
         a = by_acct[h["account"]]
@@ -394,7 +398,7 @@ def _margin_metrics(out: Out, rows, total):
 
 
 def _risk_metrics(out: Out, rows, total, index, days, values, flows_on, q):
-    w = sorted(_symbol_weights(rows, total).values(), reverse=True)
+    w = sorted(symbol_weights(rows, total).values(), reverse=True)
     invested = sum(w)
     out.m("risk.top1", w[0] if w else 0.0, "pct", quality=q)
     out.m("risk.top5", sum(w[:5]), "pct", quality=q)
@@ -428,6 +432,56 @@ def _cost_metrics(out: Out, plan, rows, total):
     q = "ok" if len(known) == len(invested) else "pro_forma"
     out.m("cost.expense", usd / base * 100, "pct", quality=q)
     out.m("cost.expense_usd", usd, "usd", window="1Y", quality=q)
+
+
+# ---- Tax ----
+
+
+def _tax_metrics(out: Out, cfg: Config, desk, activity, rows, now: datetime):
+    as_of = out.as_of
+    files = {r["kind"] for r in desk.execute("SELECT DISTINCT kind FROM lot_files")}
+    r = realized(desk, int(as_of[:4]))
+    rq = "ok" if "realized" in files else "insufficient_history"
+    for metric_id, key in (("tax.realized_st", "st"), ("tax.realized_lt", "lt"), ("tax.wash_disallowed", "wash_disallowed")):
+        out.m(metric_id, r[key] if "realized" in files else None, "usd", window="YTD", n_obs=r["rows"], quality=rq)
+    lots = current_lots(desk) if "lots" in files else []
+    prices = {h["symbol"]: h["close"] for h in rows if not h["is_cash"] and h["close"]}
+    st = lt = 0.0
+    losses: dict[tuple[str, str], float] = defaultdict(float)
+    for lot in lots:
+        price = prices.get(lot["symbol"])
+        if price is None or lot["cost"] is None:
+            continue
+        gain = lot["shares"] * price - lot["cost"]
+        if held_long(lot["acquired"], as_of):
+            lt += gain
+        else:
+            st += gain
+        if gain < 0:
+            losses[(lot["account"], lot["symbol"])] += gain
+    lq = "ok" if lots else "insufficient_history"
+    out.m("tax.unrealized_st", st if lots else None, "usd", quality=lq)
+    out.m("tax.unrealized_lt", lt if lots else None, "usd", quality=lq)
+    realized_rows = [dict(x) for x in desk.execute("SELECT * FROM realized_lots")]
+    today = max(as_of, now.date().isoformat())
+    windows = wash_windows(activity, realized_rows, lots, today)
+    out.wash = [(as_of, w["symbol"], w["kind"], w["date"], w["clears"], w["account"], w["amount"]) for w in windows]
+    clears: dict[str, str] = {}
+    for w in windows:
+        clears[w["symbol"]] = max(clears.get(w["symbol"], ""), w["clears"])
+    for sym, day in sorted(clears.items()):
+        out.m("tax.wash_window", (date.fromisoformat(day) - date.fromisoformat(today)).days, "days", scope="holding", scope_id=sym)
+    try:
+        threshold = float(active_profile(cfg).get("tax", "harvest_threshold_usd", default=250) or 250)
+    except PROFILE_ERRORS:
+        threshold = 250.0
+    bought = {w["symbol"] for w in windows if w["kind"] == "recent_buy"}
+    total = 0.0
+    for (_, sym), loss in sorted(losses.items()):
+        if -loss >= threshold and sym not in bought:
+            total += -loss
+            out.m("tax.harvestable", -loss, "usd", scope="holding", scope_id=sym, quality=lq)
+    out.m("tax.harvestable", total if lots else None, "usd", quality=lq)
 
 
 # ---- Data health ----
@@ -493,5 +547,8 @@ def store(desk: sqlite3.Connection, out: Out) -> dict:
         desk.executemany("INSERT OR REPLACE INTO series_daily VALUES (?, ?, ?, ?, ?, ?)", out.series)
         desk.execute("DELETE FROM data_health WHERE as_of=?", (out.as_of,))
         desk.executemany("INSERT INTO data_health VALUES (?, ?, ?, ?)", out.health)
+        if out.wash is not None:
+            desk.execute("DELETE FROM wash_windows")
+            desk.executemany("INSERT OR REPLACE INTO wash_windows VALUES (?, ?, ?, ?, ?, ?, ?)", out.wash)
     worst = "fail" if any(h[2] == "fail" for h in out.health) else ("warn" if any(h[2] == "warn" for h in out.health) else "ok")
     return {"as_of": out.as_of, "metrics": len(out.metrics), "series": len(out.series), "health": worst, "checks": {h[1]: h[2] for h in out.health}}

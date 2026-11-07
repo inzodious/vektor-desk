@@ -4,12 +4,19 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.2.0 - 2026-11-07
+
+Bridge and Symbol sheet are live on demo data, the engine core behind phase 3 is in, and phone alerts are wired through every package.
+
 ### Added
 
+- Bridge with the departures board, Symbol sheet, KPI tiles with drill drawers, a value chart with table view, and a market clock that follows the live feed ([#33])
+- Engine core: flows, TWR and XIRR, plan and S&P 500 shadow portfolios, drift and rule checks, margin cost and call distance, concentration, drawdown and costs, with data health and `/api/engine/metrics`, `/series`, `/health`, `/prices` and `/api/live/intraday` ([#30])
 - Phone alerts through a self-hosted ntfy server on the desk node: `desk.notify.publish()` for every package, alerts, research and ops topics, daily stale-mirror and token-renewal checks, and deploy and backup failure alerts ([#26])
 - Decisions: phone alerts for new desk proposals, late deposits, trades without a decision record and wash-sale windows clearing, with an `alerts.min_priority` dial ([#27])
 - Agents: phone alerts when a Console answer or research dossier is ready and when a desk run fails ([#28])
 - One-time setup checklist ([docs/setup.md](docs/setup.md)) and `scripts/check.sh`, which runs every local check a PR needs; auto-deploy alerts the phone when a deploy needs a hand step ([#29])
+- Compose check runs off the box ([#32])
 
 ## 0.1.0 - 2026-11-07
 
@@ -64,3 +71,6 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#27]: https://github.com/inzodious/vektor-desk/pull/27
 [#28]: https://github.com/inzodious/vektor-desk/pull/28
 [#29]: https://github.com/inzodious/vektor-desk/pull/29
+[#30]: https://github.com/inzodious/vektor-desk/pull/30
+[#32]: https://github.com/inzodious/vektor-desk/pull/32
+[#33]: https://github.com/inzodious/vektor-desk/pull/33

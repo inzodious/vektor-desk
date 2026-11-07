@@ -10,7 +10,7 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 |---|---|---|---|---|
 | 0 | Planning docs | | ✅ | |
 | 1 | Foundation | 1 | 🚧 (code done, box setup pending) | 0 |
-| 2 | Bridge and Symbol sheet | 1 | 🚧 | 1 |
+| 2 | Bridge and Symbol sheet | 1 | ✅ | 1 |
 | 3 | Engine core and Plan | 1 | 🚧 | 2 |
 | 4 | Decisions and Preflight | 1 | 🚧 | 3 |
 | 5 | Plan keeper and tax desk | 1 | 🚧 | 4 |
@@ -57,23 +57,23 @@ Done when all six are merged and agree with each other.
 
 Done when a phone on Tailscale opens the desk and sees the mirror's last run. **Code complete (0.1.0); waiting on Joshua's one-time setup** in `docs/architecture.md`, which also gives the first real `claude -p` smoke run.
 
-### 2. Bridge and Symbol sheet 🚧
+### 2. Bridge and Symbol sheet ✅
 
 - [x] Live price feed during market hours, last close outside them (live quotes table, `/api/live`) ([#19])
-- [ ] Bridge: departures-board holdings strip, KPI tiles, market clock states
-- [ ] Symbol sheet from any symbol chip: price, position across accounts, cost basis, lots
-- [ ] Line and spark charts (hand-rolled SVG, no chart library)
+- [x] Bridge: departures-board holdings strip, KPI tiles, market clock states ([#33])
+- [x] Symbol sheet from any symbol chip: price, position across accounts, cost basis, lots ([#33])
+- [x] Line and spark charts (hand-rolled SVG, no chart library) ([#33])
 - [x] Fidelity lot export parser and lots table (Dec 6 risk) ([#16])
 
 ### 3. Engine core and Plan 🚧
 
-- [ ] Engine (Python): flow classifier, reconciliation and `data_health`, value and flows, TWR and XIRR
-- [ ] Shadow portfolios: plan mix and S&P 500
-- [ ] Drift and rules, margin (interest in dollars, price drop to a call), costs, basic concentration and drawdown
-- [ ] Output contract v1
+- [x] Engine (Python): flow classifier, reconciliation and `data_health`, value and flows, TWR and XIRR ([#30])
+- [x] Shadow portfolios: plan mix and S&P 500 ([#30])
+- [x] Drift and rules, margin (interest in dollars, price drop to a call), costs, basic concentration and drawdown ([#30])
+- [x] Output contract v1 ([#30])
 - [x] Background backfill for the Strategy lab starts here: Tiingo prices at about 400 new symbols a month under the free cap shared with Escape Vektor (ETFs first, then large caps including delisted ones), SEC bulk financial statement and insider data in one import ([#19])
 - [ ] Bridge KPI row complete, drift bullets, gauges
-- [ ] Plan page: target mix and bands, drift, rules (versioned), deposit routing (rules [#12] and deposit schedule [#22] done; page and drift math to come)
+- [ ] Plan page: target mix and bands, drift, rules (versioned), deposit routing (rules [#12], deposit schedule [#22] and drift math [#30] done; page to come)
 
 ### 4. Decisions and Preflight 🚧
 
@@ -113,7 +113,7 @@ Tier 1 complete: 0.5.0.
 
 ### 8. Phone alerts 📋
 
-- [ ] Self-hosted ntfy on the box, relaying through ntfy.sh for phone delivery: rule breach, trigger hit, wash-sale window, stale mirror, research ready
+- [ ] Self-hosted ntfy on the box, relaying through ntfy.sh for phone delivery: rule breach, trigger hit, wash-sale window, stale mirror, research ready (server, stale mirror, proposals, wash-sale and research alerts [#26], [#27], [#28]; trigger-hit alerts to come)
 
 ### 9. Strategy lab 📋
 
@@ -180,3 +180,8 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#21]: https://github.com/inzodious/vektor-desk/pull/21
 [#22]: https://github.com/inzodious/vektor-desk/pull/22
 [#23]: https://github.com/inzodious/vektor-desk/pull/23
+[#26]: https://github.com/inzodious/vektor-desk/pull/26
+[#27]: https://github.com/inzodious/vektor-desk/pull/27
+[#28]: https://github.com/inzodious/vektor-desk/pull/28
+[#30]: https://github.com/inzodious/vektor-desk/pull/30
+[#33]: https://github.com/inzodious/vektor-desk/pull/33
