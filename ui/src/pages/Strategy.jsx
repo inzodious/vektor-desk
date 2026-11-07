@@ -249,8 +249,10 @@ function VerdictCard({ final, windows }) {
         </>
       ) : null}
       {final.post_cutoff ? (
-        <p className="empty-hint" style={{ marginTop: 8 }}>
-          After the model&apos;s training cutoff ({dayOf(final.post_cutoff.cutoff)}): {final.post_cutoff.days ? `${final.post_cutoff.days} days tested.` : final.post_cutoff.note || 'no days yet.'}
+        <p className="empty-hint" style={{ marginTop: 8 }} data-testid="post-cutoff">
+          {final.post_cutoff.days
+            ? `${final.post_cutoff.days} days after the model's training cutoff (${dayOf(final.post_cutoff.cutoff)}) were tested. The model could not have seen those.`
+            : `The holdout ends before the model's training cutoff (${dayOf(final.post_cutoff.cutoff)}), so the model may have seen this period. Paper trading is the unseen test.`}
         </p>
       ) : null}
     </div>

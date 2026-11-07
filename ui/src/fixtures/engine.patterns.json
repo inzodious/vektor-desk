@@ -1,0 +1,781 @@
+{
+ "as_of": "2026-11-06",
+ "market": [
+  {
+   "id": "pat.mkt_drawdown",
+   "scope_id": "FXAIX",
+   "label": "S&P 500 drawdown from its high",
+   "value": -19.4259,
+   "unit": "pct",
+   "bucket": "-10 to -20%",
+   "followed_by": "higher 12 months later",
+   "n": 0,
+   "base_rate": null,
+   "ci_low": null,
+   "ci_high": null,
+   "forward_mean_pct": null,
+   "what_it_is_not": "Not a forecast for this drawdown; past ones of a similar depth, many overlapping."
+  },
+  {
+   "id": "pat.vix_pctl",
+   "scope_id": "VIXCLS",
+   "label": "VIX percentile over 10 years",
+   "value": 56.2264,
+   "unit": "pct",
+   "bucket": "quintile 3 of 5",
+   "followed_by": "higher 12 months later",
+   "n": 0,
+   "base_rate": null,
+   "ci_low": null,
+   "ci_high": null,
+   "forward_mean_pct": null,
+   "what_it_is_not": "Not a timing signal; high fear has come before both rallies and further falls."
+  },
+  {
+   "id": "pat.hy_pctl",
+   "scope_id": "BAMLH0A0HYM2",
+   "label": "High-yield spread percentile over 10 years",
+   "value": 48.6792,
+   "unit": "pct",
+   "bucket": "quintile 3 of 5",
+   "followed_by": "higher 12 months later",
+   "n": 0,
+   "base_rate": null,
+   "ci_low": null,
+   "ci_high": null,
+   "forward_mean_pct": null,
+   "what_it_is_not": "Not a timing signal; spreads describe stress, they do not schedule it."
+  },
+  {
+   "id": "pat.curve_10y3m",
+   "scope_id": "curve",
+   "label": "10-year minus 3-month yield",
+   "value": -0.12,
+   "unit": "pts",
+   "bucket": "inverted",
+   "followed_by": "higher 12 months later",
+   "n": 0,
+   "base_rate": null,
+   "ci_low": null,
+   "ci_high": null,
+   "forward_mean_pct": null,
+   "what_it_is_not": "Not a recession call; the gap between inversion and anything happening has ranged from months to years."
+  }
+ ],
+ "holdings": {
+  "ACME": [
+   {
+    "id": "pat.range_52w",
+    "scope_id": "ACME",
+    "label": "Position in the 52-week range",
+    "value": 0.6682,
+    "unit": "pct",
+    "bucket": "quintile 1 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 3,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": 28.1282,
+    "what_it_is_not": "Not a buy or sell level; where this holding sat in its own range before."
+   },
+   {
+    "id": "pat.ma200_gap",
+    "scope_id": "ACME",
+    "label": "Distance from the 200-day average",
+    "value": -35.0092,
+    "unit": "pct",
+    "bucket": "below -10%",
+    "followed_by": "higher 3 months later",
+    "n": 3,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": 12.3633,
+    "what_it_is_not": "Not a chart signal; a description of how stretched the price is."
+   },
+   {
+    "id": "pat.vol_pctl",
+    "scope_id": "ACME",
+    "label": "Realized volatility percentile over 5 years",
+    "value": 71.4286,
+    "unit": "pct",
+    "bucket": "quintile 4 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a risk forecast; today's choppiness against this holding's own past."
+   },
+   {
+    "id": "pat.earnings_move",
+    "scope_id": "ACME",
+    "label": "Average move on the last 2 earnings",
+    "value": 3.2759,
+    "unit": "pct",
+    "bucket": null,
+    "followed_by": null,
+    "n": 2,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a prediction of the next report; the typical size of past moves."
+   }
+  ],
+  "BND": [
+   {
+    "id": "pat.range_52w",
+    "scope_id": "BND",
+    "label": "Position in the 52-week range",
+    "value": 66.2651,
+    "unit": "pct",
+    "bucket": "quintile 4 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 2,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": 1.6284,
+    "what_it_is_not": "Not a buy or sell level; where this holding sat in its own range before."
+   },
+   {
+    "id": "pat.ma200_gap",
+    "scope_id": "BND",
+    "label": "Distance from the 200-day average",
+    "value": 0.2995,
+    "unit": "pct",
+    "bucket": "0 to 10%",
+    "followed_by": "higher 3 months later",
+    "n": 10,
+    "base_rate": 0.8,
+    "ci_low": 0.5408,
+    "ci_high": 0.9314,
+    "forward_mean_pct": 1.2356,
+    "what_it_is_not": "Not a chart signal; a description of how stretched the price is."
+   },
+   {
+    "id": "pat.vol_pctl",
+    "scope_id": "BND",
+    "label": "Realized volatility percentile over 5 years",
+    "value": 33.3333,
+    "unit": "pct",
+    "bucket": "quintile 2 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a risk forecast; today's choppiness against this holding's own past."
+   }
+  ],
+  "FTEC": [
+   {
+    "id": "pat.range_52w",
+    "scope_id": "FTEC",
+    "label": "Position in the 52-week range",
+    "value": 24.1204,
+    "unit": "pct",
+    "bucket": "quintile 2 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a buy or sell level; where this holding sat in its own range before."
+   },
+   {
+    "id": "pat.ma200_gap",
+    "scope_id": "FTEC",
+    "label": "Distance from the 200-day average",
+    "value": -6.7025,
+    "unit": "pct",
+    "bucket": "-10 to 0%",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a chart signal; a description of how stretched the price is."
+   },
+   {
+    "id": "pat.vol_pctl",
+    "scope_id": "FTEC",
+    "label": "Realized volatility percentile over 5 years",
+    "value": 95.2381,
+    "unit": "pct",
+    "bucket": "quintile 5 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a risk forecast; today's choppiness against this holding's own past."
+   }
+  ],
+  "FXAIX": [
+   {
+    "id": "pat.range_52w",
+    "scope_id": "FXAIX",
+    "label": "Position in the 52-week range",
+    "value": 31.3502,
+    "unit": "pct",
+    "bucket": "quintile 2 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a buy or sell level; where this holding sat in its own range before."
+   },
+   {
+    "id": "pat.ma200_gap",
+    "scope_id": "FXAIX",
+    "label": "Distance from the 200-day average",
+    "value": -7.63,
+    "unit": "pct",
+    "bucket": "-10 to 0%",
+    "followed_by": "higher 3 months later",
+    "n": 1,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": 15.208,
+    "what_it_is_not": "Not a chart signal; a description of how stretched the price is."
+   },
+   {
+    "id": "pat.vol_pctl",
+    "scope_id": "FXAIX",
+    "label": "Realized volatility percentile over 5 years",
+    "value": 4.7619,
+    "unit": "pct",
+    "bucket": "quintile 1 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a risk forecast; today's choppiness against this holding's own past."
+   }
+  ],
+  "NOVA": [],
+  "VXUS": [
+   {
+    "id": "pat.range_52w",
+    "scope_id": "VXUS",
+    "label": "Position in the 52-week range",
+    "value": 4.2831,
+    "unit": "pct",
+    "bucket": "quintile 1 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a buy or sell level; where this holding sat in its own range before."
+   },
+   {
+    "id": "pat.ma200_gap",
+    "scope_id": "VXUS",
+    "label": "Distance from the 200-day average",
+    "value": -11.6924,
+    "unit": "pct",
+    "bucket": "below -10%",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a chart signal; a description of how stretched the price is."
+   },
+   {
+    "id": "pat.vol_pctl",
+    "scope_id": "VXUS",
+    "label": "Realized volatility percentile over 5 years",
+    "value": 42.8571,
+    "unit": "pct",
+    "bucket": "quintile 3 of 5",
+    "followed_by": "higher 3 months later",
+    "n": 0,
+    "base_rate": null,
+    "ci_low": null,
+    "ci_high": null,
+    "forward_mean_pct": null,
+    "what_it_is_not": "Not a risk forecast; today's choppiness against this holding's own past."
+   }
+  ]
+ },
+ "drawdowns": [
+  {
+   "symbol": "FXAIX",
+   "drawdown_pct": -19.43,
+   "threshold_pct": -19.43,
+   "episodes": 0,
+   "median_days_to_recover": null,
+   "longest_days_to_recover": null,
+   "deepest_pct": null,
+   "open": true,
+   "since": "2024-11-07",
+   "note": "Trading days from the old high back to it, for past drawdowns at least this deep. A base-rate table, not a call on this one."
+  },
+  {
+   "symbol": "BND",
+   "drawdown_pct": -2.47,
+   "threshold_pct": -5,
+   "episodes": 0,
+   "median_days_to_recover": null,
+   "longest_days_to_recover": null,
+   "deepest_pct": null,
+   "open": true,
+   "since": "2024-11-07",
+   "note": "Trading days from the old high back to it, for past drawdowns at least this deep. A base-rate table, not a call on this one."
+  },
+  {
+   "symbol": "FTEC",
+   "drawdown_pct": -15.62,
+   "threshold_pct": -15.62,
+   "episodes": 0,
+   "median_days_to_recover": null,
+   "longest_days_to_recover": null,
+   "deepest_pct": null,
+   "open": true,
+   "since": "2024-11-07",
+   "note": "Trading days from the old high back to it, for past drawdowns at least this deep. A base-rate table, not a call on this one."
+  },
+  {
+   "symbol": "FXAIX",
+   "drawdown_pct": -19.43,
+   "threshold_pct": -19.43,
+   "episodes": 0,
+   "median_days_to_recover": null,
+   "longest_days_to_recover": null,
+   "deepest_pct": null,
+   "open": true,
+   "since": "2024-11-07",
+   "note": "Trading days from the old high back to it, for past drawdowns at least this deep. A base-rate table, not a call on this one."
+  },
+  {
+   "symbol": "VXUS",
+   "drawdown_pct": -24.62,
+   "threshold_pct": -24.62,
+   "episodes": 0,
+   "median_days_to_recover": null,
+   "longest_days_to_recover": null,
+   "deepest_pct": null,
+   "open": true,
+   "since": "2024-11-07",
+   "note": "Trading days from the old high back to it, for past drawdowns at least this deep. A base-rate table, not a call on this one."
+  }
+ ],
+ "seasonality": {
+  "ACME": [
+   {
+    "month": 1,
+    "mean_pct": -23.8486,
+    "n": 2,
+    "share_up": 0
+   },
+   {
+    "month": 2,
+    "mean_pct": 4.0661,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 3,
+    "mean_pct": -9.0354,
+    "n": 2,
+    "share_up": 0
+   },
+   {
+    "month": 4,
+    "mean_pct": -6.5259,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 5,
+    "mean_pct": 4.4361,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 6,
+    "mean_pct": 1.2936,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 7,
+    "mean_pct": 8.9587,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 8,
+    "mean_pct": -18.3841,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 9,
+    "mean_pct": -13.6048,
+    "n": 2,
+    "share_up": 0
+   },
+   {
+    "month": 10,
+    "mean_pct": 15.3488,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 11,
+    "mean_pct": -2.0319,
+    "n": 1,
+    "share_up": 0
+   },
+   {
+    "month": 12,
+    "mean_pct": -14.1295,
+    "n": 2,
+    "share_up": 0
+   }
+  ],
+  "BND": [
+   {
+    "month": 1,
+    "mean_pct": 0.2454,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 2,
+    "mean_pct": 0.9766,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 3,
+    "mean_pct": 0.7867,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 4,
+    "mean_pct": -0.7705,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 5,
+    "mean_pct": -1.1203,
+    "n": 2,
+    "share_up": 0
+   },
+   {
+    "month": 6,
+    "mean_pct": 1.4737,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 7,
+    "mean_pct": -0.754,
+    "n": 2,
+    "share_up": 0
+   },
+   {
+    "month": 8,
+    "mean_pct": 0.7886,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 9,
+    "mean_pct": -0.351,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 10,
+    "mean_pct": 0.6812,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 11,
+    "mean_pct": 4.1253,
+    "n": 1,
+    "share_up": 1
+   },
+   {
+    "month": 12,
+    "mean_pct": 0.7211,
+    "n": 2,
+    "share_up": 1
+   }
+  ],
+  "FTEC": [
+   {
+    "month": 1,
+    "mean_pct": -1.3358,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 2,
+    "mean_pct": 1.344,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 3,
+    "mean_pct": 1.5796,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 4,
+    "mean_pct": 4.2963,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 5,
+    "mean_pct": 1.533,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 6,
+    "mean_pct": 2.9189,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 7,
+    "mean_pct": -7.7136,
+    "n": 2,
+    "share_up": 0
+   },
+   {
+    "month": 8,
+    "mean_pct": 3.732,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 9,
+    "mean_pct": 0.4639,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 10,
+    "mean_pct": 3.7087,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 11,
+    "mean_pct": 14.0553,
+    "n": 1,
+    "share_up": 1
+   },
+   {
+    "month": 12,
+    "mean_pct": 9.6139,
+    "n": 2,
+    "share_up": 1
+   }
+  ],
+  "FXAIX": [
+   {
+    "month": 1,
+    "mean_pct": 3.8004,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 2,
+    "mean_pct": 1.1629,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 3,
+    "mean_pct": 2.1018,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 4,
+    "mean_pct": 2.6068,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 5,
+    "mean_pct": 2.8499,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 6,
+    "mean_pct": 6.3774,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 7,
+    "mean_pct": 2.0285,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 8,
+    "mean_pct": -2.1727,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 9,
+    "mean_pct": -2.8957,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 10,
+    "mean_pct": 0.3277,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 11,
+    "mean_pct": -2.0613,
+    "n": 1,
+    "share_up": 0
+   },
+   {
+    "month": 12,
+    "mean_pct": -4.1855,
+    "n": 2,
+    "share_up": 0
+   }
+  ],
+  "NOVA": [],
+  "VXUS": [
+   {
+    "month": 1,
+    "mean_pct": 0.2131,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 2,
+    "mean_pct": 3.6949,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 3,
+    "mean_pct": 4.277,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 4,
+    "mean_pct": -2.553,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 5,
+    "mean_pct": 4.2413,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 6,
+    "mean_pct": 2.3517,
+    "n": 2,
+    "share_up": 1
+   },
+   {
+    "month": 7,
+    "mean_pct": -1.0556,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 8,
+    "mean_pct": -2.5941,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 9,
+    "mean_pct": -2.3233,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 10,
+    "mean_pct": -0.4362,
+    "n": 2,
+    "share_up": 0.5
+   },
+   {
+    "month": 11,
+    "mean_pct": 6.9091,
+    "n": 1,
+    "share_up": 1
+   },
+   {
+    "month": 12,
+    "mean_pct": -3.1408,
+    "n": 2,
+    "share_up": 0
+   }
+  ]
+ },
+ "seasonality_note": "Description, never a signal.",
+ "corr_shifts": [],
+ "behavior": {
+  "buys_by_setup": {
+   "after_rise": {
+    "n": 4,
+    "mean_usd": -63.66,
+    "total_usd": -254.63
+   },
+   "flat": {
+    "n": 2,
+    "mean_usd": -33.63,
+    "total_usd": -67.26
+   }
+  },
+  "funding": {
+   "off_schedule": {
+    "n": 6,
+    "mean_usd": -53.65,
+    "total_usd": -321.89
+   }
+  },
+  "trades_per_month": 1,
+  "single_stock_hold_days_median": null,
+  "single_stock_sales": 0,
+  "note": "Each of your buys scored against the same dollars in the plan at 90 days, grouped by what the stock did in the month before."
+ },
+ "left_out": "Day-of-week and calendar effects, chart patterns, and anything found by searching many rules on the same data."
+}
