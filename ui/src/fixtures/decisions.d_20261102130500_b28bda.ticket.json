@@ -1,0 +1,30 @@
+{
+ "stamp": "PLACED",
+ "fields": [
+  {
+   "label": "Account",
+   "value": "individual-0001"
+  },
+  {
+   "label": "Action",
+   "value": "Buy"
+  },
+  {
+   "label": "Symbol",
+   "value": "FXAIX"
+  },
+  {
+   "label": "Quantity",
+   "value": "$300.00"
+  },
+  {
+   "label": "Order type",
+   "value": "Market"
+  },
+  {
+   "label": "Time in force",
+   "value": "Day"
+  }
+ ],
+ "text": "Account: individual-0001\nAction: Buy\nSymbol: FXAIX\nQuantity: $300.00\nOrder type: Market\nTime in force: Day"
+}

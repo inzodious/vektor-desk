@@ -1,0 +1,30 @@
+{
+ "stamp": "DRAFT",
+ "fields": [
+  {
+   "label": "Account",
+   "value": "individual-0001"
+  },
+  {
+   "label": "Action",
+   "value": "Buy"
+  },
+  {
+   "label": "Symbol",
+   "value": "ACME"
+  },
+  {
+   "label": "Quantity",
+   "value": "$400.00"
+  },
+  {
+   "label": "Order type",
+   "value": "Market"
+  },
+  {
+   "label": "Time in force",
+   "value": "Day"
+  }
+ ],
+ "text": "Account: individual-0001\nAction: Buy\nSymbol: ACME\nQuantity: $400.00\nOrder type: Market\nTime in force: Day"
+}

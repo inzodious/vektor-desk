@@ -1,0 +1,30 @@
+{
+ "stamp": "DRAFT",
+ "fields": [
+  {
+   "label": "Account",
+   "value": "individual-0001"
+  },
+  {
+   "label": "Action",
+   "value": "Buy"
+  },
+  {
+   "label": "Symbol",
+   "value": "VXUS"
+  },
+  {
+   "label": "Quantity",
+   "value": "$180.00"
+  },
+  {
+   "label": "Order type",
+   "value": "Market"
+  },
+  {
+   "label": "Time in force",
+   "value": "Day"
+  }
+ ],
+ "text": "Account: individual-0001\nAction: Buy\nSymbol: VXUS\nQuantity: $180.00\nOrder type: Market\nTime in force: Day"
+}

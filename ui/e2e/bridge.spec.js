@@ -134,3 +134,22 @@ test('bridge explains a dead API', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('alert')).toContainText("The desk API didn't answer");
 });
+
+test('bridge shows the top three proposals and acts on them', async ({ page }) => {
+  let hit = null;
+  await page.route('**/api/decisions/*/dismiss', async (route) => {
+    hit = route.request().url();
+    await route.fulfill({ json: { id: 'd_x', title: 'Hold off on new BND until the rate decision', status: 'dismissed' } });
+  });
+  await page.goto('/');
+  const q = page.getByTestId('bridge-queue');
+  await expect(q.locator('.prop')).toHaveCount(3);
+  await expect(q).toContainText('1 more in the queue');
+  await expect(q.locator('.prop', { hasText: 'ACME' }).getByRole('link', { name: 'Review' })).toBeVisible();
+  await q.getByRole('button', { name: /^Dismiss Hold off/ }).click();
+  await expect(q.getByRole('status')).toContainText('Dismissed');
+  expect(hit).toMatch(/\/dismiss$/);
+  await q.locator('.prop', { hasText: 'ACME' }).getByRole('link', { name: 'Review' }).click();
+  await expect(page).toHaveURL(/\/decisions\?d=/);
+  await expect(page.getByTestId('detail').getByRole('heading', { level: 2 })).toHaveText('Buy $400 ACME');
+});

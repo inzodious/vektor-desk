@@ -92,3 +92,18 @@ for (const [scope, id] of [
 }
 
 for (const p of ['profile', 'rules', 'deposits']) save(`decisions.${p}`, await get(`/api/decisions/${p}`));
+
+// ---------- decisions ----------
+const queue = await get('/api/decisions/queue');
+save('decisions.queue', queue);
+save('decisions.queue.empty', { count: 0, snoozed: 0, to_place: 0, items: [] });
+const journal = await get('/api/decisions/journal?limit=200');
+save('decisions.journal', journal);
+save('decisions.summary', await get('/api/decisions/summary'));
+save('decisions.unmatched', await get('/api/decisions/unmatched'));
+save('decisions.calendar', await get('/api/decisions/calendar'));
+const ids = [...queue.items.map((d) => d.id), ...journal.days.flatMap((g) => g.items.map((d) => d.id))];
+for (const id of ids) {
+  save(`decisions.${id}`, await get(`/api/decisions/${id}`));
+  save(`decisions.${id}.ticket`, await get(`/api/decisions/${id}/ticket`));
+}

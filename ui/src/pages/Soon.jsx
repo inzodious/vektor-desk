@@ -3,11 +3,17 @@ import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { areaByKey } from '../lib/areas.js';
 
-export default function Soon({ area }) {
-  const a = areaByKey[area];
+export default function Soon({ area, phase, lands, title, kicker, foot }) {
+  const base = areaByKey[area];
+  const a = { ...base, phase: phase || base.phase, lands: lands || base.lands, title: title || base.title, kicker: kicker || base.kicker };
   return (
     <>
-      <Hero kicker={a.kicker} title={a.title} art={a.art} foot={<span className="chip lilac">Lands in phase {a.phase}</span>} />
+      <Hero kicker={a.kicker} title={a.title} art={a.art} foot={
+          <>
+            {foot}
+            <span className="chip lilac">Lands in phase {a.phase}</span>
+          </>
+        } />
       <section className="card soon" style={{ '--i': 1 }}>
         <span className="desk-ico">
           <Icon name={a.key} />

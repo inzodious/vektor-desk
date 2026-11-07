@@ -13,7 +13,14 @@ const SHOTS = [
   { name: 'bridge-sheet', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.locator('.board-row[data-sym="FTEC"]').click() },
   { name: 'bridge-demo', path: '/' },
   { name: 'research', path: '/research' },
-  { name: 'decisions', path: '/decisions' },
+  { name: 'decisions', path: '/decisions', fixtures: true, clock: MONDAY },
+  { name: 'decisions-blocked', path: '/decisions', fixtures: true, clock: MONDAY, full: true, act: async (p) => p.locator('.prop', { hasText: 'ACME' }).first().click() },
+  { name: 'decisions-flagged', path: '/decisions', fixtures: true, clock: MONDAY, full: true, act: async (p) => p.locator('.prop', { hasText: 'Trim' }).first().click() },
+  { name: 'decisions-empty', path: '/decisions?scenario=empty', fixtures: true, clock: MONDAY },
+  { name: 'decisions-demo', path: '/decisions' },
+  { name: 'journal', path: '/decisions/journal', fixtures: true, clock: MONDAY },
+  { name: 'journal-demo', path: '/decisions/journal' },
+  { name: 'flight', path: '/decisions/flight' },
   { name: 'plan', path: '/plan', fixtures: true, clock: MONDAY },
   { name: 'plan-demo', path: '/plan' },
   { name: 'bridge-drift', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.locator('[data-kpi="plan.drift_max"]').click() },
@@ -48,7 +55,7 @@ for (const shot of SHOTS.filter((s) => !only || only.includes(s.name))) {
       }
       const o = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: window.innerWidth }));
       const file = join(out, `${shot.name}-${width}-${theme}.png`);
-      await page.screenshot({ path: file, fullPage: !shot.act });
+      await page.screenshot({ path: file, fullPage: shot.full ?? !shot.act });
       report.push({ file, overflow: o.scroll > o.view, errors });
       await ctx.close();
     }

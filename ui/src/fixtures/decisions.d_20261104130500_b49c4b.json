@@ -1,0 +1,185 @@
+{
+ "id": "d_20261104130500_b49c4b",
+ "created_at": "2026-11-04T13:05:00+00:00",
+ "updated_at": "2026-11-04T16:05:00+00:00",
+ "origin": "plan_keeper",
+ "run_id": "r-seed-0",
+ "kind": "rebalance",
+ "title": "Rebalance $40 BND",
+ "symbol": "BND",
+ "account": "hsa-0002",
+ "amount_usd": 40,
+ "shares": null,
+ "funding": "cash",
+ "thesis": "Top up BND in the HSA.",
+ "bear_case": null,
+ "invalidation": null,
+ "horizon": null,
+ "rule_served": null,
+ "confidence": 0.5,
+ "numbers_used": [],
+ "sources": [],
+ "order_ticket": null,
+ "skeptic": null,
+ "expires_at": "2026-11-11T21:00:00+00:00",
+ "status": "dismissed",
+ "status_reason": "Too small to bother with",
+ "snoozed_until": null,
+ "override": false,
+ "override_reason": null,
+ "preflight_status": "clear",
+ "preflight": {
+  "as_of": "2026-11-06",
+  "engine_version": "0.1.0",
+  "lights": [
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "concentration",
+    "label": "Concentration",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "drift_after",
+    "label": "Drift after",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "funding",
+    "label": "Funding",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "wash_sales",
+    "label": "Wash sales",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "lots_tax",
+    "label": "Lots and tax",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "plan_rules",
+    "label": "Plan rules",
+    "status": "ok"
+   }
+  ],
+  "metrics": [
+   {
+    "after": 16393.49,
+    "before": 16393.49,
+    "flag": "ok",
+    "metric_id": "value.market"
+   },
+   {
+    "after": 58.8504,
+    "before": 58.8504,
+    "flag": "ok",
+    "metric_id": "risk.top1"
+   },
+   {
+    "after": 0.4816,
+    "before": 0.4816,
+    "flag": "ok",
+    "metric_id": "plan.single_stock"
+   },
+   {
+    "after": 1.3218,
+    "before": 1.3218,
+    "flag": "ok",
+    "metric_id": "plan.drift_max"
+   },
+   {
+    "after": 0,
+    "before": 0,
+    "flag": "ok",
+    "metric_id": "margin.debit"
+   },
+   {
+    "after": null,
+    "before": null,
+    "flag": "ok",
+    "metric_id": "margin.cost_month"
+   },
+   {
+    "after": null,
+    "before": null,
+    "flag": "ok",
+    "metric_id": "margin.call_drop"
+   },
+   {
+    "after": 0.8662,
+    "before": 0.8662,
+    "flag": "ok",
+    "metric_id": "cash.share"
+   }
+  ],
+  "quality": "ok",
+  "status": "clear",
+  "tax": {
+   "wash_clear_date": null
+  },
+  "trade": {
+   "account": "hsa-0002",
+   "amount_usd": null,
+   "funding": "cash",
+   "kind": "rebalance",
+   "lot_method": "highest_cost",
+   "price": 77.35,
+   "shares": null,
+   "side": null,
+   "symbol": "BND"
+  }
+ },
+ "preflight_at": "2026-11-04T13:05:00+00:00",
+ "tax_impact": {
+  "wash_clear_date": null
+ },
+ "profile_version": 1,
+ "rules_version": 1,
+ "decided_at": "2026-11-04T16:05:00+00:00",
+ "placed_at": null,
+ "filled_at": null,
+ "fill": null,
+ "activity_id": null,
+ "decision": "dismissed",
+ "events": [
+  {
+   "at": "2026-11-04T13:05:00+00:00",
+   "event": "proposed",
+   "reason": null,
+   "detail": null
+  },
+  {
+   "at": "2026-11-04T13:05:00+00:00",
+   "event": "preflight",
+   "reason": null,
+   "detail": {
+    "status": "clear"
+   }
+  },
+  {
+   "at": "2026-11-04T16:05:00+00:00",
+   "event": "dismissed",
+   "reason": "Too small to bother with",
+   "detail": null
+  }
+ ]
+}

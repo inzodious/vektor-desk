@@ -60,3 +60,18 @@ export function useApi(path, { every } = {}) {
 
   return { ...state, reload };
 }
+
+export async function postJson(path, body = {}, { method = 'POST' } = {}) {
+  let res;
+  try {
+    res = await fetch(path, { method, headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  } catch {
+    throw new ApiError(0, "The desk API didn't answer. Try again in a moment.");
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = typeof data?.detail === 'string' ? data.detail : typeof data?.error === 'string' ? data.error : `The desk API answered ${res.status}.`;
+    throw new ApiError(res.status, msg);
+  }
+  return data;
+}
