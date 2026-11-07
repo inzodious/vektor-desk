@@ -164,3 +164,4 @@ const labList = await get('/api/lab/strategies');
 save('lab.strategies', labList);
 save('lab.strategies.empty', { ...labList, strategies: [], rules: [] });
 for (const s of [...labList.strategies, ...labList.rules]) save(`lab.strategies.${s.id}`, await get(`/api/lab/strategies/${encodeURIComponent(s.id)}`));
+save('lab.strategies.pick-one', await get('/api/lab/strategies/pick-one'));

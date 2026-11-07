@@ -3,6 +3,38 @@
  "version": 1,
  "status": "failed",
  "spec_hash": "9e29cb61aa5ebbadbe39690a1f7dd151b8a1abc90930555254015f33831a0f03",
+ "spec": {
+  "title": "Buy the deepest dip",
+  "hypothesis": "The sector furthest below its high bounces first.",
+  "predicted_effect": "+2 points a year",
+  "universe": {
+   "type": "fund_list",
+   "set": "sector_etfs"
+  },
+  "signals": [
+   {
+    "metric_id": "dd",
+    "window": "252d",
+    "transform": "inverse_rank"
+   }
+  ],
+  "entry": "top 2 by rank",
+  "exit": "rebalance",
+  "rebalance": "monthly",
+  "sizing": "equal",
+  "params": {},
+  "success_criteria": {
+   "excess_vs_plan_pts": 0,
+   "max_drawdown_pct": 60
+  },
+  "horizons": [
+   3,
+   5,
+   10
+  ],
+  "written_at": "2026-01-04T12:00:00+00:00",
+  "model": "opus"
+ },
  "folds": [
   {
    "train_window": [

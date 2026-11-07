@@ -691,6 +691,7 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
   .clock { padding: 0 8px; }
 }
 @media (max-width: 480px) {
+  .subtabs { flex-wrap: wrap; border-radius: 16px; }
   .subtabs a { padding: 6px 10px; }
 }
 

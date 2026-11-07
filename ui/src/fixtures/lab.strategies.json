@@ -8,6 +8,7 @@
    "registered_at": "2026-01-05T07:00:00+00:00",
    "spec_hash": "9e29cb61aa5ebbadbe39690a1f7dd151b8a1abc90930555254015f33831a0f03",
    "parent_id": null,
+   "hypothesis": "The sector furthest below its high bounces first.",
    "trials": 19
   },
   {
@@ -18,6 +19,7 @@
    "registered_at": "2026-01-05T07:00:00+00:00",
    "spec_hash": "f5c8d1ec895f5378d62092f0edcc42f3bf20a907a78e619b9e9007d14a06be90",
    "parent_id": null,
+   "hypothesis": "The four least volatile sectors give most of the return with less of the ride.",
    "trials": 39
   },
   {
@@ -28,6 +30,7 @@
    "registered_at": "2026-01-05T07:00:00+00:00",
    "spec_hash": "02d1b0f985749bb93783f67f980be072f72c62c810a061a4df4bccfa4c1efadc",
    "parent_id": null,
+   "hypothesis": "Sectors that led over six months keep leading for a month.",
    "trials": 100,
    "paper": {
     "strategy_id": "sector-momentum",

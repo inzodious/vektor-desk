@@ -202,22 +202,46 @@ function universeText(u) {
   return u.rule || u.type || null;
 }
 
-function signalText(g) {
-  if (typeof g === 'string') return g;
-  const w = String(g.window || '').replace(/\{(\w+)\}/, '$1 ');
+function fill(text, params = {}) {
+  return String(text).replace(/\{(\w+)\}/g, (m, k) => {
+    const p = params[k];
+    const v = p == null ? null : Array.isArray(p) ? p[0] : typeof p === 'object' ? (p.default ?? p.min) : p;
+    return v == null ? k : String(v);
+  });
+}
+
+const UNIT = { d: 'days', m: 'months', y: 'years' };
+const windowText = (w) => String(w).replace(/^(\d+)\s*([dmy])$/i, (m, n, u) => `${n} ${UNIT[u.toLowerCase()]}`);
+
+function signalText(g, params) {
+  if (typeof g === 'string') return fill(g, params);
+  const w = g.window ? windowText(fill(g.window, params)) : '';
   return [METRIC_WORD[g.metric_id] || g.metric_id, w ? `over ${w}` : '', TRANSFORM_WORD[g.transform] ?? g.transform].filter(Boolean).join(' ');
 }
 
-const asText = (v) => (v == null ? null : typeof v === 'string' ? v : JSON.stringify(v).replace(/[{}"]/g, '').replace(/:/g, ' ').replace(/,/g, ', '));
+const asText = (v, params) => (v == null ? null : typeof v === 'string' ? fill(v, params) : fill(JSON.stringify(v).replace(/[{}"]/g, '').replace(/:/g, ' ').replace(/,/g, ', '), params));
+
+const paramVal = (v, params) => (typeof v === 'string' && v.startsWith('param:') ? fill(`{${v.slice(6)}}`, params) : v);
+
+function entryText(e, params) {
+  if (e && typeof e === 'object' && e.top_n != null) return `top ${paramVal(e.top_n, params)} by rank${e.min_signal != null ? `, signal at least ${e.min_signal}` : ''}`;
+  return asText(e, params);
+}
+
+function exitText(e, params) {
+  if (e === 'rebalance') return 'at the next rebalance';
+  if (e && typeof e === 'object' && e.hold_rank != null) return `keeps a holding while it ranks in the top ${paramVal(e.hold_rank, params)}`;
+  return asText(e, params);
+}
 
 export function specLines(spec) {
   if (!spec) return [];
   return [
     { k: 'Picks from', v: universeText(spec.universe) },
-    { k: 'Signal', v: (spec.signals || []).map(signalText).join('; ') || null },
-    { k: 'Buys', v: asText(spec.entry) },
-    { k: 'Sells', v: asText(spec.exit) },
-    { k: 'Trades', v: spec.rebalance ? `${spec.rebalance}, ${asText(spec.sizing) || 'equal'} weights` : null },
+    { k: 'Signal', v: (spec.signals || []).map((g) => signalText(g, spec.params)).join('; ') || null },
+    { k: 'Buys', v: entryText(spec.entry, spec.params) },
+    { k: 'Sells', v: exitText(spec.exit, spec.params) },
+    { k: 'Trades', v: spec.rebalance ? `${spec.rebalance}, ${(asText(spec.sizing) || 'equal').replace(/_/g, ' ')} weights` : null },
     { k: 'Horizons', v: spec.horizons?.length ? spec.horizons.map((h) => `${h} years`).join(', ') : null },
   ].filter((l) => l.v);
 }

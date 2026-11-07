@@ -50,6 +50,7 @@ const SHOTS = [
   { name: 'lab-strategy-lab', path: '/lab/strategies/low-vol-sectors', fixtures: true, clock: MONDAY, full: true },
   { name: 'lab-strategy-failed', path: '/lab/strategies/dip-buyer', fixtures: true, clock: MONDAY, full: true },
   { name: 'lab-rule', path: '/lab/strategies/dip-margin', fixtures: true, clock: MONDAY, full: true },
+  { name: 'lab-strategy-rejected', path: '/lab/strategies/pick-one', fixtures: true, clock: MONDAY },
   { name: 'lab-strategy-missing', path: '/lab/strategies/nobody', fixtures: true, clock: MONDAY },
   { name: 'lab-boards', path: '/lab/boards', fixtures: true, clock: MONDAY, act: async (p) => { await p.goto(p.url().replace('/lab/boards?', '/lab?'), { waitUntil: 'networkidle' }); await p.getByTestId('save-board').click(); await p.goto(p.url().replace('/lab?', '/lab/boards?'), { waitUntil: 'networkidle' }); } },
   { name: 'lab-patterns', path: '/lab/patterns' },

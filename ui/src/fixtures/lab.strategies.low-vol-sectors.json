@@ -3,6 +3,46 @@
  "version": 1,
  "status": "lab",
  "spec_hash": "f5c8d1ec895f5378d62092f0edcc42f3bf20a907a78e619b9e9007d14a06be90",
+ "spec": {
+  "title": "Calm sectors",
+  "hypothesis": "The four least volatile sectors give most of the return with less of the ride.",
+  "predicted_effect": "Same return, a third less drawdown",
+  "universe": {
+   "type": "fund_list",
+   "set": "sector_etfs"
+  },
+  "signals": [
+   {
+    "metric_id": "vol",
+    "window": "63d",
+    "transform": "inverse_rank"
+   }
+  ],
+  "entry": {
+   "top_n": "param:top_n"
+  },
+  "exit": "rebalance",
+  "rebalance": "monthly",
+  "sizing": "inverse_vol",
+  "params": {
+   "top_n": [
+    3,
+    4,
+    5
+   ]
+  },
+  "success_criteria": {
+   "excess_vs_plan_pts": 0,
+   "max_drawdown_pct": 60
+  },
+  "horizons": [
+   3,
+   5,
+   10
+  ],
+  "written_at": "2026-01-04T12:00:00+00:00",
+  "model": "opus"
+ },
  "folds": [
   {
    "train_window": [

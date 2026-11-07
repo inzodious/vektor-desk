@@ -3,6 +3,49 @@
  "version": 1,
  "status": "paper",
  "spec_hash": "02d1b0f985749bb93783f67f980be072f72c62c810a061a4df4bccfa4c1efadc",
+ "spec": {
+  "title": "Sector momentum",
+  "hypothesis": "Sectors that led over six months keep leading for a month.",
+  "predicted_effect": "+1 point a year against the plan",
+  "universe": {
+   "type": "fund_list",
+   "set": "sector_etfs"
+  },
+  "signals": [
+   {
+    "metric_id": "ret",
+    "window": "{lookback}d",
+    "transform": "rank"
+   }
+  ],
+  "entry": "top {top_n} by rank",
+  "exit": "rebalance",
+  "rebalance": "monthly",
+  "sizing": "equal",
+  "params": {
+   "top_n": {
+    "min": 2,
+    "max": 4,
+    "default": 3
+   },
+   "lookback": {
+    "min": 63,
+    "max": 252,
+    "default": 126
+   }
+  },
+  "success_criteria": {
+   "excess_vs_plan_pts": 0,
+   "max_drawdown_pct": 60
+  },
+  "horizons": [
+   3,
+   5,
+   10
+  ],
+  "written_at": "2026-01-04T12:00:00+00:00",
+  "model": "opus"
+ },
  "folds": [
   {
    "train_window": [
