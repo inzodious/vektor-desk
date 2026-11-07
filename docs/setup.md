@@ -48,7 +48,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
    bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh /tmp/vektor-desk-reader.json
    ```
 
-6. **Install the app.** Go to Apps → Discover Apps → ⋮ → **Install via YAML**. Name it `vektor-desk` and paste `deploy/compose.yaml` as it is, for example from `cat /mnt/Manifest/apps/vektor-desk-src/deploy/compose.yaml`.
+6. **Install the app.** Go to Apps → Discover Apps → ⋮ → **Install via YAML**. Name it `vektor-desk` and paste `deploy/compose.yaml` as it is, for example from `cat /mnt/Manifest/apps/vektor-desk-src/deploy/compose.yaml`. If the install fails with "env file … not found", the setup script didn't finish: run it again (the last line says where it stopped), delete the failed app in Apps, and install again.
 7. **DNS record.** `docker exec vektor-desk-tailscale tailscale ip -4` prints the node's address. At Porkbun, add an A record with host `desk`, that address, and TTL 600.
 8. **Cron jobs.** Go to System → Advanced Settings → Cron Jobs → **Add** and create each job below as user `root`. Tick Hide Standard Output and Hide Standard Error on the auto-deploy job.
 

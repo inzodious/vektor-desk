@@ -4,6 +4,7 @@
 # Safe to run again: it keeps what's already there and only asks for what's missing.
 set -Eeuo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+trap 'echo "Stop: line $LINENO failed: $BASH_COMMAND. Nothing after it ran; fix that and run this script again." >&2' ERR
 
 ROOT=/mnt/Manifest/apps/vektor-desk
 SRC=/mnt/Manifest/apps/vektor-desk-src
@@ -18,8 +19,22 @@ REPO=https://github.com/inzodious/vektor-desk.git
 
 # ---- 1. Datasets and folders ----
 
+dataset() {
+  local d=$1
+  zfs list -H "$d" >/dev/null 2>&1 && return 0
+  if [ -n "$(ls -A "/mnt/$d" 2>/dev/null)" ]; then
+    echo "   /mnt/$d already has files; keeping it as a folder"
+    return 0
+  fi
+  if zfs list -H "$(dirname "$d")" >/dev/null 2>&1 && midclt call pool.dataset.create "{\"name\": \"$d\"}" >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "   /mnt/$d as a plain folder (no dataset could be made there)"
+  mkdir -p "/mnt/$d"
+}
+
 for d in Manifest/apps/vektor-desk Manifest/apps/vektor-desk-src Singularity/backups/vektor-desk; do
-  zfs list -H "$d" >/dev/null 2>&1 || midclt call pool.dataset.create "{\"name\": \"$d\"}" >/dev/null
+  dataset "$d"
 done
 mkdir -p "$ROOT"/data/{home,inbox/fidelity,run,lab/data,lab/queue,lab/runs} "$ROOT"/caddy/{data,config} "$ROOT"/tailscale "$ROOT"/ntfy
 chown -R 568:568 "$ROOT/data" "$ROOT/ntfy"
