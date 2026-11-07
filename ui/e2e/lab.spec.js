@@ -113,7 +113,7 @@ test('a saved board lists, opens and can be removed', async ({ page }) => {
   await page.goto('/lab?ids=FXAIX,FTEC');
   await page.getByTestId('save-board').click();
   await expect(page.getByTestId('save-board')).toHaveText('Saved to boards');
-  await page.getByRole('link', { name: 'Saved boards' }).click();
+  await page.getByRole('link', { name: 'Boards', exact: true }).click();
   const link = page.getByRole('link', { name: /Compare FXAIX, FTEC/ });
   await expect(link).toBeVisible();
   await link.click();

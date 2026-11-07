@@ -13,6 +13,8 @@ import { ConsoleProvider } from './research/Console.jsx';
 import Compare from './pages/Compare.jsx';
 import Risk from './pages/Risk.jsx';
 import Boards from './pages/Boards.jsx';
+import Strategies from './pages/Strategies.jsx';
+import Strategy from './pages/Strategy.jsx';
 import { LAB_TABS } from './lib/lab.js';
 import { Subtabs } from './components/Subtabs.jsx';
 import { DECISION_TABS } from './lib/decisions.js';
@@ -55,6 +57,8 @@ export default function App() {
               <Route path="plan/*" element={<Plan />} />
               <Route path="lab" element={<Compare />} />
               <Route path="lab/risk" element={<Risk />} />
+              <Route path="lab/strategies" element={<Strategies />} />
+              <Route path="lab/strategies/:id" element={<Strategy />} />
               <Route
                 path="lab/patterns"
                 element={

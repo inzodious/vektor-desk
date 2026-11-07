@@ -1,0 +1,713 @@
+{
+ "strategy_id": "sector-momentum",
+ "version": 1,
+ "status": "paper",
+ "spec_hash": "02d1b0f985749bb93783f67f980be072f72c62c810a061a4df4bccfa4c1efadc",
+ "folds": [
+  {
+   "train_window": [
+    "2012-01-02",
+    "2015-01-02"
+   ],
+   "test_window": [
+    "2015-01-02",
+    "2016-01-02"
+   ],
+   "params": {
+    "top_n": 4,
+    "lookback": 252
+   },
+   "train_sharpe": 1.0387,
+   "test": {
+    "start": "2015-01-02",
+    "end": "2016-01-01",
+    "days": 261,
+    "return_pct": -1.6411,
+    "ann_return_pct": null,
+    "vol_pct": 9.654,
+    "sharpe": -0.118,
+    "sortino": -0.1612,
+    "mdd_pct": -13.2149,
+    "turnover_per_year": 5.7407,
+    "trades": 56,
+    "costs_usd": 28.67,
+    "taxes_usd": 0,
+    "delisted": [],
+    "bench_return_pct": 6.308,
+    "excess_vs_bench_pts": -7.9491,
+    "sp500_return_pct": 6.2155,
+    "excess_vs_sp500_pts": -7.8565
+   }
+  },
+  {
+   "train_window": [
+    "2013-01-02",
+    "2016-01-02"
+   ],
+   "test_window": [
+    "2016-01-02",
+    "2017-01-02"
+   ],
+   "params": {
+    "top_n": 3,
+    "lookback": 63
+   },
+   "train_sharpe": 0.8997,
+   "test": {
+    "start": "2016-01-04",
+    "end": "2017-01-02",
+    "days": 261,
+    "return_pct": 29.9479,
+    "ann_return_pct": null,
+    "vol_pct": 10.2123,
+    "sharpe": 2.5383,
+    "sortino": 3.9955,
+    "mdd_pct": -7.3536,
+    "turnover_per_year": 7.1585,
+    "trades": 45,
+    "costs_usd": 42.34,
+    "taxes_usd": 255.64,
+    "delisted": [],
+    "bench_return_pct": -8.6263,
+    "excess_vs_bench_pts": 38.5742,
+    "sp500_return_pct": 5.6842,
+    "excess_vs_sp500_pts": 24.2637
+   }
+  },
+  {
+   "train_window": [
+    "2014-01-02",
+    "2017-01-02"
+   ],
+   "test_window": [
+    "2017-01-02",
+    "2018-01-02"
+   ],
+   "params": {
+    "top_n": 2,
+    "lookback": 63
+   },
+   "train_sharpe": 1.4649,
+   "test": {
+    "start": "2017-01-02",
+    "end": "2018-01-02",
+    "days": 262,
+    "return_pct": -5.5201,
+    "ann_return_pct": null,
+    "vol_pct": 13.8262,
+    "sharpe": -0.3276,
+    "sortino": -0.4602,
+    "mdd_pct": -15.9931,
+    "turnover_per_year": 11.062,
+    "trades": 34,
+    "costs_usd": 53.12,
+    "taxes_usd": 0,
+    "delisted": [],
+    "bench_return_pct": 0.0543,
+    "excess_vs_bench_pts": -5.5781,
+    "sp500_return_pct": -3.2316,
+    "excess_vs_sp500_pts": -2.29
+   }
+  },
+  {
+   "train_window": [
+    "2015-01-02",
+    "2018-01-02"
+   ],
+   "test_window": [
+    "2018-01-02",
+    "2019-01-02"
+   ],
+   "params": {
+    "top_n": 2,
+    "lookback": 63
+   },
+   "train_sharpe": 1.0005,
+   "test": {
+    "start": "2018-01-02",
+    "end": "2019-01-02",
+    "days": 262,
+    "return_pct": -1.9784,
+    "ann_return_pct": null,
+    "vol_pct": 12.9365,
+    "sharpe": -0.0847,
+    "sortino": -0.1172,
+    "mdd_pct": -12.997,
+    "turnover_per_year": 12.02,
+    "trades": 35,
+    "costs_usd": 62.49,
+    "taxes_usd": 0,
+    "delisted": [],
+    "bench_return_pct": -2.5661,
+    "excess_vs_bench_pts": 0.588,
+    "sp500_return_pct": 19.5213,
+    "excess_vs_sp500_pts": -21.5157
+   }
+  },
+  {
+   "train_window": [
+    "2016-01-02",
+    "2019-01-02"
+   ],
+   "test_window": [
+    "2019-01-02",
+    "2020-01-02"
+   ],
+   "params": {
+    "top_n": 4,
+    "lookback": 252
+   },
+   "train_sharpe": 1.2437,
+   "test": {
+    "start": "2019-01-02",
+    "end": "2020-01-02",
+    "days": 262,
+    "return_pct": 13.8729,
+    "ann_return_pct": null,
+    "vol_pct": 9.5848,
+    "sharpe": 1.3567,
+    "sortino": 2.0641,
+    "mdd_pct": -4.0604,
+    "turnover_per_year": 5.7332,
+    "trades": 57,
+    "costs_usd": 30.23,
+    "taxes_usd": 0,
+    "delisted": [],
+    "bench_return_pct": 23.3784,
+    "excess_vs_bench_pts": -9.5132,
+    "sp500_return_pct": 46.4158,
+    "excess_vs_sp500_pts": -32.571
+   }
+  },
+  {
+   "train_window": [
+    "2017-01-02",
+    "2020-01-02"
+   ],
+   "test_window": [
+    "2020-01-02",
+    "2021-01-02"
+   ],
+   "params": {
+    "top_n": 3,
+    "lookback": 126
+   },
+   "train_sharpe": 1.1585,
+   "test": {
+    "start": "2020-01-02",
+    "end": "2021-01-01",
+    "days": 262,
+    "return_pct": -18.1198,
+    "ann_return_pct": null,
+    "vol_pct": 11.2426,
+    "sharpe": -1.6601,
+    "sortino": -2.1567,
+    "mdd_pct": -25.7506,
+    "turnover_per_year": 8.4531,
+    "trades": 47,
+    "costs_usd": 38.38,
+    "taxes_usd": 0,
+    "delisted": [],
+    "bench_return_pct": -8.1919,
+    "excess_vs_bench_pts": -9.9337,
+    "sp500_return_pct": -30.0564,
+    "excess_vs_sp500_pts": 11.9425
+   }
+  },
+  {
+   "train_window": [
+    "2018-01-02",
+    "2021-01-02"
+   ],
+   "test_window": [
+    "2021-01-02",
+    "2022-01-02"
+   ],
+   "params": {
+    "top_n": 3,
+    "lookback": 126
+   },
+   "train_sharpe": 0.7195,
+   "test": {
+    "start": "2021-01-04",
+    "end": "2021-12-31",
+    "days": 260,
+    "return_pct": 25.8048,
+    "ann_return_pct": null,
+    "vol_pct": 9.9729,
+    "sharpe": 2.2903,
+    "sortino": 3.5605,
+    "mdd_pct": -4.0282,
+    "turnover_per_year": 6.5837,
+    "trades": 41,
+    "costs_usd": 36.3,
+    "taxes_usd": 0,
+    "delisted": [],
+    "bench_return_pct": -3.47,
+    "excess_vs_bench_pts": 29.2748,
+    "sp500_return_pct": 9.6892,
+    "excess_vs_sp500_pts": 16.1157
+   }
+  },
+  {
+   "train_window": [
+    "2019-01-02",
+    "2022-01-02"
+   ],
+   "test_window": [
+    "2022-01-02",
+    "2023-01-02"
+   ],
+   "params": {
+    "top_n": 3,
+    "lookback": 126
+   },
+   "train_sharpe": 1.1997,
+   "test": {
+    "start": "2022-01-03",
+    "end": "2023-01-02",
+    "days": 261,
+    "return_pct": 15.6263,
+    "ann_return_pct": null,
+    "vol_pct": 10.0483,
+    "sharpe": 1.4509,
+    "sortino": 2.1993,
+    "mdd_pct": -5.6716,
+    "turnover_per_year": 4.0305,
+    "trades": 40,
+    "costs_usd": 20.69,
+    "taxes_usd": 55.48,
+    "delisted": [],
+    "bench_return_pct": -9.0697,
+    "excess_vs_bench_pts": 24.696,
+    "sp500_return_pct": -29.2716,
+    "excess_vs_sp500_pts": 44.8979
+   }
+  },
+  {
+   "train_window": [
+    "2020-01-02",
+    "2023-01-02"
+   ],
+   "test_window": [
+    "2023-01-02",
+    "2023-12-30"
+   ],
+   "params": {
+    "top_n": 4,
+    "lookback": 252
+   },
+   "train_sharpe": 0.6052,
+   "test": {
+    "start": "2023-01-02",
+    "end": "2023-12-29",
+    "days": 260,
+    "return_pct": 37.1599,
+    "ann_return_pct": null,
+    "vol_pct": 9.4192,
+    "sharpe": 3.3128,
+    "sortino": 5.7931,
+    "mdd_pct": -4.4371,
+    "turnover_per_year": 4.4053,
+    "trades": 50,
+    "costs_usd": 24.31,
+    "taxes_usd": 0,
+    "delisted": [],
+    "bench_return_pct": 5.5569,
+    "excess_vs_bench_pts": 31.6031,
+    "sp500_return_pct": 1.4298,
+    "excess_vs_sp500_pts": 35.7301
+   }
+  }
+ ],
+ "kind": "strategy",
+ "tear_sheet": {
+  "windows": {
+   "start": "2012-01-02",
+   "end": "2023-12-30",
+   "holdout_start": "2023-12-31",
+   "clipped_to_holdout": true
+  },
+  "variants": 9,
+  "trials_family": 9,
+  "walk_forward": {
+   "start": "2015-01-02",
+   "end": "2023-12-29",
+   "days": 2343,
+   "ann_return_pct": 9.1795,
+   "excess_pts": 9.2483,
+   "sharpe": 0.834,
+   "mdd_pct": -25.7506
+  },
+  "horizons": [
+   {
+    "years": 3,
+    "starts": 72,
+    "mean_pts": 5.3531,
+    "p5_pts": -5.5817,
+    "p95_pts": 14.4956,
+    "share_positive": 0.7222,
+    "basis": "walk_forward"
+   },
+   {
+    "years": 5,
+    "starts": 48,
+    "mean_pts": 4.5653,
+    "p5_pts": 0.6833,
+    "p95_pts": 8.7758,
+    "share_positive": 1,
+    "basis": "walk_forward"
+   },
+   {
+    "years": 10,
+    "starts": 24,
+    "mean_pts": 4.1036,
+    "p5_pts": 1.7582,
+    "p95_pts": 6.7559,
+    "share_positive": 1,
+    "basis": "in_sample"
+   }
+  ],
+  "deflated_sharpe": 0.9553,
+  "pbo": 0.619,
+  "factor_check": {
+   "status": "not_available",
+   "note": "The French factors are not in the lab yet; the engine's monthly french job fetches them."
+  },
+  "caveats": [
+   "Unrealized gains at the end of a window are not taxed, and the benchmark is untaxed.",
+   "The factor check could not run, so it is not part of the verdict: The French factors are not in the lab yet; the engine's monthly french job fetches them.",
+   "A 3-year horizon is mostly noise."
+  ]
+ },
+ "analyses": {
+  "param_sensitivity": {
+   "top_n": {
+    "2": 0.6206,
+    "3": 0.8766,
+    "4": 0.9253
+   },
+   "lookback": {
+    "63": 0.673,
+    "126": 0.8813,
+    "252": 0.8681
+   }
+  },
+  "turnover_cost": [
+   {
+    "cost_x": 1,
+    "excess_vs_bench_pts": 5.6959
+   },
+   {
+    "cost_x": 2,
+    "excess_vs_bench_pts": 5.5026
+   },
+   {
+    "cost_x": 4,
+    "excess_vs_bench_pts": 5.1166
+   }
+  ],
+  "regime_split": {
+   "bear": {
+    "days": 1425,
+    "ann_return_pct": 13.0032,
+    "excess_pts": 1.7746
+   },
+   "low_rates": {
+    "days": 3129,
+    "ann_return_pct": 10.0043,
+    "excess_pts": 4.7625
+   },
+   "bull": {
+    "days": 1704,
+    "ann_return_pct": 7.4965,
+    "excess_pts": 7.2612
+   }
+  },
+  "factor_regression": {
+   "status": "not_available",
+   "note": "The French factors are not in the lab yet; the engine's monthly french job fetches them."
+  }
+ },
+ "rejected": null,
+ "grammar": {
+  "universe": {
+   "fund_list": "symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks. {\"type\": \"fund_list\", \"set\": \"sector_etfs\"}",
+   "screen": "single stocks in the backfill universe; min_history_days, min_price. Carries a survivorship caveat",
+   "french": "Ken French research portfolios, no survivorship bias, daily from 1963 on the factor calendar. set: industry_12 | industry_49 | size_deciles | momentum_deciles. {\"type\": \"french\", \"set\": \"industry_12\"}. Benchmark defaults to FF.MKT; a pass is research only, never paper"
+  },
+  "signals": "metric_id from features, window like 63d, 6m or 1y (or {param}d), transform: raw, rank, inverse_rank, zscore, inverse",
+  "entry": "{\"top_n\": 3 or \"param:top_n\", \"min_signal\": 0} (min_signal applies to the first signal's raw value), or \"top 3 by rank\"",
+  "exit": "\"rebalance\", or {\"hold_rank\": 5} to keep a holding while it ranks in the top 5",
+  "rebalance": "weekly, monthly or quarterly; signals at the close, trades at the next open",
+  "sizing": "equal, inverse_vol (63-day) or rank",
+  "params": "{\"top_n\": {\"min\": 2, \"max\": 5, \"default\": 3}} or a list of allowed values; grid values must sit inside",
+  "costs": "set by the lab: 5 bps funds and French portfolios, 15 bps stocks, 25 bps thin stocks",
+  "factor_check": "automatic: alpha after the six French factors on the walk-forward record; alpha t of 2 or more passes",
+  "rule": {
+   "request": "{\"request\": \"rule\", \"id\": \"band-test\", \"rule\": \"rebalance_band\", \"params\": {\"band_pts\": [3, 5, 10]}, \"horizons\": [5, 10]}",
+   "rules": {
+    "rebalance_band": [
+     "band_pts"
+    ],
+    "deposit_steering": [],
+    "harvest": [
+     "threshold_usd"
+    ],
+    "margin": [
+     "dip_pct",
+     "borrow_pct",
+     "rate_pct"
+    ]
+   },
+   "optional": "mix (funds, defaults to the plan), deposit_monthly (default 1000), start_value (default 10000), account, date_range",
+   "notes": "margin needs rate_pct as one number; every rule runs against deposits split pro rata with no selling; grid cap 12"
+  }
+ },
+ "final": {
+  "verdict": "pass",
+  "bars": {
+   "excess_interval": true,
+   "deflated_sharpe": true,
+   "pbo": true,
+   "factor": null,
+   "holdout": true,
+   "criteria_excess": true,
+   "criteria_drawdown": true
+  },
+  "params": {
+   "lookback": 252,
+   "top_n": 4
+  },
+  "holdout": {
+   "start": "2024-01-01",
+   "end": "2025-12-31",
+   "days": 523,
+   "return_pct": 17.6814,
+   "ann_return_pct": 8.4871,
+   "vol_pct": 9.0984,
+   "sharpe": 0.9094,
+   "sortino": 1.3599,
+   "mdd_pct": -9.7715,
+   "turnover_per_year": 4.0681,
+   "trades": 105,
+   "costs_usd": 45.12,
+   "taxes_usd": 29.8,
+   "delisted": [],
+   "bench_return_pct": 0.3642,
+   "excess_vs_bench_pts": 8.3051,
+   "sp500_return_pct": 65.2613,
+   "excess_vs_sp500_pts": -20.089
+  },
+  "post_cutoff": {
+   "cutoff": "2026-06-30",
+   "days": 0,
+   "note": "The data ends before the model's training cutoff."
+  },
+  "paper_start": "2026-06-30",
+  "factor_check": {
+   "status": "not_available",
+   "note": "The French factors are not in the lab yet; the engine's monthly french job fetches them."
+  },
+  "note": null
+ },
+ "paper": {
+  "strategy_id": "sector-momentum",
+  "version": 1,
+  "title": "Sector momentum",
+  "started": "2026-06-30",
+  "as_of": "2026-11-06",
+  "days": 129,
+  "value": 10092.37,
+  "return_pct": 0.9237,
+  "excess_pts": -4.2634,
+  "status": "paper",
+  "summary": "{\"start\": \"2026-06-30\", \"end\": \"2026-11-06\", \"days\": 94, \"return_pct\": 0.9237, \"ann_return_pct\": null, \"vol_pct\": 10.0434, \"sharpe\": 0.2977, \"sortino\": 0.4477, \"mdd_pct\": -5.0436, \"turnover_per_year\": 7.3484, \"trades\": 23, \"costs_usd\": 13.1, \"taxes_usd\": 0.0, \"delisted\": [], \"bench_return_pct\": 5.1871, \"excess_vs_bench_pts\": -4.2634, \"sp500_return_pct\": -8.1746, \"excess_vs_sp500_pts\": 9.0983}"
+ },
+ "paper_trades": [
+  {
+   "date": "2026-11-02",
+   "symbol": "XLU",
+   "side": "sell",
+   "shares": 28.97543,
+   "price": 84.7792,
+   "cost": 1.2283
+  },
+  {
+   "date": "2026-11-02",
+   "symbol": "XLE",
+   "side": "sell",
+   "shares": 0.359177,
+   "price": 168.5856,
+   "cost": 0.0303
+  },
+  {
+   "date": "2026-11-02",
+   "symbol": "XLP",
+   "side": "sell",
+   "shares": 0.200379,
+   "price": 549.7473,
+   "cost": 0.0551
+  },
+  {
+   "date": "2026-11-02",
+   "symbol": "XLRE",
+   "side": "buy",
+   "shares": 0.187242,
+   "price": 323.0126,
+   "cost": 0.0302
+  },
+  {
+   "date": "2026-11-02",
+   "symbol": "XLV",
+   "side": "buy",
+   "shares": 2.013646,
+   "price": 1274.5519,
+   "cost": 1.2832
+  },
+  {
+   "date": "2026-10-01",
+   "symbol": "XLRE",
+   "side": "sell",
+   "shares": 0.746411,
+   "price": 333.5356,
+   "cost": 0.1245
+  },
+  {
+   "date": "2026-10-01",
+   "symbol": "XLU",
+   "side": "buy",
+   "shares": 0.035133,
+   "price": 89.3052,
+   "cost": 0.0016
+  },
+  {
+   "date": "2026-10-01",
+   "symbol": "XLE",
+   "side": "buy",
+   "shares": 0.266313,
+   "price": 166.0577,
+   "cost": 0.0221
+  },
+  {
+   "date": "2026-10-01",
+   "symbol": "XLP",
+   "side": "buy",
+   "shares": 0.374264,
+   "price": 531.4681,
+   "cost": 0.0995
+  },
+  {
+   "date": "2026-09-01",
+   "symbol": "XLV",
+   "side": "sell",
+   "shares": 2.128097,
+   "price": 1242.0107,
+   "cost": 1.3216
+  },
+  {
+   "date": "2026-09-01",
+   "symbol": "XLRE",
+   "side": "sell",
+   "shares": 0.141996,
+   "price": 299.4583,
+   "cost": 0.0213
+  },
+  {
+   "date": "2026-09-01",
+   "symbol": "XLP",
+   "side": "buy",
+   "shares": 0.047416,
+   "price": 566.632,
+   "cost": 0.0134
+  },
+  {
+   "date": "2026-09-01",
+   "symbol": "XLU",
+   "side": "buy",
+   "shares": 1.243542,
+   "price": 88.0017,
+   "cost": 0.0547
+  },
+  {
+   "date": "2026-09-01",
+   "symbol": "XLE",
+   "side": "buy",
+   "shares": 15.316558,
+   "price": 166.2772,
+   "cost": 1.2734
+  },
+  {
+   "date": "2026-08-03",
+   "symbol": "XLE",
+   "side": "sell",
+   "shares": 14.717036,
+   "price": 160.188,
+   "cost": 1.1787
+  },
+  {
+   "date": "2026-08-03",
+   "symbol": "XLU",
+   "side": "sell",
+   "shares": 0.929913,
+   "price": 90.3495,
+   "cost": 0.042
+  },
+  {
+   "date": "2026-08-03",
+   "symbol": "XLRE",
+   "side": "sell",
+   "shares": 0.368949,
+   "price": 289.4049,
+   "cost": 0.0534
+  },
+  {
+   "date": "2026-08-03",
+   "symbol": "XLP",
+   "side": "buy",
+   "shares": 0.072682,
+   "price": 562.6882,
+   "cost": 0.0204
+  },
+  {
+   "date": "2026-08-03",
+   "symbol": "XLV",
+   "side": "buy",
+   "shares": 2.128097,
+   "price": 1175.8803,
+   "cost": 1.2512
+  },
+  {
+   "date": "2026-07-01",
+   "symbol": "XLP",
+   "side": "buy",
+   "shares": 4.374519,
+   "price": 571.4914,
+   "cost": 1.25
+  },
+  {
+   "date": "2026-07-01",
+   "symbol": "XLRE",
+   "side": "buy",
+   "shares": 9.015614,
+   "price": 277.2967,
+   "cost": 1.25
+  },
+  {
+   "date": "2026-07-01",
+   "symbol": "XLE",
+   "side": "buy",
+   "shares": 14.717036,
+   "price": 169.8712,
+   "cost": 1.25
+  },
+  {
+   "date": "2026-07-01",
+   "symbol": "XLU",
+   "side": "buy",
+   "shares": 28.626668,
+   "price": 87.3312,
+   "cost": 1.25
+  }
+ ]
+}

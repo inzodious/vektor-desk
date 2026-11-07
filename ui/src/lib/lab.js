@@ -4,8 +4,9 @@ import { pct } from './format.js';
 export const LAB_TABS = [
   { to: '/lab', label: 'Compare', end: true },
   { to: '/lab/risk', label: 'Risk' },
+  { to: '/lab/strategies', label: 'Strategies' },
   { to: '/lab/patterns', label: 'Patterns' },
-  { to: '/lab/boards', label: 'Saved boards' },
+  { to: '/lab/boards', label: 'Boards' },
 ];
 
 export const WINDOWS = ['1M', '3M', '6M', 'YTD', '1Y', '3Y', '5Y', '10Y', 'MAX'].map((v) => ({ v, t: { '1M': '1 month', '3M': '3 months', '6M': '6 months', YTD: 'Year to date', '1Y': '1 year', '3Y': '3 years', '5Y': '5 years', '10Y': '10 years', MAX: 'All history' }[v] }));

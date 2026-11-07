@@ -1,0 +1,259 @@
+{
+ "strategies": [
+  {
+   "id": "dip-buyer",
+   "version": 1,
+   "title": "Buy the deepest dip",
+   "status": "failed",
+   "registered_at": "2026-01-05T07:00:00+00:00",
+   "spec_hash": "9e29cb61aa5ebbadbe39690a1f7dd151b8a1abc90930555254015f33831a0f03",
+   "parent_id": null,
+   "trials": 19
+  },
+  {
+   "id": "low-vol-sectors",
+   "version": 1,
+   "title": "Calm sectors",
+   "status": "lab",
+   "registered_at": "2026-01-05T07:00:00+00:00",
+   "spec_hash": "f5c8d1ec895f5378d62092f0edcc42f3bf20a907a78e619b9e9007d14a06be90",
+   "parent_id": null,
+   "trials": 39
+  },
+  {
+   "id": "sector-momentum",
+   "version": 1,
+   "title": "Sector momentum",
+   "status": "paper",
+   "registered_at": "2026-01-05T07:00:00+00:00",
+   "spec_hash": "02d1b0f985749bb93783f67f980be072f72c62c810a061a4df4bccfa4c1efadc",
+   "parent_id": null,
+   "trials": 100,
+   "paper": {
+    "strategy_id": "sector-momentum",
+    "version": 1,
+    "title": "Sector momentum",
+    "started": "2026-06-30",
+    "as_of": "2026-11-06",
+    "days": 129,
+    "value": 10092.37,
+    "return_pct": 0.9237,
+    "excess_pts": -4.2634,
+    "status": "paper",
+    "summary": "{\"start\": \"2026-06-30\", \"end\": \"2026-11-06\", \"days\": 94, \"return_pct\": 0.9237, \"ann_return_pct\": null, \"vol_pct\": 10.0434, \"sharpe\": 0.2977, \"sortino\": 0.4477, \"mdd_pct\": -5.0436, \"turnover_per_year\": 7.3484, \"trades\": 23, \"costs_usd\": 13.1, \"taxes_usd\": 0.0, \"delisted\": [], \"bench_return_pct\": 5.1871, \"excess_vs_bench_pts\": -4.2634, \"sp500_return_pct\": -8.1746, \"excess_vs_sp500_pts\": 9.0983}"
+   }
+  }
+ ],
+ "rules": [
+  {
+   "id": "band-test",
+   "version": 1,
+   "rule": "rebalance_band",
+   "verdict": "helps",
+   "best": {
+    "band_pts": 3
+   },
+   "result_at": "2026-01-05T07:00:00+00:00"
+  },
+  {
+   "id": "dip-margin",
+   "version": 1,
+   "rule": "margin",
+   "verdict": "hurts",
+   "best": {
+    "borrow_pct": 5,
+    "dip_pct": 20,
+    "rate_pct": 12
+   },
+   "result_at": "2026-01-05T07:00:00+00:00"
+  },
+  {
+   "id": "steer-deposits",
+   "version": 1,
+   "rule": "deposit_steering",
+   "verdict": "no_clear_edge",
+   "best": {},
+   "result_at": "2026-01-05T07:00:00+00:00"
+  }
+ ],
+ "features": [
+  {
+   "metric_id": "ret",
+   "description": "Total return over the window (dividends reinvested)",
+   "window_options": [
+    "21d",
+    "63d",
+    "126d",
+    "252d",
+    "1m",
+    "3m",
+    "6m",
+    "12m",
+    "1y"
+   ],
+   "transforms": [
+    "raw",
+    "rank",
+    "inverse_rank",
+    "zscore",
+    "inverse"
+   ],
+   "point_in_time": true,
+   "kind": "price"
+  },
+  {
+   "metric_id": "ret_skip",
+   "description": "Total return over the window, skipping the most recent month (12-1 momentum)",
+   "window_options": [
+    "21d",
+    "63d",
+    "126d",
+    "252d",
+    "1m",
+    "3m",
+    "6m",
+    "12m",
+    "1y"
+   ],
+   "transforms": [
+    "raw",
+    "rank",
+    "inverse_rank",
+    "zscore",
+    "inverse"
+   ],
+   "point_in_time": true,
+   "kind": "price"
+  },
+  {
+   "metric_id": "vol",
+   "description": "Annualized volatility of daily returns over the window",
+   "window_options": [
+    "21d",
+    "63d",
+    "126d",
+    "252d",
+    "1m",
+    "3m",
+    "6m",
+    "12m",
+    "1y"
+   ],
+   "transforms": [
+    "raw",
+    "rank",
+    "inverse_rank",
+    "zscore",
+    "inverse"
+   ],
+   "point_in_time": true,
+   "kind": "price"
+  },
+  {
+   "metric_id": "ma_gap",
+   "description": "Distance of the close from its moving average over the window",
+   "window_options": [
+    "21d",
+    "63d",
+    "126d",
+    "252d",
+    "1m",
+    "3m",
+    "6m",
+    "12m",
+    "1y"
+   ],
+   "transforms": [
+    "raw",
+    "rank",
+    "inverse_rank",
+    "zscore",
+    "inverse"
+   ],
+   "point_in_time": true,
+   "kind": "price"
+  },
+  {
+   "metric_id": "range_52w",
+   "description": "Position between the window's low (0) and high (1); 252 days is the 52-week range",
+   "window_options": [
+    "21d",
+    "63d",
+    "126d",
+    "252d",
+    "1m",
+    "3m",
+    "6m",
+    "12m",
+    "1y"
+   ],
+   "transforms": [
+    "raw",
+    "rank",
+    "inverse_rank",
+    "zscore",
+    "inverse"
+   ],
+   "point_in_time": true,
+   "kind": "price"
+  },
+  {
+   "metric_id": "dd",
+   "description": "Drawdown from the window's high",
+   "window_options": [
+    "21d",
+    "63d",
+    "126d",
+    "252d",
+    "1m",
+    "3m",
+    "6m",
+    "12m",
+    "1y"
+   ],
+   "transforms": [
+    "raw",
+    "rank",
+    "inverse_rank",
+    "zscore",
+    "inverse"
+   ],
+   "point_in_time": true,
+   "kind": "price"
+  }
+ ],
+ "grammar": {
+  "universe": {
+   "fund_list": "symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks. {\"type\": \"fund_list\", \"set\": \"sector_etfs\"}",
+   "screen": "single stocks in the backfill universe; min_history_days, min_price. Carries a survivorship caveat",
+   "french": "Ken French research portfolios, no survivorship bias, daily from 1963 on the factor calendar. set: industry_12 | industry_49 | size_deciles | momentum_deciles. {\"type\": \"french\", \"set\": \"industry_12\"}. Benchmark defaults to FF.MKT; a pass is research only, never paper"
+  },
+  "signals": "metric_id from features, window like 63d, 6m or 1y (or {param}d), transform: raw, rank, inverse_rank, zscore, inverse",
+  "entry": "{\"top_n\": 3 or \"param:top_n\", \"min_signal\": 0} (min_signal applies to the first signal's raw value), or \"top 3 by rank\"",
+  "exit": "\"rebalance\", or {\"hold_rank\": 5} to keep a holding while it ranks in the top 5",
+  "rebalance": "weekly, monthly or quarterly; signals at the close, trades at the next open",
+  "sizing": "equal, inverse_vol (63-day) or rank",
+  "params": "{\"top_n\": {\"min\": 2, \"max\": 5, \"default\": 3}} or a list of allowed values; grid values must sit inside",
+  "costs": "set by the lab: 5 bps funds and French portfolios, 15 bps stocks, 25 bps thin stocks",
+  "factor_check": "automatic: alpha after the six French factors on the walk-forward record; alpha t of 2 or more passes",
+  "rule": {
+   "request": "{\"request\": \"rule\", \"id\": \"band-test\", \"rule\": \"rebalance_band\", \"params\": {\"band_pts\": [3, 5, 10]}, \"horizons\": [5, 10]}",
+   "rules": {
+    "rebalance_band": [
+     "band_pts"
+    ],
+    "deposit_steering": [],
+    "harvest": [
+     "threshold_usd"
+    ],
+    "margin": [
+     "dip_pct",
+     "borrow_pct",
+     "rate_pct"
+    ]
+   },
+   "optional": "mix (funds, defaults to the plan), deposit_monthly (default 1000), start_value (default 10000), account, date_range",
+   "notes": "margin needs rate_pct as one number; every rule runs against deposits split pro rata with no selling; grid cap 12"
+  }
+ }
+}
