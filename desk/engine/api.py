@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import lab
+from desk.engine import lab, schema, watchlist
 from desk.engine.compare import CompareError, compare
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
@@ -358,7 +358,7 @@ def lookthrough_view(request: Request, fund: str | None = None, limit: int = 50)
 @router.get("/api/lab/strategies")
 def lab_strategies(request: Request) -> JSONResponse:
     cfg = get_cfg(request)
-    return _json({"strategies": lab.strategies(cfg), "features": lab.features(cfg), "grammar": lab.grammar()})
+    return _json({"strategies": lab.strategies(cfg), "rules": lab.rules(cfg), "features": lab.features(cfg), "grammar": lab.grammar()})
 
 
 @router.get("/api/lab/strategies/{strategy_id}")
@@ -385,3 +385,43 @@ def lab_strategy(request: Request, strategy_id: str) -> JSONResponse:
         finally:
             conn.close()
     return _json(view | {"paper_trades": trades})
+
+
+@router.get("/api/engine/watchlist")
+def watchlist_view(request: Request) -> JSONResponse:
+    conn = _open(get_cfg(request)) or sqlite3.connect(":memory:")
+    try:
+        return _json({"symbols": watchlist.rows(conn)})
+    finally:
+        conn.close()
+
+
+def _write(cfg: Config) -> sqlite3.Connection:
+    cfg.desk_db.parent.mkdir(parents=True, exist_ok=True)
+    conn = connect(cfg.desk_db)
+    schema.apply(conn)
+    return conn
+
+
+@router.post("/api/engine/watchlist")
+def watchlist_add(request: Request, body: Annotated[dict, Body()]) -> JSONResponse:
+    conn = _write(get_cfg(request))
+    try:
+        sym = watchlist.add(conn, str(body.get("symbol") or ""))
+        return _json({"added": sym, "symbols": watchlist.rows(conn)})
+    except watchlist.WatchError as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+
+@router.delete("/api/engine/watchlist/{symbol}")
+def watchlist_remove(request: Request, symbol: str) -> JSONResponse:
+    conn = _write(get_cfg(request))
+    try:
+        sym = watchlist.remove(conn, symbol)
+        return _json({"removed": sym, "symbols": watchlist.rows(conn)})
+    except watchlist.WatchError as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
+    finally:
+        conn.close()

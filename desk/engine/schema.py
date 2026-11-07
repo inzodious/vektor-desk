@@ -332,6 +332,19 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   price REAL NOT NULL,
   cost REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS factors_daily (
+  series TEXT NOT NULL,
+  date TEXT NOT NULL,
+  value REAL NOT NULL,
+  PRIMARY KEY (series, date)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS french_returns (
+  set_name TEXT NOT NULL,
+  name TEXT NOT NULL,
+  date TEXT NOT NULL,
+  ret REAL NOT NULL,
+  PRIMARY KEY (set_name, name, date)
+) WITHOUT ROWID;
 """
 
 

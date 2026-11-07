@@ -4,7 +4,8 @@ import json
 import re
 from dataclasses import dataclass, field
 
-from desk.engine.lab.data import FUND_KINDS, LabData
+from desk.engine.french import PORTFOLIO_FILES
+from desk.engine.lab.data import FRENCH_KIND, FRENCH_MARKET, FUND_KINDS, LabData
 from desk.engine.lab.library import FEATURES, TRANSFORMS, window_days
 from desk.engine.market import BENCHMARKS
 
@@ -154,10 +155,20 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
             if stocks:
                 problems.append(f"{', '.join(stocks)} are not funds; single stocks enter only through a screen, never a hand-picked list")
         return {"kind": "fund_list", "symbols": symbols, "set": name}
+    if kind in ("french", "french_portfolios", "ff"):
+        name = str(u.get("set") or "")
+        if name not in PORTFOLIO_FILES:
+            problems.append(f"a french universe needs a set: {', '.join(PORTFOLIO_FILES)}")
+            return {}
+        if data is not None and not data.french(name):
+            problems.append(f"French {name} data is not in the lab yet; the engine's monthly french job fetches it")
+            return {}
+        caveats.append("French portfolios are value-weighted research portfolios, not funds you can buy; a pass here is research and never goes to paper.")
+        return {"kind": FRENCH_KIND, "set": name}
     if kind == "screen":
         caveats.append("Screens run over today's backfill list, which skips companies that vanished before the backfill: survivorship bias.")
         return {"kind": "screen", "min_history_days": int(u.get("min_history_days") or 252), "min_price": float(u.get("min_price") or 5.0)}
-    problems.append('universe type must be "fund_list" or "screen"')
+    problems.append('universe type must be "fund_list", "french" or "screen"')
     return {}
 
 
@@ -216,7 +227,7 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
         constraints={"max_position_pct": float(constraints.get("max_position_pct") or 100), "max_turnover": constraints.get("max_turnover")},
         success_criteria=raw.get("success_criteria") or {},
         horizons=sorted(set(horizons)),
-        benchmark=(str(raw["benchmark"]).upper() if raw.get("benchmark") else None),
+        benchmark=(str(raw["benchmark"]).upper() if raw.get("benchmark") else (FRENCH_MARKET if universe.get("kind") == FRENCH_KIND else None)),
         taxable=not any(k in account for k in SHELTERED),
         model=model or str(raw.get("model") or ""),
         caveats=caveats,

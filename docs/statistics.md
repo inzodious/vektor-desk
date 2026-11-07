@@ -421,9 +421,9 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 | Path | Writer | Holds |
 |---|---|---|
-| `lab/data/lab.db` | Engine `lab-export` job (00:55 nightly), atomic replace | `bars` (price bars plus mirror closes), `symbols` (kind, role, first and last day), `macro`, `plan_mix`, `settings` (marginal rate). SQLite, not Parquet: no new dependencies |
+| `lab/data/lab.db` | Engine `lab-export` job (00:55 nightly), atomic replace | `bars` (price bars plus mirror closes), `symbols` (kind, role, first and last day), `macro`, `plan_mix`, `settings` (marginal rate), `factors` and `french` (phase 9b). SQLite in rollback-journal mode, never WAL, so it opens read-only on the lab's read-only mount |
 | `lab/queue/*.json` | Strategy desk runner | Experiment and finalize requests |
-| `lab/runs/ledger.db` | Lab only | `strategies`, `strategy_trials` (kinds `train`, `test`, `full`, `holdout`; never pruned), `lab_results` (`experiment`, `finalize`, `rejected` bodies), `queue_done` |
+| `lab/runs/ledger.db` | Lab only | `strategies` (status `lab`, `paper`, `research`, `failed`, `inconclusive`), `strategy_trials` (kinds `train`, `test`, `full`, `holdout`, `rule`; never pruned), `lab_results` (`experiment`, `finalize`, `rejected`, `rule` bodies), `queue_done`. Older ledgers migrate in place |
 | `desk.db` | Engine `lab-export` job | `paper_portfolios`, `paper_positions`, `paper_trades` |
 
 **Spec grammar** (also served as `grammar` by `GET /api/lab/strategies` and in every `desk_view`):
@@ -441,19 +441,61 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 **Walk-forward.** The two years before the newest bar are the holdout and never run before finalize. The range before it splits into folds of 3 years train and 1 year test (2 and 0.5 under 4 years; under 2.5 years is rejected). Each fold picks the variant with the best training Sharpe that meets `max_turnover` (read as turnover a year), then runs it on the test year; test years are stitched into the walk-forward record. Every variant also runs over the whole range for the overfitting tests.
 
-**What the desk sees** (`desk_view`): folds, the walk-forward summary, the start-month distribution per horizon (walk-forward when long enough, else the full range flagged `in_sample`), deflated Sharpe (trials counted across the spec's whole `parent_id` family, Sharpe variance across variants), PBO by combinatorial cross-validation over 10 blocks, the analyses it asked for (`param_sensitivity`, `regime_split` bull/bear and high/low rates, `turnover_cost` at 1×, 2×, 4×; `factor_regression` waits for phase 11), caveats, and rejection reasons. A changed spec under the same version, or any spec after finalize, is rejected.
+**What the desk sees** (`desk_view`): folds, the walk-forward summary, the start-month distribution per horizon (walk-forward when long enough, else the full range flagged `in_sample`), deflated Sharpe (trials counted across the spec's whole `parent_id` family, Sharpe variance across variants), PBO by combinatorial cross-validation over 10 blocks, the factor check, the analyses it asked for (`param_sensitivity`, `regime_split` bull/bear and high/low rates, `turnover_cost` at 1×, 2×, 4×, `factor_regression`), caveats, and rejection reasons. A changed spec under the same version, or any spec after finalize, is rejected.
 
-**Finalize** runs the last fold's parameters on the holdout and on the days after the writing model's cutoff (`DESK_LAB_MODEL_CUTOFFS`, a JSON map of model to date, default 2026-06-30), then checks the bars: start-month 5th percentile above zero on the longest horizon, deflated Sharpe over 0.95, PBO under 0.2, holdout excess positive and at least half the walk-forward excess, and the spec's own `excess_vs_plan_pts`, `max_drawdown_pct`, `min_trades`. Any failed bar is `fail`; all computed bars passing is `pass`; anything missing is `inconclusive`. The factor bar is reported as `null` until phase 11 and does not block. A pass moves the strategy to `paper`.
+**Finalize** runs the last fold's parameters on the holdout and on the days after the writing model's cutoff (`DESK_LAB_MODEL_CUTOFFS`, a JSON map of model to date, default 2026-06-30), then checks the bars: start-month 5th percentile above zero on the longest horizon, deflated Sharpe over 0.95, PBO under 0.2, holdout excess positive and at least half the walk-forward excess, and the spec's own `excess_vs_plan_pts`, `max_drawdown_pct`, `min_trades`. Any failed bar is `fail`; all computed bars passing is `pass`; anything missing is `inconclusive`. The factor bar is alpha t of 2 or more; it is `null`, and does not block, only when the factors are missing or overlap fewer than 252 days. A pass moves a fund or screen strategy to `paper` and a French one to `research`.
 
 **Paper.** Each night the engine replays a paper strategy with its finalized parameters from the finalize day to the newest bar on fresh data, so it can never be tuned after the fact. After 182 days it becomes `eligible` if it is level with or ahead of its benchmark, otherwise `retired`. `desk.engine.lab.eligible` lists the eligible ones for Scout.
 
 **API.** `GET /api/lab/strategies` (list, trial counts, paper state, feature catalog, grammar) and `GET /api/lab/strategies/{id}` (the desk view plus paper trades). Workers: `DESK_LAB_WORKERS` (default 1) processes.
 
-**Not in this cut.** Rule backtests (rebalance bands, deposit steering, harvest thresholds, margin rules), the French portfolio universes and the factor check (phase 11 data), point-in-time fundamentals and insider signals from the SEC bulk data sets, and reconstructed index membership.
+**Not in this cut.** Point-in-time fundamentals and insider signals from the SEC bulk data sets, and reconstructed index membership.
+
+### As built (phase 9b)
+
+**French data.** Engine job `french` (03:30 on the 2nd of each month, skips files fetched in the last 25 days) downloads the daily zips into `desk.db`:
+
+| Table | From | Holds |
+|---|---|---|
+| `factors_daily(series, date, value)` | 5 factors (2x3) and momentum, daily | `mkt_rf`, `smb`, `hml`, `rmw`, `cma`, `rf`, `mom`, in percent |
+| `french_returns(set_name, name, date, ret)` | Value-weighted block only | `industry_12`, `industry_49`, `size_deciles`, `momentum_deciles` (deciles by name) |
+
+The lab loads a French set only when a spec asks for it, sharing one calendar across the set, so 49 industries over 60 years cost about 40 MB per worker. `FF.MKT` (market plus bill) is built from the factors.
+
+**French universes.** `{"type": "french", "set": "industry_12"}`. Runs on the factor calendar (from July 1963), benchmark `FF.MKT` unless the spec names one, 5 bps costs, cash earns the French bill rate. The portfolios are not investable, so a pass is `research` and never goes to paper; the caveat says so.
+
+**Factor check.** Every experiment regresses the walk-forward record's daily excess return on the six factors (OLS, Newey-West errors with 5 lags, 252 overlapping days minimum). It reports annual alpha, its t, each loading with its t, and R².
+
+| Label | When |
+|---|---|
+| `alpha` | Alpha t of 2 or more: the factor bar passes |
+| `factor_in_disguise` | No significant alpha and a size, value, profitability, investment or momentum loading with t above 3; the caveat names the tilt |
+| `no_alpha` | Neither |
+
+**Rule backtests.** A queue file `{"request": "rule", "id", "rule", "params", "horizons"}` tests a habit, not a stock picker, on the plan mix (or `mix`, funds only) with synthetic money: `start_value` 10,000 and `deposit_monthly` 1,000 by default.
+
+| Rule | Params (grid of up to 12) | Against |
+|---|---|---|
+| `rebalance_band` | `band_pts`: rebalance to target when any weight drifts past it, checked monthly | Deposits split pro rata, never selling |
+| `deposit_steering` | none: deposits fill underweights first (`shadows.deposit_split`) | Same |
+| `harvest` | `threshold_usd`: sell a position down that much into a substitute (new basis), $3,000 a year against ordinary income | Same, never harvesting |
+| `margin` | `dip_pct`, `borrow_pct`, and `rate_pct` as one fixed number: borrow once per dip, deposits repay first, margin call at 30% equity | Same, never borrowing |
+
+Both sides are sold and taxed at the end, so deferring a gain is not a win. The score is the after-liquidation difference in points of money put in, for every start month in each horizon before the holdout (p5, p50, p95, share better), plus the holdout run.
+
+| Verdict | When |
+|---|---|
+| `helps` | p5 above zero on the longest horizon and the holdout not negative |
+| `hurts` | p95 below zero |
+| `no_clear_edge` | Otherwise; `inconclusive` when no horizon fits |
+
+Rule results are `lab_results` kind `rule`, each variant logged in `strategy_trials`. `GET /api/lab/strategies` lists them under `rules`; `GET /api/lab/strategies/{id}` returns `kind: "rule"` with the full body.
+
+**Watchlist.** `GET /api/engine/watchlist` lists `market_symbols` role `watch` (`source: "desk"`) and `DESK_WATCHLIST` (`"env"`, read-only) with name, last two closes, last bar and whether research exists. `POST {symbol}` and `DELETE /{symbol}` change desk rows only; a bad symbol, an env row or a symbol not on the list is a 400 `{detail}`.
 
 ## Honest limits
 
-Rule backtests (rebalance bands, deposit steering, harvest thresholds, margin rules) use the same lab machinery and the same bars.
+Rule backtests (rebalance bands, deposit steering, harvest thresholds, margin rules) use the same simulator rules, holdout and start-month scoring as strategies, with their own verdict.
 
 What the desk will say out loud:
 
@@ -541,7 +583,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Nightly | Tiingo, EDGAR, FRED pulls; scorecard |
 | Nightly, 00:55 | `lab-export`: fresh `lab/data/lab.db`, then paper portfolios replay to the newest bar. Queued lab experiments run 01:00 to 06:00 ET under `job_lock("lab")` |
 | Weekly, Sunday 02:10 | N-PORT look-through and sector profiles |
-| Monthly | French factors, Monte Carlo refresh, factor regression on holdings with three years or more of history |
+| Monthly, 2nd at 03:30 | `french`: factors and portfolios from the Ken French library. Phase 11 adds the Monte Carlo refresh and factor regression on holdings with three years or more of history |
 
 ## Stack and tests
 

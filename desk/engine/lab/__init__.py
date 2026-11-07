@@ -3,10 +3,12 @@ from datetime import UTC, datetime, timedelta
 
 from desk.config import Config
 from desk.db import connect
+from desk.engine.french import PORTFOLIO_FILES
 from desk.engine.lab.data import NotReady, ledger_path
 from desk.engine.lab.library import TRANSFORMS, catalog
+from desk.engine.lab.rulebook import RULES
 
-__all__ = ["NotReady", "desk_view", "eligible", "features", "grammar", "pending_reviews", "strategies"]
+__all__ = ["NotReady", "desk_view", "eligible", "features", "grammar", "pending_reviews", "rules", "strategies"]
 
 REVIEW_DAYS = 14
 
@@ -16,6 +18,9 @@ def grammar() -> dict:
         "universe": {
             "fund_list": 'symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks. {"type": "fund_list", "set": "sector_etfs"}',
             "screen": "single stocks in the backfill universe; min_history_days, min_price. Carries a survivorship caveat",
+            "french": "Ken French research portfolios, no survivorship bias, daily from 1963 on the factor calendar. set: "
+            + " | ".join(PORTFOLIO_FILES)
+            + '. {"type": "french", "set": "industry_12"}. Benchmark defaults to FF.MKT; a pass is research only, never paper',
         },
         "signals": "metric_id from features, window like 63d, 6m or 1y (or {param}d), transform: " + ", ".join(TRANSFORMS),
         "entry": '{"top_n": 3 or "param:top_n", "min_signal": 0} (min_signal applies to the first signal\'s raw value), or "top 3 by rank"',
@@ -23,7 +28,14 @@ def grammar() -> dict:
         "rebalance": "weekly, monthly or quarterly; signals at the close, trades at the next open",
         "sizing": "equal, inverse_vol (63-day) or rank",
         "params": '{"top_n": {"min": 2, "max": 5, "default": 3}} or a list of allowed values; grid values must sit inside',
-        "costs": "set by the lab: 5 bps funds, 15 bps stocks, 25 bps thin stocks",
+        "costs": "set by the lab: 5 bps funds and French portfolios, 15 bps stocks, 25 bps thin stocks",
+        "factor_check": "automatic: alpha after the six French factors on the walk-forward record; alpha t of 2 or more passes",
+        "rule": {
+            "request": '{"request": "rule", "id": "band-test", "rule": "rebalance_band", "params": {"band_pts": [3, 5, 10]}, "horizons": [5, 10]}',
+            "rules": {k: list(v) for k, v in RULES.items()},
+            "optional": "mix (funds, defaults to the plan), deposit_monthly (default 1000), start_value (default 10000), account, date_range",
+            "notes": "margin needs rate_pct as one number; every rule runs against deposits split pro rata with no selling; grid cap 12",
+        },
     }
 
 
@@ -71,6 +83,33 @@ def _paper(cfg: Config) -> dict:
         conn.close()
 
 
+def rules(cfg: Config) -> list[dict]:
+    conn = _ledger(cfg)
+    if conn is None:
+        return []
+    try:
+        rows = conn.execute(
+            "SELECT strategy_id, version, max(result_at) AS result_at, body FROM lab_results WHERE kind='rule' "
+            "GROUP BY strategy_id, version ORDER BY result_at DESC"
+        ).fetchall()
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        body = json.loads(r["body"])
+        out.append(
+            {
+                "id": r["strategy_id"],
+                "version": r["version"],
+                "rule": body.get("rule"),
+                "verdict": body.get("verdict"),
+                "best": body.get("best"),
+                "result_at": r["result_at"],
+            }
+        )
+    return out
+
+
 def desk_view(cfg: Config, strategy_id: str) -> dict:
     conn = _ledger(cfg)
     if conn is None:
@@ -87,6 +126,18 @@ def desk_view(cfg: Config, strategy_id: str) -> dict:
         return {"strategy_id": strategy_id, "status": None, "folds": [], "tear_sheet": None, "note": "No lab results for this id."}
     latest_version = results[0]["version"]
     mine = [r for r in results if r["version"] == latest_version]
+    rule = next((r for r in mine if r["kind"] == "rule"), None)
+    if rule and not row:
+        rejected = next((r for r in mine if r["kind"] == "rejected" and r["result_at"] > rule["result_at"]), None)
+        return {
+            "strategy_id": strategy_id,
+            "version": latest_version,
+            "kind": "rule",
+            "status": rule["verdict"],
+            "rule": {k: v for k, v in rule.items() if k not in ("strategy_id", "version", "kind")},
+            "rejected": rejected["problems"] if rejected else None,
+            "grammar": grammar(),
+        }
     exp = next((r for r in mine if r["kind"] == "experiment"), None)
     fin = next((r for r in mine if r["kind"] == "finalize"), None)
     rejected = next((r for r in mine if r["kind"] == "rejected"), None)
@@ -96,7 +147,10 @@ def desk_view(cfg: Config, strategy_id: str) -> dict:
         "status": row["status"] if row and row["version"] == latest_version else "rejected",
         "spec_hash": row["spec_hash"] if row else None,
         "folds": exp["folds"] if exp else [],
-        "tear_sheet": {k: exp.get(k) for k in ("windows", "variants", "trials_family", "walk_forward", "horizons", "deflated_sharpe", "pbo", "caveats")}
+        "kind": "strategy",
+        "tear_sheet": {
+            k: exp.get(k) for k in ("windows", "variants", "trials_family", "walk_forward", "horizons", "deflated_sharpe", "pbo", "factor_check", "caveats")
+        }
         if exp
         else None,
         "analyses": exp.get("analyses") if exp else {},
@@ -104,7 +158,7 @@ def desk_view(cfg: Config, strategy_id: str) -> dict:
         "grammar": grammar(),
     }
     if fin:
-        view["final"] = {k: fin.get(k) for k in ("verdict", "bars", "params", "holdout", "post_cutoff", "paper_start", "note")}
+        view["final"] = {k: fin.get(k) for k in ("verdict", "bars", "params", "holdout", "post_cutoff", "paper_start", "factor_check", "note")}
     paper = _paper(cfg).get((strategy_id, latest_version))
     if paper:
         view["paper"] = paper
