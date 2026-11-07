@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bridge · Vektor Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400..800&family=League+Spartan:wght@500..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/desk.css">
+<style>
+.kpis.k7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.brief p { display: flex; gap: 10px; align-items: flex-start; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 13.5px; color: var(--ink-2); }
+.brief p:last-child { border-bottom: 0; }
+.brief p b { color: var(--ink); }
+.brief p i { width: 8px; height: 8px; border-radius: 50%; flex: none; margin-top: 6px; background: var(--c); }
+@media (max-width: 1360px) { .kpis.k7 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 860px) { .kpis.k7 { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpis.k7 > :last-child { grid-column: 1 / -1; } }
+</style>
+</head>
+<body>
+<main class="content" id="main"></main>
+<script src="assets/data.js"></script>
+<script src="assets/desk.js"></script>
+<script src="assets/parts.js"></script>
+<script>
+DESK.page('bridge', (main) => {
+  const D = DATA, K = DESK;
+  const { usd, pct, pts, ico } = K;
+  const day = D.H.reduce((a, h) => a + h.day, 0);
+  const excess = D.port[D.port.length - 1] - D.planShadow[D.planShadow.length - 1];
+  const worst = [...D.PLAN].sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift))[0];
+  const single = D.H.filter((h) => D.SYM[h.sym].single).reduce((a, h) => a + h.value, 0) / D.total;
+  const sat = D.PLAN.find((p) => p.sleeve === 'Satellite');
+
+  main.insertAdjacentHTML('beforeend', K.hero({
+    kicker: 'Bridge · Friday, Nov 6', title: 'Bridge', art: 'bridge',
+    big: `<b data-total>${usd(D.total)}</b><span class="${day >= 0 ? 'up' : 'dn'}">${usd(day, { sign: true })} · ${pct(day / (D.total - day), 2, true)} today</span>`,
+    sub: `Five decisions in the queue. Largest drift: ${worst.sleeve}, ${pts(worst.drift)}.`,
+    foot: `<a class="btn sm" href="decisions.html">${ico('decisions')}Clear the queue</a><button class="btn sm ghost" type="button" data-console-open>${ico('send')}Ask a desk</button>`,
+    chips: '<span class="chip solid">5 in queue</span>',
+  }));
+  main.querySelector('[data-console-open]').onclick = K.openConsole;
+  K.slicers(main, { period: '1Y' });
+
+  const k = document.createElement('section');
+  k.className = 'kpis k7';
+  k.innerHTML = [
+    K.kpi({ id: 'value', metric: 'value.market', label: 'Value', value: usd(D.total), line: `${usd(day, { sign: true })} today`, spark: K.spark(D.port.slice(-60), { color: 'var(--s1)' }), cream: true }),
+    K.kpi({ id: 'excess', metric: 'bm.excess', label: 'Versus plan', value: usd(excess, { sign: true }), line: 'vs plan shadow, 1 year', spark: K.spark(D.port.map((v, i) => v - D.planShadow[i]).slice(-60), { color: 'var(--s1)', base: 0 }) }),
+    K.kpi({ id: 'drift', metric: 'plan.drift_max', label: 'Plan drift', value: (Math.abs(worst.drift) * 100).toFixed(1), unit: 'pts', line: `${worst.sleeve} ${worst.drift > 0 ? 'over' : 'under'} target` }),
+    K.kpi({ id: 'single', metric: 'plan.single_stock', label: 'Single stocks', value: pct(single), line: `Satellite ${pct(sat.weight)}, cap 10%` }),
+    K.kpi({ id: 'margin', metric: 'margin.debit · margin.cost_month', label: 'Margin debit', value: usd(D.MARGIN), line: `About $${Math.round(D.MARGIN * D.MARGIN_RATE / 12)} a month in interest` }),
+    K.kpi({ id: 'cash', metric: 'cash.ready', label: 'Cash ready', value: usd(D.CASH - D.MARGIN), line: '$2,000 deposit lands Nov 18' }),
+    K.kpi({ id: 'fi', metric: 'fi.progress', label: 'FI progress', value: '4.1', unit: '%', line: 'Median FI date 2043', quality: 'modelled' }),
+  ].join('');
+  main.append(k);
+
+  main.insertAdjacentHTML('beforeend', `
+    <section class="grid">
+      <div class="card c4 brief">
+        <div class="card-head"><span class="tag">Today's brief</span><span class="chip">Plan keeper · 5:30 PM</span></div>
+        <p><i style="--c:var(--teal)"></i><span><b>Up ${usd(day)} today</b>, mostly FSKAX. You're ${usd(excess)} ahead of the plan shadow over the year.</span></p>
+        <p><i style="--c:var(--mustard)"></i><span><b>US core is 3.6 points light.</b> The Nov 18 deposit split closes most of it.</span></p>
+        <p><i style="--c:var(--mustard)"></i><span><b>Satellite sits at ${pct(sat.weight)}</b>, past its 10% cap. No new buys there for now.</span></p>
+        <p><i style="--c:var(--sky)"></i><span><b>RIVN harvest</b> is worth about $166 in tax if it goes through by Nov 10.</span></p>
+        <p><i style="--c:var(--mint)"></i><span><b>Discipline streak: 41 days</b> without an unlogged rule break.</span></p>
+      </div>
+      <div class="card c8">
+        <div class="card-head"><span class="tag coral">Decision queue</span><span class="acts"><span class="chip">5 waiting</span><a class="link" href="decisions.html">Open Decisions →</a></span></div>
+        <div id="queue"></div>
+      </div>
+    </section>
+    <section class="card">
+      <div class="card-head"><span class="tag mint">Live holdings</span><span class="acts"><span class="chip ok"><i class="pulse" style="width:6px;height:6px"></i>Finnhub · every 5 s</span><span class="chip info">Funds price at 4 PM</span></span></div>
+      <div id="board"></div>
+    </section>
+    <section class="grid">
+      <div class="card c8">
+        <div class="card-head"><span class="tag">Value versus the plan</span><span class="acts"><span class="muted" style="font-size:12px">Same deposits, same days</span></span></div>
+        <div id="perf"></div>
+      </div>
+      <div class="card c4">
+        <div class="card-head"><span class="tag mustard">Instruments</span><span class="chip">Tap for detail</span></div>
+        <div class="gauges">
+          <button class="gauge" type="button" data-kpi="drift">${K.gauge({ min: 0, max: 10, value: Math.abs(worst.drift) * 100, unit: 'DRIFT', zones: [{ from: 0, to: 5, color: 'var(--mint)' }, { from: 5, to: 7.5, color: 'var(--mustard)' }, { from: 7.5, to: 10, color: 'var(--coral)' }] })}<b>${(Math.abs(worst.drift) * 100).toFixed(1)} pts</b><small>Rebalance at 5</small></button>
+          <button class="gauge" type="button" data-kpi="single">${K.gauge({ min: 0, max: 20, value: 12.4, unit: 'SATELLITE', zones: [{ from: 0, to: 10, color: 'var(--mint)' }, { from: 10, to: 15, color: 'var(--mustard)' }, { from: 15, to: 20, color: 'var(--coral)' }] })}<b>12.4%</b><small>Cap 10%</small></button>
+        </div>
+        <div class="note" style="margin-top:10px">${ico('shield')}<span>Margin call only after a <b style="color:var(--ink)">97% drop</b>. The real cost is the $9 a month.</span></div>
+      </div>
+    </section>
+    <section class="grid">
+      <div class="card c4"><div class="card-head"><span class="tag">Mix against the plan</span><span class="chip">Click a row</span></div><div id="drift"></div></div>
+      <div class="card c4"><div class="card-head"><span class="tag sky">Alerts</span></div><div class="rows" id="alerts"></div></div>
+      <div class="card c4"><div class="card-head"><span class="tag lilac">Coming up</span></div><div class="rows" id="events"></div></div>
+    </section>`);
+
+  main.querySelector('#queue').innerHTML = D.PROPOSALS.slice(0, 3).map((p) => K.prop(p, { actions: true })).join('') + '<p class="empty-hint" style="margin-top:8px">2 more in Decisions. Approving opens Preflight and the order ticket.</p>';
+  main.querySelectorAll('#queue [data-prop]').forEach((c) => (c.onclick = (e) => { if (!e.target.closest('button') || e.target.closest('[data-act]')) location.href = `decisions.html#${c.dataset.prop}`; }));
+  K.board(main.querySelector('#board'), K.liveRows([...D.H].sort((a, b) => b.value - a.value)));
+
+  K.lineChart(main.querySelector('#perf'), {
+    height: 250, x: D.days, endLabels: true, label: 'Portfolio value versus plan shadow and S&P 500 shadow',
+    series: [{ name: 'Portfolio', short: 'You', color: 'var(--s1)', values: D.port, width: 2.4 }, { name: 'Plan shadow', short: 'Plan', color: 'var(--s2)', values: D.planShadow }, { name: 'S&P 500 shadow', short: 'S&P', color: 'var(--s3)', values: D.spyShadow }],
+    fmtY: (v) => `$${(v / 1000).toFixed(0)}K`, fmtTip: (v) => usd(v), tipHint: 'Click a day to see what moved',
+    onClick: (i) => K.openDrawer({ title: K.dShort(D.days[i]), crumbs: [{ label: 'Value versus the plan', go: K.closeAll }], sub: 'Contribution by holding that day', body: '<div id="dd"></div>', after: (el) => K.hbars(el.querySelector('#dd'), { items: D.H.map((h) => ({ label: h.sym, value: h.shares * (D.SYM[h.sym].series[i] - D.SYM[h.sym].series[Math.max(0, i - 1)]) })).sort((a, b) => b.value - a.value), fmt: (v) => usd(v, { sign: true }), name: 'Day move' }) }),
+  });
+
+  K.driftRows(main.querySelector('#drift'), D.PLAN, (p) => drillSleeve(p));
+
+  main.querySelector('#alerts').innerHTML = D.ALERTS.map((a) => `<div class="row"><span class="l"><span class="desk-ico" style="width:32px;height:32px;border-radius:10px;background:var(--${{ watch: 'mustard', info: 'sky', act: 'coral', ok: 'mint' }[a.tone]}-soft);color:var(--${a.tone})">${ico(a.icon)}</span><div><b>${a.title}</b><small>${a.sub}</small></div></span><span></span></div>`).join('');
+  main.querySelector('#events').innerHTML = D.EVENTS.map((e) => `<div class="row"${e.sym ? ` data-sym="${e.sym}"` : ''}><span class="l"><span class="datebox"><small>${e.m}</small><b>${e.d}</b></span><div><b>${e.title}</b><small>${e.sub}</small></div></span><span>${e.sym ? `<span class="chip">${e.sym}</span>` : ''}</span></div>`).join('');
+
+  function drillSleeve(p) {
+    const funds = D.H.filter((h) => h.sleeve === p.sleeve);
+    K.openDrawer({
+      title: p.sleeve, sub: `${pct(p.weight)} of the portfolio against a ${pct(p.target, 0)} target`,
+      crumbs: [{ label: 'Bridge', go: K.closeAll }, { label: 'Mix', go: K.closeAll }],
+      body: `<div class="mini-kpis"><div><small>Value</small><b>${usd(p.value)}</b></div><div><small>Drift</small><b>${pts(p.drift)}</b></div><div><small>To target</small><b>${usd((p.target - p.weight) * D.total, { sign: true })}</b></div></div>
+        <div><span class="kicker">Funds in this sleeve</span><div id="dd" style="margin-top:6px"></div></div>
+        <div class="note">${ico('compass')}<span>${p.drift < 0 ? `The next deposit routes here first. Tap a fund to see lots and the Symbol sheet.` : `Over target. Deposits skip this sleeve until it's back inside the band.`}</span></div>`,
+      after: (el) => funds.length ? K.hbars(el.querySelector('#dd'), { items: funds.map((h) => ({ label: h.sym, value: h.value, sym: h.sym, color: 'var(--s1)' })), fmt: (v) => usd(v), name: 'Value', onClick: (it) => K.openSymbol(it.sym) }) : (el.querySelector('#dd').innerHTML = '<p class="empty-hint">SPAXX core cash, $1,600 settled.</p>'),
+    });
+  }
+  const KPI_DRILL = {
+    value: () => K.openDrawer({ title: 'Value by account', crumbs: [{ label: 'Bridge', go: K.closeAll }], sub: 'Live in market hours, close otherwise', body: '<div id="dd"></div><div class="note">' + ico('info') + '<span>401(k) joins once Empower is linked in Escape Vektor.</span></div>', after: (el) => K.hbars(el.querySelector('#dd'), { items: [{ label: 'Individual', value: D.H.filter((h) => h.acct === 'Individual').reduce((a, h) => a + h.value, 0) + D.CASH, color: 'var(--s1)' }, { label: 'HSA', value: D.H.filter((h) => h.acct === 'HSA').reduce((a, h) => a + h.value, 0), color: 'var(--s1)' }], fmt: (v) => usd(v), name: 'Value' }) }),
+    drift: () => drillSleeve(worst),
+    single: () => drillSleeve(sat),
+  };
+  main.querySelectorAll('[data-kpi]').forEach((b) => (b.onclick = () => (KPI_DRILL[b.dataset.kpi] || KPI_DRILL.value)()));
+});
+</script>
+</body>
+</html>

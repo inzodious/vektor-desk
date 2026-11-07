@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Journal · Vektor Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400..800&family=League+Spartan:wght@500..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/desk.css">
+</head>
+<body>
+<main class="content" id="main"></main>
+<script src="assets/data.js"></script>
+<script src="assets/desk.js"></script>
+<script src="assets/parts.js"></script>
+<script>
+DESK.page('decisions', (main) => {
+  const D = DATA, K = DESK;
+  const { usd, pct, pts, ico, esc } = K;
+  main.insertAdjacentHTML('beforeend', K.hero({
+    kicker: 'Decisions · Journal', title: 'Journal', art: 'decisions',
+    big: '<b>96%</b><span class="muted">of Fidelity trades have a decision record</span>',
+    foot: K.subtabs('decisions'),
+  }));
+  K.slicers(main, { period: '3M', bench: false, extra: [K.combo('Origin', ['Everyone', 'You', 'Plan keeper', 'Tax desk', 'Risk desk', 'Research desk', 'Scout'], 'Everyone'), K.combo('Status', ['Any status', 'Followed plan', 'Override', 'Passed', 'Dismissed'], 'Any status')] });
+  main.insertAdjacentHTML('beforeend', `<section class="grid">
+    <div class="card c8"><div class="card-head"><span class="tag coral">Decision journal</span><span class="acts"><span class="chip">Every action and every deliberate pass</span></span></div><div id="ledger"></div></div>
+    <div class="stack c4">
+      <div class="card"><div class="card-head"><span class="tag mint">Discipline streak</span></div><div style="display:flex;align-items:baseline;gap:10px"><b style="font-family:var(--f-poster);font-weight:400;font-size:54px;line-height:.9;color:var(--ink)">41</b><span class="muted">days without an unlogged rule break</span></div><div class="meter" style="margin-top:10px"><i style="width:68%"></i></div><p class="empty-hint" style="margin-top:6px">Longest so far: 60. Only an override without a reason resets it.</p></div>
+      <div class="card"><div class="card-head"><span class="tag mustard">Overrides this quarter</span></div><div id="ov"></div></div>
+      <div class="card"><div class="card-head"><span class="tag sky">Unmatched trades</span><span class="chip watch">1</span></div><div class="row"><span class="l"><span class="datebox"><small>Oct</small><b>14</b></span><div><b>Bought 4 FTEC at Fidelity</b><small>No decision record yet</small></div></span><button class="btn sm ghost" type="button">Log it</button></div></div>
+    </div></section>`);
+  main.querySelector('#ledger').innerHTML = K.ledger(D.JOURNAL);
+  K.hbars(main.querySelector('#ov'), { items: [{ label: 'Overrides (3)', value: -6, color: 'var(--dn)' }, { label: 'Clean (14)', value: 9, color: 'var(--up)' }], fmt: (v) => usd(v, { sign: true }), name: 'Average 30-day score vs plan', labelW: 110 });
+});
+</script>
+</body>
+</html>

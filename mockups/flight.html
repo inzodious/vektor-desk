@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Flight record · Vektor Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400..800&family=League+Spartan:wght@500..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/desk.css">
+</head>
+<body>
+<main class="content" id="main"></main>
+<script src="assets/data.js"></script>
+<script src="assets/desk.js"></script>
+<script src="assets/parts.js"></script>
+<script>
+DESK.page('decisions', (main) => {
+  const D = DATA, K = DESK;
+  const { usd, pct, pts, ico, esc } = K;
+  main.insertAdjacentHTML('beforeend', K.hero({
+    kicker: 'Decisions · Flight record', title: 'Flight record', art: 'plan',
+    big: '<b>2 of 5</b><span class="muted">desks beat “follow the plan” at 90 days</span>',
+    foot: K.subtabs('decisions'),
+  }));
+  let win = 'd90';
+  K.slicers(main, { period: false, bench: false, extra: [K.combo('Scored at', [{ v: 'd30', t: '30 days' }, { v: 'd90', t: '90 days' }, { v: 'd365', t: '365 days', note: 'From Nov 2027', off: true }], 'd90', (v) => { win = v; draw(); })] });
+  const k = document.createElement('section');
+  k.className = 'kpis';
+  k.innerHTML = [
+    K.kpi({ id: 'n', metric: 'dec.score_by', label: 'Decisions scored', value: '45', line: 'Since Jul 1, taken or not' }),
+    K.kpi({ id: 'desk', metric: 'dec.desk_record', label: 'Desks ahead', value: '2', unit: 'of 5', line: 'Tax desk, Risk desk' }),
+    K.kpi({ id: 'saves', metric: 'dec.score_by', label: 'Saves', value: '$310', line: 'Interest and tax avoided' }),
+    K.kpi({ id: 'you', metric: 'dec.offplan_gap', label: 'Your off-plan calls', value: '−$140', line: '11 trades, 90 days' }),
+    K.kpi({ id: 'lag', metric: 'dec.lag', label: 'Decision lag', value: '1.4', unit: 'days', line: 'Proposal to action' }),
+    K.kpi({ id: 'brier', metric: 'dec.brier', label: 'Calibration', value: '0.22', line: 'Brier, lower is better', quality: 'insufficient history' }),
+  ].join('');
+  main.append(k);
+  main.insertAdjacentHTML('beforeend', `<section class="grid">
+    <div class="card c6"><div class="card-head"><span class="tag">Score against the plan</span><span class="chip" id="winchip">90 days</span></div><div id="score"></div><p class="empty-hint" style="margin-top:6px">Dollars ahead of putting the same money into the plan mix on the same day.</p></div>
+    <div class="card c6"><div class="card-head"><span class="tag lilac">Is confidence honest?</span><span class="chip">All desks · 38 proposals</span></div><div id="cal"></div></div>
+  </section>
+  <section class="card"><div class="card-head"><span class="tag mustard">Desk record</span><span class="acts"><span class="chip">Keep-or-switch-off review: May 2027</span></span></div><div class="tscroll"><table class="t" id="tbl"></table></div></section>`);
+  const draw = () => {
+    main.querySelector('#winchip').textContent = win === 'd30' ? '30 days' : '90 days';
+    K.hbars(main.querySelector('#score'), { items: D.SCORE.map((s) => ({ label: s.who, value: s[win] ?? 0, none: s[win] == null, tip: `<b>${s.who}</b>${K.trow(null, 'Scored', s.n)}${K.trow(null, 'vs plan', s[win] == null ? 'Not yet' : usd(s[win], { sign: true }))}${K.trow(null, 'Hit rate', pct(s.hit, 0))}` })), fmt: (v, it) => (it.none ? 'Not yet' : usd(v, { sign: true })), name: 'vs plan', labelW: 120 });
+  };
+  draw();
+  const bins = [0.1, 0.3, 0.5, 0.7, 0.9];
+  K.lineChart(main.querySelector('#cal'), { height: 220, x: bins, xKey: (d, i) => i, xLabel: (d) => `${Math.round(d * 100)}%`, tipX: (d) => `Said ${Math.round(d * 100)}% likely`, series: [{ name: 'Actually beat the plan', color: 'var(--s1)', values: [0.2, 0.25, 0.42, 0.55, 0.67] }, { name: 'Perfectly honest', color: 'var(--ink-3)', values: bins, dash: true }], fmtY: (v) => `${Math.round(v * 100)}%`, label: 'Calibration' });
+  main.querySelector('#tbl').innerHTML = `<thead><tr><th>Origin</th><th class="r">Scored</th><th class="r">30 days</th><th class="r">90 days</th><th class="r">Hit rate</th><th class="r">Brier</th><th class="r">Turns / week</th><th>Status</th></tr></thead><tbody>${D.SCORE.map((s) => `<tr><td><b style="color:var(--ink)">${s.who}</b></td><td class="r">${s.n}</td><td class="r ${s.d30 >= 0 ? 'up' : 'dn'}">${usd(s.d30, { sign: true })}</td><td class="r ${s.d90 == null ? '' : s.d90 >= 0 ? 'up' : 'dn'}">${s.d90 == null ? '—' : usd(s.d90, { sign: true })}</td><td class="r">${pct(s.hit, 0)}</td><td class="r">${s.brier ?? '—'}</td><td class="r">${s.usage || '—'}</td><td>${s.who === 'You' ? '<span class="chip">Always on</span>' : s.d90 != null && s.d90 > 0 ? '<span class="chip ok">Earning its keep</span>' : s.n < 5 ? '<span class="chip info">Too early</span>' : '<span class="chip watch">Behind the plan</span>'}</td></tr>`).join('')}</tbody>`;
+});
+</script>
+</body>
+</html>

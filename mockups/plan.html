@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plan · Vektor Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400..800&family=League+Spartan:wght@500..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/desk.css">
+</head>
+<body>
+<main class="content" id="main"></main>
+<script src="assets/data.js"></script>
+<script src="assets/desk.js"></script>
+<script src="assets/parts.js"></script>
+<script>
+DESK.page('plan', (main) => {
+  const D = DATA, K = DESK;
+  const { usd, pct, pts, ico, esc } = K;
+  main.insertAdjacentHTML('beforeend', K.hero({
+    kicker: 'Plan · Mix and drift', title: 'Plan', art: 'plan',
+    big: '<b>v14</b><span class="muted">active plan from Escape Vektor · changed Oct 2</span>',
+    foot: K.subtabs('plan'),
+  }));
+  K.slicers(main, { period: false, bench: false });
+  const k = document.createElement('section');
+  k.className = 'kpis';
+  const worst = [...D.PLAN].sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift))[0];
+  k.innerHTML = [
+    K.kpi({ id: 'd', metric: 'plan.drift_max', label: 'Largest drift', value: (Math.abs(worst.drift) * 100).toFixed(1), unit: 'pts', line: worst.sleeve }),
+    K.kpi({ id: 'n', metric: 'plan.next_deposit', label: 'Next deposit', value: '$2,000', line: 'Nov 18 · to US core and Intl' }),
+    K.kpi({ id: 'r', metric: 'plan.rules', label: 'Rules passing', value: '4', unit: 'of 5', line: 'Satellite cap is the one' }),
+    K.kpi({ id: 'a', metric: 'plan.adherence', label: 'Plan adherence', value: '91%', line: 'Dollars into the mix, 90 days' }),
+    K.kpi({ id: 'h', metric: 'tax.harvestable', label: 'Harvestable loss', value: '$693', line: 'Worth about $166 in tax' }),
+    K.kpi({ id: 'f', metric: 'fi.date_pctl', label: 'FI date', value: '2043', line: '80% range 2040–47', quality: 'modelled' }),
+  ].join('');
+  main.append(k);
+  main.insertAdjacentHTML('beforeend', `<section class="grid">
+    <div class="card c6"><div class="card-head"><span class="tag">Sleeves against target</span><span class="chip">Click a sleeve</span></div><div id="drift"></div></div>
+    <div class="card c6"><div class="card-head"><span class="tag">Funds</span><span class="chip">Weights by account</span></div><div class="tscroll"><table class="t" id="funds"></table></div></div>
+    <div class="card c6"><div class="card-head"><span class="tag mint">Deposit schedule</span><span class="chip">Closes drift without selling</span></div><div class="tscroll"><table class="t" id="dep"></table></div></div>
+    <div class="card c6"><div class="card-head"><span class="tag mustard">Rules</span><span class="acts"><span class="chip">desk.yaml · v14</span><button class="link" type="button">Change a rule</button></span></div><div id="rules"></div></div>
+    <div class="card c6"><div class="card-head"><span class="tag sky">Tax calendar</span><span class="chip">Wash windows across all accounts</span></div><div id="tax"></div></div>
+    <div class="card c6"><div class="card-head"><span class="tag lilac">Path to the FI number</span><span class="chip lilac">Monte Carlo · modelled</span></div><div id="fi"></div></div>
+  </section>`);
+  K.driftRows(main.querySelector('#drift'), D.PLAN, (p) => K.openDrawer({ title: p.sleeve, crumbs: [{ label: 'Plan', go: K.closeAll }], sub: `${pct(p.weight)} against ${pct(p.target, 0)}`, body: '<div id="dd"></div>', after: (el) => K.hbars(el.querySelector('#dd'), { items: D.H.filter((h) => h.sleeve === p.sleeve).map((h) => ({ label: h.sym, value: h.value, color: 'var(--s1)', sym: h.sym })), fmt: (v) => usd(v), onClick: (it) => K.openSymbol(it.sym) }) }));
+  main.querySelector('#funds').innerHTML = `<thead><tr><th>Fund</th><th>Account</th><th class="r">Weight</th><th class="r">Value</th><th class="r">Gain</th></tr></thead><tbody>${D.PLAN.map((p) => `<tr class="grp"><td colspan="5">${p.sleeve} · target ${pct(p.target, 0)}</td></tr>` + (p.sleeve === 'Cash' ? `<tr><td><span class="sym"><i style="--c:var(--s-other)"></i>SPAXX</span></td><td>Individual</td><td class="r">${pct(D.CASH / D.total)}</td><td class="r">${usd(D.CASH)}</td><td class="r">—</td></tr>` : D.H.filter((h) => h.sleeve === p.sleeve).map((h) => `<tr data-sym="${h.sym}"><td><span class="sym"><i style="--c:var(--s1)"></i>${h.sym}</span></td><td>${h.acct}</td><td class="r">${pct(h.weight)}<span class="databar"><i style="width:${h.weight / 0.5 * 100}%"></i></span></td><td class="r">${usd(h.value)}</td><td class="r ${h.gain >= 0 ? 'up' : 'dn'}">${usd(h.gain, { sign: true })}</td></tr>`).join(''))).join('')}</tbody>`;
+  const deps = [['Nov 18', '$1,400 FSKAX · $600 FTIHX', '−3.6 → −1.0'], ['Dec 2', '$1,300 FSKAX · $500 FTIHX · $200 SPAXX', '−1.0 → −0.3'], ['Dec 16', '$1,100 FSKAX · $500 FTIHX · $400 FTEC', '−0.3 → −0.1'], ['Dec 30', '$1,100 FSKAX · $400 FTIHX · $500 FTEC', 'In band'], ['Jan 13', 'Plan mix', 'In band']];
+  main.querySelector('#dep').innerHTML = `<thead><tr><th>Date</th><th>Split</th><th class="r">US core drift</th></tr></thead><tbody>${deps.map((d, i) => `<tr><td><b style="color:var(--ink)">${d[0]}</b>${i === 0 ? ' <span class="chip ok">Proposal ready</span>' : ''}</td><td>${d[1]}</td><td class="r">${d[2]}</td></tr>`).join('')}</tbody>`;
+  const RULES = [['ok', 'No margin-funded buys', 'Debit is from a past buy; paying it off is queued'], ['watch', 'Satellite at or under 10%', '12.4% now. New satellite buys light up in Preflight'], ['ok', 'No new single stocks', 'Last checked Nov 6'], ['ok', 'Rebalance by deposit when drift passes 5 points', 'Largest drift 4.4 points'], ['ok', 'Keep 2% or more in cash', '3.5% now']];
+  main.querySelector('#rules').innerHTML = RULES.map(([t, b, s]) => `<div class="rule"><span style="color:${t === 'ok' ? 'var(--ok)' : 'var(--watch)'}">${ico(t === 'ok' ? 'check' : 'gauge')}</span><span><b>${b}</b><small>${s}</small></span><span class="chip ${t}">${t === 'ok' ? 'Passing' : 'Heads up'}</span></div>`).join('');
+  const span = 75, start = new Date(Date.UTC(2026, 10, 6));
+  const ev = [[4, 'RIVN harvest by', 'act'], [12, 'AAPL earnings', 'info'], [34, 'RIVN window closes', 'info'], [43, 'FTEC distribution', 'info'], [55, 'Last day to harvest', 'watch'], [68, 'Lot export due', 'info']];
+  const W = (d) => `${(d / span) * 100}%`;
+  main.querySelector('#tax').innerHTML = `<div style="position:relative;height:150px;margin:6px 6px 0">
+    <div style="position:absolute;left:0;right:0;top:70px;height:2px;background:var(--line-2)"></div>
+    <div title="Wash-sale window, RIVN" style="position:absolute;left:${W(4)};width:calc(${W(34)} - ${W(4)});top:62px;height:18px;border-radius:9px;background:var(--sky-soft);border:1px solid var(--sky)"></div>
+    ${['Nov', 'Dec', 'Jan'].map((m, i) => `<span style="position:absolute;left:${W([0, 25, 56][i])};top:82px;font-size:11px;font-weight:700;color:var(--ink-3)">${m}</span>`).join('')}
+    ${ev.map(([d, t, tone], i) => `<div style="position:absolute;left:${W(d)};top:${i % 2 ? 92 : 4}px;transform:translateX(-50%);display:grid;justify-items:center;gap:2px;width:100px;text-align:center"><span style="order:${i % 2 ? 0 : 2};width:12px;height:12px;border-radius:50%;background:var(--${tone === 'act' ? 'coral' : tone === 'watch' ? 'mustard' : 'sky'});border:2px solid var(--card);box-shadow:0 0 0 1.5px var(--ink-3)"></span><small style="order:1;font-size:11.5px;font-weight:700;color:var(--ink);line-height:1.2">${t}</small></div>`).join('')}
+  </div><p class="empty-hint">Blue bar: no RIVN buys in any account, HSA included, while it's open.</p>`;
+  const yrs = Array.from({ length: 21 }, (_, i) => 2026 + i);
+  const g = (r) => yrs.map((y, i) => Math.round(45 * Math.pow(1 + r, i) + 26 * ((Math.pow(1 + r, i) - 1) / r)));
+  K.lineChart(main.querySelector('#fi'), { height: 220, x: yrs, xKey: (d, i) => i, xLabel: (d, i) => (i % 5 === 0 ? `'${String(d).slice(2)}` : ''), tipX: (d) => `${d}`, series: [{ name: '90th percentile', short: 'p90', color: 'var(--s3)', values: g(0.09), width: 1.6 }, { name: 'Median', short: 'p50', color: 'var(--s1)', values: g(0.065), width: 2.4 }, { name: '10th percentile', short: 'p10', color: 'var(--s4)', values: g(0.035), width: 1.6 }], refs: [{ y: 900, label: 'FI number', start: true }], endLabels: true, fmtY: (v) => `$${v >= 1000 ? (v / 1000).toFixed(1) + 'M' : v + 'K'}`, label: 'FI projection percentiles' });
+});
+</script>
+</body>
+</html>

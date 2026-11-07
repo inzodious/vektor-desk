@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vektor Desk · Mockups</title>
+<style>
+:root { --bg: #f4f4f2; --panel: #ffffff; --panel-2: #f0f0ed; --line: #e2e1dc; --line-2: #cfcdc6; --text: #1a1a18; --muted: #6d6b64; --accent: #1a1a18; --accent-ink: #ffffff; --dot: #1f9a96; }
+html.dark { --bg: #121212; --panel: #1b1b1b; --panel-2: #232323; --line: #2c2c2c; --line-2: #3a3a3a; --text: #efefec; --muted: #9a988f; --accent: #efefec; --accent-ink: #121212; --dot: #4fd6cb; }
+* { box-sizing: border-box; margin: 0; }
+html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+button, a { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.viewer { display: grid; grid-template-columns: 300px minmax(0, 1fr); height: 100vh; transition: grid-template-columns .2s ease; }
+.viewer.closed { grid-template-columns: 0 minmax(0, 1fr); }
+.vnav { min-width: 0; overflow: hidden; border-right: 1px solid var(--line); background: var(--panel); }
+.vnav-in { width: 300px; height: 100%; display: flex; flex-direction: column; gap: 2px; padding: 18px 12px; overflow-y: auto; }
+.vhead { padding: 0 8px 12px; }
+.vhead b { display: block; font-size: 16px; }
+.vhead p { color: var(--muted); font-size: 12.5px; margin-top: 4px; }
+.kick, .grp { font: 600 10.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.grp { margin: 12px 8px 4px; }
+.vitem { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: center; width: 100%; min-height: 50px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
+.vitem:hover { background: var(--panel-2); }
+.vitem.on { background: var(--panel-2); border-color: var(--line-2); }
+.vitem kbd { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid var(--line-2); border-radius: 6px; font: 600 11px ui-monospace, Menlo, monospace; color: var(--muted); }
+.vitem.on kbd { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.vitem b { display: block; font-size: 13.5px; font-weight: 600; }
+.vitem span.d { display: block; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.keys { margin-top: auto; padding: 14px 8px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; font-size: 12px; color: var(--muted); }
+.keys kbd { font: 600 10.5px ui-monospace, Menlo, monospace; padding: 2px 6px; border: 1px solid var(--line-2); border-radius: 4px; color: var(--text); text-align: center; }
+.stage { min-width: 0; display: flex; flex-direction: column; }
+.bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--panel); min-width: 0; }
+.bar .title { font-weight: 600; white-space: nowrap; }
+.bar .sub { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.sp { flex: 1; }
+.ib { min-width: 38px; height: 38px; padding: 0 10px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); cursor: pointer; text-decoration: none; font-size: 12.5px; white-space: nowrap; flex: none; }
+.ib:hover { background: var(--panel-2); }
+.ib.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.ib svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.frame-wrap { flex: 1; min-height: 0; display: grid; place-items: stretch; background: var(--bg); }
+.frame-wrap.phone { place-items: center; padding: 16px; overflow: auto; }
+#frame { width: 100%; height: 100%; border: 0; background: #f6eedc; }
+.frame-wrap.phone #frame { width: 390px; height: min(844px, 100%); border-radius: 28px; border: 8px solid #1a1a18; }
+select.pick { display: none; height: 38px; border: 1px solid var(--line-2); border-radius: 8px; background: var(--panel); color: var(--text); padding: 0 8px; min-width: 0; flex: 1; font: inherit; }
+@media (max-width: 760px) {
+  .viewer, .viewer.closed { grid-template-columns: 0 minmax(0, 1fr); }
+  .bar .title, .bar .sub, .hide-m { display: none; }
+  select.pick { display: block; }
+  .frame-wrap.phone { padding: 0; }
+  .frame-wrap.phone #frame { width: 100%; height: 100%; border: 0; border-radius: 0; }
+}
+</style>
+</head>
+<body>
+<div class="viewer" id="viewer">
+  <aside class="vnav" aria-label="Mockups">
+    <div class="vnav-in">
+      <div class="vhead"><span class="kick">Vektor Desk</span><b>Dashboards and design</b><p>Clickable mockups on sample data. Every number, chart and symbol opens something.</p></div>
+      <div id="list"></div>
+      <div class="keys">
+        <kbd>1–9 0 - =</kbd><span>Jump to a mockup</span>
+        <kbd>← →</kbd><span>Previous, next</span>
+        <kbd>T</kbd><span>Light or dark</span>
+        <kbd>P</kbd><span>Phone frame</span>
+        <kbd>[</kbd><span>Hide this list</span>
+      </div>
+    </div>
+  </aside>
+  <section class="stage">
+    <div class="bar">
+      <button class="ib" id="toggle" type="button" aria-label="Show or hide the list" title="List ( [ )"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+      <select class="pick" id="pick" aria-label="Mockup"></select>
+      <span class="title" id="title"></span><span class="sub" id="sub"></span>
+      <span class="sp"></span>
+      <button class="ib" id="prev" type="button" aria-label="Previous"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+      <button class="ib" id="next" type="button" aria-label="Next"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+      <button class="ib hide-m" id="phone" type="button" title="Phone frame (P)">390</button>
+      <button class="ib" id="theme" type="button" title="Light or dark (T)" aria-label="Light or dark"><svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg></button>
+      <a class="ib hide-m" id="open" target="_blank" rel="noopener" title="Open in a new tab"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>
+    </div>
+    <div class="frame-wrap" id="wrap"><iframe id="frame" title="Mockup"></iframe></div>
+  </section>
+</div>
+<script>
+var GROUPS = [
+  ['Bridge', [
+    ['bridge.html', 'Bridge', 'KPIs, brief, queue, live holdings board'],
+    ['bridge.html?sym=FTEC', 'Symbol sheet', 'Live tracking from any symbol chip'],
+    ['bridge.html?open=console', 'Console', 'Ask a desk, run now or tonight'],
+  ]],
+  ['Decisions', [
+    ['decisions.html', 'Queue and Preflight', 'Proposal, Skeptic, cockpit lights, ticket'],
+    ['journal.html', 'Journal', 'Stamped ledger of every decision'],
+    ['flight.html', 'Flight record', 'Desks and you against the plan'],
+  ]],
+  ['Plan', [['plan.html', 'Plan', 'Drift, deposits, rules, tax calendar, FI path']]],
+  ['Research', [['research.html', 'Dossier', 'Thesis, bear case, range, sources']]],
+  ['Lab', [
+    ['lab-compare.html', 'Compare', 'Up to five items, small multiples, overlap'],
+    ['lab-risk.html', 'Risk', 'Scatter, correlation, drawdown, shocks'],
+    ['lab-patterns.html', 'Patterns', 'Market context and your own behavior'],
+  ]],
+  ['Settings', [['settings.html', 'Settings', 'Desk profile, crew, usage, freshness']]],
+];
+var PAGES = [];
+GROUPS.forEach(function (g) { g[1].forEach(function (p) { PAGES.push([p[0], p[1], p[2], g[0]]); }); });
+var KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '='];
+function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+var theme = store('desk-index-theme') || 'light';
+var phone = store('desk-index-phone') === '1';
+var cur = Math.max(0, Math.min(PAGES.length - 1, parseInt((location.hash || '#1').slice(1), 10) - 1 || 0));
+var frame = document.getElementById('frame');
+function SRC(i) { var p = PAGES[i][0]; return p + (p.indexOf('?') > -1 ? '&' : '?') + 'theme=' + theme; }
+function render() {
+  var html = '';
+  GROUPS.forEach(function (g) {
+    html += '<div class="grp">' + g[0] + '</div>';
+    PAGES.forEach(function (p, i) { if (p[3] !== g[0]) return; html += '<button type="button" class="vitem' + (i === cur ? ' on' : '') + '" data-i="' + i + '"><kbd>' + KEYS[i] + '</kbd><span><b>' + p[1] + '</b><span class="d">' + p[2] + '</span></span></button>'; });
+  });
+  document.getElementById('list').innerHTML = html;
+  Array.prototype.forEach.call(document.querySelectorAll('.vitem'), function (b) { b.onclick = function () { go(+b.dataset.i); }; });
+  document.getElementById('pick').innerHTML = PAGES.map(function (p, i) { return '<option value="' + i + '"' + (i === cur ? ' selected' : '') + '>' + p[3] + ' · ' + p[1] + '</option>'; }).join('');
+  document.getElementById('title').textContent = PAGES[cur][1];
+  document.getElementById('sub').textContent = PAGES[cur][2];
+  document.getElementById('open').href = SRC(cur);
+  document.documentElement.classList.toggle('dark', theme === 'dark');
+  document.getElementById('wrap').classList.toggle('phone', phone);
+  document.getElementById('phone').classList.toggle('on', phone);
+}
+function go(i) { cur = (i + PAGES.length) % PAGES.length; history.replaceState(null, '', '#' + (cur + 1)); render(); frame.src = SRC(cur); }
+document.getElementById('prev').onclick = function () { go(cur - 1); };
+document.getElementById('next').onclick = function () { go(cur + 1); };
+document.getElementById('pick').onchange = function (e) { go(+e.target.value); };
+document.getElementById('toggle').onclick = function () { document.getElementById('viewer').classList.toggle('closed'); };
+document.getElementById('theme').onclick = function () { theme = theme === 'dark' ? 'light' : 'dark'; store('desk-index-theme', theme); go(cur); };
+document.getElementById('phone').onclick = function () { phone = !phone; store('desk-index-phone', phone ? '1' : '0'); render(); };
+document.addEventListener('keydown', function (e) {
+  if (e.metaKey || e.ctrlKey || e.altKey || /select|input/i.test(e.target.tagName)) return;
+  var k = KEYS.indexOf(e.key);
+  if (k > -1 && k < PAGES.length) go(k);
+  else if (e.key === 'ArrowRight') go(cur + 1);
+  else if (e.key === 'ArrowLeft') go(cur - 1);
+  else if (e.key === 't' || e.key === 'T') document.getElementById('theme').click();
+  else if (e.key === 'p' || e.key === 'P') document.getElementById('phone').click();
+  else if (e.key === '[') document.getElementById('toggle').click();
+});
+go(cur);
+</script>
+</body>
+</html>
