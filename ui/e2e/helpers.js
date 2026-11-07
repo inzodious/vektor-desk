@@ -1,5 +1,8 @@
 export const ROUTES = [
   { path: '/', h1: 'Bridge' },
+  { path: '/?scenario=fail', h1: 'Bridge' },
+  { path: '/?scenario=long', h1: 'Bridge' },
+  { path: '/plan?scenario=warn', h1: 'Plan' },
   { path: '/research', h1: 'Research' },
   { path: '/research?s=ACME', h1: 'Research' },
   { path: '/research/sources', h1: 'Research' },

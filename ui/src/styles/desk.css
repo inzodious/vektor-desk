@@ -240,7 +240,7 @@ table.t { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 
 .drawer header .t { flex: 1; min-width: 0; }
 .crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--ink-3); margin-bottom: 4px; }
 .crumbs button { border: 0; background: none; padding: 0; color: var(--teal-ink); font-weight: 700; cursor: pointer; font-size: 12px; }
-.crumbs span.sep { opacity: .8; }
+.crumbs span.sep { opacity: 1; }
 .drawer h3 { font-size: 20px; }
 .drawer .body { padding: 14px 20px 20px; overflow-y: auto; overflow-x: hidden; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; align-content: start; }
 .drawer .body > * { min-width: 0; }
@@ -830,3 +830,20 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 }
 .fi-notes summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--teal-ink); width: fit-content; }
 .fi-notes[open] summary { margin-bottom: 8px; }
+
+/* ---------- health banner ---------- */
+.health-banner { display: flex; gap: 10px; align-items: flex-start; padding: 10px 14px; border-radius: 16px; background: var(--mustard-soft); color: var(--ink); font-size: 13px; border: 1px solid color-mix(in oklab, var(--mustard) 45%, transparent); }
+.health-banner.fail { background: var(--coral-soft); border-color: color-mix(in oklab, var(--coral) 45%, transparent); }
+.health-banner > svg { width: 18px; height: 18px; flex: none; margin-top: 1px; color: var(--watch); }
+.health-banner.fail > svg { color: var(--act); }
+.health-banner .hb-body { flex: 1; min-width: 0; }
+.health-banner p { margin: 0; }
+.health-banner p b { font-weight: 800; }
+.health-banner summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink-2); margin-top: 4px; width: fit-content; }
+.health-banner ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-2); }
+.health-banner .link { flex: none; font-size: 12px; }
+@media (max-width: 860px) {
+  .health-banner { flex-wrap: wrap; }
+  .health-banner .hb-body { flex-basis: calc(100% - 32px); }
+  .health-banner .link { margin-left: 28px; }
+}

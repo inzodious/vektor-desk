@@ -1,0 +1,47 @@
+{
+ "as_of": "2026-11-06",
+ "status": "fail",
+ "checks": [
+  {
+   "check_name": "value",
+   "status": "fail",
+   "detail": "Desk value is 4.1% off the broker on 2026-11-06; re-run the mirror pull, then the daily engine."
+  },
+  {
+   "check_name": "closes",
+   "status": "ok",
+   "detail": "Every holding has a close on 2026-11-06."
+  },
+  {
+   "check_name": "freshness",
+   "status": "ok",
+   "detail": "Mirror pulled 2.7 hours ago (limit 14)."
+  },
+  {
+   "check_name": "lookthrough",
+   "status": "ok",
+   "detail": "Look-through covers 100% of invested value."
+  },
+  {
+   "check_name": "marginal_rate",
+   "status": "warn",
+   "detail": "No marginal tax rate yet: open Taxes in Escape Vektor once, or set tax.marginal_rate_pct in desk.yaml."
+  },
+  {
+   "check_name": "research",
+   "status": "ok",
+   "detail": "SEC company facts for 2 stocks."
+  },
+  {
+   "check_name": "shares",
+   "status": "warn",
+   "detail": "No lot export yet; tax lots and wash-sale checks need one."
+  }
+ ],
+ "last_run": {
+  "job": "holdings",
+  "started_at": "2026-11-07T15:24:57+00:00",
+  "finished_at": "2026-11-07T15:24:57+00:00",
+  "ok": 1
+ }
+}

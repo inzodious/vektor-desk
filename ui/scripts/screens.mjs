@@ -76,6 +76,9 @@ const SHOTS = [
   { name: 'settings-failing', path: '/settings?scenario=failing', fixtures: true },
   { name: 'settings-offline', path: '/settings', offline: true },
   { name: 'not-found', path: '/nowhere' },
+  { name: 'health-fail', path: '/?scenario=fail', fixtures: true, clock: MONDAY },
+  { name: 'health-warn', path: '/plan?scenario=warn', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('health-banner').getByText('1 more check').click() },
+  { name: 'bridge-long', path: '/?scenario=long', fixtures: true, clock: MONDAY },
 ];
 
 // ---------- contrast ----------
