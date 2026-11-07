@@ -5,7 +5,7 @@
 	}
 }
 
-(tailnet) {
+(private) {
 	tls {
 		dns porkbun {
 			api_key {env.PORKBUN_API_KEY}
@@ -14,7 +14,7 @@
 		resolvers 1.1.1.1 9.9.9.9
 	}
 
-	@outside not remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48 127.0.0.0/8
+	@outside not remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48 127.0.0.0/8 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12
 	abort @outside
 
 	header {
@@ -27,8 +27,8 @@
 	}
 }
 
-{$DESK_DOMAIN:desk.escape-vektor.com} {
-	import tailnet
+{$DESK_DOMAIN:desk.escape-vektor.com}, {$DESK_LAN_DOMAIN:desk-lan.escape-vektor.com} {
+	import private
 	encode zstd gzip
 
 	@api path /api/*
@@ -37,8 +37,8 @@
 	reverse_proxy api:8000
 }
 
-{$DESK_DOMAIN:desk.escape-vektor.com}:8443 {
-	import tailnet
+{$DESK_DOMAIN:desk.escape-vektor.com}:8443, {$DESK_LAN_DOMAIN:desk-lan.escape-vektor.com}:8443 {
+	import private
 
 	reverse_proxy ntfy:8080 {
 		flush_interval -1

@@ -70,6 +70,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
     | Claude | `signed in, answered: OK` | Redo step 4. Then run the setup script again, answer "n" to keeping `desk.env`, and run `midclt call app.redeploy vektor-desk` |
     | Firestore | `read access ok, N tables` | A 403 means the account has no role in the Firebase project. If it was made in another project, grant its `client_email` the Cloud Datastore Viewer role under IAM in the Firebase project. Then check the project ID and UID in `settings.env` |
     | Address | `match` | Redo step 7 with the printed address, then wait up to 10 minutes |
+    | Home network | `not published` until you do [Home network](#home-network), then `match` | Steps 1–5 of that section |
     | Phone alerts | `ops: sent`, and the alert arrives in `desk-ops` | Check that Tailscale is on and the server in step 9 has `:8443` |
     | Certificate | `certificate obtained` | Check that Porkbun API Access is on for the domain (step 2) |
 
@@ -83,6 +84,26 @@ Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change 
 |---|---|
 | `deploy.sh` changed | Read the change (`git -C /mnt/Manifest/apps/vektor-desk-src log -p -1 -- deploy/deploy.sh`), then copy it again for the cron jobs: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`. The cron jobs run this pinned copy, so a push to `main` can't run new code as root |
 | `deploy/compose.yaml` changed | Run the setup script again (it keeps what's there and adds any new folder). Then go to Apps → `vektor-desk` → Edit and paste the new file |
+
+## Home network
+
+Open the desk at home without Tailscale, the way Hemline has its own address. Caddy also answers on a second NAS address, `192.168.0.116`, under `https://desk-lan.escape-vektor.com`, with its own certificate. Your router doesn't forward it, so it's reachable only from the home network. Tailscale and `desk.escape-vektor.com` keep working when you're away.
+
+| | Step | Where |
+|---|---|---|
+| 1 | Check the address is free: `ping -c 2 192.168.0.116` should get no reply. If something answers, pick another free address and change it in both `ports:` lines of `deploy/compose.yaml` before step 5 | TrueNAS shell |
+| 2 | Network → Interfaces → edit the interface that has `192.168.0.113` → Aliases → **Add**, `192.168.0.116` / `24` → Save → Test Changes → Save Changes | TrueNAS UI |
+| 3 | If the TrueNAS UI listens on every address, port 443 on the alias is taken: System → General Settings → GUI → Settings → Web Interface IPv4 Address, choose `192.168.0.113` only (Hemline's `.115` may already have needed this) | TrueNAS UI |
+| 4 | Add an A record: host `desk-lan`, answer `192.168.0.116`, TTL 600 | Porkbun |
+| 5 | Copy `deploy.sh` for the cron jobs again (After updates), then Apps → `vektor-desk` → Edit, paste the new `deploy/compose.yaml`, save | TrueNAS shell, Apps |
+| 6 | `deploy.sh check`: the Home network line says `match`. Then open `https://desk-lan.escape-vektor.com` with Tailscale off | TrueNAS shell, browser |
+
+| If | Do |
+|---|---|
+| The app won't start: "address already in use" or "cannot assign requested address" | Step 3, or the alias from step 2 isn't saved |
+| `desk-lan` doesn't resolve at home | The router blocks public names that point at private addresses (DNS rebind protection). Allow `escape-vektor.com` in that setting, or add `192.168.0.116 desk-lan.escape-vektor.com` to the PC's hosts file |
+| You'd rather use one name everywhere | If the router can override DNS, point `desk.escape-vektor.com` at `192.168.0.116` there. At home it goes to the alias, away it resolves to the tailnet address |
+| Phone alerts at home | The ntfy app still talks to `desk.escape-vektor.com:8443`, so keep Tailscale on the phone for alerts |
 
 ## Later
 

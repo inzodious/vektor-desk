@@ -8,8 +8,8 @@
 #   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
 #   deploy.sh restore-test  restore drill: unpacks the newest backup into a scratch folder and checks every database
 #                      opens, passes its integrity check and has the expected tables; the live data isn't touched
-#   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS record against the tailnet address,
-#                      a test phone alert
+#   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS records against the tailnet and
+#                      home-network addresses, a test phone alert
 #   deploy.sh logs     redacted tails of every desk service's log into data/run/logs, for the eval container
 #                      (docs/eval-access.md); auto does this every 5 minutes
 # Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
@@ -286,7 +286,7 @@ status() {
 }
 
 check() {
-  local ip dns answer tables
+  local ip dns lan answer tables
   echo "Claude:"
   answer=$(docker exec vektor-desk-cron sh -c 'cd "$(mktemp -d)" && echo "Reply with the single word OK." | claude -p --model haiku --output-format json --tools "" --setting-sources "" --strict-mcp-config --no-session-persistence' 2>&1 || true)
   if jq -e '.is_error == false' >/dev/null 2>&1 <<<"$answer"; then
@@ -305,6 +305,15 @@ check() {
   dns=$(getent ahostsv4 desk.escape-vektor.com 2>/dev/null | awk 'NR == 1 { print $1 }')
   echo "  tailnet ${ip:-?}, desk.escape-vektor.com resolves to ${dns:-nothing}"
   if [ -n "$ip" ] && [ "$ip" = "$dns" ]; then echo "  match"; else echo "  set the Porkbun A record for desk to ${ip:-the tailnet address} (step 7)"; fi
+  echo "Home network:"
+  lan=$(docker port vektor-desk-tailscale 443/tcp 2>/dev/null | head -n 1 | cut -d: -f1)
+  dns=$(getent ahostsv4 desk-lan.escape-vektor.com 2>/dev/null | awk 'NR == 1 { print $1 }')
+  if [ -z "$lan" ]; then
+    echo "  not published: paste the current compose.yaml into the app (docs/setup.md, Home network)"
+  else
+    echo "  published on $lan, desk-lan.escape-vektor.com resolves to ${dns:-nothing}"
+    if [ "$lan" = "$dns" ]; then echo "  match"; else echo "  set the Porkbun A record for desk-lan to $lan (docs/setup.md, Home network)"; fi
+  fi
   echo "Phone alerts:"
   docker exec vektor-desk-cron python -m desk.notify test ops 2>&1 | sed 's/^/  /' || true
   echo "  subscribe in the ntfy app: server https://desk.escape-vektor.com:8443, topics desk-alerts, desk-research, desk-ops"
