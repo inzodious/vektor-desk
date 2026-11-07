@@ -76,4 +76,13 @@ CREATE TABLE IF NOT EXISTS decision_events (
   detail TEXT
 );
 CREATE INDEX IF NOT EXISTS decision_events_decision ON decision_events (decision_id, seq);
+CREATE TABLE IF NOT EXISTS plan_events (
+  id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  title TEXT NOT NULL,
+  note TEXT,
+  kind TEXT NOT NULL DEFAULT 'note',
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS plan_events_date ON plan_events (date);
 """

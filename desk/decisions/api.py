@@ -5,8 +5,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from desk.config import Config
+from desk.decisions import plan, records, tickets
 from desk.decisions import profile as profiles
-from desk.decisions import records, tickets
 from desk.decisions import rules as ruleset
 from desk.decisions.store import session
 
@@ -110,6 +110,37 @@ def act(fn, *args, **kwargs) -> JSONResponse:
         return fresh(fn(*args, **kwargs))
     except records.DecisionError as e:
         raise HTTPException(e.status, str(e)) from e
+
+
+class Event(BaseModel):
+    date: str
+    title: str
+    note: str | None = None
+    kind: str = "note"
+
+
+@router.get("/deposits")
+def get_deposits(cfg: Cfg, days: int = 60) -> JSONResponse:
+    return act(lambda: {"deposits": plan.upcoming_deposits(cfg, days=max(0, min(days, 400)))})
+
+
+@router.get("/calendar")
+def get_calendar(
+    cfg: Cfg,
+    since: Annotated[str | None, Query(alias="from")] = None,
+    until: Annotated[str | None, Query(alias="to")] = None,
+) -> JSONResponse:
+    return act(lambda: {"events": plan.calendar_events(cfg, since, until)})
+
+
+@router.post("/calendar")
+def post_event(body: Event, cfg: Cfg) -> JSONResponse:
+    return act(plan.add_event, cfg, body.date, body.title, body.note, body.kind)
+
+
+@router.delete("/calendar/{event_id}")
+def delete_event(event_id: str, cfg: Cfg) -> JSONResponse:
+    return act(plan.delete_event, cfg, event_id)
 
 
 @router.get("/queue")
