@@ -15,6 +15,8 @@ TRIGGER_DESKS = {
     "concentration": ("risk", True),
     "lot_export": ("tax", True),
     "earnings": ("research", False),
+    "rule_breach": ("plan_keeper", True),
+    "deposit_landed": ("plan_keeper", False),
 }
 DONE = {"ok": "done", "not_ready": "done", "disabled": "done", "unchanged": "done", "over_budget": "done"}
 MAX_PER_PASS = 10

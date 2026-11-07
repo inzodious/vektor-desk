@@ -21,7 +21,7 @@ scheduler ─▶ brief builder ─▶ claude -p (one desk) ─▶ Preflight ─�
 ```
 
 1. The scheduler picks a desk whose time or trigger has come and checks the usage budget.
-2. The brief builder assembles one prompt: `brief` (this desk's slice of engine metrics, each `{metric_id, scope_id, window, value, unit, as_of, quality}`, per `docs/statistics.md`), `profile` (the active dials and their version), and `history` (the desk's last 20 proposals with Joshua's decisions and reasons).
+2. The brief builder assembles one prompt: `brief` (this desk's slice of engine metrics, each `{metric_id, scope, scope_id, window, value, unit, as_of, quality}`, per `docs/statistics.md`; portfolio-level `scope_id` is `all`), `profile` (the active dials and their version), and `history` (the desk's last 20 proposals with Joshua's decisions and reasons).
 3. The adapter pipes that prompt to `claude -p` on stdin and asks for output that matches `desk/agents/schemas/proposal.json`.
 4. The runner validates the JSON, re-checks every cited number against the brief, and calls Preflight (`preflight(holdings, trade) -> lights`, written to the preflight table), which applies the hard rules and adds the tax impact. The runner then stores the result as a decision record (`docs/concept.md`). Nothing the agent says reaches the UI without passing through this step.
 
@@ -85,9 +85,9 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 - Strategy runs are capped per week, and each lab result costs one interpretation run, not a loop.
 - When the weekly budget is spent, lower-priority desks wait for the next week rather than switching model. If limits bite in practice, the first lever is fewer research and strategy runs, then `high` instead of `xhigh`.
 
-**Engine triggers** come from the engine's triggers table and fire a desk at most once a day: a margin debit appears; a position moves more than the risk dial's daily threshold; a single holding passes its concentration band; a holding reports earnings; a new lot export arrives. Live tracking itself is engine work and needs no agent.
+**Engine triggers** come from the engine's triggers table and fire a desk at most once a day: a margin debit appears; a position moves more than the risk dial's daily threshold; a single holding passes its concentration band; a holding reports earnings; a new lot export arrives; a plan rule stops holding; a scheduled deposit lands. Live tracking itself is engine work and needs no agent.
 
-Trigger kinds and where they go: `margin_debit`, `daily_move` and `concentration` run the Risk desk right away; `lot_export` runs the Tax desk right away; `earnings` queues the Research desk for that symbol tonight. `python -m desk.agents triggers` turns them into requests at 17:45, each once.
+Trigger kinds and where they go: `margin_debit`, `daily_move` and `concentration` run the Risk desk right away; `lot_export` runs the Tax desk right away; `rule_breach` runs the Plan keeper right away; `deposit_landed` queues the Plan keeper tonight; `earnings` queues the Research desk for that symbol tonight. Stale quotes stay ops alerts only. `python -m desk.agents triggers` turns them into requests at 17:45, each once.
 
 **Requests.** Console questions and triggers are rows in `agent_requests`. "Run now" rows are picked up within a minute (`queue --now-only`); the rest run at 01:30. A request that hits the usage limit or finds another desk running moves to tonight once, then fails rather than looping. A scheduled run that hits the limit queues one retry the same way.
 
@@ -169,7 +169,7 @@ Every desk returns the same shape (`agents/schemas/proposal.json`). The UI and t
 | `rule_served` | Which plan rule or dial this advances |
 | `invalidation` | What would prove it wrong, checked by the engine where it can be (a price, a date, a reported number) |
 | `horizon` | When to judge it: 30 days, 90 days, or a date |
-| `numbers_used` | List of `{field, value}`, where `field` is the brief key `metric_id:scope_id:window` (for example `plan.drift:FXAIX:now`) and `value` must match the brief |
+| `numbers_used` | List of `{field, value}`, where `field` is the brief key `metric_id:scope_id:window` (for example `plan.drift:FXAIX:now` or `cash.ready:all:now`) and `value` must match the brief |
 | `sources` | URLs with titles; buy and sell need at least two, one primary (filing, company release, FRED) |
 | `confidence` | Probability from 0 to 1 that it beats the plan baseline at 90 days |
 | `expires` | Default five trading days; an expired ticket cannot be approved |

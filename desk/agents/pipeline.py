@@ -45,7 +45,9 @@ def holdings(slice_: dict) -> list[str]:
     seen: list[str] = []
     for item in (slice_.get("sections") or {}).get("holdings") or ():
         sym = item.get("scope_id")
-        if sym and sym not in seen and sym not in ("portfolio", "cash"):
+        if item.get("scope", "holding") != "holding":
+            continue
+        if sym and sym not in seen and sym not in ("all", "portfolio", "cash"):
             seen.append(sym)
     return seen
 

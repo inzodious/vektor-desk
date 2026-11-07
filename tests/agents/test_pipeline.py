@@ -38,13 +38,13 @@ def test_digest_ignores_as_of_only():
 
 
 def test_plan_keeper_writes_brief_and_proposals(cfg):
-    good, bad = proposal(), proposal(title="Wrong", numbers_used=[{"field": "cash.ready:portfolio:now", "value": 9999}])
+    good, bad = proposal(), proposal(title="Wrong", numbers_used=[{"field": "cash.ready:all:now", "value": 9999}])
     decisions = FakeDecisions()
     fake = FakeAdapter({"plan_keeper": answer(good, bad)})
     report = run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(SLICE), decisions=decisions, adapter=fake)
     assert report.status == "ok"
     assert [p["title"] for _, _, p in decisions.created] == ["Send the ready cash to FUNDA"]
-    assert decisions.rejected[0][1].startswith("Numbers don't match the brief: cash.ready:portfolio:now is 1500.0")
+    assert decisions.rejected[0][1].startswith("Numbers don't match the brief: cash.ready:all:now is 1500.0")
     assert decisions.created[0][1] == str(report.outcome.run_id)
     assert store.latest_brief(cfg, "plan_keeper")["summary"] == "Plan on track. FUNDA is 4.2 points under."
     assert fake.calls[0]["schema"]["required"] == ["summary", "proposals"]
