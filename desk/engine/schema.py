@@ -170,6 +170,26 @@ CREATE TABLE IF NOT EXISTS data_health (
   detail TEXT,
   PRIMARY KEY (as_of, check_name)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS preflight (
+  ticket_id TEXT NOT NULL,
+  metric_id TEXT NOT NULL,
+  before REAL,
+  after REAL,
+  flag TEXT NOT NULL CHECK (flag IN ('ok', 'watch', 'act')),
+  at TEXT NOT NULL,
+  engine_version TEXT NOT NULL,
+  PRIMARY KEY (ticket_id, metric_id)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS wash_windows (
+  as_of TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('loss_sale', 'recent_buy')),
+  date TEXT NOT NULL,
+  clears TEXT NOT NULL,
+  account TEXT NOT NULL,
+  amount REAL,
+  PRIMARY KEY (symbol, kind, date, account)
+) WITHOUT ROWID;
 """
 
 
