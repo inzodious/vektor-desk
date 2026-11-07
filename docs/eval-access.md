@@ -15,7 +15,7 @@ The working rules Claude follows inside it are in [deploy/eval/CLAUDE.md](../dep
 
 ## One-time steps
 
-Remote Control needs a full sign-in. The year-long `setup-token` the desks use is inference-only, and Remote Control refuses it ("requires a full-scope login token"). So you sign in once inside the container.
+Remote Control needs a full sign-in. The year-long `setup-token` the desks use is inference-only, and Remote Control refuses it ("requires a full-scope login token"). So you sign in once inside the container. The container answers the two one-time prompts itself (`deploy/eval/start.sh`): it trusts `/work` and enables Remote Control, so there's nothing to answer at a terminal.
 
 | | Step | Where |
 |---|---|---|
@@ -23,8 +23,7 @@ Remote Control needs a full sign-in. The year-long `setup-token` the desks use i
 | 2 | Copy the new `deploy.sh` for the cron jobs: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh` (it now exports the redacted logs) | TrueNAS shell |
 | 3 | Apps → `vektor-desk` → Edit, paste the new `deploy/compose.yaml`, save | TrueNAS Apps |
 | 4 | Sign in: `docker exec -it vektor-desk-eval claude auth login`. Open the link it prints, approve with your Claude account, paste the code back | TrueNAS shell, then browser |
-| 5 | Trust the folder once: `docker exec -it vektor-desk-eval claude`, answer **Yes** to trusting `/work`, then type `/exit` | TrueNAS shell |
-| 6 | Within a minute it starts Remote Control: `docker logs vektor-desk-eval` shows the session link, and `vektor-desk-eval` appears as a device in claude.ai/code and in your projects | TrueNAS shell |
+| 5 | Within a minute it starts Remote Control: `docker logs vektor-desk-eval` shows the session link, and `vektor-desk-eval` appears as a device in claude.ai/code and in your projects | TrueNAS shell |
 
 ## Day to day
 

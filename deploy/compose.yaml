@@ -164,13 +164,7 @@ services:
     init: true
     user: "568:568"
     working_dir: /work
-    command:
-      - sh
-      - -c
-      - >-
-        cp /src/deploy/eval/CLAUDE.md /work/CLAUDE.md;
-        until [ -s "$$HOME/.claude/.credentials.json" ]; do sleep 30; done;
-        exec claude remote-control --name vektor-desk-eval
+    command: ["sh", "/src/deploy/eval/start.sh"]
     networks: [eval]
     healthcheck:
       disable: true
