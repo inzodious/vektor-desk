@@ -26,8 +26,9 @@ dataset() {
     echo "   /mnt/$d already has files; keeping it as a folder"
     return 0
   fi
-  if zfs list -H "$(dirname "$d")" >/dev/null 2>&1 && midclt call pool.dataset.create "{\"name\": \"$d\"}" >/dev/null 2>&1; then
-    return 0
+  if zfs list -H "$(dirname "$d")" >/dev/null 2>&1; then
+    midclt call pool.dataset.create "{\"name\": \"$d\"}" >/dev/null 2>&1 || sleep 20
+    zfs list -H "$d" >/dev/null 2>&1 && return 0
   fi
   echo "   /mnt/$d as a plain folder (no dataset could be made there)"
   mkdir -p "/mnt/$d"
