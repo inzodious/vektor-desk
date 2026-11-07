@@ -4,6 +4,15 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.7.0 - 2026-11-07
+
+Lab Compare and risk is done, which completes Tier 2 (phases 6 to 8). The engine is now complete through phase 11; the Strategy lab, Flight record and FI views come next.
+
+### Added
+
+- Lab Compare, Risk and Saved boards pages, with diverging bar, heatmap and scatter charts ([#55])
+- FI Monte Carlo: 10,000 paths over US market history since 1926 using your Escape Vektor FI goal, plan mix, fees and deposits, with the FI date at the 10th, 50th and 90th percentile, the chance of reaching it on time and the return you'd need; factor exposure per holding for market, size, value, profitability, investment and momentum ([#54])
+
 ## 0.6.0 - 2026-11-07
 
 Research is done, and phone alerts are complete with trigger hits. The Strategy lab and Flight record engines landed alongside; their views come next.
@@ -132,3 +141,5 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#50]: https://github.com/inzodious/vektor-desk/pull/50
 [#51]: https://github.com/inzodious/vektor-desk/pull/51
 [#52]: https://github.com/inzodious/vektor-desk/pull/52
+[#54]: https://github.com/inzodious/vektor-desk/pull/54
+[#55]: https://github.com/inzodious/vektor-desk/pull/55

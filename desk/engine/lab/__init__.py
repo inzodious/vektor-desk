@@ -11,6 +11,20 @@ from desk.engine.lab.rulebook import RULES
 __all__ = ["NotReady", "desk_view", "eligible", "features", "grammar", "pending_reviews", "rules", "strategies"]
 
 REVIEW_DAYS = 14
+SPEC_FIELDS = (
+    "title",
+    "hypothesis",
+    "predicted_effect",
+    "universe",
+    "signals",
+    "entry",
+    "exit",
+    "rebalance",
+    "sizing",
+    "params",
+    "success_criteria",
+    "horizons",
+)
 
 
 def grammar() -> dict:
@@ -56,19 +70,36 @@ def strategies(cfg: Config) -> list[dict]:
         return []
     try:
         rows = [
-            dict(r) for r in conn.execute("SELECT id, version, title, status, registered_at, spec_hash, parent_id FROM strategies ORDER BY registered_at DESC")
+            dict(r)
+            for r in conn.execute("SELECT id, version, title, status, registered_at, spec_hash, parent_id, spec FROM strategies ORDER BY registered_at DESC")
         ]
         counts = {(r[0], r[1]): r[2] for r in conn.execute("SELECT strategy_id, version, count(*) FROM strategy_trials GROUP BY strategy_id, version")}
     finally:
         conn.close()
     paper = _paper(cfg)
     for r in rows:
+        r["hypothesis"] = _raw(r.pop("spec")).get("hypothesis")
         r["trials"] = counts.get((r["id"], r["version"]), 0)
         p = paper.get((r["id"], r["version"]))
         if p:
             r["paper"] = p
             r["status"] = p["status"] if p["status"] != "paper" else r["status"]
     return rows
+
+
+def _raw(text: str | None) -> dict:
+    try:
+        body = json.loads(text or "{}")
+    except ValueError:
+        return {}
+    return body if isinstance(body, dict) else {}
+
+
+def frozen_spec(row) -> dict | None:
+    if row is None:
+        return None
+    raw = _raw(row["spec"])
+    return {k: raw.get(k) for k in SPEC_FIELDS} | {"title": row["title"] or raw.get("title"), "written_at": row["written_at"], "model": row["model"]}
 
 
 def _paper(cfg: Config) -> dict:
@@ -146,6 +177,7 @@ def desk_view(cfg: Config, strategy_id: str) -> dict:
         "version": latest_version,
         "status": row["status"] if row and row["version"] == latest_version else "rejected",
         "spec_hash": row["spec_hash"] if row else None,
+        "spec": frozen_spec(row) if row and row["version"] == latest_version else None,
         "folds": exp["folds"] if exp else [],
         "kind": "strategy",
         "tear_sheet": {

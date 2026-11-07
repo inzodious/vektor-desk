@@ -15,11 +15,11 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 4 | Decisions and Preflight | 1 | ✅ | 3 |
 | 5 | Plan keeper and tax desk | 1 | ✅ | 4 |
 | 6 | Research | 2 | ✅ | 4 |
-| 7 | Lab: Compare and risk | 2 | 🚧 | 3 |
+| 7 | Lab: Compare and risk | 2 | ✅ | 3 |
 | 8 | Phone alerts | 2 | ✅ | 5 |
 | 9 | Strategy lab | 3 | 🚧 | 3, 6 |
 | 10 | Flight record and Patterns | 3 | 🚧 | 30 days of decision records |
-| 11 | Scout and FI scenarios | 3 | 📋 | 10 |
+| 11 | Scout and FI scenarios | 3 | 🚧 | 10 |
 | 1.0 | Hardening | | 📋 | 11 |
 
 Phases 6 and 7 can run in parallel with 5 once their dependencies land, and phase 9 can run beside 7, 8 and 10. Start the Strategy lab as early as its dependencies allow: six months of forward paper trading is its graduation bar. The agent runner and its fake adapter are built alongside phases 3 and 4, so phase 5 only wires them to real engine outputs.
@@ -104,11 +104,11 @@ Tier 1 code complete: 0.5.0. It runs on demo data until the box setup in [docs/s
 - [x] Source library: SEC EDGAR filings, insider trades, earnings dates, FRED series ([#40], [#52]); 13F moved to the backlog
 - [x] Engine: EDGAR, FRED and Finnhub fetchers and holding signals ([#40])
 
-### 7. Lab: Compare and risk 🚧
+### 7. Lab: Compare and risk ✅
 
-- [ ] Compare two to five items over a period, with fund overlap (N-PORT look-through) (engine [#43]; views to come)
-- [ ] Risk and statistics: concentration, exposure, scenario shocks, margin stress; heatmap and scatter views (engine [#43]; views to come)
-- [ ] Saved boards shell (`/api/compare`) (endpoint [#43]; shell to come)
+- [x] Compare two to five items over a period, with fund overlap (N-PORT look-through) ([#43], [#55])
+- [x] Risk and statistics: concentration, exposure, scenario shocks, margin stress; heatmap and scatter views ([#43], [#55])
+- [x] Saved boards shell (`/api/compare`) ([#43], [#55])
 - [x] Risk desk weekly report ([#18])
 
 ### 8. Phone alerts ✅
@@ -135,11 +135,11 @@ Research hypotheses become strategies, tested on history without seeing the futu
 - [x] Patterns: market and his own behavior ([#51]; views to come)
 - [ ] Saved boards complete
 
-### 11. Scout and FI scenarios 📋
+### 11. Scout and FI scenarios 🚧
 
 - [x] Scout desk: monthly ideas within the desk profile, each argued against first ([#23])
-- [ ] FI path card and scenarios (Monte Carlo percentiles)
-- [ ] Factor exposure
+- [ ] FI path card and scenarios (Monte Carlo percentiles) (engine [#54]; card to come)
+- [ ] Factor exposure (engine [#54]; view to come)
 
 ### 1.0 Hardening 📋
 
@@ -201,3 +201,5 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#50]: https://github.com/inzodious/vektor-desk/pull/50
 [#51]: https://github.com/inzodious/vektor-desk/pull/51
 [#52]: https://github.com/inzodious/vektor-desk/pull/52
+[#54]: https://github.com/inzodious/vektor-desk/pull/54
+[#55]: https://github.com/inzodious/vektor-desk/pull/55
