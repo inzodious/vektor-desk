@@ -3,6 +3,7 @@ import json
 import sys
 
 from desk.agents.desks import DESKS, Desk, get
+from desk.agents.pipeline import run_proposal_desk
 from desk.agents.runner import run_desk
 from desk.agents.status import crew
 from desk.config import Config
@@ -34,7 +35,9 @@ def main(argv: list[str] | None = None) -> int:
     if not desk.live:
         print(f"{desk.title} isn't built yet.")
         return 2
-    return 2
+    report = run_proposal_desk(cfg, desk.name, trigger=args.trigger)
+    print(f"{desk.title}: {report.status}, {len(report.created)} proposals, {len(report.rejected)} rejected. {report.note or ''}".strip())
+    return EXIT.get(report.status, 0 if report.status in ("not_ready", "unchanged") else 1)
 
 
 if __name__ == "__main__":

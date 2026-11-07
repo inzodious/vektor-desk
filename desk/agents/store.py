@@ -87,3 +87,34 @@ def set_enabled(cfg: Config, desk: str, enabled: bool) -> None:
             "ON CONFLICT(desk) DO UPDATE SET enabled=excluded.enabled, updated_at=excluded.updated_at",
             (desk, int(enabled), now_iso()),
         )
+
+
+def save_brief(cfg: Config, run_id: int, desk: str, as_of: str | None, digest: str, version: str, summary: str, answer: str) -> None:
+    with db(cfg) as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO agent_briefs (run_id, desk, as_of, digest, profile_version, summary, answer, created_at) VALUES (?,?,?,?,?,?,?,?)",
+            (run_id, desk, as_of, digest, version, summary, answer, now_iso()),
+        )
+
+
+def last_digest(cfg: Config, desk: str) -> str | None:
+    with db(cfg) as conn:
+        row = conn.execute("SELECT digest FROM agent_briefs WHERE desk=? ORDER BY run_id DESC LIMIT 1", (desk,)).fetchone()
+    return row["digest"] if row else None
+
+
+def latest_brief(cfg: Config, desk: str) -> dict | None:
+    with db(cfg) as conn:
+        row = conn.execute(
+            "SELECT run_id, desk, as_of, profile_version, summary, created_at FROM agent_briefs WHERE desk=? ORDER BY run_id DESC LIMIT 1", (desk,)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def runs(cfg: Config, desk: str | None = None, limit: int = 50) -> list[dict]:
+    with db(cfg) as conn:
+        if desk:
+            rows = conn.execute("SELECT * FROM agent_runs WHERE desk=? ORDER BY id DESC LIMIT ?", (desk, limit))
+        else:
+            rows = conn.execute("SELECT * FROM agent_runs ORDER BY id DESC LIMIT ?", (limit,))
+        return [dict(r) for r in rows]
