@@ -4,6 +4,19 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.10.0 - 2026-11-07
+
+Scout and FI scenarios are done, so every planned phase is built. What remains for 1.0 is hardening on the box.
+
+### Added
+
+- Plan gains an FI path card (Monte Carlo fan, on-time odds, FI date range), and Lab Risk gains a factor exposure view with portfolio and per-holding loadings ([#65])
+
+### Fixed
+
+- The lab service no longer waits on a health check it can't pass ([#63])
+- The setup doc warns against removing the locally built images when deleting the app ([#64])
+
 ## 0.9.0 - 2026-11-07
 
 Flight record and Patterns are done: every decision is scored against following the plan, and each desk has a record you can judge it by.
@@ -168,3 +181,6 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#58]: https://github.com/inzodious/vektor-desk/pull/58
 [#60]: https://github.com/inzodious/vektor-desk/pull/60
 [#61]: https://github.com/inzodious/vektor-desk/pull/61
+[#63]: https://github.com/inzodious/vektor-desk/pull/63
+[#64]: https://github.com/inzodious/vektor-desk/pull/64
+[#65]: https://github.com/inzodious/vektor-desk/pull/65

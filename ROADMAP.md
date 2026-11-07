@@ -19,7 +19,7 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 8 | Phone alerts | 2 | ✅ | 5 |
 | 9 | Strategy lab | 3 | ✅ | 3, 6 |
 | 10 | Flight record and Patterns | 3 | ✅ | 30 days of decision records |
-| 11 | Scout and FI scenarios | 3 | 🚧 | 10 |
+| 11 | Scout and FI scenarios | 3 | ✅ | 10 |
 | 1.0 | Hardening | | 📋 | 11 |
 
 Phases 6 and 7 can run in parallel with 5 once their dependencies land, and phase 9 can run beside 7, 8 and 10. Start the Strategy lab as early as its dependencies allow: six months of forward paper trading is its graduation bar. The agent runner and its fake adapter are built alongside phases 3 and 4, so phase 5 only wires them to real engine outputs.
@@ -135,11 +135,11 @@ Research hypotheses become strategies, tested on history without seeing the futu
 - [x] Patterns: market and his own behavior ([#51], [#61])
 - [x] Saved boards complete ([#55])
 
-### 11. Scout and FI scenarios 🚧
+### 11. Scout and FI scenarios ✅
 
 - [x] Scout desk: monthly ideas within the desk profile, each argued against first ([#23])
-- [ ] FI path card and scenarios (Monte Carlo percentiles) (engine [#54]; card to come)
-- [ ] Factor exposure (engine [#54]; view to come)
+- [x] FI path card and scenarios (Monte Carlo percentiles) ([#54], [#65])
+- [x] Factor exposure ([#54], [#65])
 
 ### 1.0 Hardening 📋
 
@@ -206,3 +206,4 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#57]: https://github.com/inzodious/vektor-desk/pull/57
 [#58]: https://github.com/inzodious/vektor-desk/pull/58
 [#61]: https://github.com/inzodious/vektor-desk/pull/61
+[#65]: https://github.com/inzodious/vektor-desk/pull/65
