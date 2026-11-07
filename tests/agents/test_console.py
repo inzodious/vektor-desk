@@ -136,3 +136,22 @@ def test_console_and_dossier_api(cfg, app_client):
     assert client.get("/api/agents/dossiers").json()[0]["dossier"]["symbol"] == "TICKA"
     assert client.get("/api/agents/dossiers/ticka").json()["dossier"]["thesis"] == "Steady grower."
     assert client.get("/api/agents/dossiers/NONE").status_code == 404
+
+
+def test_dossier_schema_has_optional_verdict_and_today_marker():
+    d = briefs.schema_for("research")["properties"]["dossier"]
+    assert d["properties"]["verdict"]["enum"] == ["add", "hold", "trim", "avoid", "watch", None]
+    assert "now" in d["properties"]["valuation_range"]["properties"]
+    assert "verdict" not in d["required"] and "now" not in d["properties"]["valuation_range"]["required"]
+
+
+def test_deep_dive_on_any_symbol_writes_its_dossier(cfg):
+    rid = console.ask(cfg, "research", "Deep dive, please.", symbol="newco", run_now=True)
+    deep = DOSSIER | {"symbol": "NEWCO", "verdict": "watch", "valuation_range": DOSSIER["valuation_range"] | {"now": 24.5}}
+    fake = FakeAdapter({"research": lambda p: research_answer(p) | {"dossier": deep}})
+    console.process_queue(cfg, now_only=True, engine=FakeEngine(HELD), decisions=FakeDecisions(), adapter=fake)
+    body = json.loads(fake.calls[0]["prompt"].split("\n\n", 1)[1])
+    saved = json.loads(store.latest_dossier(cfg, "NEWCO")["dossier"])
+    assert body["focus_symbol"] == "NEWCO" and body["question"] == "Deep dive, please."
+    assert (saved["verdict"], saved["valuation_range"]["now"]) == ("watch", 24.5)
+    assert store.get_request(cfg, rid)["status"] == "done"

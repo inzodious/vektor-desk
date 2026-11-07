@@ -71,7 +71,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Plan keeper** | Daily 17:30, after the 17:00 mirror | Drift vs plan mix, cash, pending deposits, margin debit, rule status | Where the next deposit goes; rule-breach alerts; the 3 to 5 line daily Brief on Bridge | high; no tools |
 | **Tax desk** | Sunday 02:00; daily 02:00 in December; when a new lot export lands | Lots, unrealized gains and losses, wash-sale windows across all accounts, marginal rate from Escape Vektor's tax estimate | Harvest candidates, lot picks for Specific Shares, year-end deadline list | high; no tools |
 | **Risk desk** | Saturday 02:00; also when the engine flags a trigger (below) | Concentration, correlation, drawdown scenarios, margin debit and interest cost | Weekly risk report; trim or "hold off" proposals | high; no tools |
-| **Research desk** | Wednesday 01:00 (one holding a week, in rotation); on request; day after a holding reports earnings | Holding fundamentals from the brief, plus the web and SEC EDGAR | Dossier per holding, written and refreshed: thesis, bear case, valuation range, what would change the call, dated sources | xhigh; WebSearch, WebFetch |
+| **Research desk** | Wednesday 01:00 (one holding a week, in rotation); on request; day after a holding reports earnings | Holding fundamentals from the brief, plus the web and SEC EDGAR | Dossier per holding (or any symbol asked for in the Console), written and refreshed: thesis, bear case, valuation range with today's value on the same basis, a verdict (add, hold, trim, avoid, watch), what would change the call, dated sources | xhigh; WebSearch, WebFetch |
 | **Scout** | First Sunday of the month, 03:00 | Industry focus, growth tilt, satellite room left | Up to N ideas inside the satellite cap, each with its bear case | xhigh; WebSearch, WebFetch |
 | **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | high; no tools |
 | **Strategy desk** | On request from the Console; at most two new strategies a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
@@ -138,7 +138,7 @@ The lab tests trading strategies over 3, 5 and 10 year windows as paper trading,
 | `id`, `version`, `parent_id` | Identity and lineage; every version is a new trial in the lab's ledger |
 | `title`, `hypothesis` | Plain-language idea and why the market might be missing it |
 | `predicted_effect` | What should happen and by how much, stated before any run |
-| `universe` | A rule over point-in-time data, such as index members as of each date; never a ticker list |
+| `universe` | A fund set (`sector_etfs`, `core_etfs`, `benchmarks`), a fixed fund list or a stock screen, per the lab grammar; never a pick of today's winners |
 | `signals` | From the engine's feature library only, no free-form code |
 | `entry`, `exit`, `sizing`, `rebalance` | Rules over those signals |
 | `constraints` | Long only, no margin, maximum position %, maximum turnover |
@@ -147,7 +147,7 @@ The lab tests trading strategies over 3, 5 and 10 year windows as paper trading,
 | `success_criteria`, `horizons` | Pre-registered bars; any of 3, 5, 10 years |
 | `written_at`, `desk`, `model`, `effort` | Provenance |
 
-**The loop.** Desks have no file tools, so the Strategy desk returns an experiment in its structured output (spec, param grid inside `params`, date range, seed, trial budget, default 200 per spec, and optional analysis requests). The runner writes it to `/data/lab/queue/`, and `desk.lab` runs it with no network. The next Strategy run gets the results in its prompt as `lab_result`.
+**The loop.** Desks have no file tools, so the Strategy desk returns an experiment in its structured output (spec, param grid inside `params`, date range, seed, trial budget, default 200 per spec, and optional analysis requests). The runner writes it to `/data/lab/queue/`, and `desk.lab` runs it with no network. The next Strategy run gets the results in its prompt as `lab_result`, and every run gets the lab's spec `grammar` so fewer specs bounce. `python -m desk.agents lab-reviews` queues one Strategy request per new lab result (experiment, finalize or rejected). `model` in the queue file is the model the CLI actually served, so the lab can look up its training cutoff.
 
 **No peeking.** The lab freezes and hashes each spec version on registration. While tuning, the desk sees only walk-forward fold summaries and the analyses it asked for, never simulated days mid-run. Holdout and post-cutoff results open only through one `finalize` request per spec version, and finalizing closes that version: any change after it is a new version, a new trial in the lab's ledger, and counted against the idea. A strategy that clears the backtest bars and six months of forward paper trading may then be cited only by Scout proposals inside the satellite cap, through Preflight.
 

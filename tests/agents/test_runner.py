@@ -60,6 +60,9 @@ def test_cli_command_matches_the_hemline_pattern(tmp_path):
 def test_parse_output_reads_usage_and_structured():
     r = parse_output(json.dumps(OK_JSON), model="opus")
     assert (r.structured, r.turns, r.tokens, r.cost_estimate, r.session_id) == ({"kind": "alert"}, 3, 165, 0.12, "s-1")
+    assert r.model == "opus"
+    served = OK_JSON | {"modelUsage": {"claude-haiku-x": {"outputTokens": 4}, "claude-opus-x": {"outputTokens": 90}}}
+    assert parse_output(json.dumps(served), model="opus").model == "claude-opus-x"
 
 
 def test_parse_output_classifies_limits_and_errors():
