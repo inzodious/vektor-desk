@@ -116,7 +116,7 @@ The lab tests trading strategies over 3, 5 and 10 year windows as paper trading,
 
 **Stages:** `draft` → `lab` → `paper` (forward, six months minimum) → `eligible`. An eligible strategy can back Scout proposals inside the satellite cap, and they go through Preflight and the scorecard like any other proposal. A strategy that fails its paper period goes back to `draft` or is retired.
 
-**Strategy spec.** The Strategy desk returns a `strategy` output (`desk/agents/schemas/strategy.json`) instead of a proposal. The lab's side of the contract is `docs/statistics.md`, "Strategy lab"; that doc wins where the two differ.
+**Strategy spec.** The Strategy desk returns a `strategy` output (`desk/agents/schemas/strategy.json`) instead of a proposal. The canonical field list is in `docs/statistics.md`, "Strategy lab"; that doc wins where the two differ. Costs and tax rates are set by the lab.
 
 | Field | Meaning |
 |---|---|
@@ -126,14 +126,17 @@ The lab tests trading strategies over 3, 5 and 10 year windows as paper trading,
 | `universe` | A rule over point-in-time data, such as index members as of each date; never a ticker list |
 | `signals` | From the engine's feature library only, no free-form code |
 | `entry`, `exit`, `sizing`, `rebalance` | Rules over those signals |
-| `benchmark`, `account` | Plan mix by default; the account whose rules (margin, taxes) apply |
+| `constraints` | Long only, no margin, maximum position %, maximum turnover |
+| `benchmark`, `account` | Optional; default plan mix and the taxable account |
 | `params` | Each tunable value with its allowed search range |
 | `success_criteria`, `horizons` | Pre-registered bars; any of 3, 5, 10 years |
 | `written_at`, `desk`, `model`, `effort` | Provenance |
 
-**No peeking.** The lab freezes and hashes a spec when it is registered. The Strategy desk never sees simulated days or interim results, only the tear sheet once the run ends. Once it has seen a result, that spec is closed: any change is a new version, a new trial, and counted against the idea. A strategy that clears the backtest bars and six months of forward paper trading may then be cited only by Scout proposals inside the satellite cap, through Preflight.
+**The loop.** Desks have no file tools, so the Strategy desk returns an experiment in its structured output (spec, param grid inside `params`, date range, seed, trial budget, default 200 per spec, and optional analysis requests). The runner writes it to `/data/lab/queue/`, and `desk.lab` runs it with no network. The next Strategy run gets the results in its prompt as `lab_result`.
 
-The lab's tear sheet reports each horizon, the post-cutoff window, trials tried, caveats such as survivorship, and a verdict. The Strategy desk then writes a short memo on what the result does and does not show.
+**No peeking.** The lab freezes and hashes each spec version on registration. While tuning, the desk sees only walk-forward fold summaries and the analyses it asked for, never simulated days mid-run. Holdout and post-cutoff results open only through one `finalize` request per spec version, and finalizing closes that version: any change after it is a new version, a new trial in the lab's ledger, and counted against the idea. A strategy that clears the backtest bars and six months of forward paper trading may then be cited only by Scout proposals inside the satellite cap, through Preflight.
+
+The final tear sheet reports each horizon, the post-cutoff window, trials tried, caveats such as survivorship, and a verdict. The Strategy desk then writes a short memo on what the result does and does not show.
 
 Expect most strategies to fail. That is the lab working: a cheap "no" in simulation beats an expensive one in the account.
 
