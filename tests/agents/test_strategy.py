@@ -120,7 +120,7 @@ def test_lab_reviews_queue_one_request_each(cfg):
     assert len(made) == 3 and queue_reviews(cfg, lab) == []
     req, fin, bounced = (store.get_request(cfg, r) for r in made)
     assert (req["desk"], req["symbol"], req["source"], req["run_now"]) == ("strategy", "value-momentum-etf", "lab", 0)
-    assert "finalized" in fin["question"] and "fix the spec" in bounced["question"]
+    assert "finalized" in fin["question"] and "fix the request" in bounced["question"]
     assert queue_reviews(cfg, FakeLab(ready=False)) == []
 
 
@@ -153,3 +153,20 @@ def test_all_desks_live_and_lab_job():
     assert ("30 6 * * *", "python -m desk.agents lab-reviews") in JOBS
     assert ("0 3 * * 0", "python -m desk.agents run scout") in JOBS
     assert not any(c.endswith("run strategy") for _, c in JOBS)
+
+
+def test_rule_requests_are_queued_without_a_version(cfg):
+    rule = {"id": "band-test", "rule": "rebalance_band", "params": {"band_pts": [3, 5, 10]}, "horizons": [5, 10], "mix": None, "account": None}
+    answer = {"summary": "Testing bands.", "memo": "Does a wider band cost much?", "action": "rule", "rule": rule}
+    report = run_strategy_desk(cfg, question="Is a 5 point band right?", lab=FakeLab(), decisions=FakeDecisions(), adapter=FakeAdapter({"strategy": answer}))
+    assert report.queued.name.endswith("-band-test-rule.json")
+    body = json.loads(report.queued.read_text())
+    assert body["request"] == "rule" and body["params"] == {"band_pts": [3, 5, 10]} and "mix" not in body and body["desk"] == "strategy"
+    schema = briefs.schema_file("strategy")
+    assert "rule" in schema["properties"]["action"]["enum"] and schema["properties"]["rule"]["properties"]["rule"]["enum"][-1] == "margin"
+
+
+def test_rule_results_queue_a_review(cfg):
+    lab = FakeLab(pending=[{"strategy_id": "band-test", "version": 0, "kind": "rule", "result_at": "2026-11-08T06:00:00Z"}])
+    req = store.get_request(cfg, queue_reviews(cfg, lab)[0])
+    assert "Rule test results are in for band-test" in req["question"]

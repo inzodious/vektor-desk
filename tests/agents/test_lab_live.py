@@ -9,6 +9,7 @@ from desk.engine import lab
 from desk.engine.lab.runner import process_queue
 from tests.agents.agent_fakes import FakeDecisions
 from tests.engine.test_lab import SPEC, write_lab_db
+from tests.engine.test_rules import rules_lab
 
 NOW = datetime.now(UTC)
 GRID = {"top_n": [1, 3], "lookback": [63, 126]}
@@ -64,3 +65,26 @@ def test_a_rejected_spec_comes_back_with_reasons(cfg):
         adapter=ask_lab(lambda b: seen.update(b) or {"summary": "", "memo": "", "action": "none"}),
     )
     assert seen["lab_result"]["rejected"]
+
+
+def test_rule_question_round_trip(cfg):
+    rules_lab(cfg)
+
+    def ask(body):
+        assert body["grammar"]["rule"]["rules"]["rebalance_band"] == ["band_pts"]
+        rule = {"id": "band-test", "rule": "rebalance_band", "params": {"band_pts": [3, 10]}, "horizons": [5, 10]}
+        return {"summary": "Testing bands.", "memo": "Comparing bands.", "action": "rule", "rule": rule}
+
+    run_strategy_desk(cfg, question="Is a 5 point band right?", lab=RealLab(), decisions=FakeDecisions(), adapter=ask_lab(ask))
+    assert [d["status"] for d in process_queue(cfg, now=NOW)["done"]] == ["rule"]
+    req = store.get_request(cfg, queue_reviews(cfg, RealLab())[0])
+    assert req["symbol"] == "band-test" and "Rule test" in req["question"]
+    seen = {}
+    run_strategy_desk(
+        cfg,
+        strategy_id="band-test",
+        lab=RealLab(),
+        decisions=FakeDecisions(),
+        adapter=ask_lab(lambda b: seen.update(b) or {"summary": "", "memo": "", "action": "none"}),
+    )
+    assert seen["lab_result"]["kind"] == "rule" and seen["lab_result"]["rule"]["baseline"]
