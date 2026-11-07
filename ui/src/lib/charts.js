@@ -99,3 +99,9 @@ export function periodStart(period, lastDay) {
   d.setUTCDate(d.getUTCDate() - p.days);
   return d.toISOString().slice(0, 10);
 }
+
+export function divergingColor(v, max = 1) {
+  const t = Math.max(-1, Math.min(1, v / max));
+  const c = t >= 0 ? 'var(--up)' : 'var(--dn)';
+  return { fill: `color-mix(in oklab, ${c} ${Math.round(Math.abs(t) * 100)}%, var(--mid))`, ink: Math.abs(t) > 0.55 ? '#fff' : 'var(--ink)' };
+}

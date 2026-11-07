@@ -10,7 +10,11 @@ export const ROUTES = [
   { path: '/decisions/journal', h1: 'Journal' },
   { path: '/decisions/flight', h1: 'Flight record' },
   { path: '/plan', h1: 'Plan' },
-  { path: '/lab', h1: 'Lab' },
+  { path: '/lab', h1: 'Compare' },
+  { path: '/lab?ids=FXAIX,FTEC,VXUS', h1: 'Compare' },
+  { path: '/lab/risk', h1: 'Risk' },
+  { path: '/lab/patterns', h1: 'Patterns' },
+  { path: '/lab/boards', h1: 'Saved boards' },
   { path: '/settings', h1: 'Settings' },
   { path: '/nowhere', h1: 'Lost in orbit' },
 ];

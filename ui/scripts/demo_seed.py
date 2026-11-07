@@ -397,3 +397,47 @@ for desk, q, sym, status, done_at, answer in ASKS:
         with store.db(cfg) as conn:
             conn.execute("UPDATE agent_requests SET created_at=? WHERE id=?", ("2026-11-07T12:50:00+00:00", rid))
 print("dossiers", len(DOSSIERS), "asks", len(ASKS))
+
+# ---------- fund look-through ----------
+MEGA = {
+    "AAA": ("Synthetic Megacap A", "Technology"),
+    "BBB": ("Synthetic Megacap B", "Technology"),
+    "CCC": ("Synthetic Megacap C", "Technology"),
+    "DDD": ("Synthetic Retail D", "Consumer Discretionary"),
+    "EEE": ("Synthetic Bank E", "Financials"),
+    "FFF": ("Synthetic Chips F", "Technology"),
+    "GGG": ("Synthetic Global G", "Health Care"),
+    "HHH": ("Synthetic Global H", "Industrials"),
+    "JJJ": ("Synthetic Global J", "Consumer Staples"),
+}
+FUNDS = {
+    "FXAIX": [("AAA", 7.1), ("BBB", 6.4), ("CCC", 5.9), ("DDD", 3.8), ("EEE", 2.1), ("FFF", 1.9), ("ACME", 0.05)],
+    "FTEC": [("AAA", 17.8), ("BBB", 15.6), ("CCC", 11.2), ("FFF", 6.1)],
+    "VXUS": [("GGG", 1.9), ("HHH", 1.6), ("JJJ", 1.3), ("CCC", 0.4)],
+    "BND": [("UST1", 2.4), ("UST2", 2.1), ("UST3", 1.8)],
+}
+with sqlite3.connect(cfg.desk_db) as conn:
+    for k, (fund, rows) in enumerate(FUNDS.items()):
+        conn.execute("INSERT OR REPLACE INTO sec_funds VALUES (?,?,?,?,?)", (fund, 0, f"S{k:09d}", None, "2026-11-01T00:00:00+00:00"))
+        conn.executemany(
+            "INSERT OR REPLACE INTO fund_holdings VALUES (?,?,?,?,?,?,?,?,?)",
+            [
+                (
+                    fund,
+                    "2026-09-30",
+                    sym,
+                    MEGA[sym][0] if sym in MEGA else f"Synthetic Treasury {sym[-1]}" if fund == "BND" else "Acme Orbital (synthetic)",
+                    None,
+                    w,
+                    "DBT" if fund == "BND" else "EC",
+                    "US",
+                    "synthetic",
+                )
+                for sym, w in rows
+            ],
+        )
+    conn.executemany(
+        "INSERT OR REPLACE INTO sym_profiles (symbol, name, industry, sector, fetched_at) VALUES (?,?,?,?,?)",
+        [(s, n, None, sec, "2026-11-06") for s, (n, sec) in MEGA.items()],
+    )
+print("look-through funds", len(FUNDS))
