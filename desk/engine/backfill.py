@@ -6,6 +6,7 @@ from desk.engine.market import BENCHMARKS, ProviderError, last_trading_day, tiin
 
 ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "universe": 3}
 ROTATE_DAYS = 90
+NO_PRICES = "Tiingo has no daily prices"
 
 
 def _int_env(name: str, default: int) -> int:
@@ -41,12 +42,13 @@ def add_symbols(conn: sqlite3.Connection, symbols, role: str, *, now: datetime |
         return conn.total_changes - before
 
 
-def sync_roles(conn: sqlite3.Connection) -> None:
+def sync_roles(conn: sqlite3.Connection, now: datetime | None = None) -> None:
     add_symbols(conn, BENCHMARKS, "benchmark")
     day = conn.execute("SELECT max(date) FROM holdings_daily").fetchone()[0]
     if not day:
         return
-    covered = {r[0] for r in conn.execute("SELECT DISTINCT symbol FROM prices_daily WHERE date >= date(?, '-7 days')", (day,))}
+    target = last_trading_day((now or datetime.now(UTC)).date() - timedelta(days=1)).isoformat()
+    covered = {r[0] for r in conn.execute("SELECT DISTINCT symbol FROM prices_daily WHERE date >= ?", (target,))}
     held = [r[0] for r in conn.execute("SELECT DISTINCT symbol FROM holdings_daily WHERE date=? AND is_cash=0", (day,))]
     add_symbols(conn, [s for s in held if s not in covered], "held")
 
@@ -94,11 +96,11 @@ def run_backfill(conn: sqlite3.Connection, http, *, now: datetime | None = None)
     key = tiingo_key()
     if not key:
         return {"ok": False, "error": "TIINGO_API_KEY is not set."}
-    sync_roles(conn)
+    sync_roles(conn, now)
     cap = limits()
     used = usage(conn, now)
     this_month = month_symbols(conn, now)
-    fetched, skipped, errors = [], 0, []
+    fetched, skipped, errors, unpriced = [], 0, [], []
     for row in due(conn, now):
         if used["hour"] >= cap["hour"] or used["day"] >= cap["day"]:
             break
@@ -125,10 +127,12 @@ def run_backfill(conn: sqlite3.Connection, http, *, now: datetime | None = None)
         if new_symbol:
             used["month_symbols"] += 1
             this_month.add(symbol)
-        if error:
+        if error and error.startswith(NO_PRICES):
+            unpriced.append(symbol)
+        elif error:
             errors.append(f"{symbol}: {error}")
             if "rate limit" in error:
                 break
         else:
             fetched.append(symbol)
-    return {"ok": not errors, "fetched": fetched, "skipped_for_month_cap": skipped, "errors": errors, "used": used, "limits": cap}
+    return {"ok": not errors, "fetched": fetched, "skipped_for_month_cap": skipped, "unpriced": unpriced, "errors": errors, "used": used, "limits": cap}

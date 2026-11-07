@@ -386,7 +386,7 @@ def load_context(cfg: Config, mirror: sqlite3.Connection | None, desk: sqlite3.C
     rows = [dict(r) for r in desk.execute("SELECT * FROM holdings_daily WHERE date=?", (day,))]
     plan = latest_plan(mirror) if mirror else {}
     targets = plan_targets(plan)
-    kinds = symbol_kinds(mirror, targets) if mirror else dict.fromkeys(targets, "fund")
+    kinds = symbol_kinds(mirror, targets, desk) if mirror else dict.fromkeys(targets, "fund")
     rules, _ = rules_in_force(cfg, plan)
     try:
         profile = active_profile(cfg)

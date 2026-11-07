@@ -10,13 +10,16 @@ from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
 from desk.engine import ENGINE_VERSION, fi, lookthrough, patterns, risk, scoring
+from desk.engine.backfill import NO_PRICES
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
+from desk.engine.holdings import price_series
 from desk.engine.lots import current_lots
+from desk.engine.market import BENCHMARKS, last_trading_day
 from desk.engine.research import macro, research_symbols, signals
 from desk.engine.returns import WINDOWS, annualize, base_index, daily_returns, drawdowns, period_mwr, twr_index, volatility, window_start
 from desk.engine.shadows import TotalReturn, deposit_split, shadow
-from desk.engine.source import closes, current_rows
+from desk.engine.source import current_rows
 from desk.engine.tax import held_long, realized, wash_windows
 
 UNITS = {"usd": 2, "pct": 4, "pts": 2, "ratio": 4, "days": 0, "count": 0}
@@ -25,6 +28,14 @@ SHELTERED = ("hsa", "roth", "ira", "401k", "401(k)", "403b", "457")
 ADHERENCE_WINDOWS = ("MTD", "QTD", "YTD", "1Y", "ITD")
 AFTER_TAX_WINDOWS = ("YTD", "1Y", "ITD")
 FUND_KINDS = {"fund", "etf", "mutual_fund", "index", "money_market"}
+LISTED_FUNDS = set(BENCHMARKS) | {"DIA", "MDY", "IVV", "VOO", "VUG", "VTV", "VEA", "VWO", "BND", "SCHD", "SCHB", "SCHX", "ITOT", "IEFA", "IEMG"}
+MARKET_KEYS = (
+    ("TIINGO_API_KEY", "held prices only refresh when you open Escape Vektor"),
+    ("FINNHUB_API_KEY", "no live quotes"),
+    ("FRED_API_KEY", "no macro series"),
+    ("DESK_SEC_USER_AGENT", "no SEC research or fund look-through"),
+)
+FUND_WORDS = {"ETF", "ETFS", "FUND", "FUNDS", "ISHARES", "SPDR", "PROSHARES", "INDEX"}
 PROFILE_ERRORS = (sqlite3.Error, TypeError, KeyError, ValueError, OSError, AttributeError)
 DEFAULT_RULES = [
     {"id": "no-margin-buys", "kind": "no_margin_buys", "params": {}},
@@ -115,7 +126,25 @@ def expense_ratios(plan: dict) -> dict[str, float]:
     }
 
 
-def symbol_kinds(mirror: sqlite3.Connection, targets: dict[str, float]) -> dict[str, str]:
+def _table(conn, name: str) -> bool:
+    return conn is not None and conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (name,)).fetchone() is not None
+
+
+def guess_kind(symbol: str, sec_funds: set[str], sec_titles: dict[str, str]) -> str:
+    if symbol in sec_funds or symbol in LISTED_FUNDS:
+        return "fund"
+    if len(symbol) == 5 and symbol.endswith("X") and symbol.isalpha():
+        return "fund"
+    if any(c.isdigit() for c in symbol) and symbol not in sec_titles:
+        return "fund"
+    title = sec_titles.get(symbol)
+    if title is None:
+        return "unknown"
+    words = set(title.upper().replace(",", " ").replace(".", " ").split())
+    return "fund" if words & FUND_WORDS else "stock"
+
+
+def symbol_kinds(mirror: sqlite3.Connection, targets: dict[str, float], desk: sqlite3.Connection | None = None) -> dict[str, str]:
     kinds = {}
     for p in current_rows(mirror, "priceProfiles"):
         s = str(p.get("symbol") or "").upper()
@@ -124,6 +153,16 @@ def symbol_kinds(mirror: sqlite3.Connection, targets: dict[str, float]) -> dict[
             kinds[s] = "fund" if k in FUND_KINDS else ("stock" if k in ("stock", "common stock", "equity") else "unknown")
     for s in targets:
         kinds[s] = "fund"
+    if desk is None:
+        return kinds
+    funds = {r[0] for r in desk.execute("SELECT symbol FROM sec_funds")} if _table(desk, "sec_funds") else set()
+    titles = {r[0]: r[1] or "" for r in desk.execute("SELECT symbol, title FROM sec_tickers")} if _table(desk, "sec_tickers") else {}
+    held = set()
+    if _table(desk, "holdings_daily"):
+        held = {r[0] for r in desk.execute("SELECT DISTINCT symbol FROM holdings_daily WHERE is_cash=0 AND date=(SELECT max(date) FROM holdings_daily)")}
+    for s in sorted(held | set(kinds)):
+        if kinds.get(s, "unknown") == "unknown":
+            kinds[s] = guess_kind(s, funds, titles)
     return kinds
 
 
@@ -194,12 +233,12 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     with desk:
         store_flows(desk, flows)
     if not days:
-        out.h("holdings", "fail", "No holdings yet; the holdings job has not produced a day.")
+        out.h("holdings", "fail", "No holdings yet. Fix: check the mirror has snapshots (`python -m desk.mirror`), then run `python -m desk.engine daily`.")
         return out
     as_of = days[-1]
     plan = latest_plan(mirror)
     targets = plan_targets(plan)
-    kinds = symbol_kinds(mirror, targets)
+    kinds = symbol_kinds(mirror, targets, desk)
 
     totals = {d: sum(h["value"] for h in holdings[d]) for d in days}
     quality_by_day = {d: ("pro_forma" if any(h["quality"] != "ok" for h in holdings[d]) else "ok") for d in days}
@@ -232,11 +271,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
             out.s("twr_index", "account", acct, d, ix, quality_by_day[d])
         accounts.append((acct, days[first:], a_values[first:], a_index))
 
-    price_series = closes(mirror)
-    if desk.execute("SELECT 1 FROM sqlite_master WHERE name='price_bars'").fetchone():
-        for r in desk.execute("SELECT symbol, date, close, adj_close FROM price_bars"):
-            price_series.setdefault(r["symbol"], {}).setdefault(r["date"], (r["close"], r["adj_close"]))
-    tr = TotalReturn(price_series)
+    tr = TotalReturn(price_series(mirror, desk))
     _shadow_metrics(out, days, values, flows_on, targets, tr)
     facts = profile_facts(mirror)
 
@@ -383,7 +418,11 @@ def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, da
         out.m("plan.single_stock", w, "pct", scope="holding", scope_id=s, quality=q)
     unknown = sorted(s for s in weights if kinds.get(s, "unknown") == "unknown" and s not in targets)
     if unknown:
-        out.h("symbol_kinds", "warn", f"Not sure whether these are funds or single stocks: {', '.join(unknown)}.")
+        out.h(
+            "symbol_kinds",
+            "warn",
+            f"Not sure whether {', '.join(unknown)} are funds or single stocks. Fix: set DESK_SEC_USER_AGENT so the research job can load SEC's ticker lists.",
+        )
     rules, source = rules_in_force(cfg, plan)
     debit = -sum(h["value"] for h in rows if h["is_cash"] and h["value"] < 0)
     for rule in rules:
@@ -441,7 +480,7 @@ def _margin_metrics(out: Out, rows, total):
                 drop = 1 - a["debit"] / ((1 - maint / 100) * a["value"])
                 out.m("margin.call_drop", max(0.0, drop) * 100, "pct", scope="account", scope_id=acct, quality="modelled")
         if rate is None:
-            out.h("margin_rate", "warn", "There is a margin debit but DESK_MARGIN_RATE_PCT is not set, so its interest cost is unknown.")
+            out.h("margin_rate", "warn", "There is a margin debit but no rate, so its interest cost is unknown. Fix: set DESK_MARGIN_RATE_PCT in settings.env.")
     else:
         out.m("margin.cost_month", 0.0, "usd")
 
@@ -607,7 +646,7 @@ def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datet
         out.m("tax.marginal_rate", federal, "pct", scope="tax", scope_id="federal", quality="modelled")
         out.m("tax.marginal_rate", state, "pct", scope="tax", scope_id="state", quality="modelled")
     else:
-        out.h("marginal_rate", "warn", "No marginal tax rate yet: open Taxes in Escape Vektor once, or set tax.marginal_rate_pct in desk.yaml.")
+        out.h("marginal_rate", "warn", "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once, or set tax.marginal_rate_pct in desk.yaml.")
     out.m("tax.harvest_value", total * rate / 100 if lots and rate is not None else None, "usd", quality="modelled")
     if source != "none":
         out.h("marginal_rate", "ok", "Marginal rate from Escape Vektor's tax estimate." if source == "escape_vektor" else "Marginal rate from desk.yaml.")
@@ -639,12 +678,76 @@ def _research_metrics(out: Out, desk, kinds):
     covered = {r[0] for r in desk.execute("SELECT DISTINCT symbol FROM fundamentals")}
     bare = [s for s in symbols if s not in covered]
     if bare:
-        out.h("research", "warn", f"No SEC company facts yet for {', '.join(bare[:10])}; the nightly research job fills them.")
+        fix = "the nightly research job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else "set DESK_SEC_USER_AGENT in desk.env"
+        out.h("research", "warn", f"No SEC company facts yet for {', '.join(bare[:10])}. Fix: {fix}.")
     elif symbols:
         out.h("research", "ok", f"SEC company facts for {len(symbols)} stocks.")
 
 
 # ---- Data health ----
+
+
+def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
+    held = sorted({h["symbol"] for h in rows if not h["is_cash"]})
+    newest: dict[str, str] = {}
+    for tbl in ("prices_daily", "price_bars"):
+        if desk.execute("SELECT 1 FROM sqlite_master WHERE name=?", (tbl,)).fetchone():
+            for sym, d in desk.execute(f"SELECT symbol, max(date) FROM {tbl} GROUP BY symbol"):
+                newest[sym] = max(newest.get(sym, ""), d)
+    no_source = set()
+    if desk.execute("SELECT 1 FROM sqlite_master WHERE name='market_symbols'").fetchone():
+        no_source = {r[0] for r in desk.execute("SELECT symbol FROM market_symbols WHERE error LIKE ?", (NO_PRICES + "%",))}
+    snap = {h["symbol"] for h in rows if h["source"] == "snapshot"}
+    missing = [s for s in held if s not in newest and s not in no_source]
+    session = last_trading_day(date.fromisoformat(as_of)).isoformat()
+    stale = [s for s in held if s in newest and newest[s] < session and s not in snap]
+    broker = [s for s in held if s not in newest and s in no_source]
+    notes = []
+    fix = "the overnight backfill fills them" if os.environ.get("TIINGO_API_KEY") else "set TIINGO_API_KEY in desk.env"
+    if missing:
+        notes.append(f"No close for {', '.join(missing)} on {as_of}. Fix: {fix}.")
+    if stale:
+        notes.append(f"Closes for {', '.join(stale)} stop at {min(newest[s] for s in stale)}. Fix: {fix}.")
+    if broker:
+        notes.append(f"{', '.join(broker)} have no market price anywhere, so they're valued at the broker's snapshot price.")
+    status = "warn" if missing or stale else "ok"
+    return "closes", status, " ".join(notes) or f"Every holding has a close on {as_of}."
+
+
+def _value_check(rows, day: str) -> tuple[str, str, str]:
+    mism = [h for h in rows if h["quality"] == "mismatch"]
+    if mism:
+        return (
+            "value",
+            "fail",
+            f"The {day} snapshot's positions don't add up to its account totals. Fix: re-pull the mirror; if it repeats, check Escape Vektor.",
+        )
+    bad, gaps = [], []
+    for acct in sorted({h["account"] for h in rows}):
+        mine = [h for h in rows if h["account"] == acct]
+        calc = sum(h["value"] for h in mine)
+        rep = sum(h["reported_value"] or 0 for h in mine)
+        if abs(calc - rep) > max(1.0, abs(rep) * 0.0005):
+            bad.append(f"{acct} {calc:,.2f} vs {rep:,.2f}")
+            for h in mine:
+                if not h["is_cash"] and h["shares"] and h["reported_value"] is not None and h["close"]:
+                    broker = h["reported_value"] / h["shares"]
+                    if abs(broker - h["close"]) > max(0.01, broker * 0.0005):
+                        gaps.append((abs(h["value"] - h["reported_value"]), f"{h['symbol']} {h['close']:,.2f} vs {broker:,.2f}"))
+    if not bad:
+        return "value", "ok", f"Values match the broker on {day}."
+    top = ", ".join(g for _, g in sorted(gaps, reverse=True)[:3])
+    why = f" Biggest price gaps (close vs broker): {top}." if top else ""
+    return "value", "warn", f"{'; '.join(bad)}.{why} Fix: usually the broker priced at a different time; it clears once the day's official closes land."
+
+
+def _market_keys() -> tuple[str, str, str]:
+    need = [(k, why) for k, why in MARKET_KEYS if not os.environ.get(k)]
+    if not need:
+        return "market_keys", "ok", "Tiingo, Finnhub, FRED and SEC are all set."
+    gaps = "; ".join(f"{k} ({why})" for k, why in need)
+    status = "warn" if any(k == "TIINGO_API_KEY" for k, _ in need) else "ok"
+    return "market_keys", status, f"Missing {gaps}. Fix: run the setup script again and answer n to keeping desk.env."
 
 
 def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
@@ -653,26 +756,17 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
         if row and row["mirrored_at"]:
             age = (now - datetime.fromisoformat(row["mirrored_at"].replace("Z", "+00:00"))).total_seconds() / 3600
             status = "ok" if age <= cfg.stale_hours else "fail"
-            out.h("freshness", status, f"Mirror pulled {age:.1f} hours ago (limit {cfg.stale_hours:g}).")
+            fix = "" if status == "ok" else " Fix: check the mirror job in `docker logs vektor-desk-cron`, or run `python -m desk.mirror`."
+            out.h("freshness", status, f"Mirror pulled {age:.1f} hours ago (limit {cfg.stale_hours:g}).{fix}")
         else:
-            out.h("freshness", "fail", "The mirror has never pulled snapshots.")
+            out.h("freshness", "fail", "The mirror has never pulled snapshots. Fix: run `python -m desk.mirror` and check the Firestore reader key.")
     as_of = out.as_of
     rows = holdings[as_of]
-    unpriced = sorted(h["symbol"] for h in rows if not h["is_cash"] and h["quality"] == "pro_forma" and h["source"] == "snapshot")
-    out.h("closes", "warn" if unpriced else "ok", f"No close for {', '.join(unpriced)} on {as_of}." if unpriced else f"Every holding has a close on {as_of}.")
+    out.h(*_closes_check(desk, rows, as_of))
     snap_days = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
     if snap_days:
-        d = max(snap_days)
-        bad = []
-        for acct in sorted({h["account"] for h in holdings[d]}):
-            calc = sum(h["value"] for h in holdings[d] if h["account"] == acct)
-            rep = sum(h["reported_value"] or 0 for h in holdings[d] if h["account"] == acct)
-            if abs(calc - rep) > max(1.0, abs(rep) * 0.0005):
-                bad.append(f"{acct} {calc:,.2f} vs {rep:,.2f}")
-        mism = [h for h in holdings[d] if h["quality"] == "mismatch"]
-        status = "fail" if bad or mism else "ok"
-        detail = "; ".join(bad) if bad else ("Snapshot positions don't add up to its total." if mism else f"Values match the broker on {d}.")
-        out.h("value", status, detail)
+        out.h(*_value_check(holdings[max(snap_days)], max(snap_days)))
+    out.h(*_market_keys())
     lots = []
     if desk.execute("SELECT 1 FROM sqlite_master WHERE name='lots'").fetchone():
         lots = current_lots(desk)
@@ -689,9 +783,12 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
         ]
         newest = max(str(lot["as_of"] or "") for lot in lots)
         status = "ok" if not diffs else ("warn" if newest < as_of else "fail")
-        out.h("shares", status, "; ".join(diffs[:10]) if diffs else "Lot shares match holdings.")
+        detail = "Lot shares match holdings."
+        if diffs:
+            detail = "; ".join(diffs[:10]) + ". Fix: drop a fresh lot export in the inbox's fidelity folder."
+        out.h("shares", status, detail)
     else:
-        out.h("shares", "warn", "No lot export yet; tax lots and wash-sale checks need one.")
+        out.h("shares", "warn", "No lot export yet, so tax lots and wash-sale checks are off. Fix: drop the export CSV in the inbox's fidelity folder.")
 
 
 # ---- Store ----

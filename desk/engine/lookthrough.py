@@ -427,9 +427,14 @@ def metrics(out, desk: sqlite3.Connection, kinds: dict[str, str], profiles: dict
     ]
     missing = sorted(f for f, v in view["funds"].items() if not v["holdings"] and f not in SECTOR_FUNDS)
     if missing:
-        out.h("lookthrough", "warn", f"No N-PORT holdings yet for {', '.join(missing)}; the weekly look-through job fills them.")
+        fix = "the weekly look-through job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else "set DESK_SEC_USER_AGENT in desk.env"
+        out.h("lookthrough", "warn", f"No N-PORT holdings yet for {', '.join(missing)}. Fix: {fix}.")
     elif stale:
-        out.h("lookthrough", "warn", f"N-PORT holdings for {', '.join(stale)} are over 150 days old.")
+        out.h(
+            "lookthrough",
+            "warn",
+            f"N-PORT holdings for {', '.join(stale)} are over 150 days old. Fix: run `python -m desk.engine lookthrough`.",
+        )
     else:
         out.h("lookthrough", "ok", f"Look-through covers {view['coverage']:.0f}% of invested value.")
 
