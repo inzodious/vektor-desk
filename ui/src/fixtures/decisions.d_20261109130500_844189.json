@@ -1,28 +1,28 @@
 {
- "id": "d_20261109140500_b36f38",
- "created_at": "2026-11-09T14:05:00+00:00",
- "updated_at": "2026-11-09T14:05:00+00:00",
- "origin": "research",
- "run_id": "r-seed-2",
- "kind": "buy",
- "title": "Buy $400 ACME",
- "symbol": "ACME",
+ "id": "d_20261109130500_844189",
+ "created_at": "2026-11-09T13:05:00+00:00",
+ "updated_at": "2026-11-09T13:05:00+00:00",
+ "origin": "plan_keeper",
+ "run_id": "r-seed-1",
+ "kind": "trim",
+ "title": "Trim $150 FTEC",
+ "symbol": "FTEC",
  "account": "individual-0001",
- "amount_usd": 400,
+ "amount_usd": 150,
  "shares": null,
- "funding": "margin",
- "thesis": "ACME reports next week and the synthetic launch schedule looks strong.",
- "bear_case": "Single-name launch risk; one scrub resets the timeline and the price.",
- "invalidation": "A launch slips past the quarter.",
- "horizon": "3 months",
- "rule_served": null,
- "confidence": 0.35,
+ "funding": "sale_proceeds",
+ "thesis": "FTEC is 1.2 pts over target after a strong month. A small trim keeps the tech tilt inside the plan.",
+ "bear_case": "Momentum could carry on for months, and a trim gives up some of that upside.",
+ "invalidation": "Drift falls back under 1 pt on its own before the next deposit.",
+ "horizon": "1 month",
+ "rule_served": "drift-max",
+ "confidence": 0.6,
  "numbers_used": [
   {
-   "metric_id": "plan.single_stock",
-   "scope_id": "all",
-   "unit": "pct",
-   "value": 0.5
+   "metric_id": "plan.drift",
+   "scope_id": "FTEC",
+   "unit": "pts",
+   "value": 1.2
   }
  ],
  "sources": [
@@ -39,8 +39,8 @@
  ],
  "order_ticket": null,
  "skeptic": {
-  "at": "2026-11-09T14:05:00+00:00",
-  "counter_case": "Borrowing at margin rates for a single-name earnings bet breaks two of your own rules.",
+  "at": "2026-11-09T13:05:00+00:00",
+  "counter_case": "1.2 pts is well inside the 5 pt band. Routing deposits away from FTEC does the same thing with no sale and no tax.",
   "verdict": "flag"
  },
  "expires_at": "2026-11-16T21:00:00+00:00",
@@ -49,15 +49,15 @@
  "snoozed_until": null,
  "override": false,
  "override_reason": null,
- "preflight_status": "blocked",
+ "preflight_status": "flagged",
  "preflight": {
   "as_of": "2026-11-06",
   "engine_version": "0.1.0",
   "lights": [
    {
-    "after": 2.9216,
-    "before": 0.4816,
-    "detail": "ACME goes from 0.5% to 2.9%.",
+    "after": 20.2684,
+    "before": 21.1834,
+    "detail": "FTEC goes from 21.2% to 20.3%; the largest holding would be 58.9%.",
     "id": "concentration",
     "label": "Concentration",
     "status": "ok"
@@ -71,18 +71,18 @@
     "status": "ok"
    },
    {
-    "after": 258,
+    "after": 0,
     "before": 0,
-    "detail": "Cash covers $142; the other $258 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+    "detail": "Proceeds go to cash.",
     "id": "funding",
     "label": "Funding",
-    "status": "act"
+    "status": "ok"
    },
    {
     "after": null,
     "before": null,
     "clears": null,
-    "detail": "No loss sale of this symbol in the last 30 days.",
+    "detail": "This sale is a gain, so wash-sale rules do not apply.",
     "id": "wash_sales",
     "label": "Wash sales",
     "status": "ok"
@@ -90,18 +90,18 @@
    {
     "after": null,
     "before": null,
-    "detail": "Opens a new lot at about $3.03.",
+    "detail": "No lot export for this holding yet, so the gain and lot pick can't be checked.",
     "id": "lots_tax",
     "label": "Lots and tax",
-    "status": "ok"
+    "status": "watch"
    },
    {
-    "after": 2,
-    "before": 2,
-    "detail": "Breaks no-margin-buys.",
+    "after": 3,
+    "before": 3,
+    "detail": "All 3 rules hold.",
     "id": "plan_rules",
     "label": "Plan rules",
-    "status": "act"
+    "status": "ok"
    }
   ],
   "metrics": [
@@ -118,7 +118,7 @@
     "metric_id": "risk.top1"
    },
    {
-    "after": 2.9216,
+    "after": 0.4816,
     "before": 0.4816,
     "flag": "ok",
     "metric_id": "plan.single_stock"
@@ -130,32 +130,32 @@
     "metric_id": "plan.drift_max"
    },
    {
-    "after": 258,
+    "after": 0,
     "before": 0,
-    "flag": "act",
+    "flag": "ok",
     "metric_id": "margin.debit"
    },
    {
     "after": null,
     "before": null,
-    "flag": "act",
+    "flag": "ok",
     "metric_id": "margin.cost_month"
    },
    {
-    "after": 97.3591,
+    "after": null,
     "before": null,
-    "flag": "act",
+    "flag": "ok",
     "metric_id": "margin.call_drop"
    },
    {
-    "after": -1.5738,
+    "after": 1.7812,
     "before": 0.8662,
     "flag": "ok",
     "metric_id": "cash.share"
    }
   ],
   "quality": "ok",
-  "status": "blocked",
+  "status": "flagged",
   "tax": {
    "lot_method": "highest_cost",
    "lots": [],
@@ -163,17 +163,17 @@
   },
   "trade": {
    "account": "individual-0001",
-   "amount_usd": 400,
-   "funding": "margin",
-   "kind": "buy",
+   "amount_usd": 150,
+   "funding": "sale_proceeds",
+   "kind": "trim",
    "lot_method": "highest_cost",
-   "price": 3.03,
-   "shares": 132.013201,
-   "side": "buy",
-   "symbol": "ACME"
+   "price": 250.53,
+   "shares": 0.598731,
+   "side": "sell",
+   "symbol": "FTEC"
   }
  },
- "preflight_at": "2026-11-09T14:05:00+00:00",
+ "preflight_at": "2026-11-09T13:05:00+00:00",
  "tax_impact": {
   "lot_method": "highest_cost",
   "lots": [],
@@ -189,21 +189,21 @@
  "decision": null,
  "events": [
   {
-   "at": "2026-11-09T14:05:00+00:00",
+   "at": "2026-11-09T13:05:00+00:00",
    "event": "proposed",
    "reason": null,
    "detail": null
   },
   {
-   "at": "2026-11-09T14:05:00+00:00",
+   "at": "2026-11-09T13:05:00+00:00",
    "event": "preflight",
    "reason": null,
    "detail": {
-    "status": "blocked"
+    "status": "flagged"
    }
   },
   {
-   "at": "2026-11-09T14:05:00+00:00",
+   "at": "2026-11-09T13:05:00+00:00",
    "event": "skeptic",
    "reason": null,
    "detail": {

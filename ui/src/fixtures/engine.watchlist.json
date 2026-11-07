@@ -1,0 +1,14 @@
+{
+ "symbols": [
+  {
+   "symbol": "NOVA",
+   "name": "Nova Fission (synthetic)",
+   "source": "desk",
+   "added_at": "2026-10-02T14:00:00+00:00",
+   "last_close": 36.84,
+   "prev_close": 36.77,
+   "last_bar": "2026-11-06",
+   "has_research": true
+  }
+ ]
+}

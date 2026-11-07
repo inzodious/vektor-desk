@@ -1,0 +1,41 @@
+{
+ "symbol": "FTEC",
+ "run_id": 3,
+ "created_at": "2026-11-05T06:12:00+00:00",
+ "dossier": {
+  "bear_case": "The top three holdings are 45% of the fund. A bad quarter for any one of them moves FTEC far more than the S&P 500, and it overlaps a third with the core fund.",
+  "changes_since_last": "Top three weight is up 2 points since the June holdings.",
+  "sources": [
+   {
+    "date": "2026-11-04",
+    "title": "N-PORT holdings, Sep 30 (synthetic) · SEC EDGAR",
+    "url": "https://www.sec.gov/edgar/search/"
+   },
+   {
+    "date": "2026-11-05",
+    "title": "10-year Treasury yield · FRED",
+    "url": "https://fred.stlouisfed.org/series/DGS10"
+   },
+   {
+    "date": "2026-11-02",
+    "title": "Sector earnings recap (synthetic)",
+    "url": "https://example.com/synthetic/sector-recap"
+   },
+   {
+    "date": "2026-09-12",
+    "title": "Your note: keep the tilt at 20%, no higher",
+    "url": "note:2026-09-12"
+   }
+  ],
+  "symbol": "FTEC",
+  "thesis": "FTEC is the plan's tech tilt at 20% of the mix. It tracks the broad US tech index for 0.084% a year, and the plan already caps it so one sector can't run the portfolio.",
+  "valuation_range": {
+   "basis": "forward P/E of the fund",
+   "high": 35,
+   "low": 24,
+   "now": 32
+  },
+  "verdict": "hold",
+  "what_would_change": "Top three weights pass 50%.\nForward P/E above 35x.\nThe plan drops the tech tilt."
+ }
+}

@@ -1,0 +1,32 @@
+[
+ {
+  "id": 2,
+  "desk": "research",
+  "question": "Deep dive on NOVA for the nuclear theme",
+  "symbol": "NOVA",
+  "run_now": 0,
+  "source": "console",
+  "status": "queued",
+  "created_at": "2026-11-07T12:50:00+00:00",
+  "started_at": null,
+  "finished_at": null,
+  "run_id": null,
+  "answer": null,
+  "note": null
+ },
+ {
+  "id": 1,
+  "desk": "tax",
+  "question": "Why is the tax desk quiet about ACME?",
+  "symbol": null,
+  "run_now": 0,
+  "source": "console",
+  "status": "done",
+  "created_at": "2026-11-05T21:40:00+00:00",
+  "started_at": "2026-11-06T01:04:00+00:00",
+  "finished_at": "2026-11-06T01:04:00+00:00",
+  "run_id": 3,
+  "answer": "The ACME position is $79, too small to clear the $250 harvest threshold even at a full loss. The desk speaks up once a lot can clear it.",
+  "note": null
+ }
+]

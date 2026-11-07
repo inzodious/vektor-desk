@@ -6,6 +6,8 @@ import { useLive } from '../live/context.js';
 import { etTime } from '../lib/format.js';
 import { useTheme } from '../lib/theme.js';
 import { useNow } from '../lib/useNow.js';
+import { ConsoleButton } from '../research/Console.jsx';
+import { SymbolSearch } from '../research/SymbolSearch.jsx';
 
 // ---------- clock ----------
 export function MarketClock() {
@@ -61,7 +63,9 @@ export function Shell({ badges }) {
           <NavLinks badges={badges} />
         </nav>
         <div className="tools">
+          <SymbolSearch />
           <MarketClock />
+          <ConsoleButton />
           <ThemeButton />
         </div>
       </header>

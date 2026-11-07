@@ -1,4 +1,4 @@
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const API = process.env.DESK_API || 'http://127.0.0.1:8000';
@@ -114,3 +114,41 @@ save('agents.brief', await get('/api/agents/brief'));
 save('agents.brief.empty', { summary: null });
 save('agents.runs', await get('/api/agents/runs?limit=50'));
 save('engine.wash', await get('/api/engine/wash'));
+
+// ---------- research ----------
+const dossiers = await get('/api/agents/dossiers');
+save('agents.dossiers', dossiers);
+for (const d of dossiers) save(`agents.dossiers.${d.symbol}`, d);
+save('agents.console', await get('/api/agents/console?limit=50'));
+save('engine.macro', await get('/api/engine/macro?start=2025-11-07'));
+
+let watch;
+try {
+  watch = await get('/api/engine/watchlist');
+} catch {
+  const nova = (await get('/api/engine/prices?symbol=NOVA')).rows;
+  const [prev, last] = nova.slice(-2);
+  watch = { symbols: [{ symbol: 'NOVA', name: 'Nova Fission (synthetic)', source: 'desk', added_at: '2026-10-02T14:00:00+00:00', last_close: last.close, prev_close: prev.close, last_bar: last.date, has_research: true }] };
+}
+save('engine.watchlist', watch);
+save('engine.watchlist.empty', { symbols: [] });
+
+const researched = [...new Set([...dossiers.map((d) => d.symbol), ...watch.symbols.map((w) => w.symbol), ...symbols])];
+for (const sym of researched) {
+  save(`engine.research.${sym}`, await get(`/api/engine/research?symbol=${sym}`));
+  save(`engine.prices.${sym}`, await get(`/api/engine/prices?symbol=${sym}&start=2025-11-07`));
+  save(`engine.metrics.${sym}`, await get(`/api/engine/metrics?ids=*&scope=holding&scope_id=${sym}`));
+}
+save('engine.research.any', { symbol: null, filings: [], fundamentals: {}, earnings: [], insiders: [], signals: [] });
+
+// ---------- version in status fixtures ----------
+const { version } = await get('/api/status');
+for (const name of ['status', 'status.stale', 'status.failing', 'status.empty']) {
+  const file = `${OUT}${name}.json`;
+  const body = JSON.parse(readFileSync(file, 'utf8'));
+  if (body.version !== version) {
+    body.version = version;
+    writeFileSync(file, `${JSON.stringify(body, null, 1)}\n`);
+    console.log(`set ${name}.json to ${version}`);
+  }
+}

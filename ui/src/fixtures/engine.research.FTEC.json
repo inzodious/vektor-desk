@@ -1,0 +1,23 @@
+{
+ "symbol": "FTEC",
+ "filings": [
+  {
+   "form": "NPORT-P",
+   "filed": "2026-11-04",
+   "report_date": "2026-09-30",
+   "description": "Portfolio holdings, Sep 30, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  },
+  {
+   "form": "497K",
+   "filed": "2026-09-26",
+   "report_date": null,
+   "description": "Summary prospectus, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  }
+ ],
+ "fundamentals": {},
+ "earnings": [],
+ "insiders": [],
+ "signals": []
+}

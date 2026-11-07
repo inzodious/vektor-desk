@@ -1,0 +1,26 @@
+{
+ "symbol": "NOVA",
+ "run_id": 3,
+ "created_at": "2026-10-29T06:20:00+00:00",
+ "dossier": {
+  "bear_case": "It still loses money, a follow-on offering is on file, and it would be a new single stock, which the plan rules out.",
+  "changes_since_last": "New S-1/A on file since the last look.",
+  "sources": [
+   {
+    "date": "2026-10-28",
+    "title": "S-1/A (synthetic) · SEC EDGAR",
+    "url": "https://www.sec.gov/edgar/search/"
+   }
+  ],
+  "symbol": "NOVA",
+  "thesis": "NOVA is the watchlist's nuclear theme pick. The CEO bought $624K of stock in October and revenue grew 24% last year.",
+  "valuation_range": {
+   "basis": "price per share, $",
+   "high": 44,
+   "low": 28,
+   "now": null
+  },
+  "verdict": "watch",
+  "what_would_change": "Price under $28 with the offering done.\nFirst operating profit."
+ }
+}

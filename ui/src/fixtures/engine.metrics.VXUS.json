@@ -1,0 +1,138 @@
+{
+ "as_of": "2026-11-06",
+ "engine_version": "0.1.0",
+ "metrics": [
+  {
+   "metric_id": "plan.drift",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": -1.32,
+   "unit": "pts",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "plan.next_deposit",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 178.96,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "modelled",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "plan.target",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 15,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "plan.weight",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 13.6782,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.beta",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "252D",
+   "as_of": "2026-11-06",
+   "value": 0.064,
+   "unit": "ratio",
+   "n_obs": 252,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.corr",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "252D",
+   "as_of": "2026-11-06",
+   "value": 0.0675,
+   "unit": "ratio",
+   "n_obs": 252,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.corr",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "63D",
+   "as_of": "2026-11-06",
+   "value": 0.039,
+   "unit": "ratio",
+   "n_obs": 63,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.corr_shift",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "63D",
+   "as_of": "2026-11-06",
+   "value": -0.0284,
+   "unit": "ratio",
+   "n_obs": 252,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "tax.wash_window",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 26,
+   "unit": "days",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "value.market",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 2242.33,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "value.weight",
+   "scope": "holding",
+   "scope_id": "VXUS",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 13.6782,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  }
+ ]
+}

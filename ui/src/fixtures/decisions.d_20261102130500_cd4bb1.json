@@ -1,40 +1,29 @@
 {
- "id": "d_20261109130500_f1439d",
- "created_at": "2026-11-09T13:05:00+00:00",
- "updated_at": "2026-11-09T13:05:00+00:00",
+ "id": "d_20261102130500_cd4bb1",
+ "created_at": "2026-11-02T13:05:00+00:00",
+ "updated_at": "2026-11-02T15:05:00+00:00",
  "origin": "plan_keeper",
- "run_id": "r-seed-1",
+ "run_id": "r-seed-0",
  "kind": "deposit_route",
- "title": "Route deposit to $180 VXUS",
- "symbol": "VXUS",
+ "title": "Route deposit to $300 FXAIX",
+ "symbol": "FXAIX",
  "account": "individual-0001",
- "amount_usd": 180,
+ "amount_usd": 300,
  "shares": null,
  "funding": "deposit",
- "thesis": "VXUS is the most under target. Routing part of the next deposit there pulls it back without selling anything.",
+ "thesis": "Core fund gets its share of the monthly deposit.",
  "bear_case": null,
  "invalidation": null,
- "horizon": "next deposit",
+ "horizon": null,
  "rule_served": "drift-max",
- "confidence": 0.8,
- "numbers_used": [
-  {
-   "metric_id": "plan.drift",
-   "scope_id": "VXUS",
-   "unit": "pts",
-   "value": -1.3
-  }
- ],
+ "confidence": 0.9,
+ "numbers_used": [],
  "sources": [],
  "order_ticket": null,
- "skeptic": {
-  "at": "2026-11-09T13:05:00+00:00",
-  "counter_case": "Deposit routing with no sale and no tax. Nothing to argue with.",
-  "verdict": "pass"
- },
- "expires_at": "2026-11-16T21:00:00+00:00",
- "status": "proposed",
- "status_reason": null,
+ "skeptic": null,
+ "expires_at": "2026-11-09T21:00:00+00:00",
+ "status": "placed",
+ "status_reason": "Monthly routine",
  "snoozed_until": null,
  "override": false,
  "override_reason": null,
@@ -44,17 +33,17 @@
   "engine_version": "0.1.0",
   "lights": [
    {
-    "after": 14.6157,
-    "before": 13.6782,
-    "detail": "VXUS goes from 13.7% to 14.6%; the largest holding would be 58.2%.",
+    "after": 59.5899,
+    "before": 58.8504,
+    "detail": "FXAIX goes from 58.9% to 59.6%; the largest holding would be 59.6%.",
     "id": "concentration",
     "label": "Concentration",
     "status": "ok"
    },
    {
-    "after": 1.7887,
+    "after": 1.5676,
     "before": 1.3218,
-    "detail": "Largest drift stays near 1.8 points.",
+    "detail": "Largest drift stays near 1.6 points.",
     "id": "drift_after",
     "label": "Drift after",
     "status": "ok"
@@ -79,7 +68,7 @@
    {
     "after": null,
     "before": null,
-    "detail": "Opens a new lot at about $62.95.",
+    "detail": "Opens a new lot at about $207.72.",
     "id": "lots_tax",
     "label": "Lots and tax",
     "status": "ok"
@@ -95,25 +84,25 @@
   ],
   "metrics": [
    {
-    "after": 16573.49,
+    "after": 16693.49,
     "before": 16393.49,
     "flag": "ok",
     "metric_id": "value.market"
    },
    {
-    "after": 58.2113,
+    "after": 59.5899,
     "before": 58.8504,
     "flag": "ok",
     "metric_id": "risk.top1"
    },
    {
-    "after": 0.4764,
+    "after": 0.4729,
     "before": 0.4816,
     "flag": "ok",
     "metric_id": "plan.single_stock"
    },
    {
-    "after": 1.7887,
+    "after": 1.5676,
     "before": 1.3218,
     "flag": "ok",
     "metric_id": "plan.drift_max"
@@ -137,7 +126,7 @@
     "metric_id": "margin.call_drop"
    },
    {
-    "after": 0.8568,
+    "after": 0.8506,
     "before": 0.8662,
     "flag": "ok",
     "metric_id": "cash.share"
@@ -152,17 +141,17 @@
   },
   "trade": {
    "account": "individual-0001",
-   "amount_usd": 180,
+   "amount_usd": 300,
    "funding": "deposit",
    "kind": "deposit_route",
    "lot_method": "highest_cost",
-   "price": 62.95,
-   "shares": 2.859412,
+   "price": 207.72,
+   "shares": 1.444252,
    "side": "buy",
-   "symbol": "VXUS"
+   "symbol": "FXAIX"
   }
  },
- "preflight_at": "2026-11-09T13:05:00+00:00",
+ "preflight_at": "2026-11-02T13:05:00+00:00",
  "tax_impact": {
   "lot_method": "highest_cost",
   "lots": [],
@@ -170,21 +159,26 @@
  },
  "profile_version": 1,
  "rules_version": 1,
- "decided_at": null,
- "placed_at": null,
+ "decided_at": "2026-11-02T14:05:00+00:00",
+ "placed_at": "2026-11-02T15:05:00+00:00",
  "filled_at": null,
- "fill": null,
+ "fill": {
+  "placed": {
+   "price": 207.51,
+   "shares": 1.445713
+  }
+ },
  "activity_id": null,
- "decision": null,
+ "decision": "approved",
  "events": [
   {
-   "at": "2026-11-09T13:05:00+00:00",
+   "at": "2026-11-02T13:05:00+00:00",
    "event": "proposed",
    "reason": null,
    "detail": null
   },
   {
-   "at": "2026-11-09T13:05:00+00:00",
+   "at": "2026-11-02T13:05:00+00:00",
    "event": "preflight",
    "reason": null,
    "detail": {
@@ -192,11 +186,18 @@
    }
   },
   {
-   "at": "2026-11-09T13:05:00+00:00",
-   "event": "skeptic",
+   "at": "2026-11-02T14:05:00+00:00",
+   "event": "approved",
+   "reason": "Monthly routine",
+   "detail": null
+  },
+  {
+   "at": "2026-11-02T15:05:00+00:00",
+   "event": "placed",
    "reason": null,
    "detail": {
-    "verdict": "pass"
+    "price": 207.51,
+    "shares": 1.445713
    }
   }
  ]

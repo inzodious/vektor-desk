@@ -1,0 +1,386 @@
+{
+ "symbol": "ACME",
+ "filings": [
+  {
+   "form": "8-K",
+   "filed": "2026-11-03",
+   "report_date": "2026-11-03",
+   "description": "Launch schedule update, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  },
+  {
+   "form": "10-Q",
+   "filed": "2026-10-30",
+   "report_date": "2026-09-30",
+   "description": "Quarterly report, Q3, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  },
+  {
+   "form": "4",
+   "filed": "2026-10-21",
+   "report_date": "2026-10-17",
+   "description": "Director sale under a 10b5-1 plan, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  },
+  {
+   "form": "10-Q",
+   "filed": "2026-07-31",
+   "report_date": "2026-06-30",
+   "description": "Quarterly report, Q2, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  },
+  {
+   "form": "10-K",
+   "filed": "2026-02-27",
+   "report_date": "2025-12-31",
+   "description": "Annual report, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  }
+ ],
+ "fundamentals": {
+  "gross_profit": [
+   {
+    "start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 220645600,
+    "unit": "USD"
+   },
+   {
+    "start": "2024-01-01",
+    "period_end": "2024-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 167772000,
+    "unit": "USD"
+   },
+   {
+    "start": "2023-01-01",
+    "period_end": "2023-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 127100000,
+    "unit": "USD"
+   }
+  ],
+  "net_income": [
+   {
+    "start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 50433279.99999999,
+    "unit": "USD"
+   },
+   {
+    "start": "2024-01-01",
+    "period_end": "2024-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 25419999.999999996,
+    "unit": "USD"
+   },
+   {
+    "start": "2023-01-01",
+    "period_end": "2023-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 8199999.999999999,
+    "unit": "USD"
+   }
+  ],
+  "operating_income": [
+   {
+    "start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 75649920,
+    "unit": "USD"
+   },
+   {
+    "start": "2024-01-01",
+    "period_end": "2024-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 45756000,
+    "unit": "USD"
+   },
+   {
+    "start": "2023-01-01",
+    "period_end": "2023-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 24600000,
+    "unit": "USD"
+   }
+  ],
+  "revenue": [
+   {
+    "start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 630416000,
+    "unit": "USD"
+   },
+   {
+    "start": "2024-01-01",
+    "period_end": "2024-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 508400000,
+    "unit": "USD"
+   },
+   {
+    "start": "2023-01-01",
+    "period_end": "2023-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 410000000,
+    "unit": "USD"
+   }
+  ],
+  "shares_outstanding": [
+   {
+    "start": null,
+    "period_end": "2026-09-30",
+    "fp": "Q1",
+    "form": "10-Q",
+    "value": 190894509.757952,
+    "unit": "shares"
+   },
+   {
+    "start": null,
+    "period_end": "2026-06-30",
+    "fp": "Q4",
+    "form": "10-Q",
+    "value": 188630938.496,
+    "unit": "shares"
+   },
+   {
+    "start": null,
+    "period_end": "2026-03-31",
+    "fp": "Q3",
+    "form": "10-Q",
+    "value": 186394208,
+    "unit": "shares"
+   },
+   {
+    "start": null,
+    "period_end": "2025-12-31",
+    "fp": "Q2",
+    "form": "10-Q",
+    "value": 184184000,
+    "unit": "shares"
+   },
+   {
+    "start": null,
+    "period_end": "2025-09-30",
+    "fp": "Q1",
+    "form": "10-Q",
+    "value": 182000000,
+    "unit": "shares"
+   }
+  ]
+ },
+ "earnings": [
+  {
+   "symbol": "ACME",
+   "date": "2026-11-12",
+   "hour": "amc",
+   "quarter": 3,
+   "year": 2026,
+   "eps_estimate": 0.21,
+   "eps_actual": null,
+   "revenue_estimate": 152000000,
+   "revenue_actual": null
+  },
+  {
+   "symbol": "ACME",
+   "date": "2026-07-30",
+   "hour": "amc",
+   "quarter": 2,
+   "year": 2026,
+   "eps_estimate": 0.16,
+   "eps_actual": 0.19,
+   "revenue_estimate": 131000000,
+   "revenue_actual": 136000000
+  },
+  {
+   "symbol": "ACME",
+   "date": "2026-04-29",
+   "hour": "amc",
+   "quarter": 1,
+   "year": 2026,
+   "eps_estimate": 0.12,
+   "eps_actual": 0.11,
+   "revenue_estimate": 118000000,
+   "revenue_actual": 117000000
+  }
+ ],
+ "insiders": [
+  {
+   "name": "Synthetic Director A",
+   "filing_date": "2026-10-21",
+   "txn_date": "2026-10-17",
+   "code": "S",
+   "change": -12000,
+   "shares_after": 88000,
+   "price": 3.14
+  },
+  {
+   "name": "Synthetic Officer B",
+   "filing_date": "2026-09-12",
+   "txn_date": "2026-09-10",
+   "code": "P",
+   "change": 3000,
+   "shares_after": 41000,
+   "price": 3.41
+  },
+  {
+   "name": "Synthetic Officer C",
+   "filing_date": "2026-08-20",
+   "txn_date": "2026-08-18",
+   "code": "M",
+   "change": 5000,
+   "shares_after": 60000,
+   "price": 0.95
+  }
+ ],
+ "signals": [
+  {
+   "metric_id": "fund.gross_margin",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "FY",
+   "as_of": "2026-11-06",
+   "value": 35,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fund.net_margin",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "FY",
+   "as_of": "2026-11-06",
+   "value": 8,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fund.operating_margin",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "FY",
+   "as_of": "2026-11-06",
+   "value": 12,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fund.revenue_growth",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "FY",
+   "as_of": "2026-11-06",
+   "value": 24,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.dilution",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "1Y",
+   "as_of": "2026-11-06",
+   "value": 4.8871,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.earnings_days",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 6,
+   "unit": "days",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.earnings_since",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 99,
+   "unit": "days",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.eps_surprise",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 18.75,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.insider_buyers",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": 1,
+   "unit": "count",
+   "n_obs": 2,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.insider_net",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": -27450,
+   "unit": "usd",
+   "n_obs": 2,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.revenue_surprise",
+   "scope": "holding",
+   "scope_id": "ACME",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 3.8168,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  }
+ ]
+}
