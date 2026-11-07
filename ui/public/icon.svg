@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="sky" cx="0.3" cy="0.2" r="0.95">
+      <stop offset="0" stop-color="#2a5d64"/>
+      <stop offset="1" stop-color="#132f34"/>
+    </radialGradient>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd166"/>
+      <stop offset="0.55" stop-color="#ff9a5c"/>
+      <stop offset="1" stop-color="#ff6f61"/>
+    </linearGradient>
+    <clipPath id="tile"><rect width="512" height="512" rx="116"/></clipPath>
+    <mask id="bands">
+      <rect width="512" height="512" fill="#fff"/>
+      <rect x="0" y="318" width="512" height="7" fill="#000"/>
+      <rect x="0" y="346" width="512" height="10" fill="#000"/>
+      <rect x="0" y="377" width="512" height="13" fill="#000"/>
+      <rect x="0" y="411" width="512" height="16" fill="#000"/>
+    </mask>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect width="512" height="512" fill="url(#sky)"/>
+    <g fill="#ffe7bf">
+      <circle cx="92" cy="104" r="5"/>
+      <circle cx="150" cy="62" r="3.5"/>
+      <circle cx="58" cy="208" r="3.5"/>
+      <circle cx="446" cy="248" r="4"/>
+      <circle cx="300" cy="70" r="3"/>
+    </g>
+    <path d="M84 262 l7 24 24 7 -24 7 -7 24 -7 -24 -24 -7 24 -7z" fill="#f4b63f"/>
+    <path d="M432 330 l5 16 16 5 -16 5 -5 16 -5 -16 -16 -5 16 -5z" fill="#ffe7bf" opacity=".9"/>
+    <g mask="url(#bands)">
+      <circle cx="256" cy="330" r="150" fill="url(#sun)"/>
+    </g>
+    <path d="M38 395 A222 58 -16 0 0 474 265" fill="none" stroke="#ffe7bf" stroke-width="12" stroke-linecap="round"/>
+    <path d="M128 138 L244 392 L366 162" fill="none" stroke="#0d2427" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M128 138 L244 392 L366 162" fill="none" stroke="#fffaf0" stroke-width="46" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M398 102 L407 195 L316 147 Z" fill="#fffaf0" stroke="#0d2427" stroke-width="14" stroke-linejoin="round" paint-order="stroke"/>
+  </g>
+</svg>
