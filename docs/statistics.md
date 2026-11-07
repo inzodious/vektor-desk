@@ -36,10 +36,14 @@ Held symbols already have closes in Escape Vektor's `priceCloses` (with `adjClos
 
 Two SQLite files on the TrueNAS dataset, both WAL mode, each with one writer. Nightly TrueNAS dataset snapshots are the backup.
 
-- **`/data/mirror.db`** is owned by the mirror ([architecture.md](architecture.md)): `rows(tbl, id, json, at)` is current Firestore state, with one view per table `ev_<tbl>(id, json, at)`; `row_history(seq, tbl, id, json, at, pulled_at, op)` is append-only, one row each time a document changes or disappears; `runs` and `tables` give freshness. The engine never writes to it.
+- **`/data/mirror.db`** is owned by the mirror ([architecture.md](architecture.md)): `rows(tbl, id, json, at)` is current Firestore state, with one view per table `ev_<tbl>(id, json, at)`; `row_history(seq, tbl, id, json, at, pulled_at, op)` is append-only, one row each time a document changes or disappears; `runs` and `tables` (with `full_at`, `max_at`) give freshness. Pulls read only rows whose `at` moved, with a full pass per table once a week, so a delete can reach `row_history` up to 7 days late. The engine never writes to it.
 - **`/data/desk.db`** is owned by the engine, which `ATTACH`es `mirror.db` read-only. The API and the agents' brief builder open `desk.db` read-only.
 
-Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deploy waits for them.
+- **`/data/lab/data`** holds point-in-time copies the engine drops for the lab (SQLite backup API, as in `desk.backup.snapshot`, plus the Parquet price and filing files). The lab never opens a live WAL database.
+
+Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deploy waits for them. Engine code builds on the shared scaffold: `desk/config.py`, `desk/db.py`, `desk/runlock.py`, and schedule lines in `deploy/crontab`.
+
+**Late deletes.** Current holdings always come from the latest snapshot (by `asOf`), so a deleted older snapshot that lingers for a week changes nothing. A lingering deleted activity or transaction row could double a flow; the cash check below catches it, marks the day `stale` and names the row, and the weekly full pass clears it.
 
 | Layer | Where | Tables | Rule |
 |---|---|---|---|
@@ -279,7 +283,7 @@ The feature library grows by pull request, with tests, so a new signal is review
 Joshua's ask is Claude directing simulations, tuning them and reading the statistics. The loop, with the honesty built into what Claude can see:
 
 1. **Explore.** The strategy desk returns an experiment in its structured output, and the agent runner writes it to `/data/lab/queue/*.json`: a registered spec, a parameter grid inside `params`, a date range, a seed, and a trial budget (default 200 variants per spec). It may also ask for analyses on finished runs: parameter sensitivity, regime splits (bull, bear, high and low rates), factor regression, turnover and cost sensitivity.
-2. **Run.** The `lab` service (`python -m desk.lab`, no network, read-only data mounts, writes only to `/data/lab/runs`; see [architecture.md](architecture.md)) runs the grid with walk-forward. Each variant is a row in the trial ledger.
+2. **Run.** The `lab` service (`python -m desk.lab`, no network, reads only the copies in `/data/lab/data`, writes only to `/data/lab/runs`; see [architecture.md](architecture.md)) runs the grid with walk-forward. Each variant is a row in the trial ledger.
 3. **Read.** The next desk run gets the results as `lab_result` in its prompt: walk-forward fold summaries and the analyses, never the holdout or the post-cutoff window. It can tune and resubmit until the trial budget is spent. Every variant raises the bar through the deflated Sharpe ratio, so tuning harder makes passing harder.
 4. **Finalize.** One `finalize` request per spec version opens the holdout and the post-cutoff window and produces the verdict. After that the spec is closed; a change is a new version and a new trial.
 
