@@ -47,6 +47,7 @@ Done when all six are merged and agree with each other.
 - [ ] Compose stack on TrueNAS: api, worker, web, Caddy, Tailscale sidecar
 - [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate
 - [ ] Read-only mirror of Escape Vektor's Firestore (positions, plans, activity, prices) into SQLite on a schedule
+- [ ] Raw layer and `holdings_daily`, keeping every mirror pull from day one
 - [ ] Claude Code CLI in the scheduler service (Hemline's pattern), token as a Compose secret, one `claude -p` smoke run (no `--bare`); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout
 - [ ] App shell in the Escape Vektor look: pill nav and phone dock, light and graphite dark
 - [ ] Settings: data freshness, token renewal date
@@ -56,21 +57,25 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run.
 
 ### 2. Bridge and Symbol sheet 📋
 
-- [ ] Live price feed during market hours, last close outside them
+- [ ] Live price feed during market hours, last close outside them (live quotes table, `/api/live`)
 - [ ] Bridge: holdings strip and first KPIs
 - [ ] Symbol sheet from any symbol chip: price, position across accounts, cost basis, lots
-- [ ] Fidelity lot export import
+- [ ] Fidelity lot export parser and lots table (Dec 6 risk)
 
 ### 3. Engine core and Plan 📋
 
-- [ ] Engine computes the Tier 1 metrics in `docs/statistics.md` and publishes the output contract
+- [ ] Engine (Python): flow classifier, reconciliation and `data_health`, value and flows, TWR and XIRR
+- [ ] Shadow portfolios: plan mix and S&P 500
+- [ ] Drift and rules, margin (interest in dollars, price drop to a call), costs, basic concentration and drawdown
+- [ ] Output contract v1
 - [ ] Bridge KPI row complete
 - [ ] Plan: target mix and bands, drift, rules (versioned), deposit routing
 
 ### 4. Decisions and Preflight 📋
 
 - [ ] Decision records for every action and deliberate pass; logging starts here so scoring has history later
-- [ ] Preflight lights: concentration, drift, funding and margin interest, wash sales across all accounts, lots and realized gain or loss, rule breaks
+- [ ] Preflight lights (engine, `preflight(holdings, trade)`): concentration, drift, funding and margin interest, wash sales across all accounts, lots and realized gain or loss, rule breaks
+- [ ] Tax lots, wash-sale calendar, realized gain and loss (Dec 6 risk)
 - [ ] Overrides with a one-line reason
 - [ ] Order tickets, marked placed, confirmed by the mirror
 - [ ] Decision journal and queue
@@ -78,6 +83,7 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run.
 ### 5. Plan keeper and tax desk 📋
 
 - [ ] Agent proposal record, written into the queue
+- [ ] Engine: per-desk brief slices, triggers table, marginal tax rate
 - [ ] Plan keeper: daily brief, payday split, rule breach flags
 - [ ] Tax desk: harvest candidates, lot picks, wash-sale windows, tax calendar
 - [ ] Settings: agent status, run log, usage per run
@@ -91,10 +97,11 @@ Tier 1 complete: 0.5.0.
 - [ ] Console: request research and talk to the desks
 - [ ] Watchlist and engine triggers into the queue: big daily move, band crossed, margin debit appears, earnings date, new lot export
 - [ ] Source library: SEC EDGAR filings, insider trades, 13F, earnings dates, FRED series
+- [ ] Engine: EDGAR, FRED and Finnhub fetchers and holding signals
 
 ### 7. Lab: Compare and risk 📋
 
-- [ ] Compare two to five items over a period, with fund overlap
+- [ ] Compare two to five items over a period, with fund overlap (N-PORT look-through)
 - [ ] Risk and statistics: concentration, exposure, scenario shocks, margin stress
 - [ ] Risk desk weekly report
 
@@ -104,7 +111,7 @@ Tier 1 complete: 0.5.0.
 
 ### 9. Flight record and Patterns 📋
 
-- [ ] Every decision scored at 30, 90 and 365 days against following the plan
+- [ ] Every decision scored at 30, 90 and 365 days against following the plan (next-close baseline, bootstrap intervals, Brier score)
 - [ ] Summaries by origin, type, and overrides versus clean Preflights
 - [ ] Patterns: market and his own behavior
 - [ ] Saved boards
@@ -112,7 +119,8 @@ Tier 1 complete: 0.5.0.
 ### 10. Scout and FI scenarios 📋
 
 - [ ] Scout desk: monthly ideas within the desk profile, each argued against first
-- [ ] FI projection scenarios
+- [ ] FI projection scenarios (Monte Carlo percentiles)
+- [ ] Factor exposure, rule backtests
 
 ### 1.0 Hardening 📋
 

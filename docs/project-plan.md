@@ -25,8 +25,8 @@ Each workstream is its own project thread and owns its files. Nobody edits anoth
 | Lead (roadmap and plan) | `README.md`, `ROADMAP.md`, `CHANGELOG.md`, `CLAUDE.md`, `.github/`, `docs/project-plan.md` | This plan and the roadmap |
 | Concept | `docs/concept.md` | Purpose, areas, loops, tiers (PR #1) |
 | Infrastructure | `docs/architecture.md`, deploy files (`compose.yaml`, `Caddyfile`, Dockerfiles, `.env.example`) | Stack, network, mirror, secrets |
-| Statistics | `docs/statistics.md`, later the engine | Metric catalogue and the engine's output contract |
-| AI agents | `docs/agents.md`, later the agent runner and prompts | Desks, schedules, guardrails, usage budget |
+| Statistics | `docs/statistics.md`, later the engine (Python) and Preflight | Metric catalogue and the engine's output contract (PR #4) |
+| AI agents | `docs/agents.md`, later the agent runner and prompts | Desks, schedules, guardrails, usage budget, proposal contract (PR #2) |
 | Dashboards and design | `docs/design.md`, `mockups/`, later the web app's look | Look, navigation, page and board mockups |
 
 ## How the workstreams fit together
@@ -63,6 +63,8 @@ Infrastructure ──► mirror tables ──► Statistics engine ──► out
 | 2026-11-07 | Advisory only: no broker credentials, no trade execution |
 | 2026-11-07 | Free services only beyond what is already paid for |
 | 2026-11-07 | Design borrows Escape Vektor's look with a single investing focus |
+| 2026-11-07 | Engine is Python; Preflight is engine code that agents call and Design renders |
+| 2026-11-07 | The Claude CLI runs in the scheduler service (Hemline's pattern); desks get no file, shell or MCP tools |
 
 ## Risks
 
@@ -80,4 +82,3 @@ Infrastructure ──► mirror tables ──► Statistics engine ──► out
 
 - TrueNAS Scale version and spare capacity on the box (Infrastructure)
 - Web app stack: confirm Vite and React to reuse Escape Vektor's components, or something else (Dashboards and design, Infrastructure)
-- Engine language: Python for the statistics, or JavaScript to share code with Escape Vektor (Statistics)
