@@ -12,10 +12,12 @@ from desk.agents.sources import Decisions, Lab, NotReady, RealDecisions, RealLab
 from desk.config import Config
 
 NAME = "strategy"
+RULE_FIELDS = ("id", "rule", "params", "horizons", "mix", "deposit_monthly", "start_value", "account", "date_range")
 REVIEW = {
     "experiment": "Lab results are in for {sid} v{version}.",
     "finalize": "The lab finalized {sid} v{version}. Write the memo.",
-    "rejected": "The lab rejected {sid} v{version}. Read `rejected`, fix the spec against `grammar`, and resubmit as a new version.",
+    "rule": "Rule test results are in for {sid}. Explain what the rule did against its baseline.",
+    "rejected": "The lab rejected {sid} v{version}. Read `rejected`, fix the request against `grammar`, and resubmit.",
 }
 
 
@@ -36,11 +38,12 @@ def queue_dir(cfg: Config) -> Path:
     return cfg.data_dir / "lab" / "queue"
 
 
-def _write(cfg: Config, body: dict, strategy_id: str, version: int, request: str) -> Path:
+def _write(cfg: Config, body: dict, strategy_id: str, version: int | None, request: str) -> Path:
     folder = queue_dir(cfg)
     folder.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    final = folder / f"{stamp}-{strategy_id}-v{version}-{request}.json"
+    tag = f"-v{version}" if version is not None else ""
+    final = folder / f"{stamp}-{strategy_id}{tag}-{request}.json"
     tmp = folder / f".{final.name}.tmp"
     tmp.write_text(json.dumps(body, indent=1, sort_keys=True))
     os.replace(tmp, final)
@@ -105,6 +108,9 @@ def run_strategy_desk(
             **provenance,
         }
         report.queued = _write(cfg, body, spec["id"], int(spec["version"]), "experiment")
+    elif action == "rule" and isinstance(answer.get("rule"), dict):
+        rule = {k: v for k, v in answer["rule"].items() if k in RULE_FIELDS and v is not None}
+        report.queued = _write(cfg, {"request": "rule", **rule, **provenance}, str(rule["id"]), None, "rule")
     elif action == "finalize" and isinstance(answer.get("finalize"), dict):
         fin = answer["finalize"]
         if strategy_id and fin.get("strategy_id") != strategy_id:
