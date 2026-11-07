@@ -1,7 +1,2 @@
-# Vektor Desk schedule: minute hour day-of-month month day-of-week command, in America/New_York.
-# Runs inside the cron service (python -m desk.scheduler). A line still running from last time is skipped.
-
-# ---- Mirror: Escape Vektor's Firestore copy, after the 7:30 and 4:30 bank pulls ----
-0 8,17 * * * python -m desk.mirror
-
-# ---- Engine, agents and lab: added by their owners ----
+# Extra schedule lines: minute hour day-of-month month day-of-week command, in America/New_York.
+# Package jobs live in desk/<package>/jobs.py and are picked up on their own; use this file only for one-offs.

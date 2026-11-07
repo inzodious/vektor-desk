@@ -63,7 +63,24 @@ def running(cfg: Config | None = None) -> list[dict]:
     return out
 
 
-def main() -> int:
+def hold(name: str, command: list[str]) -> int:
+    import subprocess
+
+    try:
+        with job_lock(name):
+            return subprocess.call(command)  # noqa: S603
+    except Busy as e:
+        print(f"skipped: {e}", file=sys.stderr)
+        return BUSY
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["--hold"]:
+        if len(argv) < 4 or argv[2] != "--":
+            print("usage: python -m desk.runlock --hold NAME -- COMMAND...", file=sys.stderr)
+            return 2
+        return hold(argv[1], argv[3:])
     jobs = running()
     if jobs:
         print(", ".join(f"{j['job']} (since {j.get('since', '?')})" for j in jobs))
