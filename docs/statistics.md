@@ -509,7 +509,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 **Paper.** Each night the engine replays a paper strategy with its finalized parameters from the finalize day to the newest bar on fresh data, so it can never be tuned after the fact. After 182 days it becomes `eligible` if it is level with or ahead of its benchmark, otherwise `retired`. `desk.engine.lab.eligible` lists the eligible ones for Scout.
 
-**API.** `GET /api/lab/strategies` (list, trial counts, paper state, feature catalog, grammar) and `GET /api/lab/strategies/{id}` (the desk view plus paper trades). Workers: `DESK_LAB_WORKERS` (default 1) processes.
+**API.** `GET /api/lab/strategies` (list with `hypothesis`, trial counts, paper state, feature catalog, grammar) and `GET /api/lab/strategies/{id}` (the desk view plus paper trades, and `spec`: the frozen title, hypothesis, predicted effect, universe, signals, entry, exit, rebalance, sizing, params, success criteria, horizons, `written_at` and `model`; null for a rejected version). Paper graduation is `paper.days` ≥ 182 calendar days; `paper.summary` is a JSON string. Workers: `DESK_LAB_WORKERS` (default 1) processes.
 
 **Not in this cut.** Point-in-time fundamentals and insider signals from the SEC bulk data sets, and reconstructed index membership.
 
