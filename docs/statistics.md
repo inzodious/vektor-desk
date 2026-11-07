@@ -258,26 +258,61 @@ The strategy desk ([agents.md](agents.md)) hands the lab a `strategy.json`, froz
 |---|---|
 | `id`, `version`, `parent_id` | Identity; `parent_id` links variants so every one counts in the trial ledger |
 | `title`, `hypothesis` | The claimed edge and why the market might miss it, in two sentences |
+| `predicted_effect` | Expected excess return and over what horizon, stated before any run |
 | `universe` | A point-in-time rule: index members as of each date, a fixed fund list, or a screen. Never today's tickers |
 | `signals` | `[{metric_id, window, transform}]` from the engine's feature library only: returns over N days, volatility, distance from an average, 52-week range, valuation and growth from XBRL facts, insider buys, earnings vs prior year. No free-form code |
 | `entry`, `exit`, `rebalance`, `sizing` | Rules on signals; sizing by equal weight, volatility, or signal rank |
+| `params` | Each tunable number with the range the desk may search |
 | `constraints` | Long only, no margin, max position %, max turnover |
 | `success_criteria` | Pre-registered: excess vs plan mix, max drawdown, minimum trades, the windows it must hold in |
 | `horizons` | Any of 3, 5 and 10 years |
 | `written_at`, `desk`, `model`, `effort` | Provenance; `model` sets the training-cutoff window below |
 
-The lab, not the desk, sets costs, taxes (taxable account by default), and the benchmark (plan mix, with the S&P 500 alongside).
+| `benchmark`, `account` | Optional. Defaults: plan mix (S&P 500 always shown alongside) and taxable |
 
-The feature library grows by pull request, with tests, so a new signal is reviewed code, not something a model writes on the fly.
+The lab, not the desk, sets costs and tax rates. This table is the canonical field list; [agents.md](agents.md) points here.
+
+The feature library grows by pull request, with tests, so a new signal is reviewed code, not something a model writes on the fly. Claude-written strategy code is out of scope for now; if the library ever proves too narrow, code would run in the same sandbox under the same bars, as a new trial.
+
+### Claude drives, the engine runs
+
+Joshua's ask is Claude directing simulations, tuning them and reading the statistics. The loop, with the honesty built into what Claude can see:
+
+1. **Explore.** The strategy desk writes an experiment into `/data/lab/queue/*.json`: a registered spec, a parameter grid inside `params`, a date range, a seed, and a trial budget (default 200 variants per spec). It may also ask for analyses on finished runs: parameter sensitivity, regime splits (bull, bear, high and low rates), factor regression, turnover and cost sensitivity.
+2. **Run.** The `lab` service (`python -m desk.lab`, no network, read-only data mounts, writes only to `/data/lab/runs`; see [architecture.md](architecture.md)) runs the grid with walk-forward. Each variant is a row in the trial ledger.
+3. **Read.** The next desk run gets the results: walk-forward fold summaries and the analyses, never the holdout or the post-cutoff window. It can tune and resubmit until the trial budget is spent. Every variant raises the bar through the deflated Sharpe ratio, so tuning harder makes passing harder.
+4. **Finalize.** One `finalize` request per spec version opens the holdout and the post-cutoff window and produces the verdict. After that the spec is closed; a change is a new version and a new trial.
+
+Claude never executes code and never sees a simulated day before the engine has finished it. It chooses what to test and explains what came back, which is what it is good at.
+
+### Backfill and sizing
+
+Data the lab needs for 10-year windows, sized for the box (Ryzen 5 5600GT, 6 cores; 15 GiB RAM today, 32 GB soon; desk budget 20 GiB on the NVMe pool).
+
+| Data | Source | Size on disk | How long it takes |
+|---|---|---|---|
+| ETFs, sector and factor funds, benchmarks (about 150 symbols) | Tiingo | Under 50 MB | First month |
+| Large caps: S&P 500 members over the last 15 years, removed ones included (about 1,000 symbols) | Tiingo; its ticker list carries start and end dates, which finds delisted symbols | About 150 MB | Months 2 to 4 |
+| Broader universe, optional (about 1,500 more) | Tiingo | About 250 MB | Months 5 to 8 |
+| Fundamentals with filing dates, 2009 on | SEC Financial Statement Data Sets (quarterly bulk files) | Raw zips deleted after import; about 1 to 2 GB extracted | One weekend, then one file a quarter |
+| Insider trades, 2006 on | SEC Insider Transactions Data Sets (quarterly) | About 0.5 GB | One weekend |
+| Factor and industry portfolios, 1926 on | Ken French library | Under 100 MB | Minutes |
+| Macro with vintages | FRED and ALFRED | Under 100 MB | Minutes |
+
+**The bottleneck is Tiingo's free tier, not the hardware**: 50 requests an hour, 1,000 a day, and 500 unique symbols a month, shared with Escape Vektor. One request returns a symbol's full history, so the desk takes about 400 new symbols a month overnight and leaves the rest for Escape Vektor. Bars are cached forever and only topped up after that. **Backfill starts in roadmap phase 3**, so the large-cap universe is ready when the lab lands in phase 9. ETF and French-portfolio strategies can run from day one of the lab.
+
+Storage is Parquet files under `/data/lab/data`, read with DuckDB (free, embedded), so a backtest never loads more than its universe. Totals stay under 5 GiB, well inside the 20 GiB budget.
+
+**Compute.** A universe of 1,000 stocks over 10 years is 1,000 × 2,520 days, about 10 MB per field in float32, so a whole backtest fits in memory many times over. One vectorized variant takes well under a second. Under today's limits (3 workers, 1.5 GiB, 01:00 to 06:00 ET, never overlapping an agent run under `job_lock`) that is tens of thousands of variants a night, far more than the trial budget allows. After the RAM upgrade the limit rises to 8 workers and 8 GiB, which matters for the broader universe and for running beside Ollama and Jellyfin, not for speed. Workers stream one symbol's history at a time where they can, use float32 except for cash and tax math, and cap memory per chunk. Results are stored as summaries plus the top runs; raw run files in `/data/lab/runs` are pruned after 30 days. Trial ledger rows are never pruned.
 
 ### Data, point in time
 
 | Need | Free source | Limit |
 |---|---|---|
-| Prices, splits, dividends | Tiingo EOD, including delisted symbols where it carries them | The free tier caps unique symbols a month, so a broad stock universe is backfilled over several months and cached forever. ETF, sector and factor universes (about 100 symbols) fit at once |
+| Prices, splits, dividends | Tiingo EOD, including delisted symbols where it carries them | 500 new symbols a month on the free tier, so a broad universe is backfilled over months (below) |
 | Long, survivorship-free test bed | Ken French portfolios (industry, size, value, momentum, profitability sorts) back to 1926 | Portfolio returns, not single stocks. The honest place to test factor-style ideas over many decades |
-| Fundamentals as known that day | SEC XBRL company facts, each fact dated by its filing | Reliable from about 2010; earlier years need filing text |
-| Insider trades | SEC Form 4, by acceptance time | |
+| Fundamentals as known that day | SEC Financial Statement Data Sets, each figure dated by its filing | From 2009; earlier years are out of scope |
+| Insider trades | SEC Insider Transactions Data Sets (Form 4), by filing date | From 2006 |
 | Macro | FRED, using first-release values where ALFRED vintages exist | |
 | Index membership history | No clean free source | Rebuilt from published change lists and flagged `reconstructed` |
 | Analyst estimates, options, intraday | None free | Strategies that need them are out of scope |
@@ -401,8 +436,10 @@ Mapped to the [roadmap](../ROADMAP.md) phases; the lead thread owns the final or
 | 5. Plan keeper and tax desk | Per-desk brief slices, triggers, `tax.marginal_rate`, `tax.harvest_value` |
 | 6. Research | EDGAR, FRED and Finnhub fetchers; holding signals (earnings, insiders, dilution) |
 | 7. Lab: Compare and risk | Comparison engine, full risk table, look-through and sectors, scenarios, correlation shifts |
-| 9. Flight record and Patterns | Decision scoring and calibration, pattern tables |
-| 10. Scout and FI scenarios | Monte Carlo, factor exposure, rule backtests |
-| Strategy lab (new; after 7, beside 9) | Feature library, spec validation, walk-forward runner on ETF and French universes first, trial ledger, deflated Sharpe and overfitting tests, forward paper portfolios; broad stock backfill runs in the background over months |
+| 9. Strategy lab | Feature library, spec validation, experiment queue and `desk.lab` runner, walk-forward, trial ledger, deflated Sharpe and overfitting tests, finalize step, forward paper portfolios, rule backtests. ETF and French universes first |
+| 10. Flight record and Patterns | Decision scoring and calibration, pattern tables |
+| 11. Scout and FI scenarios | Monte Carlo, factor exposure |
+
+Price backfill for the lab starts in phase 3 and runs in the background (see Backfill and sizing).
 
 Tier 1 metrics are everything through phase 5. The December 6 target depends on the lot export (phase 2) and the wash-sale calendar (phase 4); if those slip, the December loss sale is planned at Fidelity as before.
