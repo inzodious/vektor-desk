@@ -15,7 +15,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
 | ☐ | 7. DNS record | Porkbun | `desk` A record points at the node's `100.x` address |
 | ☐ | 8. Cron jobs | TrueNAS Advanced Settings | Both jobs listed and enabled |
 | ☐ | 9. Phone alerts | ntfy app on your phone | Subscribed to the three `desk-` topics |
-| ☐ | 10. Check | TrueNAS shell, then phone | `deploy.sh check` passes, the test alert arrives, and the desk opens on your phone |
+| ☐ | 10. Check | TrueNAS shell, then your browser | `deploy.sh check` passes, the test alert arrives, and the desk opens in your browser |
 
 ## Steps
 
@@ -73,7 +73,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
     | Phone alerts | `ops: sent`, and the alert arrives in `desk-ops` | Check that Tailscale is on and the server in step 9 has `:8443` |
     | Certificate | `certificate obtained` | Check that Porkbun API Access is on for the domain (step 2) |
 
-    Then open `https://desk.escape-vektor.com` on your phone. It should show the mirror's last run and today's positions.
+    Then open `https://desk.escape-vektor.com` in your browser, on any device with Tailscale connected. It should show the mirror's last run and today's positions. If it hangs, Tailscale is off on that device.
 
 ## After updates
 
