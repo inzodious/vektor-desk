@@ -1,0 +1,123 @@
+# Vektor Desk on TrueNAS SCALE: Apps → Discover Apps → ⋮ → Install via YAML, name it "vektor-desk" (docs/architecture.md).
+# Private: the only way in is the tailscale service's own tailnet address, where caddy answers https://desk.escape-vektor.com.
+# Nothing here publishes a port on the NAS or the home network.
+services:
+  tailscale:
+    image: tailscale/tailscale:v1.102.4
+    container_name: vektor-desk-tailscale
+    hostname: desk
+    restart: unless-stopped
+    environment:
+      TS_HOSTNAME: desk
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "false"
+      TS_ACCEPT_DNS: "false"
+      TS_EXTRA_ARGS: --advertise-tags=tag:desk
+    # TS_AUTHKEY, only needed for the first sign-in; the node's state is kept in tailscale/ after that.
+    env_file: /mnt/Manifest/apps/vektor-desk/tailscale.env
+    volumes:
+      - /mnt/Manifest/apps/vektor-desk/tailscale:/var/lib/tailscale
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN, NET_RAW]
+    mem_limit: 96m
+
+  caddy:
+    image: vektor-desk/caddy:local
+    pull_policy: never
+    container_name: vektor-desk-caddy
+    restart: unless-stopped
+    # Listens on the tailscale service's address only, so https://desk.escape-vektor.com answers on the tailnet and nowhere else.
+    network_mode: service:tailscale
+    depends_on: [tailscale, api]
+    environment:
+      DESK_DOMAIN: desk.escape-vektor.com
+    # PORKBUN_API_KEY and PORKBUN_API_SECRET_KEY, for the certificate's DNS check.
+    env_file: /mnt/Manifest/apps/vektor-desk/caddy.env
+    volumes:
+      - /mnt/Manifest/apps/vektor-desk/caddy/data:/data
+      - /mnt/Manifest/apps/vektor-desk/caddy/config:/config
+    mem_limit: 96m
+
+  api:
+    image: vektor-desk:local
+    pull_policy: never
+    container_name: vektor-desk-api
+    restart: unless-stopped
+    init: true
+    user: "568:568"
+    # DESK_FIREBASE_PROJECT, DESK_UID, DESK_CLAUDE_TOKEN_EXPIRES: settings, no secrets.
+    env_file: /mnt/Manifest/apps/vektor-desk/settings.env
+    volumes:
+      - /mnt/Manifest/apps/vektor-desk/data:/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+
+  # The schedule in deploy/crontab: the mirror, and the engine and agents once they land. The only service with the Claude
+  # token and the Firestore key.
+  cron:
+    image: vektor-desk:local
+    pull_policy: never
+    container_name: vektor-desk-cron
+    restart: unless-stopped
+    init: true
+    user: "568:568"
+    command: ["python", "-m", "desk.scheduler", "/app/deploy/crontab"]
+    environment:
+      DESK_FIRESTORE_CREDENTIALS: /run/secrets/firestore-reader
+    # settings.env, then desk.env: CLAUDE_CODE_OAUTH_TOKEN, TIINGO_API_KEY, FINNHUB_API_KEY, FRED_API_KEY, DESK_SEC_USER_AGENT.
+    env_file:
+      - /mnt/Manifest/apps/vektor-desk/settings.env
+      - /mnt/Manifest/apps/vektor-desk/desk.env
+    volumes:
+      - /mnt/Manifest/apps/vektor-desk/data:/data
+      - /mnt/Manifest/apps/vektor-desk/firestore-reader.json:/run/secrets/firestore-reader:ro
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-m", "desk.scheduler", "--check", "/app/deploy/crontab"]
+      interval: 5m
+      timeout: 10s
+    # 640m on 16 GB of RAM; 2g after the upgrade to 32 GB.
+    mem_limit: 640m
+
+  # The strategy lab (docs/statistics.md): runs queued experiment specs with no network, reading only the snapshots and price
+  # data the engine leaves in data/lab/data. Uncomment when `python -m desk.lab` lands.
+  # lab:
+  #   image: vektor-desk:local
+  #   pull_policy: never
+  #   container_name: vektor-desk-lab
+  #   restart: unless-stopped
+  #   init: true
+  #   user: "568:568"
+  #   command: ["python", "-m", "desk.lab"]
+  #   network_mode: none
+  #   environment:
+  #     DESK_LAB_WORKERS: "3"
+  #   volumes:
+  #     - /mnt/Manifest/apps/vektor-desk/data/lab/data:/data/lab/data:ro
+  #     - /mnt/Manifest/apps/vektor-desk/data/lab/queue:/data/lab/queue
+  #     - /mnt/Manifest/apps/vektor-desk/data/lab/runs:/data/lab/runs
+  #     - /mnt/Manifest/apps/vektor-desk/data/run:/data/run
+  #   read_only: true
+  #   tmpfs: [/tmp]
+  #   cap_drop: [ALL]
+  #   security_opt: [no-new-privileges:true]
+  #   # 3 CPUs and 1.5g on 16 GB of RAM; 8 CPUs, 8g and DESK_LAB_WORKERS 8 after the upgrade.
+  #   cpus: 3
+  #   mem_limit: 1536m
+
+x-notes: |
+  ## Vektor Desk
+
+  Private investing desk for Escape Vektor. Tailnet only.
+
+  - **Open:** https://desk.escape-vektor.com from a device on your tailnet
+  - **Status:** `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh status`
+  - **Deploy now:** `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh now`
+  - **Source:** https://github.com/inzodious/vektor-desk

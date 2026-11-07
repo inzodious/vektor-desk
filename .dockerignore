@@ -1,0 +1,13 @@
+.git
+.venv
+**/__pycache__
+.pytest_cache
+.ruff_cache
+data
+backups
+inbox
+*.env
+*.db
+*.csv
+service-account*.json
+firestore-reader*.json

@@ -1,0 +1,302 @@
+#!/usr/bin/env bash
+# Vektor Desk on TrueNAS SCALE (docs/architecture.md). Run as root:
+#   deploy.sh now      pull main, build what changed, back up, restart the app; back to the previous images if it isn't
+#                      healthy. Waits for nothing: refuses while a desk job (mirror, engine, agent, lab) is running.
+#   deploy.sh auto     what the auto-deploy cron job runs every 5 minutes: deploys when main has moved, quietly does nothing
+#                      otherwise, waits out a running job, and doesn't retry a commit that failed
+#   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
+#   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
+#   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS record against the tailnet address
+set -Eeuo pipefail
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+export GIT_TERMINAL_PROMPT=0
+
+# ---- Settings ----
+
+APP=${DESK_APP:-vektor-desk}
+ROOT=${DESK_ROOT:-/mnt/Manifest/apps/vektor-desk}
+SRC=${DESK_SRC:-/mnt/Manifest/apps/vektor-desk-src}
+BACKUPS=${DESK_BACKUPS:-/mnt/Singularity/backups/vektor-desk}
+BRANCH=${DESK_BRANCH:-main}
+CREDENTIALS=${DESK_GIT_CREDENTIALS:-/mnt/Manifest/apps/.git-credentials}
+PINNED=${DESK_PINNED:-/mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh}
+KEEP=${DESK_BACKUP_KEEP:-14}
+HEALTH_WAIT=${DESK_HEALTH_WAIT:-120}
+LOG=$ROOT/deploy.log
+BUILD_LOG=$ROOT/deploy-build.log
+LOCK=/run/vektor-desk-deploy.lock
+AUTO_FAILED=$ROOT/deploy-auto.failed
+AUTO_NOTE=$ROOT/deploy-auto.note
+BUSY=75
+IMAGES=("vektor-desk:local=." "vektor-desk/caddy:local=deploy/caddy")
+
+# ---- Helpers ----
+
+log() { printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG"; }
+die() {
+  log "Stopped: $1"
+  exit "${2:-1}"
+}
+
+repo() { git -C "$SRC" -c safe.directory="$SRC" -c credential.helper="store --file=$CREDENTIALS" "$@"; }
+
+app_state() { midclt call app.query "[[\"name\", \"=\", \"$APP\"]]" | jq -r '.[0].state // "MISSING"'; }
+image_build() { docker image inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$1" 2>/dev/null || true; }
+live_build() { docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$1" 2>/dev/null || true; }
+health() { docker inspect -f '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}{{ .State.Status }}{{ end }}' "$1" 2>/dev/null || echo missing; }
+
+run_job() {
+  local id state deadline=$((SECONDS + 300))
+  id=$(midclt call "$@" 2>>"$BUILD_LOG") || return 1
+  [[ "$id" =~ ^[0-9]+$ ]] || return 1
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    state=$(midclt call core.get_jobs "[[\"id\", \"=\", $id]]" | jq -r '.[0].state // "UNKNOWN"')
+    case "$state" in
+      SUCCESS) return 0 ;;
+      FAILED | ABORTED)
+        {
+          echo "==== $(date '+%F %T') $1 $id $state"
+          midclt call core.get_jobs "[[\"id\", \"=\", $id]]" | jq -r '.[0].error // empty'
+        } >>"$BUILD_LOG"
+        return 1
+        ;;
+    esac
+    sleep 2
+  done
+  echo "==== $(date '+%F %T') $1 $id still $state after 300 s" >>"$BUILD_LOG"
+  return 1
+}
+
+restart_app() {
+  run_job app.redeploy "$APP" && return 0
+  log "app.redeploy didn't work; stopping and starting $APP instead"
+  run_job app.stop "$APP" || true
+  run_job app.start "$APP"
+}
+
+healthy() {
+  local target=$1 deadline=$((SECONDS + HEALTH_WAIT))
+  while [ "$SECONDS" -lt "$deadline" ]; do
+    if [ "$(live_build vektor-desk-api)" = "$target" ] && [ "$(health vektor-desk-api)" = healthy ] &&
+      [ "$(health vektor-desk-cron)" != missing ] && [ "$(health vektor-desk-caddy)" = running ]; then
+      return 0
+    fi
+    sleep 3
+  done
+  return 1
+}
+
+busy() { docker exec vektor-desk-cron python -m desk.runlock 2>/dev/null; }
+
+tarball() {
+  local file
+  mkdir -p "$BACKUPS"
+  file="$BACKUPS/$APP-$(date +%Y%m%d-%H%M%S).tar.gz"
+  tar "$@" -czf "$file.part" || {
+    rm -f "$file.part"
+    return 1
+  }
+  mv "$file.part" "$file"
+  find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP + 1)) | cut -d' ' -f2- | xargs -r rm -f
+  echo "$file"
+}
+
+backup() {
+  local staging=$ROOT/data/backup-staging
+  [ -d "$ROOT/data" ] || {
+    echo "there's no $ROOT/data to back up" >&2
+    return 1
+  }
+  if [ "$(docker inspect -f '{{ .State.Running }}' vektor-desk-cron 2>/dev/null)" = true ]; then
+    docker exec vektor-desk-cron python -m desk.backup --out /data/backup-staging >>"$LOG" 2>&1 || return 1
+  else
+    docker run --rm --user 568:568 -v "$ROOT/data:/data" vektor-desk:local python -m desk.backup --out /data/backup-staging >>"$LOG" 2>&1 || return 1
+  fi
+  tarball -C "$staging" . || return 1
+  rm -rf "$staging"
+}
+
+# ---- Commands ----
+
+update_checkout() {
+  [ -d "$SRC/.git" ] || die "there's no checkout in $SRC (docs/architecture.md, step 5)"
+  repo fetch --quiet origin "$BRANCH" 2>>"$LOG" || die "couldn't fetch from GitHub (has the token in $CREDENTIALS expired, or does it lack vektor-desk?)"
+  [ -z "$(repo status --porcelain --untracked-files=no)" ] || die "$SRC has local edits; run 'git -C $SRC status' and undo them"
+  repo merge --ff-only --quiet "origin/$BRANCH" 2>>"$LOG" || die "$SRC can't fast-forward to origin/$BRANCH"
+}
+
+deploy() {
+  local state why before target pair image dir built=() previous=() files
+  state=$(app_state)
+  if [ "$state" = RUNNING ] && why=$(busy); then
+    die "a desk job is running: $why. Nothing was changed" "$BUSY"
+  fi
+  before=$(repo rev-parse HEAD 2>/dev/null || true)
+  update_checkout
+  target=$(repo rev-parse HEAD)
+
+  for pair in "${IMAGES[@]}"; do
+    image=${pair%%=*}
+    dir=${pair#*=}
+    [ "$(image_build "$image")" = "$target" ] && continue
+    log "Building $image ${target:0:7}: $(repo log -1 --format=%s) (output in $BUILD_LOG)"
+    echo "==== $(date '+%F %T') build $image ${target:0:7}" >>"$BUILD_LOG"
+    docker build --build-arg "DESK_BUILD=$target" --label vektor-desk.app=1 -t "${image%:*}:candidate" "$SRC/$dir" >>"$BUILD_LOG" 2>&1 ||
+      die "$image didn't build; the live app wasn't touched. See $BUILD_LOG"
+    built+=("$image")
+  done
+
+  if [ ${#built[@]} -eq 0 ]; then
+    log "Already live: ${target:0:7}"
+    rm -f "$AUTO_FAILED"
+    return 0
+  fi
+  for image in "${built[@]}"; do
+    if docker image inspect "$image" >/dev/null 2>&1; then
+      previous+=("$image")
+      docker tag "$image" "${image%:*}:previous"
+    fi
+    docker tag "${image%:*}:candidate" "$image"
+    docker rmi "${image%:*}:candidate" >/dev/null
+  done
+
+  if [ "$state" = MISSING ]; then
+    log "Built ${built[*]} at ${target:0:7}. There's no app called $APP yet: install it from deploy/compose.yaml (docs/architecture.md, step 6)"
+    return 0
+  fi
+  if [ -n "$before" ] && ! repo diff --quiet "$before" "$target" -- deploy/compose.yaml; then
+    log "deploy/compose.yaml changed since ${before:0:7}: paste it into Apps → $APP → Edit after this deploy"
+  fi
+
+  files=$(backup) || die "the backup failed, so nothing was restarted"
+  log "Backed up: $files"
+  log "Restarting $APP"
+  if restart_app && healthy "$target"; then
+    log "Live: ${target:0:7}"
+    rm -f "$AUTO_FAILED"
+    docker image prune -f --filter "label=vektor-desk.app=1" >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  [ ${#previous[@]} -gt 0 ] || die "it didn't come up healthy and there are no previous images. See the app's logs"
+  log "It didn't come up healthy; going back to the previous images"
+  for image in "${previous[@]}"; do docker tag "${image%:*}:previous" "$image"; done
+  if restart_app && [ "$(health vektor-desk-api)" != missing ]; then
+    die "rolled back; the previous version is live again. Pre-deploy backup: $files"
+  fi
+  die "the rollback didn't come up either. Check the app in the TrueNAS Apps screen. Pre-deploy backup: $files"
+}
+
+note() {
+  [ "$(cat "$AUTO_NOTE" 2>/dev/null)" != "$1" ] || return 1
+  printf '%s\n' "$1" >"$AUTO_NOTE"
+  log "$1"
+}
+
+auto_stopped() {
+  if [ "$1" -eq 0 ] || [ "$1" -eq "$BUSY" ]; then return 0; fi
+  printf '%s\n' "$AUTO_TARGET" >"$AUTO_FAILED"
+}
+
+pinned_stale() { [ -f "$PINNED" ] && ! cmp -s "$PINNED" "$SRC/deploy/deploy.sh"; }
+
+auto() {
+  local target why
+  exec 9>"$LOCK"
+  flock -n 9 || return 0
+  [ "$(app_state)" = RUNNING ] || return 0
+  if ! repo fetch --quiet origin "$BRANCH" 2>/dev/null; then
+    note "Auto-deploy couldn't fetch from GitHub; it keeps trying (has the token in $CREDENTIALS expired?)" || true
+    return 0
+  fi
+  target=$(repo rev-parse "origin/$BRANCH")
+  if [ "$(live_build vektor-desk-api)" = "$target" ]; then
+    rm -f "$AUTO_NOTE"
+    return 0
+  fi
+  [ "$(cat "$AUTO_FAILED" 2>/dev/null)" != "$target" ] || return 0
+  if why=$(busy); then
+    note "Auto-deploy is waiting for ${target:0:7}: $why" || true
+    return 0
+  fi
+  rm -f "$AUTO_NOTE"
+  log "Auto-deploy: main moved to ${target:0:7}"
+  AUTO_TARGET=$target
+  trap 'auto_stopped $?' EXIT
+  deploy
+  trap - EXIT
+  if pinned_stale; then note "deploy.sh changed on main; read it, then copy it again for the cron jobs (docs/architecture.md, step 8)" || true; fi
+}
+
+status() {
+  local why crons
+  echo "App:         $APP $(app_state)$(why=$(busy) && echo " (running: $why)")"
+  repo fetch --quiet origin "$BRANCH" 2>/dev/null || echo "(couldn't reach GitHub)"
+  printf 'Live:        %s\n' "$(live_build vektor-desk-api | cut -c1-7)"
+  printf 'On GitHub:   %s\n' "$(repo log -1 --format='%h %s' "origin/$BRANCH")"
+  printf 'Containers:  api %s, cron %s, caddy %s, tailscale %s\n' "$(health vektor-desk-api)" "$(health vektor-desk-cron)" "$(health vektor-desk-caddy)" "$(health vektor-desk-tailscale)"
+  printf 'Tailnet IP:  %s\n' "$(docker exec vektor-desk-tailscale tailscale ip -4 2>/dev/null || echo '?')"
+  echo "Backups:     $(find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" 2>/dev/null | wc -l) in $BACKUPS"
+  crons=$(midclt call cronjob.query 2>/dev/null | jq -r '[.[] | select(.enabled and (.command | test("vektor-desk-deploy/deploy\\.sh auto")))] | length' 2>/dev/null || true)
+  if [ "${crons:-0}" -gt 0 ]; then echo "Auto-deploy: on"; else echo "Auto-deploy: off (docs/architecture.md, step 8)"; fi
+  if [ -s "$AUTO_FAILED" ]; then echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or run deploy.sh now"; fi
+  if [ ! -f "$PINNED" ]; then echo "Cron copy:   none at $PINNED (step 8)"; elif pinned_stale; then echo "Cron copy:   differs from the checkout's deploy.sh; read the change, then copy it again (step 8)"; fi
+  echo
+  docker exec vektor-desk-api python -m desk.status 2>/dev/null || echo "(the desk's own status isn't answering)"
+  echo
+  tail -n 8 "$LOG" 2>/dev/null || true
+}
+
+check() {
+  local ip dns answer tables
+  echo "Claude:"
+  answer=$(docker exec vektor-desk-cron sh -c 'cd "$(mktemp -d)" && echo "Reply with the single word OK." | claude -p --model haiku --output-format json --tools "" --setting-sources "" --strict-mcp-config --no-session-persistence' 2>&1 || true)
+  if jq -e '.is_error == false' >/dev/null 2>&1 <<<"$answer"; then
+    echo "  signed in, answered: $(jq -r '.result' <<<"$answer" | head -c 80)"
+  else
+    echo "  failed: $(head -c 300 <<<"$answer")"
+  fi
+  echo "Firestore:"
+  if tables=$(docker exec vektor-desk-cron python -m desk.mirror --list 2>&1); then
+    echo "  read access ok, $(wc -l <<<"$tables") tables: $(tr '\n' ' ' <<<"$tables")"
+  else
+    echo "  failed: $(tail -n 1 <<<"$tables")"
+  fi
+  echo "Address:"
+  ip=$(docker exec vektor-desk-tailscale tailscale ip -4 2>/dev/null || true)
+  dns=$(getent ahostsv4 desk.escape-vektor.com 2>/dev/null | awk 'NR == 1 { print $1 }')
+  echo "  tailnet ${ip:-?}, desk.escape-vektor.com resolves to ${dns:-nothing}"
+  if [ -n "$ip" ] && [ "$ip" = "$dns" ]; then echo "  match"; else echo "  set the Porkbun A record for desk to ${ip:-the tailnet address} (step 7)"; fi
+  echo "Certificate:"
+  docker logs vektor-desk-caddy 2>&1 | grep -E 'certificate obtained|could not get certificate|obtain' | tail -n 2 | sed 's/^/  /' || true
+}
+
+main() {
+  local files
+  [ "$(id -u)" -eq 0 ] || {
+    echo "Run it as root: sudo bash $0 ${1:-now}" >&2
+    exit 1
+  }
+  mkdir -p "$ROOT"
+  case "${1:-now}" in
+    now)
+      exec 9>"$LOCK"
+      flock -n 9 || die "a deploy is already running: tail -f $LOG"
+      deploy
+      if pinned_stale; then log "deploy.sh changed: copy it again for the cron jobs (step 8)"; fi
+      ;;
+    backup)
+      files=$(backup) || die "the backup failed"
+      log "Backed up: $files"
+      ;;
+    auto) auto ;;
+    status) status ;;
+    check) check ;;
+    *)
+      echo "usage: deploy.sh [now | auto | status | backup | check]" >&2
+      exit 2
+      ;;
+  esac
+}
+
+main "$@"
