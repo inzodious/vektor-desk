@@ -7,7 +7,18 @@ from desk.config import Config
 from desk.db import connect
 from desk.decisions.profile import active_profile
 from desk.engine import ENGINE_VERSION, schema
-from desk.engine.core import PROFILE_ERRORS, deposit_split, env_float, latest_plan, next_deposit, plan_targets, rules_in_force, symbol_kinds, symbol_weights
+from desk.engine.core import (
+    PROFILE_ERRORS,
+    deposit_split,
+    env_float,
+    latest_plan,
+    marginal_rate,
+    next_deposit,
+    plan_targets,
+    rules_in_force,
+    symbol_kinds,
+    symbol_weights,
+)
 from desk.engine.lots import current_lots
 from desk.engine.market import latest_close
 from desk.engine.source import closes, current_rows, open_mirror
@@ -47,6 +58,8 @@ class Context:
     margin_rate: float | None = None
     maint: float = 30.0
     next_deposit: tuple[float | None, str | None] = (None, None)
+    satellite_cap: float | None = None
+    tax_rate: float | None = None
     quality: str = "ok"
 
 
@@ -135,7 +148,7 @@ def apply_trade(rows: list[dict], t: dict) -> list[dict]:
 def _band(ctx: Context, symbol: str) -> float | None:
     caps = [r.get("params", {}).get("max_pct") for r in ctx.rules if r.get("kind") == "single_stock_band" and (not r.get("symbols") or symbol in r["symbols"])]
     caps = [c for c in caps if isinstance(c, int | float)]
-    return min(caps) if caps else None
+    return min(caps) if caps else ctx.satellite_cap
 
 
 def _has_rule(ctx: Context, kind: str) -> dict | None:
@@ -149,6 +162,9 @@ def lamp_concentration(ctx, t, before, after):
     if kind == "stock" and s not in ctx.targets:
         if side == "buy" and b == 0 and _has_rule(ctx, "no_new_single_stocks"):
             return "act", f"{s} would be a new single stock, and the rules say no new ones.", b, a
+        total_b, total_a = before["single_stock"], after["single_stock"]
+        if side == "buy" and ctx.satellite_cap is not None and total_a > ctx.satellite_cap and total_a > total_b:
+            return "act", f"Single stocks would be {total_a:.1f}% of the portfolio, past the {ctx.satellite_cap:g}% satellite cap.", b, a
         cap = _band(ctx, s)
         if cap is not None and a > cap and a > b:
             return ("act" if side == "buy" else "watch"), f"{s} would be {a:.1f}% of the portfolio, past its {cap:g}% band.", b, a
@@ -311,6 +327,7 @@ def preflight(ctx: Context, trade: dict) -> dict:
     w_status, w_detail, clear = wash_check(t["symbol"], t["side"], loss, windows, ctx.upcoming, ctx.as_of)
     if t["side"] == "sell" and loss:
         tax["harvest_loss"] = round(-gain, 2) if gain is not None else None
+        tax["harvest_value"] = round(-gain * ctx.tax_rate / 100, 2) if gain is not None and ctx.tax_rate is not None else None
     tax["wash_clear_date"] = clear if (t["side"] == "buy" and w_status != "ok") or loss else None
     lights.append({"id": "wash_sales", "label": "Wash sales", "status": w_status, "before": None, "after": None, "detail": w_detail, "clears": clear})
     lights.append({"id": "lots_tax", "label": "Lots and tax", "status": l_status, "before": None, "after": _r(gain), "detail": l_detail})
@@ -372,9 +389,11 @@ def load_context(cfg: Config, mirror: sqlite3.Connection | None, desk: sqlite3.C
     kinds = symbol_kinds(mirror, targets) if mirror else dict.fromkeys(targets, "fund")
     rules, _ = rules_in_force(cfg, plan)
     try:
-        tax = active_profile(cfg).get("tax", default={}) or {}
+        profile = active_profile(cfg)
+        tax = profile.get("tax", default={}) or {}
+        cap = profile.get("opportunity", "satellite_cap_pct")
     except PROFILE_ERRORS:
-        tax = {}
+        tax, cap = {}, None
     has_lots = desk.execute("SELECT 1 FROM lot_files WHERE kind='lots' LIMIT 1").fetchone() is not None
     lots = current_lots(desk) if has_lots else []
     realized_rows = [dict(r) for r in desk.execute("SELECT * FROM realized_lots")]
@@ -385,6 +404,9 @@ def load_context(cfg: Config, mirror: sqlite3.Connection | None, desk: sqlite3.C
     ctx.wash_accounts = list(tax.get("wash_sale_accounts") or [])
     ctx.lot_method = tax.get("lot_method") or "highest_cost"
     ctx.margin_rate = env_float("DESK_MARGIN_RATE_PCT")
+    ctx.satellite_cap = float(cap) if isinstance(cap, int | float) else None
+    federal, state, _ = marginal_rate(cfg, mirror)
+    ctx.tax_rate = None if federal is None else federal + state
     ctx.maint = env_float("DESK_MARGIN_MAINT_PCT") or 30.0
     ctx.quality = "pro_forma" if any(r["quality"] != "ok" for r in rows) else "ok"
     ctx.prices = _prices(desk, mirror, rows, now)

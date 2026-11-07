@@ -78,6 +78,7 @@ Each metric has an id, a formula, a minimum sample, and scopes (portfolio, accou
 |---|---|---|
 | `value.market` | Market value | Live in market hours, close otherwise |
 | `value.day_change` | Day change in dollars and percent | Against the prior close |
+| `value.market`, `value.weight` (scope `holding`) | Value and weight per holding | Summed across accounts |
 | `flow.net_contrib` | Net contributions | External flows only, by window |
 | `value.gain` | Investment gain | Change in value minus net contributions. The honest "how much did the market give me" |
 | `income.dividends` | Dividend and interest income | Trailing 12 months and by window |
@@ -162,7 +163,7 @@ The shadows answer the only question that matters for a personal portfolio: woul
 | `tax.realized_st`, `tax.realized_lt`, `tax.wash_disallowed` | Realized short- and long-term gains this year, and disallowed wash losses | From the realized gain/loss export, window `YTD` |
 | `tax.offset` | Ordinary-income offset used and carryforward | The $3,000 annual limit |
 | `tax.harvest_value` | Tax value of a harvest | Loss × `tax.marginal_rate` |
-| `tax.marginal_rate` | Marginal federal and state rate | From Escape Vektor's tax estimate in the mirror, else `desk.yaml`; quality `modelled` either way |
+| `tax.marginal_rate` | Marginal federal and state rate | Escape Vektor's PolicyEngine estimate (`prefs.taxEngine`, tax on $1,000 more pay), else `tax.marginal_rate_pct` in `desk.yaml`, else `DESK_MARGINAL_RATE_PCT`; scope `tax` splits `federal` and `state`; quality `modelled` |
 | `tax.lot_realized` | Realized gain or loss per lot sold | Short or long term, with the sale it came from |
 | `tax.div_drag` | Tax drag from taxable dividends | |
 
@@ -246,7 +247,7 @@ Code: `desk.engine.preflight.check_trade(cfg, trade, ticket_id=None)`; the trade
 
 | Lamp | `act` when | `watch` when |
 |---|---|---|
-| Concentration | A buy opens a new single stock, or takes one past its band | A sale leaves one past its band; a buy of a symbol whose kind is unknown |
+| Concentration | A buy opens a new single stock, takes one past its band (default: the satellite cap), or takes all single stocks past `opportunity.satellite_cap_pct` | A sale leaves one past its band; a buy of a symbol whose kind is unknown |
 | Drift after | | Largest drift grows past the drift limit |
 | Funding | A buy is margin-funded or cash runs short, with the monthly interest in dollars and the drop to a call | |
 | Wash sales | A buy within 30 days of a loss sale of that symbol; a loss sale within 30 days of a buy of it in any account | A scheduled deposit or dividend reinvest would buy it back; a possibly identical fund |
@@ -408,9 +409,31 @@ strategies, strategy_trials, paper_positions, paper_trades   (see Strategy lab)
 - `quality`: `ok`, `stale`, `pro_forma`, `modelled`, `insufficient_history`.
 - `unit`: `usd`, `pct`, `pts`, `ratio`, `days`, `date`.
 
-**Agent brief.** Agents never open the SQLite file. The brief builder ([agents.md](agents.md)) asks the engine for one desk's slice and writes it as that run's `brief.json`: `data_health`, headline metrics, holdings, drift and rule checks, risk, margin, tax (when lots are fresh), active signals and triggers. Every value is `{metric_id, scope_id, window, value, unit, as_of, quality}`. A proposal's `numbers_used[].field` is the key `metric_id:scope_id:window` (for example `plan.drift:FXAIX:now`), so Preflight can match it to the brief exactly.
+**Agent brief.** Agents never open the SQLite file. The brief builder ([agents.md](agents.md)) calls `desk.engine.brief.desk_slice(cfg, desk)` and writes the result as that run's `brief.json`: `{desk, as_of, data_as_of, data_health: [{check, status, detail}], sections}`. It raises `brief.NotReady` before the first engine run. Every metric value is `{metric_id, scope, scope_id, window, value, unit, as_of, quality}`; portfolio-level rows use `scope_id` `all`.
 
-**Triggers.** The engine writes `triggers(as_of, kind, scope_id, detail)` for the agents' scheduler: margin debit appeared, daily move past the risk dial, concentration band crossed, earnings reported, new lot export. Each fires at most once a day.
+| Desk | Sections |
+|---|---|
+| Plan keeper | value, cash, drift, rules, margin, benchmarks |
+| Tax | tax, holdings, cash, drift, `lots` (per lot gain and term), `wash_windows` |
+| Risk | risk, margin, concentration, returns |
+| Research | holdings, returns, room |
+| Scout | room, holdings |
+| Skeptic | value, drift, margin, risk, tax, `wash_windows` |
+| Strategy | returns, benchmarks, risk |
+
+Every slice also carries `triggers` for its day. A proposal's `numbers_used[].field` is the key `metric_id:scope_id:window` (for example `plan.drift:FXAIX:now`), so Preflight can match it to the brief exactly.
+
+**Triggers.** After each core run the engine writes `triggers(as_of, kind, scope_id, detail)` for the agents' scheduler (`desk.engine.triggers.today(cfg)`); each fires at most once a day. The first day a condition appears, it also sends a phone alert on `alerts` (no dollar amounts). Live quotes failing during market hours sends one `ops` alert a day.
+
+| Kind | Fires when | Scope |
+|---|---|---|
+| `margin_debit` | `margin.debit` above zero | `portfolio` |
+| `daily_move` | Portfolio 1D TWR past the risk dial (1 to 4% for risk level 1 to 5), or a holding past 2.5 times it | `portfolio` or ticker |
+| `concentration` | A single stock, or all of them together, past `opportunity.satellite_cap_pct` | ticker or `satellite` |
+| `rule_breach` | A `plan.rules` check is 0 | rule id |
+| `lot_export` | A lot or realized export was imported | `lots` or `realized` |
+| `deposit_landed` | A scheduled deposit landed in the last 3 days | deposit id |
+| `earnings` | A holding reported (phase 6 fetchers) | ticker |
 
 **API for the UI.**
 

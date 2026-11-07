@@ -164,3 +164,17 @@ def test_backfill_stops_on_rate_limit(cfg, monkeypatch):
     monkeypatch.setenv("TIINGO_API_KEY", "k")
     result = run_market_backfill(cfg, FakeHttp(status=429))
     assert not result["ok"] and len(result["errors"]) == 1 and "rate limit" in result["errors"][0]
+
+
+def test_stale_quotes_page_ops_during_market_hours(cfg, mirror, monkeypatch):
+    seed(mirror)
+    run_holdings(cfg)
+    sent = []
+    monkeypatch.setattr("desk.engine.__main__.publish", lambda topic, title, body="", priority="default", **kw: sent.append((topic, title, kw["key"])))
+    monkeypatch.delenv("FINNHUB_API_KEY", raising=False)
+    monkeypatch.setattr("desk.engine.live.now_utc", lambda: et(2026, 11, 9, 10, 0))
+    run_quotes(cfg, FakeHttp())
+    assert [s[:2] for s in sent] == [("ops", "Live quotes are stale")]
+    monkeypatch.setattr("desk.engine.live.now_utc", lambda: et(2026, 11, 8, 10, 0))
+    run_quotes(cfg, FakeHttp())
+    assert len(sent) == 1

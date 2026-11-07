@@ -218,7 +218,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _margin_metrics(out, now_rows, total)
     _risk_metrics(out, now_rows, total, index, days, values, flows_on, q_now)
     _cost_metrics(out, plan, now_rows, total)
-    _tax_metrics(out, cfg, desk, activity, now_rows, now)
+    _tax_metrics(out, cfg, mirror, desk, activity, now_rows, now)
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:
         out.m("cash.pending_days", (date.fromisoformat(when) - date.fromisoformat(as_of)).days, "days", quality="modelled")
@@ -236,6 +236,13 @@ def _flows_between(days: list[str], flows: dict[str, float], i: int) -> float:
 def _value_metrics(out: Out, days, values, flows_on, holdings, q, income_rows):
     as_of = days[-1]
     out.m("value.market", values[-1], "usd", quality=q)
+    by_symbol: dict[str, float] = defaultdict(float)
+    for h in holdings[as_of]:
+        if not h["is_cash"]:
+            by_symbol[h["symbol"]] += h["value"]
+    for sym, v in sorted(by_symbol.items()):
+        out.m("value.market", v, "usd", scope="holding", scope_id=sym, quality=q)
+        out.m("value.weight", v / values[-1] * 100 if values[-1] else None, "pct", scope="holding", scope_id=sym, quality=q)
     out.m("value.day_change", values[-1] - values[-2] - flows_on[-1] if len(values) > 1 else None, "usd", quality=q)
     cash = sum(h["value"] for h in holdings[as_of] if h["is_cash"] and h["value"] > 0)
     debit = -sum(h["value"] for h in holdings[as_of] if h["is_cash"] and h["value"] < 0)
@@ -437,7 +444,29 @@ def _cost_metrics(out: Out, plan, rows, total):
 # ---- Tax ----
 
 
-def _tax_metrics(out: Out, cfg: Config, desk, activity, rows, now: datetime):
+RAISE_USD = 1000.0
+
+
+def marginal_rate(cfg: Config, mirror: sqlite3.Connection | None) -> tuple[float | None, float | None, str]:
+    for p in current_rows(mirror, "prefs") if mirror else []:
+        if p.get("key") != "taxEngine":
+            continue
+        res = (p.get("value") or {}).get("res") or {}
+        raise_, fed = res.get("raise") or {}, (res.get("federal") or {}).get("tax")
+        if res.get("ok") and isinstance(raise_.get("federal"), int | float) and isinstance(fed, int | float):
+            federal = max(0.0, (raise_["federal"] - fed) / RAISE_USD * 100)
+            state_now, state_up = res.get("stateTax"), raise_.get("state")
+            state = max(0.0, (state_up - state_now) / RAISE_USD * 100) if isinstance(state_now, int | float) and isinstance(state_up, int | float) else 0.0
+            return round(federal, 2), round(state, 2), "escape_vektor"
+    try:
+        pct = active_profile(cfg).get("tax", "marginal_rate_pct")
+    except PROFILE_ERRORS:
+        pct = None
+    pct = pct if isinstance(pct, int | float) else env_float("DESK_MARGINAL_RATE_PCT")
+    return (float(pct), 0.0, "setting") if pct is not None else (None, None, "none")
+
+
+def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datetime):
     as_of = out.as_of
     files = {r["kind"] for r in desk.execute("SELECT DISTINCT kind FROM lot_files")}
     r = realized(desk, int(as_of[:4]))
@@ -482,6 +511,17 @@ def _tax_metrics(out: Out, cfg: Config, desk, activity, rows, now: datetime):
             total += -loss
             out.m("tax.harvestable", -loss, "usd", scope="holding", scope_id=sym, quality=lq)
     out.m("tax.harvestable", total if lots else None, "usd", quality=lq)
+    federal, state, source = marginal_rate(cfg, mirror)
+    rate = None if federal is None else federal + state
+    out.m("tax.marginal_rate", rate, "pct", quality="modelled")
+    if federal is not None:
+        out.m("tax.marginal_rate", federal, "pct", scope="tax", scope_id="federal", quality="modelled")
+        out.m("tax.marginal_rate", state, "pct", scope="tax", scope_id="state", quality="modelled")
+    else:
+        out.h("marginal_rate", "warn", "No marginal tax rate yet: open Taxes in Escape Vektor once, or set tax.marginal_rate_pct in desk.yaml.")
+    out.m("tax.harvest_value", total * rate / 100 if lots and rate is not None else None, "usd", quality="modelled")
+    if source != "none":
+        out.h("marginal_rate", "ok", "Marginal rate from Escape Vektor's tax estimate." if source == "escape_vektor" else "Marginal rate from desk.yaml.")
 
 
 # ---- Data health ----
