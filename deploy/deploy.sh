@@ -35,6 +35,7 @@ KEEP=${DESK_BACKUP_KEEP:-14}
 HEALTH_WAIT=${DESK_HEALTH_WAIT:-120}
 LOG=$ROOT/deploy.log
 BUILD_LOG=$ROOT/deploy-build.log
+DEBUG_MAX=${DESK_DEBUG_MAX:-104857600}
 LOCK=/run/vektor-desk-deploy.lock
 AUTO_FAILED=$ROOT/deploy-auto.failed
 AUTO_NOTE=$ROOT/deploy-auto.note
@@ -395,17 +396,18 @@ redact() {
     -e 's/(sk-ant-|tskey-|pk1_|sk1_)[A-Za-z0-9_-]+/\1[redacted]/g' \
     -e 's/(Bearer )[A-Za-z0-9._~+\/=-]+/\1[redacted]/g' \
     -e 's/((token|apikey|api_key|key|secret|password)=)[^&[:space:]"]+/\1[redacted]/gI' \
-    -e 's/("private_key(_id)?": *")[^"]*/\1[redacted]/g'
+    -e 's/("private_key(_id)?": *")[^"]*/\1[redacted]/g' \
+    -e 's/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/[redacted]/g'
 }
 
 logs_export() {
-  local out=$ROOT/data/run/logs list name tmp
+  local out=$ROOT/data/run/logs list name tmp debug
   [ -d "$ROOT/data" ] || return 0
   mkdir -p "$out"
   list=$(mktemp)
   chmod 600 "$list"
   secret_values >"$list"
-  for name in api cron caddy ntfy lab tailscale; do
+  for name in api cron caddy ntfy lab tailscale eval; do
     tmp="$out/.$name.log.part"
     docker logs --tail 400 --timestamps "vektor-desk-$name" 2>&1 | redact "$list" >"$tmp" || true
     mv "$tmp" "$out/$name.log"
@@ -416,6 +418,10 @@ logs_export() {
     tail -n 100 "$BUILD_LOG" 2>/dev/null || true
   } | redact "$list" >"$out/.deploy.log.part"
   mv "$out/.deploy.log.part" "$out/deploy.log"
+  debug=$ROOT/eval/home/logs/remote-control.log
+  tail -n 1000 "$debug" 2>/dev/null | redact "$list" >"$out/.eval-debug.log.part" || true
+  mv "$out/.eval-debug.log.part" "$out/eval-debug.log"
+  if [ -f "$debug" ] && [ "$(stat -c %s "$debug")" -gt "$DEBUG_MAX" ]; then truncate -s 0 "$debug"; fi
   docker ps -a --filter name=vektor-desk --format '{{.Names}}\t{{.Status}}\t{{.Image}}' >"$out/containers.txt" 2>&1 || true
   date -Is >"$out/exported_at"
   rm -f "$list"

@@ -30,12 +30,13 @@ def test_log_export_redacts_env_values_and_token_shapes(tmp_path):
         "Authorization: Bearer abc.def.ghi",
         f"fresh {tailnet} in a log",
         'key file {"private_key_id": "0f0f0f", "client_email": "reader@example.iam.gserviceaccount.com"}',
+        "session token " + "eyJ" + "hbGciOi.eyJzdWIi.c2lnbmF0dXJl",
         "SHORT stays abc, and an ordinary line stays as it is",
     ]
     out = redact(tmp_path, "\n".join(lines) + "\n")
-    for secret in (claude, tiingo, porkbun, "zzzzzzzzzzzz", "abc.def.ghi", "kAbCdEf123", "0f0f0f"):
+    for secret in (claude, tiingo, porkbun, "zzzzzzzzzzzz", "abc.def.ghi", "kAbCdEf123", "0f0f0f", "c2lnbmF0dXJl"):
         assert secret not in out
-    assert out.count("[redacted]") >= 7
+    assert out.count("[redacted]") >= 8
     assert "SHORT stays abc, and an ordinary line stays as it is" in out
     assert "reader@example.iam.gserviceaccount.com" in out
     assert "symbol=SPY" in out
@@ -95,3 +96,27 @@ def test_app_card_sets_icon_and_web_ui_then_rebuilds_the_app_list_once(tmp_path)
     assert yaml.safe_load(collective.read_text())["vektor-desk"]["portals"] == {"Web UI": "https://desk-lan.escape-vektor.com/"}
     assert run().stdout == ""
     assert calls.read_text().count("app.metadata.generate") == 1
+
+
+def test_logs_export_includes_the_eval_debug_log_redacted_and_caps_it(tmp_path):
+    claude = "sk-" + "ant-oat01-" + "R" * 24
+    (tmp_path / "data").mkdir()
+    (tmp_path / "desk.env").write_text(f"CLAUDE_CODE_OAUTH_TOKEN={claude}\n")
+    logs = tmp_path / "eval" / "home" / "logs"
+    logs.mkdir(parents=True)
+    debug = logs / "remote-control.log"
+    debug.write_text("".join(f"line {i}\n" for i in range(1500)) + f"[bridge:work] Declined session cse_1: token {claude}\n")
+    stub = tmp_path / "bin"
+    stub.mkdir()
+    (stub / "docker").write_text('#!/bin/sh\necho "docker $*"\n')
+    (stub / "docker").chmod(0o755)
+    (stub / "chown").write_text("#!/bin/sh\nexit 0\n")
+    (stub / "chown").chmod(0o755)
+    env = {"DESK_ROOT": str(tmp_path), "DESK_DEBUG_MAX": "100", "PATH": "/usr/bin:/bin"}
+    subprocess.run(["bash", "-c", f'source "{DEPLOY}"; PATH="{stub}:$PATH"; logs_export'], capture_output=True, text=True, env=env, check=True)
+    out = tmp_path / "data" / "run" / "logs"
+    exported = (out / "eval-debug.log").read_text()
+    assert "Declined session cse_1" in exported and claude not in exported
+    assert len(exported.splitlines()) == 1000
+    assert "vektor-desk-eval" in (out / "eval.log").read_text()
+    assert debug.stat().st_size == 0
