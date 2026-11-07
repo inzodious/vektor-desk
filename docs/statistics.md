@@ -75,10 +75,15 @@ Before metrics are published for a day, the engine checks:
 | Cash | Change in cash equals flows plus trades plus income, within $0.01 |
 | Freshness | Mirror pull under 14 hours old |
 | Closes | Every held symbol has a close for the last trading day, or is a code nothing prices |
+| Flows | Lists any snapshot-day change that prices and recorded activity don't explain. The engine counts it as money in or out, not return (unlogged deposits, payroll contributions, a margin buy without a debit row). Always `ok`; it's there to explain the number |
 | Market keys | `TIINGO_API_KEY` is set (Finnhub, FRED and the SEC contact are listed but don't warn) |
 | Symbol kinds | Every holding is known as a fund or a stock: Escape Vektor's profiles, then SEC's fund list, the benchmark ETFs, ticker shape (5 letters ending in X, plan codes with digits) and SEC titles |
 
 Every non-ok detail ends with `Fix:` and the one step that clears it.
+
+**Implied flows.** On each snapshot day, per account: residual = snapshot value − the prior day's holdings repriced at today's closes − recorded deposits and withdrawals − dividends and interest. A residual over $1 or 0.05% is added to that day's flows for the account and the portfolio, so TWR, MWR, day change, shadows and risk see price moves only.
+
+**Holding moves.** The per-holding `daily_move` trigger uses market closes only (Tiingo bars or the mirror's), dated on the run day, against a close at most 5 days older. Symbols valued at the broker's snapshot price, such as plan codes, never fire it.
 
 **Dry run.** `python -m desk.engine daily --dry-run` (also `holdings`, `core`) runs on a throwaway copy of the data, sends no alerts, and prints the result plus `health_detail` for every check. Nothing in `/data` changes.
 

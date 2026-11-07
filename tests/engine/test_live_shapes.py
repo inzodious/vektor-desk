@@ -206,3 +206,63 @@ def test_dry_run_writes_nothing_and_sends_nothing(cfg, mirror, monkeypatch, caps
     capsys.readouterr()
     assert digest(cfg.desk_db) == before and sent == []
     assert engine_main.main(["backfill", "--dry-run"]) == 2
+
+
+# ---- Flows and moves ----
+
+
+def seed_two_snapshots(m):
+    thu = [(IND, "ROKT", 100.0, 3000.0, False), (IND, "SPAXX", 500.0, 500.0, True), (K401, "Q20002", 2.0, 150.0, False)]
+    fri = [(IND, "ROKT", 200.0, 6060.0, False), (IND, "SPAXX", 1500.0, 1500.0, True), (K401, "Q20002", 2.5, 164.0, False)]
+    pid = 0
+    for sid, (stamp, rows) in enumerate(((f"{THU}T21:30", thu), (f"{FRI}T21:30", fri)), start=1):
+        m.put("snapshots", sid, snapshot(sid, stamp, sum(r[3] for r in rows), len(rows)))
+        for acct, sym, qty, value, cash in rows:
+            pid += 1
+            m.put("positions", pid, position(pid, sid, acct, sym, qty, value, value, cash=cash))
+    m.put("priceCloses", "ROKT_2026", closes_doc("ROKT", 2026, [["2026-11-04", 29.0, 29.0], [THU, 30.0, 30.0], [FRI, 30.3, 30.3]]))
+    m.put("activity", "dep", {"date": FRI, "accountKey": IND, "kind": "deposit", "symbol": None, "quantity": None, "amount": 1000.0, "core": False})
+    m.pull(f"{SAT}T14:00:00+00:00")
+
+
+def stored_run(cfg, now=SAT_NOW):
+    from desk.engine import triggers
+
+    mirror = open_mirror(cfg)
+    desk = connect(cfg.desk_db)
+    try:
+        out = core.compute(cfg, mirror, desk, now=now)
+        stored = core.store(desk, out)
+        found = triggers.detect(cfg, desk, stored["as_of"], now=now)
+        day = desk.execute(
+            "SELECT value FROM metric_values WHERE metric_id='ret.twr' AND scope='portfolio' AND \"window\"='1D' AND as_of=?", (stored["as_of"],)
+        ).fetchone()
+    finally:
+        desk.close()
+        mirror.close()
+    return out, found, day[0] if day else None
+
+
+def test_a_margin_buy_and_deposit_are_flows_not_return(cfg, mirror):
+    seed_two_snapshots(mirror)
+    run_holdings(cfg)
+    out, found, day = stored_run(cfg)
+    assert out.implied[(IND, FRI)] == pytest.approx(3030.0) and out.implied[(K401, FRI)] == pytest.approx(32.8)
+    start, end = 3500.0 + 150.0, 7560.0 + 164.0
+    want = (end - 1000.0 - 3030.0 - 32.8) / start - 1
+    assert day == pytest.approx(want * 100, abs=1e-3) and abs(day) < 1.5
+    assert not [f for f in found if f[1] == "daily_move" and f[2] == "portfolio"]
+    status, detail = {c: (s, d) for _, c, s, d in out.health}["flows"]
+    assert status == "ok" and IND in detail and "+3,030.00" in detail and "not return" in detail
+
+
+def test_unpriced_plan_codes_never_fire_a_daily_move(cfg, mirror):
+    seed_two_snapshots(mirror)
+    run_holdings(cfg)
+    _, found, _ = stored_run(cfg)
+    assert not [f for f in found if f[1] == "daily_move" and f[2] == "Q20002"]
+    add_bars(cfg, [("ROKT", THU, 30.0), ("ROKT", FRI, 36.0)])
+    run_holdings(cfg)
+    _, found, _ = stored_run(cfg)
+    moves = {f[2]: f[3]["ret_pct"] for f in found if f[1] == "daily_move"}
+    assert moves.get("ROKT") == 20.0 and "Q20002" not in moves

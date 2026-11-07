@@ -12,6 +12,7 @@ from desk.notify import publish
 
 MOVE_BY_RISK = {1: 1.0, 2: 1.5, 3: 2.0, 4: 3.0, 5: 4.0}
 HOLDING_MOVE_X = 2.5
+MAX_GAP_DAYS = 5
 ALERTS = {
     "margin_debit": ("Margin debit on the desk", "high"),
     "daily_move": ("Big move today", "default"),
@@ -45,6 +46,16 @@ def _dials(cfg: Config) -> tuple[float, float | None]:
 # ---- Detection ----
 
 
+def market_close(conn: sqlite3.Connection, symbol: str, day: str) -> tuple[str, float] | None:
+    best = None
+    for tbl in ("price_bars", "prices_daily"):
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (tbl,)).fetchone():
+            r = conn.execute(f"SELECT date, close FROM {tbl} WHERE symbol=? AND date<=? ORDER BY date DESC LIMIT 1", (symbol, day)).fetchone()
+            if r and r["close"] and (best is None or r["date"] > best[0]):
+                best = (r["date"], r["close"])
+    return best
+
+
 def detect(cfg: Config, conn: sqlite3.Connection, as_of: str, *, now: datetime | None = None) -> list[tuple[str, str, str, dict]]:
     found: list[tuple[str, str, str, dict]] = []
     move, cap = _dials(cfg)
@@ -56,12 +67,12 @@ def detect(cfg: Config, conn: sqlite3.Connection, as_of: str, *, now: datetime |
         found.append((as_of, "daily_move", "portfolio", {"ret_pct": day, "dial_pct": move}))
     days = [r[0] for r in conn.execute("SELECT DISTINCT date FROM holdings_daily WHERE date <= ? ORDER BY date DESC LIMIT 2", (as_of,))]
     if len(days) == 2:
-        closes = {}
-        for r in conn.execute("SELECT date, symbol, max(close) AS close FROM holdings_daily WHERE date IN (?, ?) AND is_cash=0 GROUP BY date, symbol", days):
-            closes.setdefault(r["symbol"], {})[r["date"]] = r["close"]
-        for sym, c in sorted(closes.items()):
-            if c.get(days[0]) and c.get(days[1]):
-                pct = (c[days[0]] / c[days[1]] - 1) * 100
+        held = [r[0] for r in conn.execute("SELECT DISTINCT symbol FROM holdings_daily WHERE date=? AND is_cash=0", (days[0],))]
+        for sym in sorted(held):
+            now_close, before = market_close(conn, sym, days[0]), market_close(conn, sym, days[1])
+            fresh = before and (date.fromisoformat(days[0]) - date.fromisoformat(before[0])).days <= MAX_GAP_DAYS
+            if now_close and fresh and now_close[0] == days[0] and before[0] < days[0] and before[1]:
+                pct = (now_close[1] / before[1] - 1) * 100
                 if abs(pct) >= move * HOLDING_MOVE_X:
                     found.append((as_of, "daily_move", sym, {"ret_pct": round(pct, 2), "dial_pct": move * HOLDING_MOVE_X}))
     picks = "SELECT metric_id, scope_id, value FROM metric_values WHERE as_of=? AND scope IN ('holding', 'rule') "
