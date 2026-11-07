@@ -425,3 +425,35 @@ def watchlist_remove(request: Request, symbol: str) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=400)
     finally:
         conn.close()
+
+
+def _view(request: Request, name: str, empty: dict) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "engine_views"):
+        if conn is not None:
+            conn.close()
+        return _json(empty)
+    try:
+        row = conn.execute("SELECT as_of, body FROM engine_views WHERE name=?", (name,)).fetchone()
+    finally:
+        conn.close()
+    return _json(json.loads(row["body"]) if row else empty)
+
+
+@router.get("/api/engine/scorecard")
+def scorecard_view(request: Request, origin: str | None = None) -> JSONResponse:
+    empty = {"as_of": None, "groups": [], "desks": [], "saves": {"n": 0, "usd": 0.0}, "offplan_gap": {"n": 0}, "decisions": []}
+    resp = _view(request, "scorecard", empty)
+    if origin is None:
+        return resp
+    body = json.loads(resp.body)
+    body["decisions"] = [d for d in body["decisions"] if d["origin"] == origin]
+    body["desks"] = [d for d in body["desks"] if d["desk"] == origin]
+    body["groups"] = [g for g in body["groups"] if g["by"] != "origin" or g["group"] == origin]
+    return _json(body)
+
+
+@router.get("/api/engine/patterns")
+def patterns_view(request: Request) -> JSONResponse:
+    empty = {"as_of": None, "market": [], "holdings": {}, "drawdowns": [], "seasonality": {}, "corr_shifts": [], "behavior": {}}
+    return _view(request, "patterns", empty)
