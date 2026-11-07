@@ -1,0 +1,22 @@
+{
+ "events": [
+  {
+   "date": "2026-12-01",
+   "kind": "tax",
+   "title": "Year-end tax window opens",
+   "source": "desk"
+  },
+  {
+   "date": "2026-12-31",
+   "kind": "tax",
+   "title": "Last trading day to realize gains or losses this year",
+   "source": "desk"
+  },
+  {
+   "date": "2027-04-15",
+   "kind": "tax",
+   "title": "Last day for last year's HSA and IRA contributions",
+   "source": "desk"
+  }
+ ]
+}

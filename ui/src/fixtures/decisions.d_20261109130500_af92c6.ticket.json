@@ -1,0 +1,34 @@
+{
+ "stamp": "DRAFT",
+ "fields": [
+  {
+   "label": "Account",
+   "value": "individual-0001"
+  },
+  {
+   "label": "Action",
+   "value": "Sell"
+  },
+  {
+   "label": "Symbol",
+   "value": "FTEC"
+  },
+  {
+   "label": "Quantity",
+   "value": "$150.00"
+  },
+  {
+   "label": "Order type",
+   "value": "Market"
+  },
+  {
+   "label": "Lots",
+   "value": "Specific shares: highest cost first"
+  },
+  {
+   "label": "Time in force",
+   "value": "Day"
+  }
+ ],
+ "text": "Account: individual-0001\nAction: Sell\nSymbol: FTEC\nQuantity: $150.00\nOrder type: Market\nLots: Specific shares: highest cost first\nTime in force: Day"
+}

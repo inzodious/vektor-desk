@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Kpi } from '../components/Kpi.jsx';
@@ -8,6 +9,7 @@ import { LineChart } from '../components/LineChart.jsx';
 import { Spark } from '../components/Spark.jsx';
 import { Gauge } from '../components/Gauge.jsx';
 import { DriftRows } from '../components/DriftRows.jsx';
+import { QueueCard } from '../decisions/QueueCard.jsx';
 import { CashDrawer, DriftDrawer, ExcessDrawer, SinglesDrawer, ValueDrawer } from './BridgeDrawers.jsx';
 import { LIVE_STATES, useLive, useSymbol } from '../live/context.js';
 import { useApi } from '../lib/api.js';
@@ -147,6 +149,7 @@ export default function Bridge() {
   const limits = usePlanLimits();
   const spark = useApi('/api/engine/value');
   const [drill, setDrill] = useState(null);
+  const queue = useApi('/api/decisions/queue', { every: 120000 });
   const sparkVals = useMemo(() => (spark.data?.series || []).slice(-30).map((p) => p.value), [spark.data]);
   const funds = useMemo(() => fundsFromMetrics(plan.rows), [plan.rows]);
   const values = useMemo(() => Object.fromEntries(ctx.symbols.map((s) => [s.symbol, s.value])), [ctx.symbols]);
@@ -250,6 +253,12 @@ export default function Bridge() {
             <span className="chip">
               {plural(ctx.symbols.length, 'fund')} · {plural(accounts.length, 'account')}
             </span>
+            {queue.data?.count ? (
+              <Link className="btn sm" to="/decisions">
+                <Icon name="check" />
+                Clear the queue · {queue.data.count}
+              </Link>
+            ) : null}
           </>
         }
       />
@@ -263,6 +272,7 @@ export default function Bridge() {
         <Kpi i={7} label="FI progress" metric="fi.progress" value={fiV == null ? 'Not yet' : fiV.toFixed(1)} unit={fiV == null ? undefined : '%'} line={fiV == null ? 'Needs the FI path' : 'of the FI number'} quality={fiV == null ? undefined : fi?.quality} asOf={fiV == null ? null : engineAsOf} />
       </section>
       <section className="grid">
+        <QueueCard queue={queue} i={7} />
         <div className="card c12" style={{ '--i': 7 }}>
           <div className="card-head">
             <span className="tag mustard">Departures board</span>

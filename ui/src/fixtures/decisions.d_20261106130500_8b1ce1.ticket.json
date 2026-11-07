@@ -1,0 +1,30 @@
+{
+ "stamp": "READY",
+ "fields": [
+  {
+   "label": "Account",
+   "value": "hsa-0002"
+  },
+  {
+   "label": "Action",
+   "value": "Buy"
+  },
+  {
+   "label": "Symbol",
+   "value": "BND"
+  },
+  {
+   "label": "Quantity",
+   "value": "$25.00"
+  },
+  {
+   "label": "Order type",
+   "value": "Market"
+  },
+  {
+   "label": "Time in force",
+   "value": "Day"
+  }
+ ],
+ "text": "Account: hsa-0002\nAction: Buy\nSymbol: BND\nQuantity: $25.00\nOrder type: Market\nTime in force: Day"
+}

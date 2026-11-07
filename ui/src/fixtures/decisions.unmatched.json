@@ -1,0 +1,244 @@
+{
+ "trades": [
+  {
+   "activity_id": "%222026-11-02-buy-hsa-0002-BND-1%22",
+   "date": "2026-11-02",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "BND",
+   "quantity": 0.064416,
+   "price": 77.62,
+   "amount": -5
+  },
+  {
+   "activity_id": "%222026-11-02-buy-hsa-0002-FTEC-1%22",
+   "date": "2026-11-02",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "quantity": 0.076339,
+   "price": 261.99,
+   "amount": -20
+  },
+  {
+   "activity_id": "%222026-11-02-buy-hsa-0002-FXAIX-1%22",
+   "date": "2026-11-02",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "FXAIX",
+   "quantity": 0.289143,
+   "price": 207.51,
+   "amount": -60
+  },
+  {
+   "activity_id": "%222026-11-02-buy-hsa-0002-VXUS-1%22",
+   "date": "2026-11-02",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "VXUS",
+   "quantity": 0.234155,
+   "price": 64.06,
+   "amount": -15
+  },
+  {
+   "activity_id": "%222026-11-02-buy-individual-0001-BND-1%22",
+   "date": "2026-11-02",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "BND",
+   "quantity": 0.322082,
+   "price": 77.62,
+   "amount": -25
+  },
+  {
+   "activity_id": "%222026-11-02-buy-individual-0001-FTEC-1%22",
+   "date": "2026-11-02",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "quantity": 0.381694,
+   "price": 261.99,
+   "amount": -100
+  },
+  {
+   "activity_id": "%222026-11-02-buy-individual-0001-FXAIX-1%22",
+   "date": "2026-11-02",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "FXAIX",
+   "quantity": 1.445713,
+   "price": 207.51,
+   "amount": -300
+  },
+  {
+   "activity_id": "%222026-11-02-buy-individual-0001-VXUS-1%22",
+   "date": "2026-11-02",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "VXUS",
+   "quantity": 1.170777,
+   "price": 64.06,
+   "amount": -75
+  },
+  {
+   "activity_id": "%222026-10-01-buy-hsa-0002-BND-1%22",
+   "date": "2026-10-01",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "BND",
+   "quantity": 0.063654,
+   "price": 78.55,
+   "amount": -5
+  },
+  {
+   "activity_id": "%222026-10-01-buy-hsa-0002-FTEC-1%22",
+   "date": "2026-10-01",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "quantity": 0.079086,
+   "price": 252.89,
+   "amount": -20
+  },
+  {
+   "activity_id": "%222026-10-01-buy-hsa-0002-FXAIX-1%22",
+   "date": "2026-10-01",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "FXAIX",
+   "quantity": 0.284806,
+   "price": 210.67,
+   "amount": -60
+  },
+  {
+   "activity_id": "%222026-10-01-buy-hsa-0002-VXUS-1%22",
+   "date": "2026-10-01",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "VXUS",
+   "quantity": 0.224854,
+   "price": 66.71,
+   "amount": -15
+  },
+  {
+   "activity_id": "%222026-10-01-buy-individual-0001-BND-1%22",
+   "date": "2026-10-01",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "BND",
+   "quantity": 0.318269,
+   "price": 78.55,
+   "amount": -25
+  },
+  {
+   "activity_id": "%222026-10-01-buy-individual-0001-FTEC-1%22",
+   "date": "2026-10-01",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "quantity": 0.395429,
+   "price": 252.89,
+   "amount": -100
+  },
+  {
+   "activity_id": "%222026-10-01-buy-individual-0001-FXAIX-1%22",
+   "date": "2026-10-01",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "FXAIX",
+   "quantity": 1.424028,
+   "price": 210.67,
+   "amount": -300
+  },
+  {
+   "activity_id": "%222026-10-01-buy-individual-0001-VXUS-1%22",
+   "date": "2026-10-01",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "VXUS",
+   "quantity": 1.124269,
+   "price": 66.71,
+   "amount": -75
+  },
+  {
+   "activity_id": "%222026-09-01-buy-hsa-0002-BND-1%22",
+   "date": "2026-09-01",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "BND",
+   "quantity": 0.065036,
+   "price": 76.88,
+   "amount": -5
+  },
+  {
+   "activity_id": "%222026-09-01-buy-hsa-0002-FTEC-1%22",
+   "date": "2026-09-01",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "quantity": 0.075844,
+   "price": 263.7,
+   "amount": -20
+  },
+  {
+   "activity_id": "%222026-09-01-buy-hsa-0002-FXAIX-1%22",
+   "date": "2026-09-01",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "FXAIX",
+   "quantity": 0.259875,
+   "price": 230.88,
+   "amount": -60
+  },
+  {
+   "activity_id": "%222026-09-01-buy-hsa-0002-VXUS-1%22",
+   "date": "2026-09-01",
+   "accountKey": "hsa-0002",
+   "kind": "buy",
+   "symbol": "VXUS",
+   "quantity": 0.211775,
+   "price": 70.83,
+   "amount": -15
+  },
+  {
+   "activity_id": "%222026-09-01-buy-individual-0001-BND-1%22",
+   "date": "2026-09-01",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "BND",
+   "quantity": 0.325182,
+   "price": 76.88,
+   "amount": -25
+  },
+  {
+   "activity_id": "%222026-09-01-buy-individual-0001-FTEC-1%22",
+   "date": "2026-09-01",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "quantity": 0.379219,
+   "price": 263.7,
+   "amount": -100
+  },
+  {
+   "activity_id": "%222026-09-01-buy-individual-0001-FXAIX-1%22",
+   "date": "2026-09-01",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "FXAIX",
+   "quantity": 1.299376,
+   "price": 230.88,
+   "amount": -300
+  },
+  {
+   "activity_id": "%222026-09-01-buy-individual-0001-VXUS-1%22",
+   "date": "2026-09-01",
+   "accountKey": "individual-0001",
+   "kind": "buy",
+   "symbol": "VXUS",
+   "quantity": 1.058873,
+   "price": 70.83,
+   "amount": -75
+  }
+ ]
+}

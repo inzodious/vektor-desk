@@ -11,6 +11,7 @@ Vite + React. Hand-rolled SVG charts, no chart library. Tokens are copied from E
 | `npm run build` | Builds `dist/`, served by the API |
 | `npm run test:e2e` | Playwright on a fixtures preview, desktop 1440 and phone 390 |
 | `npm run fixtures` | Rebuilds the fixtures from a demo API (`DESK_DEMO=1`) with seeded intraday moves |
+| `python scripts/demo_decisions.py` | Seeds synthetic proposals into a demo data dir (run with `DESK_DEMO=1 DESK_DATA_DIR=…` before `npm run fixtures`) |
 | `npm run screens -- <dir>` | Screens at 1920, 1440, 390 in light and dark (needs a preview on 4318, fixtures on 4319) |
 
 ## Fixtures
@@ -34,4 +35,6 @@ For real shapes, run the API in demo mode (`DESK_DEMO=1`) and use `npm run dev`.
 | `/settings` | 1 | Live from `/api/status` and `/api/health` |
 | `/` Bridge | 2, 3 | Live value, 7 KPIs with drawers, departures board, value versus the plan and S&P shadows, gauges, drift bullets |
 | `/plan` | 3 | Plan KPIs, drift bullets, rules with desk.yaml version, funds, modelled deposit split with drift after |
-| `/research`, `/decisions`, `/lab` | 4 to 11 | Hero and a "lands in phase" card |
+| `/decisions` | 4 | Queue of proposal cards, detail with Preflight annunciator, override box, order ticket, sources and history; To place list |
+| `/decisions/journal` | 4 | Stamped ledger, discipline streak, overrides against clean, unmatched trades with Log it |
+| `/decisions/flight`, `/research`, `/lab` | 6 to 11 | Hero and a "lands in phase" card |

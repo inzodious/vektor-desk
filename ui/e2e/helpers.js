@@ -2,6 +2,8 @@ export const ROUTES = [
   { path: '/', h1: 'Bridge' },
   { path: '/research', h1: 'Research' },
   { path: '/decisions', h1: 'Decisions' },
+  { path: '/decisions/journal', h1: 'Journal' },
+  { path: '/decisions/flight', h1: 'Flight record' },
   { path: '/plan', h1: 'Plan' },
   { path: '/lab', h1: 'Lab' },
   { path: '/settings', h1: 'Settings' },
@@ -21,4 +23,8 @@ export function watchErrors(page) {
 
 export async function overflow(page) {
   return page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: window.innerWidth }));
+}
+
+export function record(over = {}) {
+  return { id: 'd_test', title: 'Test', status: 'approved', kind: 'buy', ...over };
 }
