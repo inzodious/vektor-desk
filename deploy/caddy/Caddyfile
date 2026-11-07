@@ -1,0 +1,35 @@
+{
+	admin off
+	servers {
+		trusted_proxies static private_ranges
+	}
+}
+
+{$DESK_DOMAIN:desk.escape-vektor.com} {
+	tls {
+		dns porkbun {
+			api_key {env.PORKBUN_API_KEY}
+			api_secret_key {env.PORKBUN_API_SECRET_KEY}
+		}
+		resolvers 1.1.1.1 9.9.9.9
+	}
+
+	@outside not remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48 127.0.0.0/8
+	abort @outside
+
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	@api path /api/*
+	header @api Cache-Control no-store
+
+	reverse_proxy api:8000
+}
