@@ -8,14 +8,14 @@ Status: plan, November 7, 2026. Nothing built. Base decisions are in fin-dashboa
 
 1. **Advisory only.** Agents write proposals. Joshua approves, dismisses or snoozes, then places any trade at the broker himself. Nothing in the stack holds broker credentials or can place an order.
 2. **The engine computes, agents reason.** Every number an agent uses comes from the Python engine (see `docs/statistics.md`). An agent that cites a number the engine did not produce gets its proposal rejected.
-3. **Rules live in code, not prompts.** Margin, concentration and wash-sale limits are checked by the runner after the agent answers. A prompt can be talked out of a rule; a function cannot.
+3. **Rules live in code, not prompts.** Margin, concentration and wash-sale limits are checked by Preflight, engine code that runs on every proposal after the agent answers. A prompt can be talked out of a rule; a function cannot.
 4. **"Follow the plan" is the opponent.** Every proposal is scored against putting the same dollars into the plan mix on the same day. A desk that cannot beat that gets turned off.
 5. **The most valuable agent is the one that says no.** Most good advice on this account is "don't", with the cost in dollars.
 
 ## How a run works
 
 ```
-scheduler ─▶ brief builder ─▶ claude -p (one desk) ─▶ runner checks ─▶ proposals table ─▶ decision queue (UI)
+scheduler ─▶ brief builder ─▶ claude -p (one desk) ─▶ Preflight ──────▶ decision records ─▶ decision queue (UI)
               (engine, SQLite)   structured JSON out    numbers, rules,      │
                                                         sources, expiry      └─▶ scorecard at 30 and 90 days
 ```
@@ -23,7 +23,7 @@ scheduler ─▶ brief builder ─▶ claude -p (one desk) ─▶ runner checks 
 1. The scheduler picks a desk whose time or trigger has come and checks the usage budget.
 2. The brief builder writes a run folder with `brief.json` (engine output for this desk only), `settings.json` (the active dials and their hash), and `history.json` (the desk's last 20 proposals with Joshua's decisions and reasons).
 3. The adapter runs `claude -p` in that folder and asks for output that matches `agents/schemas/proposal.json`.
-4. The runner validates the JSON, re-checks every cited number against the brief, applies the hard rules, and stores the result. Nothing the agent says reaches the UI without passing through this step.
+4. The runner validates the JSON and hands it to Preflight, which re-checks every cited number against the brief, applies the hard rules, adds the tax impact, and stores the result as a decision record (`docs/concept.md`). Nothing the agent says reaches the UI without passing through this step.
 
 ### The adapter
 
@@ -66,20 +66,20 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 
 | Desk | Runs (ET) | Reads | Writes | Model, effort, tools |
 |---|---|---|---|---|
-| **Plan keeper** | Daily 17:30, after the 17:00 mirror | Drift vs plan mix, cash, pending deposits, margin debit, rule status | Where the next deposit goes; rule-breach alerts; the daily brief | sonnet, medium; read tools |
+| **Plan keeper** | Daily 17:30, after the 17:00 mirror | Drift vs plan mix, cash, pending deposits, margin debit, rule status | Where the next deposit goes; rule-breach alerts; the 3 to 5 line daily Brief on Bridge | sonnet, medium; read tools |
 | **Tax desk** | Sunday 02:00; daily 02:00 in December; when a new lot export lands | Lots, unrealized gains and losses, wash-sale windows across all accounts, marginal rate from Escape Vektor's tax estimate | Harvest candidates, lot picks for Specific Shares, year-end deadline list | sonnet, high; read tools |
 | **Risk desk** | Saturday 02:00; also when the engine flags a trigger (below) | Concentration, correlation, drawdown scenarios, margin debit and interest cost | Weekly risk report; trim or "hold off" proposals | sonnet, high; read tools |
-| **Research desk** | Wednesday 01:00 (one holding a week, in rotation); on request; day after a holding reports earnings | Holding fundamentals from the brief, plus the web and SEC EDGAR | Deep-dive memo: thesis, bear case, valuation range, what would change the call, sources | opus, high; read tools, WebSearch, WebFetch |
+| **Research desk** | Wednesday 01:00 (one holding a week, in rotation); on request; day after a holding reports earnings | Holding fundamentals from the brief, plus the web and SEC EDGAR | Dossier per holding, written and refreshed: thesis, bear case, valuation range, what would change the call, dated sources | opus, high; read tools, WebSearch, WebFetch |
 | **Scout** | First Sunday of the month, 03:00 | Industry focus, growth tilt, satellite room left | Up to N ideas inside the satellite cap, each with its bear case | opus, high; read tools, WebSearch, WebFetch |
 | **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | sonnet, high; read tools |
 
 **Engine triggers** (each fires a desk at most once a day): a margin debit appears; a position moves more than the risk dial's daily threshold; a single holding passes its concentration band; a holding reports earnings; a new lot export arrives. Live tracking itself is engine work and needs no agent.
 
-**Ask the desk.** A text box in the UI queues a question to the Research desk. It runs in the next overnight window unless Joshua presses "Run now", and answers with a memo plus any proposals.
+**Console.** The Console (Escape Vektor's Ask terminal look) is where Joshua talks to the desks. A question or research request is queued to the right desk and runs in the next overnight window unless he presses "Run now". It answers with a memo or dossier update plus any proposals. Settings shows each desk's last and next run, turns used, and an on/off toggle.
 
 ### Dials
 
-Real settings live in `desk.yaml` on the TrueNAS box, outside the repo. The repo carries `desk.example.yaml` with made-up values. Every change is stored with a timestamp in SQLite, and every proposal records the settings hash it was made under.
+Real settings live in `desk.yaml` on the TrueNAS box, outside the repo. The repo carries `desk.example.yaml` with made-up values. Every change is stored as a new profile version in SQLite, and every proposal records the version it was made under.
 
 | Dial | Example settings | Read by |
 |---|---|---|
@@ -99,9 +99,11 @@ Every desk returns the same shape (`agents/schemas/proposal.json`). The UI and t
 | `kind` | `buy`, `sell`, `trim`, `rebalance`, `harvest`, `deposit_route`, `hold_off`, `alert`, `memo` |
 | `symbol`, `account`, `amount_usd` or `shares` | What and where |
 | `funding` | `cash`, `deposit`, `sale_proceeds` or `margin` |
-| `why` | Two or three sentences, plain language |
+| `thesis` | Two or three sentences, plain language |
 | `bear_case` | The best argument against, required for buy and sell |
 | `rule_served` | Which plan rule or dial this advances |
+| `invalidation` | What would prove it wrong, checked by the engine where it can be (a price, a date, a reported number) |
+| `horizon` | When to judge it: 30 days, 90 days, or a date |
 | `numbers_used` | List of `{field, value}` taken from `brief.json` |
 | `sources` | URLs with titles; buy and sell need at least two, one primary (filing, company release, FRED) |
 | `confidence` | Probability from 0 to 1 that it beats the plan baseline at 90 days |
@@ -112,9 +114,9 @@ Decisions Joshua makes are stored against the proposal: `approved`, `dismissed`,
 
 ## Guardrails
 
-**Hard rules, run by the runner on every proposal:**
+**Preflight, on every proposal** (desk-written fields are above; Preflight adds the result, tax impact, profile version and status):
 
-| Rule | Effect |
+| Check | Effect |
 |---|---|
 | Margin-funded buy | Status `blocked`, with the monthly interest in dollars at the current margin rate. Never shown as a recommendation |
 | New single stock outside the satellite cap | `blocked` |
@@ -161,7 +163,7 @@ Agents do not have memory of their own. Each run's `history.json` carries the de
 ## Testing
 
 - **Fake adapter** that returns canned JSON, so the runner, rules and UI can be built and tested without using the subscription.
-- **Unit tests** for every hard rule and the number check, on synthetic briefs only.
+- **Unit tests** for every Preflight check, on synthetic briefs only.
 - **Scenario set:** about ten synthetic briefs that each tempt a desk to fail, for example a margin-funded buy, a harvest inside a wash-sale window, an over-concentrated add, and a web page with an injected instruction. Run by hand after any prompt change, because each run costs usage.
 
 ## Repo layout
@@ -174,7 +176,7 @@ agents/
 desk/runner/
   adapter.py      run_agent(), Claude Code CLI implementation and the fake
   briefs.py       builds run folders from engine output
-  rules.py        hard rules and the number check
+  preflight.py    hard rules, number check, tax impact
   scheduler.py    windows, priority, budget, deferrals
   score.py        30/90-day scoring
 desk.example.yaml
@@ -185,8 +187,8 @@ desk.example.yaml
 | Phase | Agent work | Needs first |
 |---|---|---|
 | **0. Plumbing** | CLI installed in an `agents` container, token as a secret, one `claude -p` smoke test from the container | Compose app, Tailscale, secrets (infra) |
-| **2. Plan keeper and tax desk** | Adapter, fake adapter, brief builder, runner, hard rules, scheduler, proposal schema, plan keeper, tax desk, scorecard logging | Engine outputs for drift, cash, margin, lots and wash-sale windows (statistics); proposals table and decision queue (design); lot import |
-| **3. Research, risk, skeptic** | Three more desks, engine triggers, Ask the desk, source library, usage status page | Market-data and EDGAR fetchers; memo and source views (design) |
+| **2. Plan keeper and tax desk** | Adapter, fake adapter, brief builder, runner, Preflight, scheduler, proposal schema, plan keeper, tax desk, scorecard logging | Engine outputs for drift, cash, margin, lots and wash-sale windows (statistics); proposals table and decision queue (design); lot import |
+| **3. Research, risk, skeptic** | Three more desks, engine triggers, Console requests, dossiers and source library, usage status in Settings | Market-data and EDGAR fetchers; memo and source views (design) |
 | **4. Scout and scorecard** | Scout, scorecard reports, keep-or-switch-off review; optional read-only MCP server | Six months of logged proposals for the review |
 
 ## Before you start
