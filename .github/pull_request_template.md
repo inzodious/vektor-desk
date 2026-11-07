@@ -10,7 +10,6 @@ After:
 
 ## Checklist
 
-- [ ] `CHANGELOG.md` has a line under Unreleased (docs-only PRs skip this)
-- [ ] `ROADMAP.md` items ticked and phase status updated
+- [ ] `Changelog:` line and delivered roadmap items in this body (Lead writes them into `CHANGELOG.md` and `ROADMAP.md`)
 - [ ] Only files this workstream owns are changed (see `CLAUDE.md`)
 - [ ] No personal figures, account numbers or statements

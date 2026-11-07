@@ -8,7 +8,7 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 - Infrastructure: compose stack for TrueNAS (Tailscale sidecar, Caddy with Porkbun DNS-01), read-only Firestore mirror with change history, scheduler, backups, deploy and setup scripts ([#5])
 - Package seams: routers from `desk/*/api.py`, schemas from `desk/*/schema.py` applied to `desk.db` at startup, jobs from `desk/*/jobs.py` under run locks, and shared test fixtures ([#9])
-- Decisions: desk profile from `desk.yaml` (validated, versioned, safe defaults, `desk.example.yaml`), versioned plan rules where every change is logged as a decision record, `/api/decisions/profile` and `/api/decisions/rules`
+- Agents runner: `claude -p` adapter on the subscription, fake adapter, run log, Settings switches, weekly caps and `/api/agents/status` for the crew tiles ([#10])
 
 ## 0.0.0 - 2026-11-07
 
@@ -20,4 +20,5 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#4]: https://github.com/inzodious/vektor-desk/pull/4
 [#5]: https://github.com/inzodious/vektor-desk/pull/5
 [#6]: https://github.com/inzodious/vektor-desk/pull/6
+[#10]: https://github.com/inzodious/vektor-desk/pull/10
 [#9]: https://github.com/inzodious/vektor-desk/pull/9
