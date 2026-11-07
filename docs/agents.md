@@ -76,7 +76,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | high; no tools |
 | **Strategy desk** | On request from the Console; at most two new strategies a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
 
-**Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is a line in `desk/agents/desks.yaml`.
+**Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
 
 **Usage impact.** Opus at high and extra-high effort draws down the 5-hour and weekly limits much faster than a smaller model would, and these runs share those limits with his interactive Claude Code and the cloud build threads. The plan keeps the model and controls frequency instead:
 
@@ -220,14 +220,18 @@ Agents do not have memory of their own. Each run's `history.json` carries the de
 
 ```
 desk/agents/
-  prompts/        one system prompt per desk
-  schemas/        proposal.json, brief.json
-  desks.yaml      triggers, model, effort, tools, turn caps, priority
-  adapter.py      run_agent(), Claude Code CLI implementation and the fake
-  briefs.py       builds each desk's prompt from engine output
-  scheduler.py    windows, priority, budget, deferrals, the run lock
-  score.py        calls the engine's scoring for each decision record
-deploy/crontab    one line per scheduled desk (infra's cron service, America/New_York)
+  desks.py        model, effort, tools, turn and weekly caps, priority, schedules
+  adapter.py      ClaudeCli (claude -p) and FakeAdapter behind one run() call
+  runner.py       switches, weekly cap, the "agents" run lock, run log
+  store.py        agent_runs and agent_settings in desk.db
+  status.py       crew tiles: last and next run, weekly usage
+  api.py          /api/agents/status, /api/agents/{desk}/enabled
+  jobs.py         JOBS for the scheduler, one per live desk schedule
+  schema.py       the package's tables
+  prompts/        one system prompt per desk (Phase 5 on)
+  schemas/        proposal.json, strategy.json (Phase 5 on)
+  briefs.py       builds each desk's prompt from engine brief slices (Phase 5 on)
+tests/agents/     fake adapter and a stand-in claude binary only; never the real CLI
 desk.example.yaml
 ```
 
