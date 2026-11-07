@@ -35,8 +35,8 @@ DESKS: dict[str, Desk] = {
         Desk("risk", "Risk desk", "high", 3, 16, 3, ("0 2 * * 6",), live=True),
         Desk("research", "Research desk", "xhigh", 4, 40, 4, ("0 1 * * 3",), WEB, live=True),
         Desk("skeptic", "Skeptic", "high", 4, 8, 10, live=True),
-        Desk("scout", "Scout", "xhigh", 5, 40, 1, ("0 3 * * 0",), WEB, only_if=_first_week),
-        Desk("strategy", "Strategy desk", "xhigh", 6, 40, 2, (), WEB),
+        Desk("scout", "Scout", "xhigh", 5, 40, 1, ("0 3 * * 0",), WEB, live=True, only_if=_first_week),
+        Desk("strategy", "Strategy desk", "xhigh", 6, 40, 2, (), WEB, live=True),
     )
 }
 
