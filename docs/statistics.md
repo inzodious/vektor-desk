@@ -252,19 +252,21 @@ Any model writing a strategy in 2026 knows how 2016 to 2025 turned out. A strate
 
 ### Strategy spec
 
-The research desk (see [agents.md](agents.md)) hands the lab a `strategy.json`, frozen and hashed when registered:
+The strategy desk ([agents.md](agents.md)) hands the lab a `strategy.json`, frozen and hashed when registered. Stages: `draft` → `lab` → `paper` → `eligible`.
 
 | Field | Meaning |
 |---|---|
-| `hypothesis` | The claimed edge and why the market might miss it, in two sentences |
-| `predicted_effect` | Expected excess return over the benchmark and the horizon, stated before the run |
-| `universe` | A rule over point-in-time data (index membership, market cap rank, sector, ETF list) |
-| `signals` | Built from the engine's feature library: returns over N days, volatility, distance from an average, 52-week range, valuation and growth from XBRL facts, insider buys, earnings surprise vs prior year. No free-form code |
-| `entry`, `exit`, `sizing` | Rules on signals; sizing by equal weight, volatility, or signal rank, with a position cap |
-| `rebalance` | Daily, weekly or monthly |
-| `benchmark` | Plan mix, S&P 500, or the universe's equal-weight average |
-| `account` | Taxable or tax-deferred, which sets the tax drag |
-| `params` | Any tunable numbers, with the range the desk is allowed to search |
+| `id`, `version`, `parent_id` | Identity; `parent_id` links variants so every one counts in the trial ledger |
+| `title`, `hypothesis` | The claimed edge and why the market might miss it, in two sentences |
+| `universe` | A point-in-time rule: index members as of each date, a fixed fund list, or a screen. Never today's tickers |
+| `signals` | `[{metric_id, window, transform}]` from the engine's feature library only: returns over N days, volatility, distance from an average, 52-week range, valuation and growth from XBRL facts, insider buys, earnings vs prior year. No free-form code |
+| `entry`, `exit`, `rebalance`, `sizing` | Rules on signals; sizing by equal weight, volatility, or signal rank |
+| `constraints` | Long only, no margin, max position %, max turnover |
+| `success_criteria` | Pre-registered: excess vs plan mix, max drawdown, minimum trades, the windows it must hold in |
+| `horizons` | Any of 3, 5 and 10 years |
+| `written_at`, `desk`, `model`, `effort` | Provenance; `model` sets the training-cutoff window below |
+
+The lab, not the desk, sets costs, taxes (taxable account by default), and the benchmark (plan mix, with the S&P 500 alongside).
 
 The feature library grows by pull request, with tests, so a new signal is reviewed code, not something a model writes on the fly.
 
@@ -288,6 +290,8 @@ The feature library grows by pull request, with tests, so a new signal is review
 - **Taxes:** taxable runs pay short- and long-term rates on realized gains at each year end, using `tax.marginal_rate`.
 - **Walk-forward:** parameters are chosen on a training window and tested on the next window, rolling forward. Every start month in the horizon is run, not one lucky start date.
 - **Locked holdout:** the most recent two years are opened once per spec, after the walk-forward is final.
+- **After the model's training cutoff:** results for the days after the writing model's cutoff are reported separately. That window is the only past data the model cannot have seen.
+- **Result:** per-horizon metrics, the post-cutoff window, variants tried, caveats (survivorship, reconstructed membership), and a verdict of `pass`, `fail` or `inconclusive` against both the pre-registered `success_criteria` and the bars below.
 - **Trial ledger:** every variant run is logged in `strategy_trials`. The count feeds the overfitting statistics; nothing gets deleted.
 
 ### What a strategy must show
