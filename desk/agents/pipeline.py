@@ -1,7 +1,7 @@
 import json
 from dataclasses import dataclass, field, replace
 
-from desk.agents import briefs, store
+from desk.agents import alerts, briefs, store
 from desk.agents.adapter import Adapter
 from desk.agents.desks import get
 from desk.agents.runner import Outcome, run_desk
@@ -144,7 +144,10 @@ def run_proposal_desk(
     proposals = [p for p in answer.get("proposals") or () if isinstance(p, dict)]
     store.save_brief(cfg, outcome.run_id, name, slice_.get("as_of"), digest, version, summary, json.dumps(answer, sort_keys=True))
     if name == "research" and isinstance(answer.get("dossier"), dict):
-        store.save_dossier(cfg, answer["dossier"].get("symbol") or symbol, outcome.run_id, json.dumps(answer["dossier"], sort_keys=True))
+        dossier_symbol = answer["dossier"].get("symbol") or symbol
+        store.save_dossier(cfg, dossier_symbol, outcome.run_id, json.dumps(answer["dossier"], sort_keys=True))
+        if trigger == "schedule":
+            alerts.dossier_ready(cfg, dossier_symbol, outcome.run_id, summary)
     report = Report(outcome, summary, symbol=symbol)
     idx = briefs.index(slice_)
     run_id = str(outcome.run_id)

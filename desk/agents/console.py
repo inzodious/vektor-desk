@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from desk.agents import store
+from desk.agents import alerts, store
 from desk.agents.adapter import Adapter
 from desk.agents.pipeline import run_proposal_desk
 from desk.agents.sources import Decisions, Engine, Lab, NotReady, RealTriggers
@@ -89,7 +89,10 @@ def process_queue(
             )
         status = report.status
         if status in DONE:
-            store.finish_request(cfg, req["id"], "done", run_id=report.outcome.run_id, answer=_answer(report), note=report.note)
+            answer = _answer(report)
+            store.finish_request(cfg, req["id"], "done", run_id=report.outcome.run_id, answer=answer, note=report.note)
+            if status == "ok":
+                alerts.answer_ready(cfg, req, answer)
             tally.done += 1
         elif status in ("busy", "deferred") and req["source"] != "retry" and "deferred once" not in (req["note"] or ""):
             store.requeue(cfg, req["id"], f"{status}; deferred once to tonight")
@@ -98,6 +101,8 @@ def process_queue(
                 break
         else:
             store.finish_request(cfg, req["id"], "failed", run_id=report.outcome.run_id, note=report.note)
+            if status in ("busy", "deferred"):
+                alerts.run_failed(cfg, req["desk"], status, report.outcome.run_id, report.note)
             tally.failed += 1
     return tally
 
