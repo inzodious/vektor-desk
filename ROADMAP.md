@@ -12,9 +12,9 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 1 | Foundation | 1 | 🚧 (code done, box setup pending) | 0 |
 | 2 | Bridge and Symbol sheet | 1 | ✅ | 1 |
 | 3 | Engine core and Plan | 1 | ✅ | 2 |
-| 4 | Decisions and Preflight | 1 | 🚧 | 3 |
+| 4 | Decisions and Preflight | 1 | ✅ | 3 |
 | 5 | Plan keeper and tax desk | 1 | 🚧 | 4 |
-| 6 | Research | 2 | 📋 | 4 |
+| 6 | Research | 2 | 🚧 | 4 |
 | 7 | Lab: Compare and risk | 2 | 📋 | 3 |
 | 8 | Phone alerts | 2 | 📋 | 5 |
 | 9 | Strategy lab | 3 | 📋 | 3, 6 |
@@ -75,14 +75,14 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run. **
 - [x] Bridge KPI row complete, drift bullets, gauges ([#37])
 - [x] Plan page: target mix and bands, drift, rules (versioned), deposit routing ([#12], [#22], [#30], [#37])
 
-### 4. Decisions and Preflight 🚧
+### 4. Decisions and Preflight ✅
 
 - [x] Decision records for every action and deliberate pass; logging starts here so scoring has history later ([#20])
 - [x] Preflight lights (engine, `preflight(holdings, trade)`): concentration, drift, funding and margin interest, wash sales across all accounts, lots and realized gain or loss, rule breaks ([#35])
 - [x] Tax lots, wash-sale calendar, realized gain and loss ([#16], [#35])
-- [ ] Preflight annunciator (`POST /api/preflight`) and override box with a one-line reason (endpoint [#35]; UI to come)
+- [x] Preflight annunciator (`POST /api/preflight`) and override box with a one-line reason ([#35], [#41])
 - [x] Order tickets, marked placed, confirmed by the mirror ([#20])
-- [ ] Queue with proposal cards; Journal as a stamped ledger (data [#20]; pages to come)
+- [x] Queue with proposal cards; Journal as a stamped ledger ([#20], [#41])
 
 ### 5. Plan keeper and tax desk 🚧
 
@@ -95,14 +95,14 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run. **
 
 Tier 1 complete: 0.5.0.
 
-### 6. Research 📋
+### 6. Research 🚧
 
 - [ ] Dossiers per symbol and theme, with sources and "what would change the call"
 - [x] Research desk, on request (overnight by default) and on a weekly rotation, with a skeptic run checking each dossier ([#18])
 - [ ] Dossier and sources views; Console to request research and talk to the desks (backend [#18]; views to come)
-- [ ] Watchlist and engine triggers into the queue: big daily move, band crossed, margin debit appears, earnings date, new lot export
-- [ ] Source library: SEC EDGAR filings, insider trades, 13F, earnings dates, FRED series
-- [ ] Engine: EDGAR, FRED and Finnhub fetchers and holding signals
+- [ ] Watchlist and engine triggers into the queue: big daily move, band crossed, margin debit appears, earnings date, new lot export (triggers [#36], [#38], [#40]; watchlist to come)
+- [ ] Source library: SEC EDGAR filings, insider trades, 13F, earnings dates, FRED series (data [#40]; 13F and views to come)
+- [x] Engine: EDGAR, FRED and Finnhub fetchers and holding signals ([#40])
 
 ### 7. Lab: Compare and risk 📋
 
@@ -189,3 +189,5 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#36]: https://github.com/inzodious/vektor-desk/pull/36
 [#37]: https://github.com/inzodious/vektor-desk/pull/37
 [#38]: https://github.com/inzodious/vektor-desk/pull/38
+[#40]: https://github.com/inzodious/vektor-desk/pull/40
+[#41]: https://github.com/inzodious/vektor-desk/pull/41

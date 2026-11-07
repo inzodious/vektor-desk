@@ -4,6 +4,15 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.4.0 - 2026-11-07
+
+Decisions and Preflight are done: every proposal now shows its Preflight lights, an override needs a reason, and the Journal keeps score. The research data feeds for phase 6 landed alongside.
+
+### Added
+
+- Decisions page with the proposal queue, Preflight annunciator, override box and order ticket; Journal with the stamped ledger, discipline streak and unmatched trades; top three proposals on the Bridge ([#41])
+- Nightly research data from SEC EDGAR, FRED and Finnhub (filings, company facts, earnings, insider trades, rates and VIX), with holding signals, macro metrics, an earnings trigger, and `/api/engine/research` and `/api/engine/macro` ([#40])
+
 ## 0.3.0 - 2026-11-07
 
 Engine core and Plan are done. Preflight, desk brief slices and triggers from phases 4 and 5 landed alongside, so the Plan keeper and tax desk now run on real engine numbers.
@@ -89,3 +98,5 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#36]: https://github.com/inzodious/vektor-desk/pull/36
 [#37]: https://github.com/inzodious/vektor-desk/pull/37
 [#38]: https://github.com/inzodious/vektor-desk/pull/38
+[#40]: https://github.com/inzodious/vektor-desk/pull/40
+[#41]: https://github.com/inzodious/vektor-desk/pull/41
