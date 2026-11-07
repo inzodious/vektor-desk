@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 from collections import defaultdict
@@ -8,7 +9,7 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION, lookthrough, risk
+from desk.engine import ENGINE_VERSION, lookthrough, patterns, risk, scoring
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
 from desk.engine.lots import current_lots
@@ -40,6 +41,8 @@ class Out:
     health: list[tuple] = field(default_factory=list)
     wash: list[tuple] | None = None
     lookthrough: list[tuple] | None = None
+    signals: list[tuple] | None = None
+    views: dict[str, dict] = field(default_factory=dict)
 
     def m(
         self,
@@ -253,6 +256,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _tax_metrics(out, cfg, mirror, desk, activity, now_rows, now)
     _after_tax(out, cfg, mirror, desk, accounts, income(activity))
     _research_metrics(out, desk, kinds)
+    _flight_record(out, cfg, desk, tr, targets, kinds, now_rows)
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:
         out.m("cash.pending_days", (date.fromisoformat(when) - date.fromisoformat(as_of)).days, "days", quality="modelled")
@@ -609,6 +613,19 @@ def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datet
 # ---- Research signals and macro ----
 
 
+def _flight_record(out: Out, cfg: Config, desk, tr, targets, kinds, rows):
+    ref = risk.market_symbol(tr)
+    cal = tr.dates.get(ref, []) if ref else sorted({d for s in targets for d in tr.dates.get(s, [])})
+    rate = next((m[5] for m in out.metrics if m[0] == "tax.marginal_rate" and m[1] == "portfolio" and m[5] is not None), None)
+    decisions = scoring.decision_rows(cfg)
+    card = scoring.metrics(out, cfg, tr, targets, rate=rate / 100 if rate is not None else None, cal=cal, fallback=ref, rows=decisions)
+    held = sorted({h["symbol"] for h in rows if not h["is_cash"]})
+    watch = [r[0] for r in desk.execute("SELECT symbol FROM market_symbols WHERE role='watch'")]
+    symbols = sorted({*held, *watch})
+    out.views["scorecard"] = card
+    out.views["patterns"] = patterns.metrics(out, desk, tr, symbols, kinds, card, decisions)
+
+
 def _research_metrics(out: Out, desk, kinds):
     symbols = research_symbols(desk, kinds)
     prev = desk.execute("SELECT max(as_of) FROM metric_values WHERE as_of < ?", (out.as_of,)).fetchone()[0]
@@ -690,6 +707,11 @@ def store(desk: sqlite3.Connection, out: Out) -> dict:
         if out.lookthrough is not None:
             desk.execute("DELETE FROM lookthrough")
             desk.executemany("INSERT OR REPLACE INTO lookthrough VALUES (?, ?, ?, ?, ?, ?)", out.lookthrough)
+        if out.signals is not None:
+            desk.execute("DELETE FROM signals WHERE as_of=?", (out.as_of,))
+            desk.executemany("INSERT OR REPLACE INTO signals VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", out.signals)
+        for name, body in out.views.items():
+            desk.execute("INSERT OR REPLACE INTO engine_views VALUES (?, ?, ?)", (name, out.as_of, json.dumps(body)))
         if out.wash is not None:
             desk.execute("DELETE FROM wash_windows")
             desk.executemany("INSERT OR REPLACE INTO wash_windows VALUES (?, ?, ?, ?, ?, ?, ?)", out.wash)

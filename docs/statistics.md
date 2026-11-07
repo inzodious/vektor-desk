@@ -303,6 +303,47 @@ The method behind `dec.score_*` and the agents' scorecard.
 - **Per desk:** total excess dollars, hit rate, and a bootstrap 90% interval for the mean excess. With a few dozen proposals the interval will usually include zero, and the scorecard says that rather than ranking noise.
 - **Calibration:** Brier score of `confidence` against "beat the baseline at 90 days", plus a calibration table once a desk has 30 scored proposals.
 
+### As built (phase 10)
+
+Scoring and patterns run inside every core run (`desk.engine.scoring`, `desk.engine.patterns`), from `desk.decisions.records.scoring_rows`; nothing new is fetched.
+
+**One decision.** Day zero is the first close after the decision's local day: `created_at` for proposals, `filled_at` for your own logged trades. A horizon is scored once its day has passed (last close on or before day zero plus 30, 90 or 365 calendar days). The plan side is the plan mix bought at day zero and held; missing fund prices renormalize the mix (`pro_forma`), no plan prices at all fall back to the S&P 500 (`modelled`). Proposals with status `rejected` are skipped; every other status counts, taken or not.
+
+| Kind | Score in dollars |
+|---|---|
+| `buy`, `deposit_route`, `rebalance` (buy side) | amount × (symbol return − plan return), less margin interest at `DESK_MARGIN_RATE_PCT` (360-day year) when funded on margin |
+| `sell`, `trim`, `rebalance` (sell side) | amount × (plan return − symbol return) |
+| `harvest` | realized loss from Preflight's `tax_impact` × marginal rate; tracking difference is not modelled |
+| `hold_off` | amount × (plan return − symbol return) when it names a symbol, plus margin interest avoided |
+| `alert`, `memo` | Not scored |
+
+**Summaries.**
+
+| Metric | Scope, scope_id, window | What |
+|---|---|---|
+| `dec.score_30`, `_90`, `_365` | `decision`, decision id, `30D` / `90D` / `365D` | The score above; the Journal reads these |
+| `dec.score_by` | `group`, `origin:…`, `kind:…`, `path:clean\|flagged\|override`, `taken:taken\|not_taken` | Total dollars, `n_obs` = decisions |
+| `dec.desk_record` | `desk`, desk, `90D` | Cumulative 90-day dollars |
+| `dec.brier` | `desk`, desk, `90D` | Brier of `confidence` against beating the plan at 90 days |
+| `dec.lag` | `desk` and portfolio | Median days from proposal to your decision |
+| `dec.offplan_gap` | portfolio, `90D` | Your own trades with an override, margin funding, or a buy outside the plan |
+| `dec.saves` | portfolio, `90D` | Ideas not taken that would have lost money, plus `hold_off` savings |
+
+`GET /api/engine/scorecard[?origin=]` returns the full card: `groups` (n, total, mean, hit rate, 90% bootstrap interval of the mean with a note when it includes zero), `desks` (record, approvals, calibration bins from 30 scored, lag, days on, chip `too_early` under 182 days or 10 scored, else `keep` or `behind`), `saves`, `offplan_gap`, and each decision's scores. The bootstrap is seeded, so numbers do not wobble.
+
+**Patterns.** Each pattern row in `signals` carries its value, the base rate of "higher later" for past days in the same bucket, a 90% Wilson interval, the sample count, and one line on what it is not. Base rates need 5 samples; samples are month ends, so overlapping windows make the interval optimistic.
+
+| Pattern | Bucket | Followed by |
+|---|---|---|
+| `pat.mkt_drawdown` | 0–5, 5–10, 10–20, 20–30, 30%+ below the high | S&P 500 higher 12 months later |
+| `pat.vix_pctl`, `pat.hy_pctl` | Quintile of the trailing 10 years | Same |
+| `pat.curve_10y3m` | Inverted or not | Same |
+| `pat.range_52w`, `pat.vol_pctl` (own 5 years) | Quintile | Holding higher 3 months later |
+| `pat.ma200_gap` | Below −10, −10–0, 0–10, above 10% | Same |
+| `pat.earnings_move` | Mean absolute two-day move on the last 8 reports | No base rate |
+
+`GET /api/engine/patterns` adds drawdown base-rate tables (market and each fund: past drawdowns at least as deep, median and longest trading days back to the high), monthly seasonality per symbol labelled "description, never a signal", correlation shifts of 0.3 or more, and your behavior: buys after a 5% drop, a 5% rise or flat (90-day scores), scheduled vs off-schedule vs margin-funded buys, trades a month, and the median holding period of sold single stocks.
+
 ## Strategy lab
 
 Where a strategy from deep research gets tested: a backtest over 3, 5 and 10 years that only sees data as it was known on each day, then forward paper trading with fake money. The research desk proposes; the engine runs the rules; nothing in the lab touches real money.
@@ -516,13 +557,14 @@ What agents and dashboards build against. Owned by this doc; changes go through 
 metric_values(metric_id, scope, scope_id, window, as_of, value, unit, n_obs, quality, engine_version)
 series_daily(series_id, scope, scope_id, date, value, quality)
 signals(signal_id, scope_id, as_of, value, base_rate, ci_low, ci_high, n_obs, note)
+engine_views(name, as_of, body)   (latest scorecard and patterns JSON)
 data_health(as_of, check, status, detail)
 preflight(ticket_id, metric_id, before, after, flag)
 triggers(as_of, kind, scope_id, detail)
 paper_portfolios, paper_positions, paper_trades   (Strategy lab; the trial ledger is lab/runs/ledger.db)
 ```
 
-- `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`, plus `pair`, `underlying`, `sector`, `scenario`, `macro`, `rule`, `tax`.
+- `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`, plus `pair`, `underlying`, `sector`, `scenario`, `macro`, `rule`, `tax`, `decision`, `group`, `desk`.
 - `quality`: `ok`, `stale`, `pro_forma`, `modelled`, `insufficient_history`.
 - `unit`: `usd`, `pct`, `pts`, `ratio`, `days`, `date`.
 
@@ -571,6 +613,9 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | `GET /api/engine/preflight?ticket_id=` | Stored before and after rows for a ticket |
 | `GET /api/engine/wash` | Open wash-sale windows `{symbol, kind, date, clears, account, amount}` |
 | `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status, feature catalog and grammar; one strategy's tear sheet, verdict and paper trades |
+| `GET /api/engine/scorecard?origin=` | Flight record: groups, desks, saves, off-plan gap, per-decision scores |
+| `GET /api/engine/patterns` | Patterns: market, holdings, drawdown tables, seasonality, correlation shifts, behavior |
+| `GET`, `POST /api/engine/watchlist`, `DELETE /api/engine/watchlist/{symbol}` | Watchlist rows; desk rows editable, `DESK_WATCHLIST` rows read-only |
 
 **Display rules for design.** Show `as_of` on every KPI; show any non-`ok` quality as a small, friendly tag, not a red error; never annualize under a year; Monte Carlo as percentile lines or markers, not a filled band.
 
@@ -580,7 +625,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 |---|---|
 | Every 5 min, 9:30 to 16:00 ET weekdays | Quotes, live value, day change, intraday drawdown, margin call distance |
 | After each mirror (8:00, 17:00 ET) | Reconciliation, holdings, flows, returns, drift, rules, margin, tax (if lots are fresh), risk, correlations, scenarios, look-through exposure, signals, brief for the agents. Comparisons are computed on request |
-| Nightly | Tiingo, EDGAR, FRED pulls; scorecard |
+| Nightly | Tiingo, EDGAR, FRED pulls (the scorecard and patterns refresh with each core run) |
 | Nightly, 00:55 | `lab-export`: fresh `lab/data/lab.db`, then paper portfolios replay to the newest bar. Queued lab experiments run 01:00 to 06:00 ET under `job_lock("lab")` |
 | Weekly, Sunday 02:10 | N-PORT look-through and sector profiles |
 | Monthly, 2nd at 03:30 | `french`: factors and portfolios from the Ken French library. Phase 11 adds the Monte Carlo refresh and factor regression on holdings with three years or more of history |
