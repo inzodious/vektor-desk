@@ -12,8 +12,9 @@ function fixtureApi() {
     if (!url.pathname.startsWith('/api/')) return next();
     const scenario = req.headers['x-desk-scenario'] || url.searchParams.get('scenario') || '';
     const symbol = (url.searchParams.get('symbol') || '').toUpperCase();
+    const scopeId = url.searchParams.get('scope_id') || '';
     const base = url.pathname.slice(5).replace(/\/+$/, '').replace(/\//g, '.') || 'index';
-    const tries = [scenario && `${base}.${scenario}`, symbol && `${base}.${symbol}`, symbol && `${base}.any`, symbol ? null : base].filter(Boolean);
+    const tries = [scenario && `${base}.${scenario}`, symbol && `${base}.${symbol}`, scopeId && `${base}.${scopeId}`, symbol && `${base}.any`, base].filter(Boolean);
     const file = tries.map((t) => `${FIXTURES}${t}.json`).find((f) => existsSync(f));
     res.setHeader('Cache-Control', 'no-store');
     if (!file) {

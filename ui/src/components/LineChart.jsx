@@ -61,13 +61,12 @@ export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, re
   if (endLabels && !narrow) {
     series.forEach((s) => {
       const v = s.values[n - 1];
-      if (v == null) return;
-      let y = Y(v) + 4;
-      ends.forEach((p) => {
-        if (Math.abs(p.y - y) < 14) y = p.y + (y >= p.y ? 14 : -14);
-      });
-      ends.push({ y, name: s.short || s.name });
+      if (v != null) ends.push({ y: Y(v) + 4, name: s.short || s.name, color: s.color });
     });
+    ends.sort((a, b) => a.y - b.y);
+    for (let k = 1; k < ends.length; k += 1) if (ends[k].y - ends[k - 1].y < 14) ends[k].y = ends[k - 1].y + 14;
+    const over = ends.length ? ends[ends.length - 1].y - (H - B) : 0;
+    if (over > 0) ends.forEach((e) => (e.y -= over));
   }
 
   return (
@@ -129,7 +128,7 @@ export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, re
             <g key={r.label || r.y}>
               <line className="ref" x1={L} x2={W - R} y1={Y(r.y)} y2={Y(r.y)} />
               {r.label ? (
-                <text x={L + 6} y={Y(r.y) - 6} className="lbl" style={{ fontWeight: 600 }}>
+                <text x={r.start ? L + 6 : W - R - 4} y={Y(r.y) - 6} textAnchor={r.start ? 'start' : 'end'} className="lbl ref-lbl" style={{ fontWeight: 600 }}>
                   {r.label}
                 </text>
               ) : null}
@@ -143,7 +142,7 @@ export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, re
             series[0].values[m.i] == null ? null : <circle key={`${m.i}-${m.label}`} cx={X(m.i)} cy={Y(series[0].values[m.i])} r="5" fill={m.color || 'var(--card)'} stroke={series[0].color} strokeWidth="2" />,
           )}
           {ends.map((e) => (
-            <text key={e.name} x={W - R + 8} y={e.y} className="lbl">
+            <text key={e.name} x={W - R + 8} y={e.y} className="lbl" style={{ fill: e.color }}>
               {e.name}
             </text>
           ))}

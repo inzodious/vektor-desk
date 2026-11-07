@@ -1,0 +1,94 @@
+import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const API = process.env.DESK_API || 'http://127.0.0.1:8000';
+const OUT = fileURLToPath(new URL('../src/fixtures/', import.meta.url));
+const DAY = '2026-11-09';
+const AS_OF = `${DAY}T16:40:00+00:00`;
+
+// ---------- helpers ----------
+async function get(path) {
+  const res = await fetch(`${API}${path}`);
+  if (!res.ok) throw new Error(`${path} answered ${res.status}`);
+  return res.json();
+}
+
+function save(name, body) {
+  writeFileSync(`${OUT}${name}.json`, `${JSON.stringify(body, null, 1)}\n`);
+  console.log(`wrote ${name}.json`);
+}
+
+let seed = 11;
+function rand() {
+  seed = (seed * 16807) % 2147483647;
+  return (seed - 1) / 2147483646;
+}
+
+const round = (v, d = 2) => Math.round(v * 10 ** d) / 10 ** d;
+
+// ---------- read the demo desk ----------
+const health = await get('/api/health');
+if (!health.demo) throw new Error('Point DESK_API at an API running with DESK_DEMO=1');
+
+const closed = await get('/api/live');
+const positions = await get('/api/positions');
+const value = await get('/api/engine/value');
+const metrics = await get('/api/engine/metrics?ids=*');
+const lots = await get('/api/engine/lots');
+
+// ---------- live variants ----------
+const MOVES = {};
+const NAV = new Set(positions.positions.filter((p) => /fund/i.test(p.description || '') && !/etf/i.test(p.description || '')).map((p) => p.symbol));
+const symbols = [...new Set(closed.rows.filter((r) => r.source !== 'cash').map((r) => r.symbol))];
+symbols.forEach((s) => {
+  MOVES[s] = NAV.has(s) ? 0 : round((rand() - 0.45) * 0.05, 4);
+});
+
+const openRows = closed.rows.map((r) => {
+  if (r.source === 'cash' || NAV.has(r.symbol)) return { ...r };
+  const price = round(r.prev_close * (1 + MOVES[r.symbol]));
+  return { ...r, price, value: round(r.shares * price), day_change: round(r.shares * (price - r.prev_close)), source: 'finnhub' };
+});
+const total = round(openRows.reduce((a, r) => a + r.value, 0));
+const change = round(openRows.reduce((a, r) => a + r.day_change, 0));
+const open = { ...closed, state: 'open', day: DAY, opens_at: `${DAY}T14:30:00+00:00`, closes_at: `${DAY}T21:00:00+00:00`, as_of: AS_OF, value: total, day_change: change, day_change_pct: round((change / (total - change)) * 100), quality: 'ok', rows: openRows };
+save('live', open);
+save('live.stale', { ...open, quality: 'stale', as_of: `${DAY}T15:05:00+00:00` });
+save('live.closed', { ...closed, day: '2026-11-07' });
+save('live.empty', { state: 'closed', day: '2026-11-07', opens_at: null, closes_at: null, as_of: null, holdings_date: null, value: 0, day_change: 0, day_change_pct: null, quality: 'insufficient_history', rows: [], benchmarks: {} });
+
+const intraday = {};
+symbols
+  .filter((s) => !NAV.has(s))
+  .forEach((s) => {
+    const prev = closed.rows.find((r) => r.symbol === s).prev_close;
+    const end = prev * (1 + MOVES[s]);
+    intraday[s] = Array.from({ length: 28 }, (_, i) => ({
+      t: new Date(Date.parse(`${DAY}T14:30:00Z`) + i * 300000).toISOString().replace('.000Z', '+00:00'),
+      price: round(i === 27 ? end : prev + (end - prev) * (i / 27) + (rand() - 0.5) * 0.008 * prev),
+    }));
+  });
+save('live.intraday', { day: DAY, symbols: intraday });
+
+// ---------- engine ----------
+save('positions', positions);
+save('engine.value', value);
+save('engine.metrics', metrics);
+save('engine.lots', { lots: [], files: [] });
+save('engine.lots.any', { lots: [], files: [] });
+const withLots = lots.lots.length ? lots : null;
+if (withLots) save(`engine.lots.${withLots.lots[0].symbol}`, { lots: withLots.lots.filter((l) => l.symbol === withLots.lots[0].symbol), files: withLots.files });
+
+const top = symbols[0];
+const prices = await get(`/api/engine/prices?symbol=${top}&start=2025-11-07`);
+save('engine.prices.any', prices);
+
+for (const [scope, id] of [
+  ['portfolio', 'all'],
+  ['shadow', 'plan_shadow'],
+  ['shadow', 'sp500_shadow'],
+]) {
+  save(`engine.series.${id}`, await get(`/api/engine/series?id=value&scope=${scope}&scope_id=${id}`));
+}
+
+for (const p of ['profile', 'rules', 'deposits']) save(`decisions.${p}`, await get(`/api/decisions/${p}`));

@@ -8,9 +8,9 @@ test.beforeEach(async ({ page }) => {
 test('bridge shows live value, KPI tiles and the departures board', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');
-  await expect(page.locator('.ph-big b')).toHaveText('$19,505');
-  await expect(page.locator('.kpi')).toHaveCount(4);
-  await expect(page.getByRole('table', { name: 'Live holdings' }).getByRole('row')).toHaveCount(8);
+  await expect(page.locator('.ph-big b')).toHaveText('$16,308');
+  await expect(page.locator('.kpi')).toHaveCount(7);
+  await expect(page.getByRole('table', { name: 'Live holdings' }).getByRole('row')).toHaveCount(6);
   await expect(page.getByTestId('market-clock')).toHaveAttribute('data-feed', 'live');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
@@ -43,9 +43,9 @@ test('the sheet opens from the URL and closes on an outside click', async ({ pag
 
 test('board rows open from the keyboard', async ({ page }) => {
   await page.goto('/');
-  await page.locator('.board-row[data-sym="RKLB"]').focus();
+  await page.locator('.board-row[data-sym="ACME"]').focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('dialog', { name: 'RKLB symbol sheet' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'ACME symbol sheet' })).toBeVisible();
 });
 
 test('market value KPI drills into accounts', async ({ page }) => {
@@ -57,19 +57,53 @@ test('market value KPI drills into accounts', async ({ page }) => {
   await expect(drawer).toBeHidden();
 });
 
-test('today KPI lists movers and hands off to the symbol sheet', async ({ page }) => {
+test('market value drawer lists movers and hands off to the symbol sheet', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: /^Today/ }).click();
-  await page.getByRole('dialog', { name: 'Today' }).getByRole('button', { name: /SMR/ }).click();
-  await expect(page.getByRole('dialog', { name: 'SMR symbol sheet' })).toBeVisible();
+  await page.getByRole('button', { name: /Market value/ }).click();
+  await page.getByRole('dialog', { name: 'Market value' }).getByRole('button', { name: /FTEC/ }).click();
+  await expect(page.getByRole('dialog', { name: 'FTEC symbol sheet' })).toBeVisible();
+});
+
+test('vs the plan drills into windows against both shadows', async ({ page }) => {
+  await page.goto('/');
+  await page.locator('[data-kpi="bm.excess"]').click();
+  const drawer = page.getByRole('dialog', { name: 'Against the shadows' });
+  await expect(drawer.getByRole('columnheader', { name: 'vs S&P 500' })).toBeVisible();
+  await expect(drawer.getByRole('row', { name: /Year to date/ })).toContainText('$');
+  await page.mouse.click(5, 5);
+  await expect(drawer).toBeHidden();
+});
+
+test('largest drift drills into drift bullets and hands off to a fund', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-kpi="plan.drift_max"] .v')).toContainText('1.3');
+  await page.locator('[data-kpi="plan.drift_max"]').click();
+  const drawer = page.getByRole('dialog', { name: 'Drift by fund' });
+  await expect(drawer.locator('.drift-row')).toHaveCount(4);
+  await drawer.locator('.drift-row', { hasText: 'VXUS' }).click();
+  await expect(page.getByRole('dialog', { name: 'VXUS symbol sheet' })).toBeVisible();
+});
+
+test('instruments show the drift and single stock gauges', async ({ page }) => {
+  await page.goto('/');
+  const card = page.locator('.card', { hasText: 'Instruments' });
+  await expect(card.locator('.gauge')).toHaveCount(2);
+  await expect(card).toContainText('Rebalance at 5');
+  await expect(card).toContainText('Cap 10%');
+});
+
+test('FI progress waits for the FI path instead of guessing', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.locator('[data-kpi="fi.progress"] .v')).toHaveText('Not yet');
 });
 
 test('value chart has a table view and period combo', async ({ page }) => {
   await page.goto('/');
-  const card = page.locator('.card', { hasText: 'Value over time' });
-  await expect(card.getByRole('img', { name: 'Portfolio value over time' })).toBeVisible();
+  const card = page.locator('.card', { hasText: 'Value versus the plan' });
+  await expect(card.getByRole('img', { name: 'Your value against the plan and S&P 500 shadows' })).toBeVisible();
+  await expect(card.locator('.legend')).toContainText('S&P 500 shadow');
   await card.getByRole('button', { name: 'Table view' }).click();
-  await expect(card.getByRole('columnheader', { name: 'Value' })).toBeVisible();
+  await expect(card.getByRole('columnheader', { name: 'Plan shadow' })).toBeVisible();
   await card.getByRole('button', { name: 'Chart view' }).click();
   await card.getByRole('button', { name: /^Period/ }).click();
   await page.getByRole('option', { name: '3 months' }).click();
