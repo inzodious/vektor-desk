@@ -17,7 +17,7 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 6 | Research | 2 | ✅ | 4 |
 | 7 | Lab: Compare and risk | 2 | ✅ | 3 |
 | 8 | Phone alerts | 2 | ✅ | 5 |
-| 9 | Strategy lab | 3 | 🚧 | 3, 6 |
+| 9 | Strategy lab | 3 | ✅ | 3, 6 |
 | 10 | Flight record and Patterns | 3 | 🚧 | 30 days of decision records |
 | 11 | Scout and FI scenarios | 3 | 🚧 | 10 |
 | 1.0 | Hardening | | 📋 | 11 |
@@ -115,7 +115,7 @@ Tier 1 code complete: 0.5.0. It runs on demo data until the box setup in [docs/s
 
 - [x] Self-hosted ntfy on the box, relaying through ntfy.sh for phone delivery: rule breach, trigger hit, wash-sale window, stale mirror, research ready ([#26], [#27], [#28], [#36])
 
-### 9. Strategy lab 🚧
+### 9. Strategy lab ✅
 
 Research hypotheses become strategies, tested on history without seeing the future, then paper-traded forward before any of them can inform a proposal.
 
@@ -126,7 +126,7 @@ Research hypotheses become strategies, tested on history without seeing the futu
 - [x] Strategy desk: turns research desk hypotheses into specs, reads results ([#23], [#48], [#50])
 - [x] Forward paper portfolios; a strategy is eligible only after six months of forward results ([#45], [#47])
 - [x] Rule backtests for the plan's own rules ([#49], [#50])
-- [ ] Strategy lab views (Design mocks them once the spec settles)
+- [x] Strategy lab views ([#57], [#58])
 
 ### 10. Flight record and Patterns 🚧
 
@@ -203,3 +203,5 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#52]: https://github.com/inzodious/vektor-desk/pull/52
 [#54]: https://github.com/inzodious/vektor-desk/pull/54
 [#55]: https://github.com/inzodious/vektor-desk/pull/55
+[#57]: https://github.com/inzodious/vektor-desk/pull/57
+[#58]: https://github.com/inzodious/vektor-desk/pull/58

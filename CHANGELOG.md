@@ -4,6 +4,15 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.8.0 - 2026-11-07
+
+The Strategy lab is done: strategies are specced, tested on history without seeing the future, and paper-traded for six months before any of them can inform a proposal.
+
+### Added
+
+- Strategy lab pages: stage rail, strategy tear sheets with verdict lamps and paper trading, and rule tests against never selling ([#58])
+- Strategy detail carries the frozen spec, and list rows carry the hypothesis ([#57])
+
 ## 0.7.0 - 2026-11-07
 
 Lab Compare and risk is done, which completes Tier 2 (phases 6 to 8). The engine is now complete through phase 11; the Strategy lab, Flight record and FI views come next.
@@ -143,3 +152,5 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#52]: https://github.com/inzodious/vektor-desk/pull/52
 [#54]: https://github.com/inzodious/vektor-desk/pull/54
 [#55]: https://github.com/inzodious/vektor-desk/pull/55
+[#57]: https://github.com/inzodious/vektor-desk/pull/57
+[#58]: https://github.com/inzodious/vektor-desk/pull/58
