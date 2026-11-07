@@ -16,7 +16,8 @@ TrueNAS SCALE 24.10 ─ custom app "vektor-desk" (deploy/compose.yaml)
   ├─ api        FastAPI on :8000, compose network only; serves the UI once it lands
   ├─ cron       python -m desk.scheduler running deploy/crontab: mirror, engine, agents (claude -p)
   ├─ ntfy       phone alerts at https://desk.escape-vektor.com:8443, through the same caddy
-  └─ lab        python -m desk.engine.lab: overnight strategy sweeps, no network at all
+  ├─ lab        python -m desk.engine.lab: overnight strategy sweeps, no network at all
+  └─ eval       claude remote-control for QA: data and source read-only, own network, no keys (eval-access.md)
 ```
 
 The NAS publishes no port for the desk. The TrueNAS UI keeps 443 on the LAN; Caddy listens inside the tailscale container's network namespace, so `desk.escape-vektor.com` answers only on the tailnet.
@@ -133,6 +134,7 @@ The service account can also read life-stack's `users/` data in the same Firebas
 - **Nightly at 3:45** (TrueNAS cron job, `deploy.sh backup`): consistent copies of every SQLite file through SQLite's backup API, each checked with `quick_check`, plus `inbox/`, as a dated tarball in `/mnt/Singularity/backups/vektor-desk`. The newest 14 are kept. Every deploy takes one first too.
 - **What matters.** `desk.db` (decisions, proposals, scorecards) and `inbox/` can't be rebuilt. `mirror.db` can be re-pulled from Firestore at any time.
 - **Restore.** Stop the app, then `tar -xzf /mnt/Singularity/backups/vektor-desk/vektor-desk-<date>.tar.gz -C /mnt/Manifest/apps/vektor-desk/data`, then `chown -R 568:568` that folder and start the app.
+- **Restore drill.** `deploy.sh restore-test` unpacks the newest backup into a scratch folder, checks each database opens, passes `integrity_check` and has every package's tables, then deletes the scratch copy. The live data isn't touched. Run it once after the first nightly backup, and after any change to backups.
 - **Why Singularity.** Manifest is a single disk, so backups go to the RAIDZ1 pool.
 
 ## Deploys
@@ -157,7 +159,8 @@ The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free.
 | Deploy | Nothing: within 5 minutes of a push to `main`. Right away: `deploy.sh now` |
 | Status | `deploy.sh status`, or `https://desk.escape-vektor.com/api/status` |
 | Pull Escape Vektor now | `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
-| Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log` |
+| Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log`; redacted copies in `data/run/logs` every 5 minutes (`deploy.sh logs` now) |
+| Let Claude QA the box | [eval-access.md](eval-access.md): a Remote Control session in the sealed `eval` container |
 | Add a schedule | A line in `deploy/crontab` (minute hour day month weekday command, Eastern time) |
 | Test phone alerts | `docker exec vektor-desk-cron python -m desk.notify test`; recent ones with `... desk.notify recent` |
 

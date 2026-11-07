@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from desk.api.app import create_app
-from desk.backup import snapshot
-from desk.db import connect
+from desk.backup import snapshot, verify
+from desk.db import apply_schemas, connect
 from desk.mirror import FirestoreReader, MirrorStore, run_mirror
 from desk.runlock import Busy, job_lock, running
 from desk.status import status
@@ -72,6 +72,25 @@ def test_backup_copies_every_db_and_inbox(cfg, tmp_path):
     assert (out / "inbox" / "fidelity" / "lots.txt").exists()
 
 
+def test_backup_reads_idle_databases_on_a_read_only_mount(cfg, tmp_path, monkeypatch):
+    import sqlite3
+
+    import desk.backup as backup
+
+    mirrored(cfg)
+
+    def no_lock_file(path, *, readonly=False):
+        if readonly:
+            raise sqlite3.OperationalError("unable to open database file")
+        return connect(path)
+
+    monkeypatch.setattr(backup, "connect", no_lock_file)
+    out = tmp_path / "copies"
+    files = snapshot(cfg.data_dir, out)
+    assert [f["db"] for f in files] == ["mirror.db"]
+    assert sqlite3.connect(out / "mirror.db").execute("SELECT count(*) FROM rows").fetchone()[0] == 7
+
+
 def test_api_health_status_positions_and_smoke_page(cfg):
     mirrored(cfg)
     client = TestClient(create_app(cfg))
@@ -101,3 +120,24 @@ def test_serves_the_built_ui_with_spa_fallback(cfg, tmp_path, monkeypatch):
         assert client.get("/api/health").json()["ok"] is True
         missing = client.get("/api/nope")
         assert missing.status_code == 404 and missing.json()["ok"] is False
+
+
+def test_restore_drill_checks_a_backup(cfg, tmp_path):
+    mirrored(cfg)
+    apply_schemas(cfg)
+    (cfg.inbox / "fidelity").mkdir(parents=True)
+    (cfg.inbox / "fidelity" / "lots.txt").write_text("synthetic")
+    out = tmp_path / "restore"
+    snapshot(cfg.data_dir, out)
+    report = verify(out)
+    assert report["ok"], report["problems"]
+    assert report["inbox_files"] == 1 and report["databases"]["mirror.db"]["rows"] > 0
+    conn = connect(out / "desk.db")
+    conn.execute("DROP TABLE notify_log")
+    conn.commit()
+    conn.close()
+    (out / "mirror.db").write_bytes(b"not a database")
+    report = verify(out)
+    assert not report["ok"]
+    assert any("notify tables: notify_log" in p for p in report["problems"])
+    assert any(p.startswith("mirror.db") for p in report["problems"])

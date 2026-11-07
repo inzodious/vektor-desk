@@ -149,7 +149,7 @@ def test_backfill_fetches_history_then_tops_up_and_respects_caps(cfg, mirror, mo
     now = datetime(2026, 11, 9, 6, 10, tzinfo=UTC)
     monkeypatch.setattr("desk.engine.backfill.datetime", type("D", (datetime,), {"now": staticmethod(lambda tz=None: now)}))
     first = run_market_backfill(cfg, http)
-    assert len(first["fetched"]) + len(first["errors"]) == 3 and first["skipped_for_month_cap"] > 0
+    assert len(first["fetched"]) + len(first["errors"]) + len(first["unpriced"]) == 3 and first["skipped_for_month_cap"] > 0
     conn = connect(cfg.desk_db)
     schema.apply(conn)
     assert usage(conn, now)["month_symbols"] == 3

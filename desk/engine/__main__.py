@@ -1,7 +1,13 @@
 import argparse
 import json
+import os
+import shutil
+import sqlite3
 import sys
+import tempfile
+from dataclasses import replace
 from datetime import UTC, datetime
+from pathlib import Path
 
 import requests
 
@@ -19,6 +25,9 @@ from desk.engine.research import run_all as run_research_all
 from desk.engine.source import open_mirror
 from desk.notify import publish
 from desk.runlock import BUSY, Busy, job_lock
+
+DRY_RUN = "DESK_ENGINE_DRY_RUN"
+DRY_JOBS = ("holdings", "core", "daily")
 
 
 def now_iso() -> str:
@@ -56,6 +65,8 @@ def run_core(cfg: Config) -> dict:
 
 def _core(cfg: Config, mirror, desk) -> dict:
     stored = core.store(desk, core.compute(cfg, mirror, desk))
+    if os.environ.get(DRY_RUN) == "1":
+        return {"ok": True, **stored, "triggers": "skipped in a dry run"}
     fired = triggers.run(cfg, desk, stored["as_of"]) if stored["metrics"] else {"new": 0, "kinds": []}
     return {"ok": True, **stored, "triggers": fired}
 
@@ -121,10 +132,13 @@ def _kinds(cfg: Config) -> dict[str, str]:
     mirror = open_mirror(cfg)
     if mirror is None:
         return {}
+    desk = connect(cfg.desk_db, readonly=True) if cfg.desk_db.exists() else None
     try:
-        return core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror)))
+        return core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror)), desk)
     finally:
         mirror.close()
+        if desk is not None:
+            desk.close()
 
 
 def run_research(cfg: Config, http=None) -> dict:
@@ -140,11 +154,11 @@ def run_lookthrough(cfg: Config, http=None) -> dict:
 def run_lab_export(cfg: Config) -> dict:
     mirror = open_mirror(cfg)
     try:
-        kinds = core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror))) if mirror else {}
         targets = core.plan_targets(core.latest_plan(mirror)) if mirror else {}
     finally:
         if mirror:
             mirror.close()
+    kinds = _kinds(cfg)
 
     def work(desk):
         exported = lab_data.export(cfg, desk, kinds, targets)
@@ -175,14 +189,63 @@ JOBS = {
 }
 
 
+# ---- Dry run ----
+
+
+def dry_run(cfg: Config, job: str) -> dict:
+    with tempfile.TemporaryDirectory(prefix="desk-dry-") as tmp:
+        root = Path(tmp)
+        for db in sorted(cfg.data_dir.glob("*.db")):
+            src = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+            dst = sqlite3.connect(root / db.name)
+            try:
+                src.backup(dst)
+            finally:
+                src.close()
+                dst.close()
+        if (cfg.data_dir / "desk.yaml").exists():
+            shutil.copy2(cfg.data_dir / "desk.yaml", root / "desk.yaml")
+        if (cfg.data_dir / "lab").is_dir():
+            (root / "lab").symlink_to(cfg.data_dir / "lab")
+        copy = replace(cfg, data_dir=root)
+        before = os.environ.get(DRY_RUN)
+        os.environ[DRY_RUN] = "1"
+        try:
+            result = JOBS[job](copy)
+        finally:
+            if before is None:
+                os.environ.pop(DRY_RUN, None)
+            else:
+                os.environ[DRY_RUN] = before
+        health = []
+        if copy.desk_db.exists():
+            conn = connect(copy.desk_db, readonly=True)
+            try:
+                health = [
+                    {"check": r["check_name"], "status": r["status"], "detail": r["detail"]}
+                    for r in conn.execute(
+                        "SELECT check_name, status, detail FROM data_health WHERE as_of=(SELECT max(as_of) FROM data_health) ORDER BY check_name"
+                    )
+                ]
+            except sqlite3.Error:
+                health = []
+            finally:
+                conn.close()
+    return {**result, "dry_run": True, "health_detail": health}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m desk.engine", description="Vektor Desk statistics engine.")
     parser.add_argument("job", choices=sorted(JOBS))
+    parser.add_argument("--dry-run", action="store_true", help="run on a throwaway copy of the data, write nothing and send no alerts")
     args = parser.parse_args(argv)
     cfg = Config.from_env()
+    if args.dry_run and args.job not in DRY_JOBS:
+        print(json.dumps({"ok": False, "error": f"--dry-run covers {', '.join(DRY_JOBS)}; the other jobs call outside services."}), file=sys.stderr)
+        return 2
     try:
         with job_lock(f"engine-{args.job}", wait=600, cfg=cfg):
-            result = JOBS[args.job](cfg)
+            result = dry_run(cfg, args.job) if args.dry_run else JOBS[args.job](cfg)
     except Busy as e:
         print(json.dumps({"ok": False, "error": str(e)}), file=sys.stderr)
         return BUSY

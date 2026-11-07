@@ -52,13 +52,13 @@ no_secrets() {
   }
 }
 
-ui() {
+ui() (
   cd ui || return 1
   if [ ! -d node_modules ]; then
     if [ -f package-lock.json ]; then npm ci; else npm install; fi
   fi
   npm run lint --if-present && npm test --if-present && npm run build && test -f dist/index.html
-}
+)
 
 # ---- Checks ----
 

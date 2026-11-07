@@ -291,3 +291,39 @@ def versions(conn: sqlite3.Connection, limit: int = 50) -> list[dict]:
 def get_version(conn: sqlite3.Connection, version: int) -> Profile | None:
     row = conn.execute("SELECT * FROM profile_versions WHERE version=?", (version,)).fetchone()
     return None if row is None else _row_to_profile(row)
+
+
+# ---- Command line ----
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    import sys
+
+    from desk.decisions import starter
+
+    parser = argparse.ArgumentParser(prog="python -m desk.decisions.profile", description="Draft or check the desk profile (desk.yaml).")
+    sub = parser.add_subparsers(dest="command", required=True)
+    init = sub.add_parser("init", help="write a draft desk.yaml from the mirror; never overwrites")
+    init.add_argument("--path", type=Path, help="where to write (default $DESK_PROFILE or /data/desk.yaml)")
+    init.add_argument("--print", dest="dry_run", action="store_true", help="print the draft instead of writing it")
+    sub.add_parser("status", help="show the active version and which settings are still defaults")
+    args = parser.parse_args(argv)
+    cfg = Config.from_env()
+    if args.command == "status":
+        print(json.dumps(starter.status(cfg), indent=2))
+        return 0
+    try:
+        path, text = starter.init(cfg, args.path, dry_run=args.dry_run)
+    except starter.StarterError as e:
+        print(e, file=sys.stderr)
+        return 1
+    if args.dry_run:
+        print(text)
+    else:
+        print(f"Wrote {path}. Check it, then the next sync (or any page load) picks it up as a new profile version.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

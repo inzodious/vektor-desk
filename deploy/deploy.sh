@@ -6,8 +6,12 @@
 #                      otherwise, waits out a running job, and doesn't retry a commit that failed
 #   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
 #   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
+#   deploy.sh restore-test  restore drill: unpacks the newest backup into a scratch folder and checks every database
+#                      opens, passes its integrity check and has the expected tables; the live data isn't touched
 #   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS record against the tailnet address,
 #                      a test phone alert
+#   deploy.sh logs     redacted tails of every desk service's log into data/run/logs, for the eval container
+#                      (docs/eval-access.md); auto does this every 5 minutes
 # Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
 set -Eeuo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -124,6 +128,24 @@ backup() {
 }
 
 # ---- Commands ----
+
+restore_test() {
+  local latest scratch=$ROOT/restore-test rc=0
+  latest=$(find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+  [ -n "$latest" ] || die "there are no backups in $BACKUPS yet; run deploy.sh backup first"
+  rm -rf "$scratch"
+  mkdir -p "$scratch"
+  tar -xzf "$latest" -C "$scratch" || die "couldn't unpack $latest"
+  chown -R 568:568 "$scratch"
+  echo "Restoring $(basename "$latest") into $scratch"
+  docker run --rm --network none --user 568:568 -v "$scratch:/restore" vektor-desk:local python -m desk.backup --verify /restore || rc=$?
+  rm -rf "$scratch"
+  if [ "$rc" -eq 0 ]; then
+    log "Restore drill passed: $(basename "$latest")"
+  else
+    die "the restore drill failed for $(basename "$latest"); see the problems above"
+  fi
+}
 
 update_checkout() {
   [ -d "$SRC/.git" ] || die "there's no checkout in $SRC (docs/setup.md, step 5)"
@@ -285,6 +307,55 @@ check() {
   docker logs vektor-desk-caddy 2>&1 | grep -E 'certificate obtained|could not get certificate|obtain' | tail -n 2 | sed 's/^/  /' || true
 }
 
+# ---- Logs for the eval container ----
+
+secret_values() {
+  local f
+  for f in "$ROOT"/*.env; do
+    [ -f "$f" ] || continue
+    sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?[A-Za-z_][A-Za-z0-9_]*=//p' "$f" | sed "s/^[\"']//; s/[\"']\$//"
+  done
+}
+
+redact() {
+  awk -v list="$1" '
+    BEGIN { while ((getline line < list) > 0) if (length(line) >= 8 && !index("[redacted]", line)) s[++n] = line }
+    {
+      for (i = 1; i <= n; i++)
+        while ((p = index($0, s[i])) > 0) $0 = substr($0, 1, p - 1) "[redacted]" substr($0, p + length(s[i]))
+      print
+    }' | sed -E \
+    -e 's/(sk-ant-|tskey-|pk1_|sk1_)[A-Za-z0-9_-]+/\1[redacted]/g' \
+    -e 's/(Bearer )[A-Za-z0-9._~+\/=-]+/\1[redacted]/g' \
+    -e 's/((token|apikey|api_key|key|secret|password)=)[^&[:space:]"]+/\1[redacted]/gI' \
+    -e 's/("private_key(_id)?": *")[^"]*/\1[redacted]/g'
+}
+
+logs_export() {
+  local out=$ROOT/data/run/logs list name tmp
+  [ -d "$ROOT/data" ] || return 0
+  mkdir -p "$out"
+  list=$(mktemp)
+  chmod 600 "$list"
+  secret_values >"$list"
+  for name in api cron caddy ntfy lab tailscale; do
+    tmp="$out/.$name.log.part"
+    docker logs --tail 400 --timestamps "vektor-desk-$name" 2>&1 | redact "$list" >"$tmp" || true
+    mv "$tmp" "$out/$name.log"
+  done
+  {
+    tail -n 200 "$LOG" 2>/dev/null || true
+    echo "==== build log"
+    tail -n 100 "$BUILD_LOG" 2>/dev/null || true
+  } | redact "$list" >"$out/.deploy.log.part"
+  mv "$out/.deploy.log.part" "$out/deploy.log"
+  docker ps -a --filter name=vektor-desk --format '{{.Names}}\t{{.Status}}\t{{.Image}}' >"$out/containers.txt" 2>&1 || true
+  date -Is >"$out/exported_at"
+  rm -f "$list"
+  chown -R 568:568 "$out"
+  chmod 640 "$out"/*.log "$out/containers.txt" "$out/exported_at"
+}
+
 main() {
   local files
   [ "$(id -u)" -eq 0 ] || {
@@ -304,14 +375,19 @@ main() {
       files=$(backup) || die "the backup failed"
       log "Backed up: $files"
       ;;
-    auto) auto ;;
+    auto)
+      auto
+      logs_export || true
+      ;;
+    logs) logs_export ;;
     status) status ;;
+    restore-test) restore_test ;;
     check) check ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | check]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs]" >&2
       exit 2
       ;;
   esac
 }
 
-main "$@"
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then main "$@"; fi

@@ -30,7 +30,7 @@ def _first_week(day: date) -> bool:
 DESKS: dict[str, Desk] = {
     d.name: d
     for d in (
-        Desk("plan_keeper", "Plan keeper", "high", 1, 12, 7, ("30 17 * * *",), live=True),
+        Desk("plan_keeper", "Plan keeper", "high", 1, 12, 10, ("30 17 * * *",), live=True),
         Desk("tax", "Tax desk", "high", 2, 16, 8, ("0 2 * 1-11 0", "0 2 * 12 *"), live=True),
         Desk("risk", "Risk desk", "high", 3, 16, 3, ("0 2 * * 6",), live=True),
         Desk("research", "Research desk", "xhigh", 4, 40, 4, ("0 1 * * 3",), WEB, live=True),

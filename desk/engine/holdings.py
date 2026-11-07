@@ -2,7 +2,9 @@ import sqlite3
 from bisect import bisect_right
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import date
 
+from desk.engine.market import last_trading_day
 from desk.engine.source import SnapshotVersion, closes, current_rows, snapshot_versions
 
 SHARE_KINDS = {"buy", "sell", "reinvest"}
@@ -143,14 +145,37 @@ class Prices:
         self.series = series
 
     def close(self, symbol: str, day: str) -> float | None:
+        found = self.dated(symbol, day)
+        return found[1] if found else None
+
+    def dated(self, symbol: str, day: str) -> tuple[str, float] | None:
         dates = self.dates.get(symbol)
         if not dates:
             return None
         i = bisect_right(dates, day)
-        return self.series[symbol][dates[i - 1]][0] if i else None
+        return (dates[i - 1], self.series[symbol][dates[i - 1]][0]) if i else None
 
     def calendar(self) -> set[str]:
         return {d for ds in self.dates.values() for d in ds}
+
+
+def bar_series(desk: sqlite3.Connection) -> dict[str, dict[str, tuple[float, float | None]]]:
+    out: dict[str, dict[str, tuple[float, float | None]]] = {}
+    if desk.execute("SELECT 1 FROM sqlite_master WHERE name='price_bars'").fetchone():
+        for r in desk.execute("SELECT symbol, date, close, adj_close FROM price_bars"):
+            out.setdefault(r["symbol"], {})[r["date"]] = (r["close"], r["adj_close"])
+    return out
+
+
+def merge(mirror_series: dict, bars: dict) -> dict[str, dict[str, tuple[float, float | None]]]:
+    out = {s: dict(ds) for s, ds in mirror_series.items()}
+    for s, ds in bars.items():
+        out.setdefault(s, {}).update(ds)
+    return out
+
+
+def price_series(mirror: sqlite3.Connection, desk: sqlite3.Connection) -> dict[str, dict[str, tuple[float, float | None]]]:
+    return merge(closes(mirror), bar_series(desk))
 
 
 def build_days(anchor_list: list[Anchor], prices: Prices, through: str | None = None) -> list[str]:
@@ -180,10 +205,14 @@ def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str,
             if h["is_cash"]:
                 close, value = 1.0, round(h["shares"], 2)
             else:
-                close = prices.close(symbol, day)
-                if close is None:
-                    base = a.rows.get((account, symbol))
-                    close = base["value"] / base["shares"] if base and base["shares"] else None
+                found = prices.dated(symbol, day)
+                base = a.rows.get((account, symbol))
+                implied = base["value"] / base["shares"] if base and base["shares"] else None
+                close = found[1] if found else None
+                if source == "snapshot" and implied is not None and found is not None and found[0] < last_trading_day(date.fromisoformat(day)).isoformat():
+                    close = implied
+                elif close is None:
+                    close = implied
                     row_quality = "pro_forma" if quality in ("ok", "trimmed") else quality
                 value = round(h["shares"] * close, 2) if close is not None else round(h["value"], 2)
             if abs(h["shares"]) < 1e-9 and abs(value) < 0.005:
@@ -197,12 +226,8 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
     versions = snapshot_versions(mirror)
     anchor_list, records = anchors(versions)
     series = closes(mirror)
-    priced = dict(series)
-    if desk.execute("SELECT 1 FROM sqlite_master WHERE name='price_bars'").fetchone():
-        for r in desk.execute("SELECT symbol, date, close, adj_close FROM price_bars"):
-            if r["symbol"] not in series:
-                priced.setdefault(r["symbol"], {})[r["date"]] = (r["close"], r["adj_close"])
-    prices = Prices(priced)
+    bars = bar_series(desk)
+    prices = Prices(merge(series, bars))
     activity = activity_by_date(current_rows(mirror, "activity"))
     days = build_days(anchor_list, prices, through)
     rows = holdings_rows(anchor_list, prices, activity, days)
@@ -212,7 +237,7 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
         desk.execute("DELETE FROM prices_daily WHERE source='mirror'")
         desk.executemany(
             "INSERT OR REPLACE INTO prices_daily (symbol, date, close, adj_close, source) VALUES (?, ?, ?, ?, 'mirror')",
-            ((s, d, c, adj) for s, ds in series.items() for d, (c, adj) in ds.items()),
+            ((s, d, c, adj) for s, ds in series.items() for d, (c, adj) in ds.items() if d not in bars.get(s, {})),
         )
         desk.execute("DELETE FROM holdings_daily")
         desk.executemany("INSERT INTO holdings_daily VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)

@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from desk.config import Config
-from desk.decisions import plan, records, tickets
+from desk.decisions import plan, records, starter, tickets
 from desk.decisions import profile as profiles
 from desk.decisions import rules as ruleset
 from desk.decisions.store import session
@@ -30,6 +30,11 @@ def fresh(body) -> JSONResponse:
 @router.get("/profile")
 def get_profile(cfg: Cfg) -> JSONResponse:
     return fresh(profiles.active_profile(cfg).as_dict())
+
+
+@router.get("/profile/status")
+def get_profile_status(cfg: Cfg) -> JSONResponse:
+    return fresh(starter.status(cfg))
 
 
 @router.get("/profile/versions")

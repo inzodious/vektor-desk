@@ -89,7 +89,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 
 Trigger kinds and where they go: `margin_debit`, `daily_move` and `concentration` run the Risk desk right away; `lot_export` runs the Tax desk right away; `rule_breach` runs the Plan keeper right away; `deposit_landed` queues the Plan keeper tonight; `earnings` queues the Research desk for that symbol tonight. Stale quotes stay ops alerts only. `python -m desk.agents triggers` turns them into requests at 17:45, each once.
 
-**Requests.** Console questions and triggers are rows in `agent_requests`. "Run now" rows are picked up within a minute (`queue --now-only`); the rest run at 01:30. A request that hits the usage limit or finds another desk running moves to tonight once, then fails rather than looping. A scheduled run that hits the limit queues one retry the same way.
+**Requests.** Console questions and triggers are rows in `agent_requests`. "Run now" rows are picked up within a minute (`queue --now-only`); the rest run in the overnight passes at 01:30 through 05:30, so one busy pass doesn't strand a night's queue. Each pass claims a request atomically, so two passes never run the same one. A request that finds another desk running goes back in line without losing its place. A request that hits the usage limit moves to tonight once, then fails rather than looping. A scheduled run waits up to 45 minutes for the run lock, then queues one retry; so does one that hits the usage limit.
 
 **Console.** The Console (Escape Vektor's Ask terminal look) is where Joshua talks to the desks. A question or research request is queued to the right desk and runs in the next overnight window unless he presses "Run now". It answers with a memo or dossier update plus any proposals. Settings shows each desk's last and next run, turns used, and an on/off toggle.
 
@@ -207,6 +207,7 @@ Agent runs share the subscription's 5-hour and weekly limits with Joshua's inter
 - **Overnight by default.** Scheduled runs sit between 01:00 and 06:00 ET, except the plan keeper's short daily run.
 - **Priority when the budget is tight:** plan keeper, then tax desk (first in December), risk desk, research desk, scout, strategy desk. The scheduler skips lower-priority runs rather than squeezing them in.
 - **Metered.** Each run logs turns, tokens and wall time. The status page shows usage per desk per week. Start with a small weekly budget and set the real one after two weeks of logs.
+- **Weekly caps** count scheduled, trigger, retry and lab runs. Console questions are his own asks and bypass the cap; Skeptic runs ride on the run that asked for them.
 - **Rate limits.** If a run fails on a usage or rate limit, it is marked `deferred` and retried once in the next window. No retry loops.
 - **Token health.** The `setup-token` token lasts a year. The status page shows the date it was created and warns 30 days before it expires. An authentication failure pauses every desk and shows a banner instead of failing silently each night.
 
@@ -265,6 +266,15 @@ Numbering follows `ROADMAP.md`.
 | **9. Strategy lab** | Strategy desk, strategy specs, tear-sheet memos | The lab, rule backtests and enough stored price and filing history for 10-year windows (statistics); Phases 3 and 6 |
 | **10. Flight record and Patterns** | Scorecard reports per desk | Scorecard method (statistics); 30 days of decision records |
 | **11. Scout** | Scout; keep-or-switch-off review once six months of scores exist; optional read-only MCP server | Eligible lab strategies for Scout to cite (Phase 9) |
+
+## Going live
+
+| Safety | What it does | How to use it |
+|---|---|---|
+| Health gate | A desk logs `unhealthy` and stays quiet while any engine health check is `fail`, or the engine's last run finished over 36 hours ago. Warnings don't block. | Fix the failing check; the next run goes ahead |
+| Dry run | `python -m desk.agents dry-run <desk>` builds the real brief and prompt from live data and prints them with the health checks and any skip reason. It calls no model and writes nothing. | Add `--symbol`, `--question`, `--system` or `--schema` as needed |
+| First-run guard | On by default: only the Plan keeper and Tax desk run, whatever `desk.yaml` enables. Status shows the other desks as guarded. | `python -m desk.agents guard off` once their first runs look right (or `PUT /api/agents/guard`) |
+| Recovery | A run or request left `running` by a stopped process is closed or queued again at the next `run` or `queue`, but only while no desk holds the run lock. A request interrupted twice fails. | Automatic |
 
 ## Before you start
 
