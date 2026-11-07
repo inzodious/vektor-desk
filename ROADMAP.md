@@ -18,7 +18,7 @@ Draft, November 7, 2026. Phase contents firm up as the planning docs land.
 | 7 | Lab: Compare and risk | 2 | 📋 | 3 |
 | 8 | Phone alerts | 2 | 📋 | 5 |
 | 9 | Flight record and Patterns | 3 | 📋 | 30 days of decision records |
-| 10 | Scout and FI scenarios | 3 | 📋 | 9 |
+| 10 | Scout, Strategy and FI scenarios | 3 | 📋 | 9 |
 | 1.0 | Hardening | | 📋 | 10 |
 
 Phases 6 and 7 can run in parallel with 5 once their dependencies land. The agent runner and its fake adapter are built alongside phases 3 and 4, so phase 5 only wires them to real engine outputs.
@@ -116,11 +116,12 @@ Tier 1 complete: 0.5.0.
 - [ ] Patterns: market and his own behavior
 - [ ] Saved boards
 
-### 10. Scout and FI scenarios 📋
+### 10. Scout, Strategy and FI scenarios 📋
 
 - [ ] Scout desk: monthly ideas within the desk profile, each argued against first
 - [ ] FI projection scenarios (Monte Carlo percentiles)
 - [ ] Factor exposure, rule backtests
+- [ ] Strategy desk and lab: spec, point-in-time backtest, six months of forward paper trading, then eligible (needs ten years of stored price and filing history)
 
 ### 1.0 Hardening 📋
 

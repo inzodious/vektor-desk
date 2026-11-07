@@ -70,7 +70,7 @@ Infrastructure ──► mirror tables ──► Statistics engine ──► out
 
 | Risk | Mitigation |
 |---|---|
-| Agent runs eat the subscription limits shared with development | Overnight schedules, `--max-turns` caps, a usage budget per desk in `docs/agents.md` |
+| Agent runs eat the subscription limits shared with development (every desk runs on Opus) | Frequency is the lever: overnight schedules, `--max-turns` caps, a usage budget per desk in `docs/agents.md` |
 | Subscription terms for scripted use change | All model calls go through one runner, so switching to the API or a local model is a one-file change |
 | Agents sound confident and are wrong | Engine computes every number; proposals cite sources; the scorecard decides which desks stay on |
 | Prompt injection from web pages during research | Tight tool allow-lists, no shell, proposals checked by a second run that sees only the numbers |
