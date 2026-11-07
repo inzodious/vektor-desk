@@ -1,0 +1,11 @@
+{
+ "as_of": "2026-11-06",
+ "status": "not_ready",
+ "fi_number": 700000,
+ "target_date": "2051-03-20",
+ "start_value": 16393.49,
+ "monthly_deposit": 500,
+ "deposit_source": "plan",
+ "required_return_pct": 9.6515,
+ "note": "The Monte Carlo needs the French monthly market history; the engine's monthly french job fetches it."
+}

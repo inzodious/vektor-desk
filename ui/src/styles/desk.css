@@ -812,3 +812,18 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
   .pats, .pats.four { grid-template-columns: minmax(0, 1fr); }
   .desk-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- FI path and factors ---------- */
+.mini-kpis.fi-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 10px; }
+.mini-kpis.fi-kpis span { display: block; font-size: 11.5px; margin-top: 2px; color: var(--ink-2); }
+.mini-kpis.fi-kpis b.up { color: var(--up); }
+.mini-kpis.fi-kpis b.dn { color: var(--dn); }
+.legend.fi-range { margin: 8px 0 6px; }
+.legend.fi-range b { color: var(--ink); }
+.legend.fi-range .muted { font-weight: 500; }
+.fi-lean { margin: 0 0 10px; font-size: 13px; }
+@media (max-width: 860px) {
+  .mini-kpis.fi-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.fi-notes summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--teal-ink); width: fit-content; }
+.fi-notes[open] summary { margin-bottom: 8px; }

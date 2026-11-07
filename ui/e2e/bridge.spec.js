@@ -92,9 +92,10 @@ test('instruments show the drift and single stock gauges', async ({ page }) => {
   await expect(card).toContainText('Cap 10%');
 });
 
-test('FI progress waits for the FI path instead of guessing', async ({ page }) => {
+test('FI progress reads the FI number from the engine', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('[data-kpi="fi.progress"] .v')).toHaveText('Not yet');
+  await expect(page.locator('[data-kpi="fi.progress"] .v')).toHaveText('2.3%');
+  await expect(page.locator('[data-kpi="fi.progress"]')).toContainText('of the FI number');
 });
 
 test('value chart has a table view and period combo', async ({ page }) => {

@@ -171,3 +171,12 @@ const card = await get('/api/engine/scorecard');
 save('engine.scorecard', card);
 save('engine.scorecard.empty', { ...card, groups: [], desks: [], saves: { n: 0, usd: 0 }, offplan_gap: { n: 0, total_usd: 0, mean_usd: null, hit_rate: null, ci_low: null, ci_high: null }, decisions: [] });
 save('engine.patterns', await get('/api/engine/patterns'));
+
+// ---------- FI path and factors ----------
+const fiView = await get('/api/engine/fi');
+save('engine.fi', fiView);
+save('engine.fi.empty', { as_of: fiView.as_of, status: 'not_ready', note: 'No FI goal in Escape Vektor yet; set yearly spend and target age there.' });
+save('engine.fi.history', { as_of: fiView.as_of, status: 'not_ready', fi_number: fiView.fi_number, target_date: fiView.target_date, start_value: fiView.start_value, monthly_deposit: fiView.monthly_deposit, deposit_source: fiView.deposit_source, required_return_pct: fiView.required_return_pct, note: "The Monte Carlo needs the French monthly market history; the engine's monthly french job fetches it." });
+const factorView = await get('/api/engine/factors');
+save('engine.factors', factorView);
+save('engine.factors.empty', { as_of: factorView.as_of, holdings: {}, portfolio: {}, coverage_pct: 0, note: 'No French factors yet.' });

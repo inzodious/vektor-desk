@@ -497,7 +497,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20251121140500_2120f6",
+   "scope_id": "d_20251121140500_473a1d",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 56,
@@ -509,7 +509,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20251128140500_63e5a0",
+   "scope_id": "d_20251128140500_bd5294",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -3.57,
@@ -521,7 +521,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20251212140500_428d5b",
+   "scope_id": "d_20251212140500_77beaf",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -68.34,
@@ -533,7 +533,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20251216140500_d3ac7e",
+   "scope_id": "d_20251216140500_179ba3",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 13.51,
@@ -545,7 +545,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20251223140500_5bf90d",
+   "scope_id": "d_20251223140500_a40a54",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -37.16,
@@ -557,7 +557,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20251224140500_6de0a2",
+   "scope_id": "d_20251224140500_99a04a",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -569,7 +569,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20251225140500_a915e7",
+   "scope_id": "d_20251225140500_d421ab",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -581,19 +581,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20251226140500_1bc174",
-   "window": "30D",
-   "as_of": "2026-11-06",
-   "value": -78.01,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "ok",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_30",
-   "scope": "decision",
-   "scope_id": "d_20251226140500_4f8f4f",
+   "scope_id": "d_20251226140500_b6b843",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 44.96,
@@ -605,7 +593,19 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260102140500_42564b",
+   "scope_id": "d_20251226140500_fb4a87",
+   "window": "30D",
+   "as_of": "2026-11-06",
+   "value": -78.01,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_30",
+   "scope": "decision",
+   "scope_id": "d_20260102140500_7e80a2",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -31.92,
@@ -617,7 +617,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260102140500_81d741",
+   "scope_id": "d_20260102140500_a0a589",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 11.75,
@@ -629,7 +629,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260106140500_4d6bc5",
+   "scope_id": "d_20260106140500_3b9b28",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -641,7 +641,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260106140500_6f555f",
+   "scope_id": "d_20260106140500_ee093c",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -24.65,
@@ -653,7 +653,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260109140500_60245e",
+   "scope_id": "d_20260109140500_6124c1",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -5.36,
@@ -665,7 +665,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260109140500_833c1f",
+   "scope_id": "d_20260109140500_d453b4",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -677,7 +677,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260109140500_b18365",
+   "scope_id": "d_20260109140500_f2c133",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -11.26,
@@ -689,7 +689,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260113140500_e2395c",
+   "scope_id": "d_20260113140500_8fb1b7",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 6.05,
@@ -701,7 +701,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260126140500_339d5b",
+   "scope_id": "d_20260126140500_5f09fa",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -4.62,
@@ -713,7 +713,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260126140500_779604",
+   "scope_id": "d_20260126140500_edd385",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -725,7 +725,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260127140500_ef8814",
+   "scope_id": "d_20260127140500_daf72c",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -737,7 +737,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260128140500_b0994c",
+   "scope_id": "d_20260128140500_84529b",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -16.37,
@@ -749,7 +749,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260202140500_a8dd98",
+   "scope_id": "d_20260202140500_0e400f",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -3.54,
@@ -761,19 +761,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260212140500_7c4b22",
-   "window": "30D",
-   "as_of": "2026-11-06",
-   "value": null,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "insufficient_history",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_30",
-   "scope": "decision",
-   "scope_id": "d_20260212140500_b723f7",
+   "scope_id": "d_20260212140500_66f2cb",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -1.79,
@@ -785,7 +773,19 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260227140500_0592b3",
+   "scope_id": "d_20260212140500_ae43cc",
+   "window": "30D",
+   "as_of": "2026-11-06",
+   "value": null,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "insufficient_history",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_30",
+   "scope": "decision",
+   "scope_id": "d_20260227140500_73942b",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -6.95,
@@ -797,7 +797,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260303140500_3a8b05",
+   "scope_id": "d_20260303140500_b2a6c7",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 106.17,
@@ -809,7 +809,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260304140500_0a5d6d",
+   "scope_id": "d_20260304140500_c26542",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -821,7 +821,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260309140500_06e388",
+   "scope_id": "d_20260309140500_2abe28",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 0.84,
@@ -833,7 +833,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260312140500_39e403",
+   "scope_id": "d_20260312140500_167ad3",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 3.08,
@@ -845,7 +845,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260312140500_5bf12e",
+   "scope_id": "d_20260312140500_3ee504",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -857,7 +857,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260316140500_0ee94e",
+   "scope_id": "d_20260316140500_6a312c",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -1.29,
@@ -869,7 +869,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260320140500_4855d7",
+   "scope_id": "d_20260320140500_9f57ad",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -6.48,
@@ -881,7 +881,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260326140500_3686da",
+   "scope_id": "d_20260326140500_d20987",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -3.28,
@@ -893,31 +893,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260327140500_43a2dc",
-   "window": "30D",
-   "as_of": "2026-11-06",
-   "value": 0.87,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "ok",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_30",
-   "scope": "decision",
-   "scope_id": "d_20260327140500_648cb0",
-   "window": "30D",
-   "as_of": "2026-11-06",
-   "value": null,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "insufficient_history",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_30",
-   "scope": "decision",
-   "scope_id": "d_20260327140500_c8535c",
+   "scope_id": "d_20260327140500_05b260",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 178.42,
@@ -929,7 +905,31 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260331140500_19dc19",
+   "scope_id": "d_20260327140500_819e0b",
+   "window": "30D",
+   "as_of": "2026-11-06",
+   "value": null,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "insufficient_history",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_30",
+   "scope": "decision",
+   "scope_id": "d_20260327140500_ea1725",
+   "window": "30D",
+   "as_of": "2026-11-06",
+   "value": 0.87,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_30",
+   "scope": "decision",
+   "scope_id": "d_20260331140500_ab80db",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 15.58,
@@ -941,7 +941,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260403140500_c9a011",
+   "scope_id": "d_20260403140500_8ae10f",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -3.38,
@@ -953,7 +953,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260410140500_e00309",
+   "scope_id": "d_20260410140500_63255e",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -965,7 +965,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260417140500_9d4507",
+   "scope_id": "d_20260417140500_c8a7c8",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 94.69,
@@ -977,7 +977,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260423140500_979974",
+   "scope_id": "d_20260423140500_d27a6c",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 43.57,
@@ -989,7 +989,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260427140500_5071ef",
+   "scope_id": "d_20260427140500_355091",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -3.31,
@@ -1001,7 +1001,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260501140500_9c09c7",
+   "scope_id": "d_20260501140500_d3fb2e",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1013,7 +1013,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260506140500_831ee3",
+   "scope_id": "d_20260506140500_3a5a02",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1025,7 +1025,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260508140500_60e72a",
+   "scope_id": "d_20260508140500_85ed8e",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1037,7 +1037,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260508140500_b7837c",
+   "scope_id": "d_20260508140500_c06bef",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 5.49,
@@ -1049,7 +1049,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260511140500_1725de",
+   "scope_id": "d_20260511140500_aab5a4",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -30.45,
@@ -1061,7 +1061,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260514140500_5df03e",
+   "scope_id": "d_20260514140500_1f4c71",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -31.96,
@@ -1073,7 +1073,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260515140500_a7d55b",
+   "scope_id": "d_20260515140500_6e9b65",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 20.98,
@@ -1085,7 +1085,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260518140500_551f97",
+   "scope_id": "d_20260518140500_b184c5",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 40.52,
@@ -1097,7 +1097,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260519140500_a0a1ea",
+   "scope_id": "d_20260519140500_aa6b6e",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -33.97,
@@ -1109,7 +1109,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260522140500_ae2956",
+   "scope_id": "d_20260522140500_e72faa",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -23.6,
@@ -1121,7 +1121,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260528140500_75aa8d",
+   "scope_id": "d_20260528140500_49f291",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1133,7 +1133,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260604140500_e44120",
+   "scope_id": "d_20260604140500_613f8a",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 82.93,
@@ -1145,19 +1145,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260605140500_490dd9",
-   "window": "30D",
-   "as_of": "2026-11-06",
-   "value": null,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "insufficient_history",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_30",
-   "scope": "decision",
-   "scope_id": "d_20260605140500_63b63b",
+   "scope_id": "d_20260605140500_8d397d",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -18.2,
@@ -1169,7 +1157,19 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260610140500_6a0e8b",
+   "scope_id": "d_20260605140500_c3928b",
+   "window": "30D",
+   "as_of": "2026-11-06",
+   "value": null,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "insufficient_history",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_30",
+   "scope": "decision",
+   "scope_id": "d_20260610140500_f3dfc5",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -25.55,
@@ -1181,7 +1181,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260615140500_79663c",
+   "scope_id": "d_20260615140500_2469ba",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 176.91,
@@ -1193,7 +1193,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260615140500_f0e700",
+   "scope_id": "d_20260615140500_a4c17d",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -10.05,
@@ -1205,7 +1205,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260617140500_859ac8",
+   "scope_id": "d_20260617140500_c156a0",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 153.85,
@@ -1217,7 +1217,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260622140500_c2b2e1",
+   "scope_id": "d_20260622140500_d10332",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -11.81,
@@ -1229,7 +1229,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260626140500_f5e912",
+   "scope_id": "d_20260626140500_ea0fd5",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 5.63,
@@ -1241,7 +1241,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260702140500_345e51",
+   "scope_id": "d_20260702140500_f20b83",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 134.6,
@@ -1253,7 +1253,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260703140500_25babd",
+   "scope_id": "d_20260703140500_3598a7",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -2.8,
@@ -1265,7 +1265,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260703140500_7bc580",
+   "scope_id": "d_20260703140500_3e97fc",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 7.52,
@@ -1277,7 +1277,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260708140500_9cc27e",
+   "scope_id": "d_20260708140500_1d2296",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 0.97,
@@ -1289,7 +1289,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260720140500_80bd67",
+   "scope_id": "d_20260720140500_e27492",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -2.46,
@@ -1301,7 +1301,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260721140500_0e5d96",
+   "scope_id": "d_20260721140500_0f381d",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1313,7 +1313,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260728140500_8c4ca5",
+   "scope_id": "d_20260728140500_fdb45f",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1325,7 +1325,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260803140500_fa89d7",
+   "scope_id": "d_20260803140500_5e5235",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 170.6,
@@ -1337,7 +1337,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260806140500_c78cfe",
+   "scope_id": "d_20260806140500_34bbb0",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -55.37,
@@ -1349,7 +1349,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260807140500_2ccf5a",
+   "scope_id": "d_20260807140500_10d348",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 4.69,
@@ -1361,7 +1361,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260810140500_bd5278",
+   "scope_id": "d_20260810140500_0c55de",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -11.12,
@@ -1373,7 +1373,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260819140500_c991c5",
+   "scope_id": "d_20260819140500_8844eb",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -2.48,
@@ -1385,7 +1385,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260824140500_17f269",
+   "scope_id": "d_20260824140500_c943cb",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1397,7 +1397,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260828140500_fe7849",
+   "scope_id": "d_20260828140500_363fed",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 1.64,
@@ -1409,7 +1409,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260901140500_0804eb",
+   "scope_id": "d_20260901140500_12bcf6",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": -7.76,
@@ -1421,7 +1421,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260901140500_6a16fd",
+   "scope_id": "d_20260901140500_c802d6",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 1.36,
@@ -1433,7 +1433,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260907140500_2fd22f",
+   "scope_id": "d_20260907140500_0371ce",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 4.47,
@@ -1445,7 +1445,7 @@
   {
    "metric_id": "dec.score_30",
    "scope": "decision",
-   "scope_id": "d_20260924140500_9adbff",
+   "scope_id": "d_20260924140500_25005b",
    "window": "30D",
    "as_of": "2026-11-06",
    "value": 11.17,
@@ -1457,7 +1457,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20251121140500_2120f6",
+   "scope_id": "d_20251121140500_473a1d",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 88.22,
@@ -1469,7 +1469,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20251128140500_63e5a0",
+   "scope_id": "d_20251128140500_bd5294",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -20.98,
@@ -1481,7 +1481,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20251212140500_428d5b",
+   "scope_id": "d_20251212140500_77beaf",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -118.64,
@@ -1493,7 +1493,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20251216140500_d3ac7e",
+   "scope_id": "d_20251216140500_179ba3",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 20.53,
@@ -1505,7 +1505,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20251223140500_5bf90d",
+   "scope_id": "d_20251223140500_a40a54",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -31.43,
@@ -1517,7 +1517,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20251224140500_6de0a2",
+   "scope_id": "d_20251224140500_99a04a",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1529,7 +1529,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20251225140500_a915e7",
+   "scope_id": "d_20251225140500_d421ab",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1541,19 +1541,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20251226140500_1bc174",
-   "window": "90D",
-   "as_of": "2026-11-06",
-   "value": -93.15,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "ok",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_90",
-   "scope": "decision",
-   "scope_id": "d_20251226140500_4f8f4f",
+   "scope_id": "d_20251226140500_b6b843",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 53.68,
@@ -1565,7 +1553,19 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260102140500_42564b",
+   "scope_id": "d_20251226140500_fb4a87",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": -93.15,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_90",
+   "scope": "decision",
+   "scope_id": "d_20260102140500_7e80a2",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -11.97,
@@ -1577,7 +1577,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260102140500_81d741",
+   "scope_id": "d_20260102140500_a0a589",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 11.94,
@@ -1589,7 +1589,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260106140500_4d6bc5",
+   "scope_id": "d_20260106140500_3b9b28",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1601,7 +1601,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260106140500_6f555f",
+   "scope_id": "d_20260106140500_ee093c",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -35.08,
@@ -1613,7 +1613,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260109140500_60245e",
+   "scope_id": "d_20260109140500_6124c1",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -5.54,
@@ -1625,7 +1625,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260109140500_833c1f",
+   "scope_id": "d_20260109140500_d453b4",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1637,7 +1637,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260109140500_b18365",
+   "scope_id": "d_20260109140500_f2c133",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -14.96,
@@ -1649,7 +1649,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260113140500_e2395c",
+   "scope_id": "d_20260113140500_8fb1b7",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 1.98,
@@ -1661,7 +1661,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260126140500_339d5b",
+   "scope_id": "d_20260126140500_5f09fa",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 6.28,
@@ -1673,7 +1673,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260126140500_779604",
+   "scope_id": "d_20260126140500_edd385",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1685,7 +1685,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260127140500_ef8814",
+   "scope_id": "d_20260127140500_daf72c",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1697,7 +1697,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260128140500_b0994c",
+   "scope_id": "d_20260128140500_84529b",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 17.65,
@@ -1709,7 +1709,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260202140500_a8dd98",
+   "scope_id": "d_20260202140500_0e400f",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -5.89,
@@ -1721,19 +1721,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260212140500_7c4b22",
-   "window": "90D",
-   "as_of": "2026-11-06",
-   "value": null,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "insufficient_history",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_90",
-   "scope": "decision",
-   "scope_id": "d_20260212140500_b723f7",
+   "scope_id": "d_20260212140500_66f2cb",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -2.64,
@@ -1745,7 +1733,19 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260227140500_0592b3",
+   "scope_id": "d_20260212140500_ae43cc",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": null,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "insufficient_history",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_90",
+   "scope": "decision",
+   "scope_id": "d_20260227140500_73942b",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -11.62,
@@ -1757,7 +1757,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260303140500_3a8b05",
+   "scope_id": "d_20260303140500_b2a6c7",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 320.16,
@@ -1769,7 +1769,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260304140500_0a5d6d",
+   "scope_id": "d_20260304140500_c26542",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1781,7 +1781,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260309140500_06e388",
+   "scope_id": "d_20260309140500_2abe28",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 4.28,
@@ -1793,7 +1793,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260312140500_39e403",
+   "scope_id": "d_20260312140500_167ad3",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -3.86,
@@ -1805,7 +1805,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260312140500_5bf12e",
+   "scope_id": "d_20260312140500_3ee504",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1817,7 +1817,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260316140500_0ee94e",
+   "scope_id": "d_20260316140500_6a312c",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -16.6,
@@ -1829,7 +1829,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260320140500_4855d7",
+   "scope_id": "d_20260320140500_9f57ad",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -3.07,
@@ -1841,7 +1841,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260326140500_3686da",
+   "scope_id": "d_20260326140500_d20987",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -24.04,
@@ -1853,31 +1853,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260327140500_43a2dc",
-   "window": "90D",
-   "as_of": "2026-11-06",
-   "value": 7.54,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "ok",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_90",
-   "scope": "decision",
-   "scope_id": "d_20260327140500_648cb0",
-   "window": "90D",
-   "as_of": "2026-11-06",
-   "value": null,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "insufficient_history",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_90",
-   "scope": "decision",
-   "scope_id": "d_20260327140500_c8535c",
+   "scope_id": "d_20260327140500_05b260",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 123.47,
@@ -1889,7 +1865,31 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260331140500_19dc19",
+   "scope_id": "d_20260327140500_819e0b",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": null,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "insufficient_history",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_90",
+   "scope": "decision",
+   "scope_id": "d_20260327140500_ea1725",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": 7.54,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_90",
+   "scope": "decision",
+   "scope_id": "d_20260331140500_ab80db",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -15.78,
@@ -1901,7 +1901,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260403140500_c9a011",
+   "scope_id": "d_20260403140500_8ae10f",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -32.56,
@@ -1913,7 +1913,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260410140500_e00309",
+   "scope_id": "d_20260410140500_63255e",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1925,7 +1925,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260417140500_9d4507",
+   "scope_id": "d_20260417140500_c8a7c8",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 435.73,
@@ -1937,7 +1937,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260423140500_979974",
+   "scope_id": "d_20260423140500_d27a6c",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 261.3,
@@ -1949,7 +1949,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260427140500_5071ef",
+   "scope_id": "d_20260427140500_355091",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 6.96,
@@ -1961,7 +1961,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260501140500_9c09c7",
+   "scope_id": "d_20260501140500_d3fb2e",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1973,7 +1973,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260506140500_831ee3",
+   "scope_id": "d_20260506140500_3a5a02",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1985,7 +1985,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260508140500_60e72a",
+   "scope_id": "d_20260508140500_85ed8e",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -1997,7 +1997,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260508140500_b7837c",
+   "scope_id": "d_20260508140500_c06bef",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 28.94,
@@ -2009,7 +2009,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260511140500_1725de",
+   "scope_id": "d_20260511140500_aab5a4",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -31.32,
@@ -2021,7 +2021,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260514140500_5df03e",
+   "scope_id": "d_20260514140500_1f4c71",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -50,
@@ -2033,7 +2033,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260515140500_a7d55b",
+   "scope_id": "d_20260515140500_6e9b65",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 27.42,
@@ -2045,7 +2045,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260518140500_551f97",
+   "scope_id": "d_20260518140500_b184c5",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -61.53,
@@ -2057,7 +2057,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260519140500_a0a1ea",
+   "scope_id": "d_20260519140500_aa6b6e",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -47.41,
@@ -2069,7 +2069,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260522140500_ae2956",
+   "scope_id": "d_20260522140500_e72faa",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -7.15,
@@ -2081,7 +2081,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260528140500_75aa8d",
+   "scope_id": "d_20260528140500_49f291",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -2093,7 +2093,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260604140500_e44120",
+   "scope_id": "d_20260604140500_613f8a",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -46.44,
@@ -2105,19 +2105,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260605140500_490dd9",
-   "window": "90D",
-   "as_of": "2026-11-06",
-   "value": null,
-   "unit": "usd",
-   "n_obs": null,
-   "quality": "insufficient_history",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "dec.score_90",
-   "scope": "decision",
-   "scope_id": "d_20260605140500_63b63b",
+   "scope_id": "d_20260605140500_8d397d",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -24.46,
@@ -2129,7 +2117,19 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260610140500_6a0e8b",
+   "scope_id": "d_20260605140500_c3928b",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": null,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "insufficient_history",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "dec.score_90",
+   "scope": "decision",
+   "scope_id": "d_20260610140500_f3dfc5",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -25.34,
@@ -2141,7 +2141,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260615140500_79663c",
+   "scope_id": "d_20260615140500_2469ba",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -49.16,
@@ -2153,7 +2153,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260615140500_f0e700",
+   "scope_id": "d_20260615140500_a4c17d",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 23.41,
@@ -2165,7 +2165,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260617140500_859ac8",
+   "scope_id": "d_20260617140500_c156a0",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -73.61,
@@ -2177,7 +2177,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260622140500_c2b2e1",
+   "scope_id": "d_20260622140500_d10332",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -12.56,
@@ -2189,7 +2189,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260626140500_f5e912",
+   "scope_id": "d_20260626140500_ea0fd5",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -1.12,
@@ -2201,7 +2201,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260702140500_345e51",
+   "scope_id": "d_20260702140500_f20b83",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -96.78,
@@ -2213,7 +2213,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260703140500_25babd",
+   "scope_id": "d_20260703140500_3598a7",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 25.89,
@@ -2225,7 +2225,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260703140500_7bc580",
+   "scope_id": "d_20260703140500_3e97fc",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 31.79,
@@ -2237,7 +2237,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260708140500_9cc27e",
+   "scope_id": "d_20260708140500_1d2296",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 1.64,
@@ -2249,7 +2249,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260720140500_80bd67",
+   "scope_id": "d_20260720140500_e27492",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -1.74,
@@ -2261,7 +2261,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260721140500_0e5d96",
+   "scope_id": "d_20260721140500_0f381d",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -2273,7 +2273,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260728140500_8c4ca5",
+   "scope_id": "d_20260728140500_fdb45f",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": null,
@@ -2285,7 +2285,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260803140500_fa89d7",
+   "scope_id": "d_20260803140500_5e5235",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": 169.02,
@@ -2297,7 +2297,7 @@
   {
    "metric_id": "dec.score_90",
    "scope": "decision",
-   "scope_id": "d_20260806140500_c78cfe",
+   "scope_id": "d_20260806140500_34bbb0",
    "window": "90D",
    "as_of": "2026-11-06",
    "value": -67.5,
@@ -2640,6 +2640,90 @@
    "unit": "usd",
    "n_obs": 44,
    "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fi.date_pctl",
+   "scope": "portfolio",
+   "scope_id": "all",
+   "window": "p10",
+   "as_of": "2026-11-06",
+   "value": 7975,
+   "unit": "days",
+   "n_obs": 10000,
+   "quality": "modelled",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fi.date_pctl",
+   "scope": "portfolio",
+   "scope_id": "all",
+   "window": "p50",
+   "as_of": "2026-11-06",
+   "value": 11415,
+   "unit": "days",
+   "n_obs": 10000,
+   "quality": "modelled",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fi.date_pctl",
+   "scope": "portfolio",
+   "scope_id": "all",
+   "window": "p90",
+   "as_of": "2026-11-06",
+   "value": null,
+   "unit": "days",
+   "n_obs": 10000,
+   "quality": "modelled",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fi.number",
+   "scope": "portfolio",
+   "scope_id": "all",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 700000,
+   "unit": "usd",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fi.on_time",
+   "scope": "portfolio",
+   "scope_id": "all",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 19.12,
+   "unit": "pct",
+   "n_obs": 10000,
+   "quality": "modelled",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fi.progress",
+   "scope": "portfolio",
+   "scope_id": "all",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 2.3419,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "modelled",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fi.required_return",
+   "scope": "portfolio",
+   "scope_id": "all",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 9.6515,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "modelled",
    "engine_version": "0.1.0"
   },
   {
@@ -4403,6 +4487,90 @@
    "value": 2.3831,
    "unit": "ratio",
    "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.factor",
+   "scope": "factor",
+   "scope_id": "cma",
+   "window": "3Y",
+   "as_of": "2026-11-06",
+   "value": -0.115,
+   "unit": "ratio",
+   "n_obs": 5,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.factor",
+   "scope": "factor",
+   "scope_id": "hml",
+   "window": "3Y",
+   "as_of": "2026-11-06",
+   "value": -0.0528,
+   "unit": "ratio",
+   "n_obs": 5,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.factor",
+   "scope": "factor",
+   "scope_id": "mkt_rf",
+   "window": "3Y",
+   "as_of": "2026-11-06",
+   "value": 0.8091,
+   "unit": "ratio",
+   "n_obs": 5,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.factor",
+   "scope": "factor",
+   "scope_id": "mom",
+   "window": "3Y",
+   "as_of": "2026-11-06",
+   "value": 0.0387,
+   "unit": "ratio",
+   "n_obs": 5,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.factor",
+   "scope": "factor",
+   "scope_id": "rmw",
+   "window": "3Y",
+   "as_of": "2026-11-06",
+   "value": -0.0857,
+   "unit": "ratio",
+   "n_obs": 5,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.factor",
+   "scope": "factor",
+   "scope_id": "smb",
+   "window": "3Y",
+   "as_of": "2026-11-06",
+   "value": 0.0188,
+   "unit": "ratio",
+   "n_obs": 5,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "risk.factor_coverage",
+   "scope": "portfolio",
+   "scope_id": "all",
+   "window": "3Y",
+   "as_of": "2026-11-06",
+   "value": 99.1338,
+   "unit": "pct",
+   "n_obs": 5,
    "quality": "ok",
    "engine_version": "0.1.0"
   },

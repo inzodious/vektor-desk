@@ -16,7 +16,7 @@ export function Legend({ series }) {
   );
 }
 
-export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, refs = [], markers = [], label = 'Line chart', endLabels = false, zero = false, tipHint, onPick, table = true, tableFmt }) {
+export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, refs = [], markers = [], label = 'Line chart', endLabels = false, zero = false, tipHint, onPick, table = true, tableFmt, ticksX, vrefs = [], tipHeadFmt }) {
   const [ref, width] = useWidth();
   const [hover, setHover] = useState(null);
   const [asTable, setAsTable] = useState(false);
@@ -43,7 +43,7 @@ export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, re
     return { ticks, X, Y };
   }, [series, refs, zero, narrow, n, W, R, H]);
 
-  const xticks = useMemo(() => monthTicks(x, narrow ? 4 : 9), [x, narrow]);
+  const xticks = useMemo(() => (ticksX ? ticksX(x, narrow) : monthTicks(x, narrow ? 4 : 9)), [x, narrow, ticksX]);
 
   if (!n) return <p className="empty-hint">Nothing to chart yet.</p>;
   const { ticks, X, Y } = geo;
@@ -98,7 +98,7 @@ export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, re
                 .reverse()
                 .map(({ d, i }) => (
                   <tr key={d} className="still">
-                    <td>{dayLabel(d, true)}</td>
+                    <td>{tipHeadFmt ? tipHeadFmt(d) : dayLabel(d, true)}</td>
                     {series.map((s) => (
                       <td className="r" key={s.name}>
                         {s.values[i] == null ? '—' : (tableFmt || fmt)(s.values[i], s, i)}
@@ -134,6 +134,14 @@ export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, re
               ) : null}
             </g>
           ))}
+          {vrefs.map((r) => (
+            <g key={r.label}>
+              <line className="ref" x1={X(r.i)} x2={X(r.i)} y1={T} y2={H - B} />
+              <text x={X(r.i) + (X(r.i) > W / 2 ? -6 : 6)} y={T + 12} textAnchor={X(r.i) > W / 2 ? 'end' : 'start'} className="lbl ref-lbl" style={{ fontWeight: 600 }}>
+                {r.label}
+              </text>
+            </g>
+          ))}
           {zero ? <line className="axis" x1={L} x2={W - R} y1={Y(0)} y2={Y(0)} /> : null}
           {series.map((s) => (
             <path key={s.name} className="mark" d={linePath(s.values, X, Y)} fill="none" stroke={s.color} strokeWidth={s.width || 2} strokeLinejoin="round" strokeLinecap="round" strokeDasharray={s.dash ? '5 5' : undefined} />
@@ -158,7 +166,7 @@ export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, re
       {hover && !asTable ? (
         <Tip
           at={hover.at}
-          head={dayLabel(x[hover.i], true)}
+          head={tipHeadFmt ? tipHeadFmt(x[hover.i]) : dayLabel(x[hover.i], true)}
           rows={series.filter((s) => s.values[hover.i] != null).map((s) => ({ color: s.color, label: s.name, value: fmt(s.values[hover.i], s, hover.i) }))}
           hint={[markers.find((m) => m.i === hover.i)?.label, tipHint].filter(Boolean).join(' · ') || undefined}
         />

@@ -13,6 +13,8 @@ export const ROUTES = [
   { path: '/lab', h1: 'Compare' },
   { path: '/lab?ids=FXAIX,FTEC,VXUS', h1: 'Compare' },
   { path: '/lab/risk', h1: 'Risk' },
+  { path: '/lab/risk?scenario=empty', h1: 'Risk' },
+  { path: '/plan?scenario=empty', h1: 'Plan' },
   { path: '/lab/strategies', h1: 'Strategy lab' },
   { path: '/lab/strategies/sector-momentum', h1: 'Sector momentum' },
   { path: '/lab/strategies/dip-margin', h1: 'Margin in a dip' },

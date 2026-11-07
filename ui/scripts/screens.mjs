@@ -57,6 +57,16 @@ const SHOTS = [
   { name: 'lab-boards', path: '/lab/boards', fixtures: true, clock: MONDAY, act: async (p) => { await p.goto(p.url().replace('/lab/boards?', '/lab?'), { waitUntil: 'networkidle' }); await p.getByTestId('save-board').click(); await p.goto(p.url().replace('/lab?', '/lab/boards?'), { waitUntil: 'networkidle' }); } },
   { name: 'lab-patterns', path: '/lab/patterns', fixtures: true, clock: MONDAY, full: true },
   { name: 'lab-patterns-demo', path: '/lab/patterns' },
+  { name: 'plan-full', path: '/plan', fixtures: true, clock: MONDAY, full: true },
+  { name: 'plan-fi', path: '/plan', fixtures: true, clock: MONDAY, el: 'fi-path' },
+  { name: 'plan-fi-table', path: '/plan', fixtures: true, clock: MONDAY, el: 'fi-path', act: async (p) => p.getByTestId('fi-path').getByRole('button', { name: 'Table view' }).click() },
+  { name: 'plan-fi-empty', path: '/plan?scenario=empty', fixtures: true, clock: MONDAY, el: 'fi-path' },
+  { name: 'plan-fi-history', path: '/plan?scenario=history', fixtures: true, clock: MONDAY, el: 'fi-path' },
+  { name: 'plan-fi-demo', path: '/plan', el: 'fi-path' },
+  { name: 'lab-factors', path: '/lab/risk', fixtures: true, clock: MONDAY, el: 'factors' },
+  { name: 'lab-factors-table', path: '/lab/risk', fixtures: true, clock: MONDAY, el: 'factors', act: async (p) => p.getByTestId('factors').getByRole('button', { name: 'Table view' }).last().click() },
+  { name: 'lab-factors-empty', path: '/lab/risk?scenario=empty', fixtures: true, clock: MONDAY, el: 'factors' },
+  { name: 'lab-factors-demo', path: '/lab/risk', el: 'factors' },
   { name: 'settings', path: '/settings' },
   { name: 'settings-crew', path: '/settings', fixtures: true, clock: MONDAY },
   { name: 'plan-table', path: '/plan', fixtures: true, clock: MONDAY, full: true, act: async (p) => p.getByTestId('tax-calendar').getByRole('button', { name: 'Table view' }).click() },
@@ -89,7 +99,8 @@ for (const shot of SHOTS.filter((s) => !only || only.includes(s.name))) {
       }
       const o = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: window.innerWidth }));
       const file = join(out, `${shot.name}-${width}-${theme}.png`);
-      await page.screenshot({ path: file, fullPage: shot.full ?? !shot.act });
+      if (shot.el) await page.getByTestId(shot.el).screenshot({ path: file });
+      else await page.screenshot({ path: file, fullPage: shot.full ?? !shot.act });
       report.push({ file, overflow: o.scroll > o.view, errors });
       await ctx.close();
     }

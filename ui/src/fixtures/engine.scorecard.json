@@ -472,7 +472,7 @@
  },
  "decisions": [
   {
-   "id": "d_20251121140500_2120f6",
+   "id": "d_20251121140500_473a1d",
    "origin": "scout",
    "kind": "buy",
    "symbol": "ACME",
@@ -497,7 +497,7 @@
    "amount_usd": 410
   },
   {
-   "id": "d_20251128140500_63e5a0",
+   "id": "d_20251128140500_bd5294",
    "origin": "plan_keeper",
    "kind": "rebalance",
    "symbol": "VXUS",
@@ -522,7 +522,7 @@
    "amount_usd": 140
   },
   {
-   "id": "d_20251212140500_428d5b",
+   "id": "d_20251212140500_77beaf",
    "origin": "scout",
    "kind": "buy",
    "symbol": "ACME",
@@ -547,7 +547,7 @@
    "amount_usd": 600
   },
   {
-   "id": "d_20251216140500_d3ac7e",
+   "id": "d_20251216140500_179ba3",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -572,7 +572,7 @@
    "amount_usd": 280
   },
   {
-   "id": "d_20251223140500_5bf90d",
+   "id": "d_20251223140500_a40a54",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FTEC",
@@ -597,7 +597,7 @@
    "amount_usd": 300
   },
   {
-   "id": "d_20251224140500_6de0a2",
+   "id": "d_20251224140500_99a04a",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "NOVA",
@@ -618,7 +618,7 @@
    "amount_usd": 490
   },
   {
-   "id": "d_20251225140500_a915e7",
+   "id": "d_20251225140500_d421ab",
    "origin": "scout",
    "kind": "buy",
    "symbol": "NOVA",
@@ -639,7 +639,7 @@
    "amount_usd": 540
   },
   {
-   "id": "d_20251226140500_4f8f4f",
+   "id": "d_20251226140500_b6b843",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "ACME",
@@ -662,7 +662,7 @@
    "amount_usd": 340
   },
   {
-   "id": "d_20251226140500_1bc174",
+   "id": "d_20251226140500_fb4a87",
    "origin": "you",
    "kind": "buy",
    "symbol": "ACME",
@@ -687,7 +687,7 @@
    "amount_usd": 590
   },
   {
-   "id": "d_20260102140500_81d741",
+   "id": "d_20260102140500_a0a589",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -712,7 +712,7 @@
    "amount_usd": 250
   },
   {
-   "id": "d_20260102140500_42564b",
+   "id": "d_20260102140500_7e80a2",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "VXUS",
@@ -737,7 +737,7 @@
    "amount_usd": 370
   },
   {
-   "id": "d_20260106140500_4d6bc5",
+   "id": "d_20260106140500_3b9b28",
    "origin": "tax",
    "kind": "harvest",
    "symbol": "ACME",
@@ -758,7 +758,7 @@
    "amount_usd": 650
   },
   {
-   "id": "d_20260106140500_6f555f",
+   "id": "d_20260106140500_ee093c",
    "origin": "you",
    "kind": "buy",
    "symbol": "FTEC",
@@ -783,7 +783,7 @@
    "amount_usd": 340
   },
   {
-   "id": "d_20260109140500_b18365",
+   "id": "d_20260109140500_f2c133",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FTEC",
@@ -808,7 +808,7 @@
    "amount_usd": 300
   },
   {
-   "id": "d_20260109140500_60245e",
+   "id": "d_20260109140500_6124c1",
    "origin": "plan_keeper",
    "kind": "trim",
    "symbol": "FXAIX",
@@ -833,7 +833,7 @@
    "amount_usd": 220
   },
   {
-   "id": "d_20260109140500_833c1f",
+   "id": "d_20260109140500_d453b4",
    "origin": "scout",
    "kind": "buy",
    "symbol": "NOVA",
@@ -854,7 +854,7 @@
    "amount_usd": 570
   },
   {
-   "id": "d_20260113140500_e2395c",
+   "id": "d_20260113140500_8fb1b7",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -879,7 +879,7 @@
    "amount_usd": 180
   },
   {
-   "id": "d_20260126140500_339d5b",
+   "id": "d_20260126140500_5f09fa",
    "origin": "plan_keeper",
    "kind": "trim",
    "symbol": "FXAIX",
@@ -904,7 +904,7 @@
    "amount_usd": 270
   },
   {
-   "id": "d_20260126140500_779604",
+   "id": "d_20260126140500_edd385",
    "origin": "you",
    "kind": "buy",
    "symbol": "NOVA",
@@ -925,7 +925,7 @@
    "amount_usd": 420
   },
   {
-   "id": "d_20260127140500_ef8814",
+   "id": "d_20260127140500_daf72c",
    "origin": "you",
    "kind": "buy",
    "symbol": "NOVA",
@@ -946,7 +946,7 @@
    "amount_usd": 610
   },
   {
-   "id": "d_20260128140500_b0994c",
+   "id": "d_20260128140500_84529b",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "VXUS",
@@ -971,7 +971,7 @@
    "amount_usd": 390
   },
   {
-   "id": "d_20260202140500_a8dd98",
+   "id": "d_20260202140500_0e400f",
    "origin": "plan_keeper",
    "kind": "rebalance",
    "symbol": "BND",
@@ -996,7 +996,7 @@
    "amount_usd": 110
   },
   {
-   "id": "d_20260212140500_b723f7",
+   "id": "d_20260212140500_66f2cb",
    "origin": "plan_keeper",
    "kind": "rebalance",
    "symbol": "BND",
@@ -1021,7 +1021,7 @@
    "amount_usd": 90
   },
   {
-   "id": "d_20260212140500_7c4b22",
+   "id": "d_20260212140500_ae43cc",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "NOVA",
@@ -1042,7 +1042,7 @@
    "amount_usd": 700
   },
   {
-   "id": "d_20260227140500_0592b3",
+   "id": "d_20260227140500_73942b",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -1067,7 +1067,7 @@
    "amount_usd": 330
   },
   {
-   "id": "d_20260303140500_3a8b05",
+   "id": "d_20260303140500_b2a6c7",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "ACME",
@@ -1090,7 +1090,7 @@
    "amount_usd": 710
   },
   {
-   "id": "d_20260304140500_0a5d6d",
+   "id": "d_20260304140500_c26542",
    "origin": "tax",
    "kind": "harvest",
    "symbol": "VXUS",
@@ -1111,7 +1111,7 @@
    "amount_usd": 220
   },
   {
-   "id": "d_20260309140500_06e388",
+   "id": "d_20260309140500_2abe28",
    "origin": "plan_keeper",
    "kind": "trim",
    "symbol": "FXAIX",
@@ -1136,7 +1136,7 @@
    "amount_usd": 140
   },
   {
-   "id": "d_20260312140500_39e403",
+   "id": "d_20260312140500_167ad3",
    "origin": "plan_keeper",
    "kind": "trim",
    "symbol": "FTEC",
@@ -1161,7 +1161,7 @@
    "amount_usd": 200
   },
   {
-   "id": "d_20260312140500_5bf12e",
+   "id": "d_20260312140500_3ee504",
    "origin": "you",
    "kind": "buy",
    "symbol": "NOVA",
@@ -1182,7 +1182,7 @@
    "amount_usd": 310
   },
   {
-   "id": "d_20260316140500_0ee94e",
+   "id": "d_20260316140500_6a312c",
    "origin": "plan_keeper",
    "kind": "rebalance",
    "symbol": "BND",
@@ -1207,7 +1207,7 @@
    "amount_usd": 200
   },
   {
-   "id": "d_20260320140500_4855d7",
+   "id": "d_20260320140500_9f57ad",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -1232,7 +1232,7 @@
    "amount_usd": 180
   },
   {
-   "id": "d_20260326140500_3686da",
+   "id": "d_20260326140500_d20987",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "BND",
@@ -1257,7 +1257,7 @@
    "amount_usd": 210
   },
   {
-   "id": "d_20260327140500_43a2dc",
+   "id": "d_20260327140500_ea1725",
    "origin": "plan_keeper",
    "kind": "rebalance",
    "symbol": "VXUS",
@@ -1282,7 +1282,7 @@
    "amount_usd": 170
   },
   {
-   "id": "d_20260327140500_c8535c",
+   "id": "d_20260327140500_05b260",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "ACME",
@@ -1305,7 +1305,7 @@
    "amount_usd": 380
   },
   {
-   "id": "d_20260327140500_648cb0",
+   "id": "d_20260327140500_819e0b",
    "origin": "tax",
    "kind": "harvest",
    "symbol": "ACME",
@@ -1326,7 +1326,7 @@
    "amount_usd": 760
   },
   {
-   "id": "d_20260331140500_19dc19",
+   "id": "d_20260331140500_ab80db",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FTEC",
@@ -1351,7 +1351,7 @@
    "amount_usd": 370
   },
   {
-   "id": "d_20260403140500_c9a011",
+   "id": "d_20260403140500_8ae10f",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "BND",
@@ -1376,7 +1376,7 @@
    "amount_usd": 250
   },
   {
-   "id": "d_20260410140500_e00309",
+   "id": "d_20260410140500_63255e",
    "origin": "tax",
    "kind": "harvest",
    "symbol": "VXUS",
@@ -1397,7 +1397,7 @@
    "amount_usd": 860
   },
   {
-   "id": "d_20260417140500_9d4507",
+   "id": "d_20260417140500_c8a7c8",
    "origin": "scout",
    "kind": "buy",
    "symbol": "ACME",
@@ -1422,7 +1422,7 @@
    "amount_usd": 530
   },
   {
-   "id": "d_20260423140500_979974",
+   "id": "d_20260423140500_d27a6c",
    "origin": "scout",
    "kind": "buy",
    "symbol": "ACME",
@@ -1447,7 +1447,7 @@
    "amount_usd": 310
   },
   {
-   "id": "d_20260427140500_5071ef",
+   "id": "d_20260427140500_355091",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -1472,7 +1472,7 @@
    "amount_usd": 210
   },
   {
-   "id": "d_20260501140500_9c09c7",
+   "id": "d_20260501140500_d3fb2e",
    "origin": "you",
    "kind": "buy",
    "symbol": "NOVA",
@@ -1493,7 +1493,7 @@
    "amount_usd": 320
   },
   {
-   "id": "d_20260506140500_831ee3",
+   "id": "d_20260506140500_3a5a02",
    "origin": "you",
    "kind": "buy",
    "symbol": "NOVA",
@@ -1514,7 +1514,7 @@
    "amount_usd": 510
   },
   {
-   "id": "d_20260508140500_b7837c",
+   "id": "d_20260508140500_c06bef",
    "origin": "plan_keeper",
    "kind": "trim",
    "symbol": "FTEC",
@@ -1539,7 +1539,7 @@
    "amount_usd": 240
   },
   {
-   "id": "d_20260508140500_60e72a",
+   "id": "d_20260508140500_85ed8e",
    "origin": "tax",
    "kind": "harvest",
    "symbol": "VXUS",
@@ -1560,7 +1560,7 @@
    "amount_usd": 750
   },
   {
-   "id": "d_20260511140500_1725de",
+   "id": "d_20260511140500_aab5a4",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "BND",
@@ -1585,7 +1585,7 @@
    "amount_usd": 360
   },
   {
-   "id": "d_20260514140500_5df03e",
+   "id": "d_20260514140500_1f4c71",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FTEC",
@@ -1610,7 +1610,7 @@
    "amount_usd": 320
   },
   {
-   "id": "d_20260515140500_a7d55b",
+   "id": "d_20260515140500_6e9b65",
    "origin": "plan_keeper",
    "kind": "trim",
    "symbol": "FTEC",
@@ -1635,7 +1635,7 @@
    "amount_usd": 190
   },
   {
-   "id": "d_20260518140500_551f97",
+   "id": "d_20260518140500_b184c5",
    "origin": "scout",
    "kind": "buy",
    "symbol": "ACME",
@@ -1660,7 +1660,7 @@
    "amount_usd": 340
   },
   {
-   "id": "d_20260519140500_a0a1ea",
+   "id": "d_20260519140500_aa6b6e",
    "origin": "scout",
    "kind": "buy",
    "symbol": "FTEC",
@@ -1685,7 +1685,7 @@
    "amount_usd": 520
   },
   {
-   "id": "d_20260522140500_ae2956",
+   "id": "d_20260522140500_e72faa",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "BND",
@@ -1710,7 +1710,7 @@
    "amount_usd": 210
   },
   {
-   "id": "d_20260528140500_75aa8d",
+   "id": "d_20260528140500_49f291",
    "origin": "scout",
    "kind": "buy",
    "symbol": "NOVA",
@@ -1731,7 +1731,7 @@
    "amount_usd": 420
   },
   {
-   "id": "d_20260604140500_e44120",
+   "id": "d_20260604140500_613f8a",
    "origin": "scout",
    "kind": "buy",
    "symbol": "ACME",
@@ -1756,7 +1756,7 @@
    "amount_usd": 460
   },
   {
-   "id": "d_20260605140500_63b63b",
+   "id": "d_20260605140500_8d397d",
    "origin": "scout",
    "kind": "buy",
    "symbol": "FTEC",
@@ -1781,7 +1781,7 @@
    "amount_usd": 420
   },
   {
-   "id": "d_20260605140500_490dd9",
+   "id": "d_20260605140500_c3928b",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "NOVA",
@@ -1802,7 +1802,7 @@
    "amount_usd": 630
   },
   {
-   "id": "d_20260610140500_6a0e8b",
+   "id": "d_20260610140500_f3dfc5",
    "origin": "scout",
    "kind": "buy",
    "symbol": "FTEC",
@@ -1827,7 +1827,7 @@
    "amount_usd": 580
   },
   {
-   "id": "d_20260615140500_f0e700",
+   "id": "d_20260615140500_a4c17d",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "BND",
@@ -1852,7 +1852,7 @@
    "amount_usd": 280
   },
   {
-   "id": "d_20260615140500_79663c",
+   "id": "d_20260615140500_2469ba",
    "origin": "you",
    "kind": "buy",
    "symbol": "ACME",
@@ -1877,7 +1877,7 @@
    "amount_usd": 500
   },
   {
-   "id": "d_20260617140500_859ac8",
+   "id": "d_20260617140500_c156a0",
    "origin": "you",
    "kind": "buy",
    "symbol": "ACME",
@@ -1902,7 +1902,7 @@
    "amount_usd": 400
   },
   {
-   "id": "d_20260622140500_c2b2e1",
+   "id": "d_20260622140500_d10332",
    "origin": "plan_keeper",
    "kind": "rebalance",
    "symbol": "VXUS",
@@ -1927,7 +1927,7 @@
    "amount_usd": 200
   },
   {
-   "id": "d_20260626140500_f5e912",
+   "id": "d_20260626140500_ea0fd5",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -1952,7 +1952,7 @@
    "amount_usd": 390
   },
   {
-   "id": "d_20260702140500_345e51",
+   "id": "d_20260702140500_f20b83",
    "origin": "you",
    "kind": "buy",
    "symbol": "ACME",
@@ -1977,7 +1977,7 @@
    "amount_usd": 470
   },
   {
-   "id": "d_20260703140500_7bc580",
+   "id": "d_20260703140500_3e97fc",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "BND",
@@ -2002,7 +2002,7 @@
    "amount_usd": 190
   },
   {
-   "id": "d_20260703140500_25babd",
+   "id": "d_20260703140500_3598a7",
    "origin": "you",
    "kind": "buy",
    "symbol": "FTEC",
@@ -2027,7 +2027,7 @@
    "amount_usd": 630
   },
   {
-   "id": "d_20260708140500_9cc27e",
+   "id": "d_20260708140500_1d2296",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "VXUS",
@@ -2052,7 +2052,7 @@
    "amount_usd": 170
   },
   {
-   "id": "d_20260720140500_80bd67",
+   "id": "d_20260720140500_e27492",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FTEC",
@@ -2077,7 +2077,7 @@
    "amount_usd": 210
   },
   {
-   "id": "d_20260721140500_0e5d96",
+   "id": "d_20260721140500_0f381d",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "NOVA",
@@ -2098,7 +2098,7 @@
    "amount_usd": 650
   },
   {
-   "id": "d_20260728140500_8c4ca5",
+   "id": "d_20260728140500_fdb45f",
    "origin": "you",
    "kind": "buy",
    "symbol": "NOVA",
@@ -2119,7 +2119,7 @@
    "amount_usd": 450
   },
   {
-   "id": "d_20260803140500_fa89d7",
+   "id": "d_20260803140500_5e5235",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "ACME",
@@ -2142,7 +2142,7 @@
    "amount_usd": 640
   },
   {
-   "id": "d_20260806140500_c78cfe",
+   "id": "d_20260806140500_34bbb0",
    "origin": "scout",
    "kind": "buy",
    "symbol": "ACME",
@@ -2167,7 +2167,7 @@
    "amount_usd": 340
   },
   {
-   "id": "d_20260807140500_2ccf5a",
+   "id": "d_20260807140500_10d348",
    "origin": "scout",
    "kind": "buy",
    "symbol": "FTEC",
@@ -2185,7 +2185,7 @@
    "amount_usd": 310
   },
   {
-   "id": "d_20260810140500_bd5278",
+   "id": "d_20260810140500_0c55de",
    "origin": "plan_keeper",
    "kind": "trim",
    "symbol": "FTEC",
@@ -2203,7 +2203,7 @@
    "amount_usd": 250
   },
   {
-   "id": "d_20260819140500_c991c5",
+   "id": "d_20260819140500_8844eb",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "VXUS",
@@ -2221,7 +2221,7 @@
    "amount_usd": 200
   },
   {
-   "id": "d_20260824140500_17f269",
+   "id": "d_20260824140500_c943cb",
    "origin": "risk",
    "kind": "hold_off",
    "symbol": "NOVA",
@@ -2237,7 +2237,7 @@
    "amount_usd": 730
   },
   {
-   "id": "d_20260828140500_fe7849",
+   "id": "d_20260828140500_363fed",
    "origin": "plan_keeper",
    "kind": "trim",
    "symbol": "FXAIX",
@@ -2255,7 +2255,7 @@
    "amount_usd": 110
   },
   {
-   "id": "d_20260901140500_0804eb",
+   "id": "d_20260901140500_12bcf6",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -2273,7 +2273,7 @@
    "amount_usd": 350
   },
   {
-   "id": "d_20260901140500_6a16fd",
+   "id": "d_20260901140500_c802d6",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "VXUS",
@@ -2291,7 +2291,7 @@
    "amount_usd": 260
   },
   {
-   "id": "d_20260907140500_2fd22f",
+   "id": "d_20260907140500_0371ce",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "VXUS",
@@ -2309,7 +2309,7 @@
    "amount_usd": 310
   },
   {
-   "id": "d_20260924140500_9adbff",
+   "id": "d_20260924140500_25005b",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FTEC",
@@ -2327,7 +2327,7 @@
    "amount_usd": 350
   },
   {
-   "id": "d_20261102130500_405a45",
+   "id": "d_20261102130500_da319c",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "FXAIX",
@@ -2337,7 +2337,7 @@
    "amount_usd": 300
   },
   {
-   "id": "d_20261104130500_8c82ff",
+   "id": "d_20261104130500_ba10c8",
    "origin": "plan_keeper",
    "kind": "rebalance",
    "symbol": "BND",
@@ -2347,7 +2347,7 @@
    "amount_usd": 40
   },
   {
-   "id": "d_20261106130500_b6af3c",
+   "id": "d_20261106130500_13b6fb",
    "origin": "plan_keeper",
    "kind": "deposit_route",
    "symbol": "BND",
