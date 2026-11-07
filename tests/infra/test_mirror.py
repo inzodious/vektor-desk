@@ -142,3 +142,15 @@ def test_incremental_reads_only_changed_rows_then_weekly_full(cfg):
 
 def test_timestamps_sort_whatever_firestore_precision():
     assert norm_ts("2026-11-07T13:00:00Z") < norm_ts("2026-11-07T13:00:00.5Z") < norm_ts("2026-11-07T13:00:01Z")
+
+
+def test_firestore_errors_carry_googles_reason():
+    from desk.mirror.firestore import FirestoreReader, MirrorError
+    from tests.fakes import Res
+
+    class Denied:
+        def post(self, url, json=None, timeout=None):
+            return Res(403, {"error": {"code": 403, "message": "Missing or insufficient permissions.", "status": "PERMISSION_DENIED"}})
+
+    with pytest.raises(MirrorError, match="403 listing tables: Missing or insufficient permissions"):
+        FirestoreReader("p", "u", Denied()).tables()

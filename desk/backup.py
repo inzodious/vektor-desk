@@ -1,5 +1,6 @@
 import argparse
 import json
+import re
 import shutil
 import sqlite3
 import sys
@@ -7,6 +8,10 @@ from pathlib import Path
 
 from desk.config import Config
 from desk.db import connect
+from desk.packages import seams
+
+MIRROR_TABLES = ("rows", "row_history", "tables", "runs")
+TABLE = re.compile(r"CREATE TABLE IF NOT EXISTS\s+(\w+)", re.IGNORECASE)
 
 
 def snapshot(data_dir: Path, out_dir: Path) -> list[dict]:
@@ -33,12 +38,71 @@ def snapshot(data_dir: Path, out_dir: Path) -> list[dict]:
     return done
 
 
+def expected_desk_tables() -> dict[str, list[str]]:
+    out = {}
+    for pkg, mod in seams("schema").items():
+        names = TABLE.findall(getattr(mod, "SCHEMA", "") or "")
+        if names:
+            out[pkg] = names
+    return out
+
+
+def _inspect(path: Path) -> dict:
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    try:
+        check = conn.execute("PRAGMA integrity_check").fetchone()[0]
+        names = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
+        counts = {n: conn.execute(f'SELECT count(*) FROM "{n}"').fetchone()[0] for n in names}
+    finally:
+        conn.close()
+    return {"check": check, "tables": counts}
+
+
+def verify(folder: Path) -> dict:
+    problems: list[str] = []
+    found: dict[str, dict] = {}
+    for db in sorted(folder.glob("*.db")):
+        try:
+            found[db.name] = _inspect(db)
+        except sqlite3.Error as e:
+            problems.append(f"{db.name} won't open: {e}")
+            continue
+        if found[db.name]["check"] != "ok":
+            problems.append(f"{db.name} failed its integrity check: {found[db.name]['check']}")
+    if "desk.db" not in found:
+        problems.append("there's no desk.db in the backup")
+    else:
+        have = set(found["desk.db"]["tables"])
+        for pkg, names in expected_desk_tables().items():
+            missing = [n for n in names if n not in have]
+            if missing:
+                problems.append(f"desk.db is missing {pkg} tables: {', '.join(missing)}")
+    if "mirror.db" in found:
+        missing = [n for n in MIRROR_TABLES if n not in found["mirror.db"]["tables"]]
+        if missing:
+            problems.append(f"mirror.db is missing {', '.join(missing)}")
+    inbox = folder / "inbox"
+    files = sum(1 for p in inbox.rglob("*") if p.is_file()) if inbox.is_dir() else 0
+    summary = {name: {"tables": len(info["tables"]), "rows": sum(info["tables"].values())} for name, info in found.items()}
+    return {"ok": not problems, "problems": problems, "databases": summary, "inbox_files": files}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="python -m desk.backup", description="Consistent copies of every SQLite file in the data folder, for deploy.sh backup to tar up."
     )
     parser.add_argument("--out", default="", help="folder to write into (replaced); default <data>/backup-staging")
+    parser.add_argument(
+        "--verify",
+        default="",
+        metavar="FOLDER",
+        help="check an unpacked backup: every database opens, passes integrity_check and has its tables",
+    )
     args = parser.parse_args(argv)
+    if args.verify:
+        report = verify(Path(args.verify))
+        print(json.dumps(report, indent=2))
+        return 0 if report["ok"] else 1
     cfg = Config.from_env()
     out = Path(args.out) if args.out else cfg.data_dir / "backup-staging"
     try:

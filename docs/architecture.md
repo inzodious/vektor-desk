@@ -133,6 +133,7 @@ The service account can also read life-stack's `users/` data in the same Firebas
 - **Nightly at 3:45** (TrueNAS cron job, `deploy.sh backup`): consistent copies of every SQLite file through SQLite's backup API, each checked with `quick_check`, plus `inbox/`, as a dated tarball in `/mnt/Singularity/backups/vektor-desk`. The newest 14 are kept. Every deploy takes one first too.
 - **What matters.** `desk.db` (decisions, proposals, scorecards) and `inbox/` can't be rebuilt. `mirror.db` can be re-pulled from Firestore at any time.
 - **Restore.** Stop the app, then `tar -xzf /mnt/Singularity/backups/vektor-desk/vektor-desk-<date>.tar.gz -C /mnt/Manifest/apps/vektor-desk/data`, then `chown -R 568:568` that folder and start the app.
+- **Restore drill.** `deploy.sh restore-test` unpacks the newest backup into a scratch folder, checks each database opens, passes `integrity_check` and has every package's tables, then deletes the scratch copy. The live data isn't touched. Run it once after the first nightly backup, and after any change to backups.
 - **Why Singularity.** Manifest is a single disk, so backups go to the RAIDZ1 pool.
 
 ## Deploys

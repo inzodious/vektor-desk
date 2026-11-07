@@ -52,6 +52,14 @@ def service_account_session(path: str) -> Session:
     return AuthorizedSession(creds)
 
 
+def _reason(res: Any) -> str:
+    try:
+        message = res.json()["error"]["message"]
+    except (ValueError, KeyError, TypeError, AttributeError):
+        return ""
+    return ": " + " ".join(str(message).split())[:300]
+
+
 class FirestoreReader:
     def __init__(self, project: str, uid: str, session: Session, *, timeout: float = 60.0):
         if not project:
@@ -69,7 +77,7 @@ class FirestoreReader:
 
     def _check(self, res: Any, what: str) -> dict:
         if res.status_code != 200:
-            raise MirrorError(f"Firestore answered {res.status_code} {what}.", status=res.status_code)
+            raise MirrorError(f"Firestore answered {res.status_code} {what}{_reason(res)}.", status=res.status_code)
         return res.json()
 
     def tables(self) -> list[str]:
@@ -114,7 +122,7 @@ class FirestoreReader:
         }
         res = self.session.post(f"{self.base}:runQuery", json=query, timeout=self.timeout)
         if res.status_code != 200:
-            raise MirrorError(f"Firestore answered {res.status_code} querying {table}.", status=res.status_code)
+            raise MirrorError(f"Firestore answered {res.status_code} querying {table}{_reason(res)}.", status=res.status_code)
         for item in res.json():
             doc = item.get("document")
             row = _row(doc) if doc else None
