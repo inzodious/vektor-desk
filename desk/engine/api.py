@@ -457,3 +457,13 @@ def scorecard_view(request: Request, origin: str | None = None) -> JSONResponse:
 def patterns_view(request: Request) -> JSONResponse:
     empty = {"as_of": None, "market": [], "holdings": {}, "drawdowns": [], "seasonality": {}, "corr_shifts": [], "behavior": {}}
     return _view(request, "patterns", empty)
+
+
+@router.get("/api/engine/fi")
+def fi_view(request: Request) -> JSONResponse:
+    return _view(request, "fi", {"as_of": None, "status": "not_ready", "lines": [], "fi_date": {}})
+
+
+@router.get("/api/engine/factors")
+def factors_view(request: Request) -> JSONResponse:
+    return _view(request, "factors", {"as_of": None, "holdings": {}, "portfolio": {}, "coverage_pct": 0.0})
