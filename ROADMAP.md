@@ -1,0 +1,168 @@
+# Roadmap
+
+Each phase is one pull request (or one short series) and one minor version: phase 3 ships as 0.3.0. Status: ✅ done, 🚧 in progress, ⏭️ next, 📋 planned. Areas and tiers come from [docs/concept.md](docs/concept.md).
+
+Draft, November 7, 2026. Phase contents firm up as the planning docs land.
+
+## Phases
+
+| # | Phase | Tier | Status | Depends on |
+|---|---|---|---|---|
+| 0 | Planning docs | | 🚧 | |
+| 1 | Foundation | 1 | 📋 | 0 |
+| 2 | Bridge and Symbol sheet | 1 | 📋 | 1 |
+| 3 | Engine core and Plan | 1 | 📋 | 2 |
+| 4 | Decisions and Preflight | 1 | 📋 | 3 |
+| 5 | Plan keeper and tax desk | 1 | 📋 | 4 |
+| 6 | Research | 2 | 📋 | 4 |
+| 7 | Lab: Compare and risk | 2 | 📋 | 3 |
+| 8 | Phone alerts | 2 | 📋 | 5 |
+| 9 | Strategy lab | 3 | 📋 | 3, 6 |
+| 10 | Flight record and Patterns | 3 | 📋 | 30 days of decision records |
+| 11 | Scout and FI scenarios | 3 | 📋 | 10 |
+| 1.0 | Hardening | | 📋 | 11 |
+
+Phases 6 and 7 can run in parallel with 5 once their dependencies land, and phase 9 can run beside 7, 8 and 10. Start the Strategy lab as early as its dependencies allow: six months of forward paper trading is its graduation bar. The agent runner and its fake adapter are built alongside phases 3 and 4, so phase 5 only wires them to real engine outputs.
+
+**Who builds what inside a phase.** Preflight's checks are deterministic engine code (Statistics); Design renders them; agents call them. The decision record's fields come from the concept; agents write proposals into it.
+
+## December target
+
+Concept's success measure is that December's loss-sale plan comes from the desk. That needs Tier 1 (phases 1 to 5) merged and running by **December 6**. It is a target, not a gate: year-end tax moves do not wait on the desk, and the Nov 17–21 quiet window takes a week out of the schedule.
+
+## Phase detail
+
+### 0. Planning docs 🚧
+
+- [ ] README, ROADMAP, project plan, repo conventions (Lead, [#3])
+- [ ] Concept: purpose, areas, loops, tiers (Concept, [#1])
+- [ ] Architecture: stack, network, mirror, storage, secrets, alerts (Infrastructure, [#5])
+- [ ] Statistics: metric catalogue, methods, engine output contract (Statistics, [#4])
+- [ ] Agents: desks, schedules, tools, guardrails, usage budget, proposal record (AI agents, [#2])
+- [ ] Design: look, navigation, page and board mockups (Dashboards and design, [#6])
+
+Done when all six are merged and agree with each other.
+
+### 1. Foundation 📋
+
+- [ ] Compose stack on TrueNAS: Tailscale sidecar, Caddy, api (serves the built UI), cron (scheduler, engine and agents) ([#5])
+- [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate (built in [#5]; needs Joshua's one-time setup steps in `docs/architecture.md`)
+- [ ] Read-only mirror of every `lockIn/{uid}` collection into SQLite, incremental by change time with a weekly full pass, with change history ([#5])
+- [ ] `holdings_daily` built from the mirror history from day one (Statistics)
+- [ ] Claude Code CLI in the cron service (Hemline's pattern), token in a root-only env file, smoke run with `deploy.sh check` (no `--bare`) ([#5]); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout
+- [ ] Backups of the desk database ([#5])
+- [ ] App shell in the Escape Vektor look: tokens in `ui/src/styles`, pill nav and phone dock, light and graphite dark
+- [ ] Settings: data freshness and token card (`/api/status` in [#5]; page by Design)
+- [ ] Local lint, test and build scripts; synthetic fixtures
+
+Done when a phone on Tailscale opens the desk and sees the mirror's last run.
+
+### 2. Bridge and Symbol sheet 📋
+
+- [ ] Live price feed during market hours, last close outside them (live quotes table, `/api/live`)
+- [ ] Bridge: departures-board holdings strip, KPI tiles, market clock states
+- [ ] Symbol sheet from any symbol chip: price, position across accounts, cost basis, lots
+- [ ] Line and spark charts (hand-rolled SVG, no chart library)
+- [ ] Fidelity lot export parser and lots table (Dec 6 risk)
+
+### 3. Engine core and Plan 📋
+
+- [ ] Engine (Python): flow classifier, reconciliation and `data_health`, value and flows, TWR and XIRR
+- [ ] Shadow portfolios: plan mix and S&P 500
+- [ ] Drift and rules, margin (interest in dollars, price drop to a call), costs, basic concentration and drawdown
+- [ ] Output contract v1
+- [ ] Background backfill for the Strategy lab starts here: Tiingo prices at about 400 new symbols a month under the free cap shared with Escape Vektor (ETFs first, then large caps including delisted ones), SEC bulk financial statement and insider data in one import
+- [ ] Bridge KPI row complete, drift bullets, gauges
+- [ ] Plan page: target mix and bands, drift, rules (versioned), deposit routing
+
+### 4. Decisions and Preflight 📋
+
+- [ ] Decision records for every action and deliberate pass; logging starts here so scoring has history later
+- [ ] Preflight lights (engine, `preflight(holdings, trade)`): concentration, drift, funding and margin interest, wash sales across all accounts, lots and realized gain or loss, rule breaks
+- [ ] Tax lots, wash-sale calendar, realized gain and loss (Dec 6 risk)
+- [ ] Preflight annunciator (`POST /api/preflight`) and override box with a one-line reason
+- [ ] Order tickets, marked placed, confirmed by the mirror
+- [ ] Queue with proposal cards; Journal as a stamped ledger
+
+### 5. Plan keeper and tax desk 📋
+
+- [ ] Agent proposal record, written into the queue
+- [ ] Engine: per-desk brief slices, triggers table, marginal tax rate
+- [ ] Plan keeper: daily brief, payday split, rule breach flags
+- [ ] Tax desk: harvest candidates, lot picks, wash-sale windows, tax calendar
+- [ ] Brief card; crew tiles with agent status, run log and usage per run
+- [ ] Tax calendar view
+
+Tier 1 complete: 0.5.0.
+
+### 6. Research 📋
+
+- [ ] Dossiers per symbol and theme, with sources and "what would change the call"
+- [ ] Research desk, on request (overnight by default) and on a weekly rotation, with a skeptic run checking each dossier
+- [ ] Dossier and sources views; Console to request research and talk to the desks
+- [ ] Watchlist and engine triggers into the queue: big daily move, band crossed, margin debit appears, earnings date, new lot export
+- [ ] Source library: SEC EDGAR filings, insider trades, 13F, earnings dates, FRED series
+- [ ] Engine: EDGAR, FRED and Finnhub fetchers and holding signals
+
+### 7. Lab: Compare and risk 📋
+
+- [ ] Compare two to five items over a period, with fund overlap (N-PORT look-through)
+- [ ] Risk and statistics: concentration, exposure, scenario shocks, margin stress; heatmap and scatter views
+- [ ] Saved boards shell (`/api/compare`)
+- [ ] Risk desk weekly report
+
+### 8. Phone alerts 📋
+
+- [ ] Self-hosted ntfy on the box, relaying through ntfy.sh for phone delivery: rule breach, trigger hit, wash-sale window, stale mirror, research ready
+
+### 9. Strategy lab 📋
+
+Research hypotheses become strategies, tested on history without seeing the future, then paper-traded forward before any of them can inform a proposal.
+
+- [ ] Feature library and strategy spec validation
+- [ ] Walk-forward runner over 3, 5 and 10 year windows, point-in-time data only; ETF and Ken French universes first
+- [ ] Trial ledger: every strategy tried is recorded, so overfitting tests count them all
+- [ ] Deflated Sharpe and overfitting tests
+- [ ] Strategy desk: turns research desk hypotheses into specs, reads results
+- [ ] Forward paper portfolios; a strategy is eligible only after six months of forward results
+- [ ] Rule backtests for the plan's own rules
+- [ ] Strategy lab views (Design mocks them once the spec settles)
+
+### 10. Flight record and Patterns 📋
+
+- [ ] Every decision scored at 30, 90 and 365 days against following the plan (next-close baseline, bootstrap intervals, Brier score)
+- [ ] Summaries by origin, type, and overrides versus clean Preflights
+- [ ] Patterns: market and his own behavior
+- [ ] Saved boards complete
+
+### 11. Scout and FI scenarios 📋
+
+- [ ] Scout desk: monthly ideas within the desk profile, each argued against first
+- [ ] FI path card and scenarios (Monte Carlo percentiles)
+- [ ] Factor exposure
+
+### 1.0 Hardening 📋
+
+- [ ] Restore from backup tested
+- [ ] Every page checked at 1920, 1440 and 390 in light and dark
+- [ ] Six months of Flight record reviewed; desks that do not beat following the plan are switched off
+
+## Key dates
+
+| Date | What |
+|---|---|
+| 2026-11-07 | Repo created, planning starts |
+| Nov 17–21 | Quiet window, no merges expected |
+| Dec 6 | Tier 1 target |
+| Dec 12–16 | Quiet window, no merges expected |
+
+## Backlog
+
+- Options and crypto, if he starts holding them
+
+[#1]: https://github.com/inzodious/vektor-desk/pull/1
+[#2]: https://github.com/inzodious/vektor-desk/pull/2
+[#3]: https://github.com/inzodious/vektor-desk/pull/3
+[#4]: https://github.com/inzodious/vektor-desk/pull/4
+[#5]: https://github.com/inzodious/vektor-desk/pull/5
+[#6]: https://github.com/inzodious/vektor-desk/pull/6
