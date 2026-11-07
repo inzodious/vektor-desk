@@ -18,7 +18,7 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 7 | Lab: Compare and risk | 2 | ✅ | 3 |
 | 8 | Phone alerts | 2 | ✅ | 5 |
 | 9 | Strategy lab | 3 | ✅ | 3, 6 |
-| 10 | Flight record and Patterns | 3 | 🚧 | 30 days of decision records |
+| 10 | Flight record and Patterns | 3 | ✅ | 30 days of decision records |
 | 11 | Scout and FI scenarios | 3 | 🚧 | 10 |
 | 1.0 | Hardening | | 📋 | 11 |
 
@@ -128,12 +128,12 @@ Research hypotheses become strategies, tested on history without seeing the futu
 - [x] Rule backtests for the plan's own rules ([#49], [#50])
 - [x] Strategy lab views ([#57], [#58])
 
-### 10. Flight record and Patterns 🚧
+### 10. Flight record and Patterns ✅
 
-- [x] Every decision scored at 30, 90 and 365 days against following the plan (next-close baseline, bootstrap intervals, Brier score) ([#51]; views to come)
-- [x] Summaries by origin, type, and overrides versus clean Preflights ([#51]; views to come)
-- [x] Patterns: market and his own behavior ([#51]; views to come)
-- [ ] Saved boards complete
+- [x] Every decision scored at 30, 90 and 365 days against following the plan (next-close baseline, bootstrap intervals, Brier score) ([#51], [#61])
+- [x] Summaries by origin, type, and overrides versus clean Preflights ([#51], [#61])
+- [x] Patterns: market and his own behavior ([#51], [#61])
+- [x] Saved boards complete ([#55])
 
 ### 11. Scout and FI scenarios 🚧
 
@@ -205,3 +205,4 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#55]: https://github.com/inzodious/vektor-desk/pull/55
 [#57]: https://github.com/inzodious/vektor-desk/pull/57
 [#58]: https://github.com/inzodious/vektor-desk/pull/58
+[#61]: https://github.com/inzodious/vektor-desk/pull/61
