@@ -45,12 +45,33 @@ Infrastructure ──► mirror tables ──► Statistics engine ──► out
 
 ## Working rules
 
-- One phase is one pull request into `main`. Planning docs are one PR per workstream.
+- Each phase is built by the workstreams that own its pieces, one PR per workstream per phase, into `main`. Lead cuts the phase's version once all its pieces are in.
 - Branch from the latest `main`; re-merge `main` before asking for review. A thread pushes only its own branch.
 - No CI minutes: every PR is validated locally (lint, tests, build, and Playwright screenshots at 1920, 1440 and 390 in light and dark for anything visual), and the PR says what ran.
-- Joshua merges. When several PRs are ready, Lead posts one merge order.
+- Lead validates and merges (Joshua's go-ahead of November 7 to implement everything). Validation: re-merged on the latest `main`, lint and the full test suite green, UI build green, screenshots checked for anything visual. Joshua can still merge or revert anything himself.
 - Docs are short, plain and scannable: tables over paragraphs, no walls of text.
 - Synthetic fixtures only. Real data never leaves the TrueNAS box.
+
+## Code layout
+
+Parallel workstreams stay conflict-free by owning packages, not files scattered across the tree.
+
+| Path | Owner |
+|---|---|
+| `desk/api/app.py`, `desk/config.py`, `desk/db.py`, `desk/mirror/`, `desk/scheduler.py`, `desk/backup.py`, `desk/status.py`, `deploy/`, `Dockerfile`, `tests/fakes.py` | Infrastructure |
+| `desk/engine/` (metrics, market data, lots, Preflight, lab) | Statistics |
+| `desk/decisions/` (decision records, queue, overrides, order tickets, rules and desk profile) | Concept |
+| `desk/agents/` (runner, adapters, prompts, desks) | AI agents |
+| `ui/` (the whole web app) | Dashboards and design |
+| `tests/<package>/` | The package's owner |
+
+Shared seams, so nobody edits another owner's code:
+
+- **Routes.** Each package exposes `router` in `desk/<package>/api.py`; `app.py` includes every package router it finds. Paths are `/api/<package>/...`.
+- **Tables.** Each package declares its own tables in `desk/<package>/schema.py`; startup applies them in `desk.db`. Only the owner writes its tables; others read through the owner's functions or published views.
+- **Jobs.** Each package lists scheduled jobs in `desk/<package>/jobs.py`; the scheduler picks them up.
+- **Dependencies.** Add your own lines to `pyproject.toml` or `ui/package.json`; never reorder or remove others'. Re-merge `main` before review.
+- **Synthetic demo data.** Infrastructure publishes one synthetic `mirror.db` builder that every package's tests and the UI's demo mode use.
 
 ## Decisions so far
 
@@ -66,6 +87,7 @@ Infrastructure ──► mirror tables ──► Statistics engine ──► out
 | 2026-11-07 | Engine is Python; Preflight is engine code that agents call and Design renders |
 | 2026-11-07 | The Claude CLI runs in the cron service (Hemline's pattern); desks get no file, shell or MCP tools |
 | 2026-11-07 | Web app is Vite and React with Escape Vektor's tokens; charts are hand-rolled SVG, no chart library |
+| 2026-11-07 | Joshua: implement everything; Lead validates and merges |
 | 2026-11-07 | Four services: Tailscale sidecar, Caddy, api (serves the built UI), cron; phone alerts through self-hosted ntfy |
 
 ## Risks
