@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patterns · Vektor Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400..800&family=League+Spartan:wght@500..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/desk.css">
+</head>
+<body>
+<main class="content" id="main"></main>
+<script src="assets/data.js"></script>
+<script src="assets/desk.js"></script>
+<script src="assets/parts.js"></script>
+<script>
+DESK.page('lab', (main) => {
+  const D = DATA, K = DESK;
+  const { usd, pct, pts, ico, esc } = K;
+  const rets = (v) => v.slice(1).map((x, i) => x / v[i] - 1);
+  const vol = (v) => { const r = rets(v); const m = r.reduce((a, b) => a + b, 0) / r.length; return Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / r.length) * Math.sqrt(252); };
+  const mdd = (v) => { let hi = v[0], dd = 0; v.forEach((x) => { hi = Math.max(hi, x); dd = Math.min(dd, x / hi - 1); }); return dd; };
+  const ddSeries = (v) => { let hi = v[0]; return v.map((x) => { hi = Math.max(hi, x); return x / hi - 1; }); };
+  const corr = (a, b) => { const x = rets(a), y = rets(b); const mx = x.reduce((s, v) => s + v, 0) / x.length, my = y.reduce((s, v) => s + v, 0) / y.length; let n = 0, dx = 0, dy = 0; x.forEach((v, i) => { n += (v - mx) * (y[i] - my); dx += (v - mx) ** 2; dy += (y[i] - my) ** 2; }); return n / Math.sqrt(dx * dy); };
+  const div = (v, max = 1) => { const t = Math.max(-1, Math.min(1, v / max)); const c = t >= 0 ? 'var(--up)' : 'var(--dn)'; return { fill: `color-mix(in oklab, ${c} ${Math.round(Math.abs(t) * 100)}%, var(--mid))`, ink: Math.abs(t) > 0.55 ? '#fff' : 'var(--ink)' }; };
+
+  main.insertAdjacentHTML('beforeend', K.hero({
+    kicker: 'Lab · Patterns', title: 'Patterns', art: 'lab',
+    big: '<b>You</b><span class="muted">are a subject of analysis too</span>',
+    foot: K.subtabs('lab'),
+  }));
+  K.slicers(main, { period: 'Max', bench: false });
+  const k = document.createElement('section');
+  k.className = 'kpis';
+  k.innerHTML = [
+    K.kpi({ id: 'a', metric: 'signals.market', label: 'S&P from its high', value: '−3.1%', line: 'Normal territory' }),
+    K.kpi({ id: 'b', metric: 'signals.market', label: 'VIX percentile', value: '38th', line: 'Ten-year history' }),
+    K.kpi({ id: 'c', metric: 'signals.market', label: '10y minus 3m', value: '+0.42', unit: 'pts', line: 'Curve upright again' }),
+    K.kpi({ id: 'd', metric: 'signals.market', label: 'High-yield spread', value: '22nd', line: 'Percentile, calm credit' }),
+    K.kpi({ id: 'e', metric: 'dec.score_by', label: 'Off-schedule buys', value: '9', line: 'Of 31 buys this year' }),
+    K.kpi({ id: 'f', metric: 'signals.holding', label: 'Single-stock hold', value: '14', unit: 'months', line: 'Median holding period' }),
+  ].join('');
+  main.append(k);
+  main.insertAdjacentHTML('beforeend', `<section class="grid">
+    <div class="card c6"><div class="card-head"><span class="tag coral">Your buys, scored</span><span class="chip">90 days vs a plan buy</span></div><div id="beh"></div><p class="empty-hint" style="margin-top:6px">Average dollars per $1,000 against putting it in the plan mix that day. Small samples, read loosely.</p></div>
+    <div class="card c6"><div class="card-head"><span class="tag mustard">Drops like this one</span><span class="chip">S&P 500 since 1950</span></div><div class="tscroll"><table class="t" id="base"></table></div><p class="empty-hint" style="margin-top:8px">A base rate, not a call on this one.</p></div>
+    <div class="card c6"><div class="card-head"><span class="tag sky">Correlation shifts</span><span class="chip">63-day vs 252-day</span></div><div class="rows" id="shift"></div></div>
+    <div class="card c6"><div class="card-head"><span class="tag lilac">Seasonality</span><span class="chip watch">Description, never a signal</span></div><div id="season"></div><div class="scale">Down<i></i>Up · 10 years each, n = 10 per cell</div></div>
+  </section>`);
+  K.hbars(main.querySelector('#beh'), { items: [['Scheduled plan buys (22)', 0, 'var(--s-other)'], ['After a 5% drop (4)', 22], ['After a 5% rise (3)', -11], ['Off schedule (9)', -14], ['On margin (2)', -31], ['Single stocks (6)', -19]].map(([l, v, c]) => ({ label: l, value: v, color: c })), fmt: (v) => usd(v, { sign: true }), name: 'Per $1,000', labelW: 170 });
+  main.querySelector('#base').innerHTML = `<thead><tr><th>Drop from high</th><th class="r">Times</th><th class="r">Median to recover</th><th class="r">Went on to −20%</th></tr></thead><tbody>${[['−3% to −5%', 98, '1 month', '6%'], ['−5% to −10%', 61, '3 months', '14%'], ['−10% to −20%', 27, '8 months', '33%'], ['Worse than −20%', 12, '2.1 years', '—']].map((r, i) => `<tr${i === 0 ? ' style="background:var(--teal-soft)"' : ''}><td><b style="color:var(--ink)">${r[0]}</b>${i === 0 ? ' <span class="chip ok">Now</span>' : ''}</td><td class="r">${r[1]}</td><td class="r">${r[2]}</td><td class="r">${r[3]}</td></tr>`).join('')}</tbody>`;
+  main.querySelector('#shift').innerHTML = [['FTEC', 0.91, 0.78], ['FTIHX', 0.81, 0.79], ['UFO', 0.62, 0.71], ['RIVN', 0.44, 0.52]].map(([s, a, b]) => `<div class="row" data-sym="${s}"><span class="l"><span class="sym"><i style="--c:var(--s1)"></i>${s}</span><div><small>Now ${a.toFixed(2)} · a year ago ${b.toFixed(2)}</small></div></span><span class="v">${a - b >= 0 ? '+' : '−'}${Math.abs(a - b).toFixed(2)}${a - b >= 0.1 ? '<small class="dn" style="display:block">Less diversifying</small>' : '<small class="muted" style="display:block">Steady</small>'}</span></div>`).join('');
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const R = D.rng(42);
+  const hs = ['FSKAX', 'FTIHX', 'FTEC', 'AAPL'];
+  K.heatmap(main.querySelector('#season'), { rows: hs, cols: months, values: hs.map(() => months.map((m, i) => (i === 8 ? -0.012 : i === 10 || i === 11 ? 0.018 : 0.008) + (R() - 0.5) * 0.02)), color: (v) => div(v, 0.03), fmt: (v) => pct(v, 1, true), name: 'Average month', cellH: 30 });
+});
+</script>
+</body>
+</html>

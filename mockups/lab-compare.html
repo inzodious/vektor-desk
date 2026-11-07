@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compare · Vektor Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400..800&family=League+Spartan:wght@500..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/desk.css">
+</head>
+<body>
+<main class="content" id="main"></main>
+<script src="assets/data.js"></script>
+<script src="assets/desk.js"></script>
+<script src="assets/parts.js"></script>
+<script>
+DESK.page('lab', (main) => {
+  const D = DATA, K = DESK;
+  const { usd, pct, pts, ico, esc } = K;
+  const rets = (v) => v.slice(1).map((x, i) => x / v[i] - 1);
+  const vol = (v) => { const r = rets(v); const m = r.reduce((a, b) => a + b, 0) / r.length; return Math.sqrt(r.reduce((a, b) => a + (b - m) ** 2, 0) / r.length) * Math.sqrt(252); };
+  const mdd = (v) => { let hi = v[0], dd = 0; v.forEach((x) => { hi = Math.max(hi, x); dd = Math.min(dd, x / hi - 1); }); return dd; };
+  const ddSeries = (v) => { let hi = v[0]; return v.map((x) => { hi = Math.max(hi, x); return x / hi - 1; }); };
+  const corr = (a, b) => { const x = rets(a), y = rets(b); const mx = x.reduce((s, v) => s + v, 0) / x.length, my = y.reduce((s, v) => s + v, 0) / y.length; let n = 0, dx = 0, dy = 0; x.forEach((v, i) => { n += (v - mx) * (y[i] - my); dx += (v - mx) ** 2; dy += (y[i] - my) ** 2; }); return n / Math.sqrt(dx * dy); };
+  const div = (v, max = 1) => { const t = Math.max(-1, Math.min(1, v / max)); const c = t >= 0 ? 'var(--up)' : 'var(--dn)'; return { fill: `color-mix(in oklab, ${c} ${Math.round(Math.abs(t) * 100)}%, var(--mid))`, ink: Math.abs(t) > 0.55 ? '#fff' : 'var(--ink)' }; };
+
+  main.insertAdjacentHTML('beforeend', K.hero({
+    kicker: 'Lab · Compare', title: 'Compare', art: 'lab',
+    big: '<b>5</b><span class="muted">items · up to five, colors stay with the item</span>',
+    foot: `${K.subtabs('lab')}<button class="btn sm ghost" type="button">${ico('pin')}Save as a board</button>`,
+  }));
+  K.slicers(main, { period: '1Y', bench: false, extra: [K.combo('Rebase', ['To 100', 'To dollars invested'], 'To 100')] });
+  const items = [
+    { key: 'FSKAX', name: 'FSKAX', c: 'var(--s1)', v: D.SYM.FSKAX.series, er: 0.015, yld: 1.2 },
+    { key: 'FTEC', name: 'FTEC', c: 'var(--s2)', v: D.SYM.FTEC.series, er: 0.084, yld: 0.5 },
+    { key: 'UFO', name: 'UFO', c: 'var(--s3)', v: D.SYM.UFO.series, er: 0.75, yld: 0.9 },
+    { key: 'plan', name: 'Plan mix', c: 'var(--s4)', v: D.planShadow, er: 0.03, yld: 1.6 },
+    { key: 'spx', name: 'S&P 500', c: 'var(--s5)', v: D.SYM.SPY.series, er: 0.0945, yld: 1.2 },
+  ];
+  const slots = document.createElement('div');
+  slots.className = 'slots';
+  slots.innerHTML = items.map((it) => `<span class="slot"><i style="--c:${it.c}"></i>${it.name}<button type="button" aria-label="Remove ${it.name}">${ico('x')}</button></span>`).join('') + `<button class="slot add" type="button" data-search>${ico('plus')}Add an item</button>`;
+  main.append(slots);
+  main.insertAdjacentHTML('beforeend', `<section class="grid">
+    <div class="card c8"><div class="card-head"><span class="tag">Growth of 100</span><span class="chip">Total return, dividends reinvested</span></div><div id="idx"></div></div>
+    <div class="card c4"><div class="card-head"><span class="tag mustard">Holdings overlap</span><span class="chip">Look-through, N-PORT</span></div><div id="ovl"></div><div class="scale">0%<i class="seq"></i>60%</div><p class="empty-hint" style="margin-top:6px">Share of the row fund also held by the column fund.</p></div>
+  </section>
+  <section class="grid" id="mult"></section>
+  <section class="card"><div class="card-head"><span class="tag">Side by side</span><span class="chip">Table view of every chart above</span></div><div class="tscroll"><table class="t" id="tbl"></table></div></section>`);
+  const reb = (v) => v.map((x) => (x / v[0]) * 100);
+  K.lineChart(main.querySelector('#idx'), { height: 270, x: D.days, endLabels: true, series: items.map((it) => ({ name: it.name, color: it.c, values: reb(it.v) })), refs: [{ y: 100 }], fmtY: (v) => v.toFixed(0), label: 'Growth of 100' });
+  const funds = ['FSKAX', 'FTEC', 'UFO', 'FXAIX'];
+  const OV = [[1, 0.24, 0.02, 0.86], [0.92, 1, 0.01, 0.9], [0.18, 0.04, 1, 0.12], [1, 0.26, 0.01, 1]];
+  K.heatmap(main.querySelector('#ovl'), { rows: funds, cols: funds, values: OV.map((r, i) => r.map((v, j) => (i === j ? null : v))), color: (v) => { const t = Math.min(1, v / 0.6); return { fill: `color-mix(in oklab, var(--seq-4) ${Math.round(t * 100)}%, var(--seq-0))`, ink: t > 0.55 ? '#fff' : 'var(--ink)' }; }, fmt: (v) => `${Math.round(v * 100)}%`, showVals: true, name: 'Overlap', tipHead: (i, j) => `${funds[i]} held inside ${funds[j]}` });
+  const metrics = [
+    ['Return, 1 year', (it) => it.v[it.v.length - 1] / it.v[0] - 1, (v) => pct(v, 1, true)],
+    ['Volatility', (it) => vol(it.v), (v) => pct(v)],
+    ['Max drawdown', (it) => mdd(it.v), (v) => pct(v)],
+    ['Return per unit of risk', (it) => (it.v[it.v.length - 1] / it.v[0] - 1) / vol(it.v), (v) => v.toFixed(2)],
+    ['Expense ratio', (it) => it.er / 100, (v) => pct(v, 2)],
+    ['Correlation to S&P 500', (it) => corr(it.v, D.SYM.SPY.series), (v) => v.toFixed(2)],
+  ];
+  const mult = main.querySelector('#mult');
+  metrics.forEach(([t], i) => mult.insertAdjacentHTML('beforeend', `<div class="card c4"><div class="card-head" style="margin-bottom:6px"><span class="tag ${['', 'sky', 'mustard', 'mint', 'coral', 'lilac'][i]}">${t}</span></div><div id="m${i}"></div></div>`));
+  metrics.forEach(([t, f, fmt], i) => K.hbars(mult.querySelector(`#m${i}`), { items: items.map((it) => ({ label: it.name, value: f(it), color: it.c })), fmt: (v) => fmt(v), name: t, rowH: 26, labelW: 70 }));
+  main.querySelector('#tbl').innerHTML = `<thead><tr><th>Item</th>${metrics.map((m) => `<th class="r">${m[0]}</th>`).join('')}<th class="r">Yield</th></tr></thead><tbody>${items.map((it) => `<tr${D.SYM[it.key] ? ` data-sym="${it.key}"` : ''}><td><span class="sym"><i style="--c:${it.c}"></i>${it.name}</span></td>${metrics.map(([, f, fmt]) => `<td class="r">${fmt(f(it))}</td>`).join('')}<td class="r">${it.yld}%</td></tr>`).join('')}</tbody>`;
+});
+</script>
+</body>
+</html>

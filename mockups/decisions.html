@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Decisions · Vektor Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400..800&family=League+Spartan:wght@500..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/desk.css">
+<style>
+.detail { position: sticky; top: 118px; align-self: start; display: grid; gap: 14px; }
+.detail h2 { font-size: 22px; line-height: 1.2; }
+.override { display: grid; gap: 8px; padding: 12px; border-radius: 16px; background: var(--mustard-soft); }
+.override b { color: var(--ink); }
+@media (max-width: 860px) { .detail { position: static; } }
+</style>
+</head>
+<body>
+<main class="content" id="main"></main>
+<script src="assets/data.js"></script>
+<script src="assets/desk.js"></script>
+<script src="assets/parts.js"></script>
+<script>
+DESK.page('decisions', (main) => {
+  const D = DATA, K = DESK;
+  const { usd, pct, ico, esc } = K;
+  main.insertAdjacentHTML('beforeend', K.hero({
+    kicker: 'Decisions · Queue', title: 'Decisions', art: 'decisions',
+    big: '<b>5</b><span class="muted">waiting · 2 need a reason to go ahead</span>',
+    foot: `${K.subtabs('decisions')}<button class="btn sm ghost" type="button">${ico('plus')}Draft your own</button>`,
+  }));
+  K.slicers(main, { period: false, bench: false, extra: [K.combo('Desk', ['All desks', 'Plan keeper', 'Tax desk', 'Risk desk', 'Research desk', 'Scout', 'Your drafts'], 'All desks'), K.combo('Status', ['Waiting', 'Snoozed', 'Expired'], 'Waiting')] });
+
+  main.insertAdjacentHTML('beforeend', `<section class="grid"><div class="card c5"><div class="card-head"><span class="tag coral">Queue</span><span class="chip">Sorted by expiry</span></div><div id="list"></div></div><div class="c7 detail" id="detail"></div></section>`);
+
+  const PF = {
+    p1: [['Concentration', 'Satellite 12.4% → 11.9%', 'ok'], ['Drift after', 'US core −3.6 → −0.9 pts', 'ok'], ['Funding', 'Deposit Nov 18', 'ok'], ['Wash sales', 'None open', 'ok'], ['Lots and tax', 'No sale', 'ok'], ['Plan rules', 'All clear', 'ok']],
+    p2: [['Concentration', 'Satellite 12.4% → 10.6%', 'ok'], ['Drift after', 'Satellite +4.4 → +2.6 pts', 'ok'], ['Funding', 'Proceeds $795 to SPAXX', 'ok'], ['Wash sales', 'No RIVN buys until Dec 10', 'watch'], ['Lots and tax', 'Jun 2024 lot · −$693 LT', 'ok'], ['Plan rules', 'All clear', 'ok']],
+    p3: [['Concentration', 'Satellite 12.4% → 13.5%', 'act'], ['Drift after', 'Satellite +4.4 → +5.5 pts', 'watch'], ['Funding', 'Cash $750 ready', 'ok'], ['Wash sales', 'None open', 'ok'], ['Lots and tax', 'No sale', 'ok'], ['Plan rules', 'Breaks: satellite cap 10%', 'act']],
+    p4: [['Concentration', 'No change', 'ok'], ['Drift after', 'Cash 3.5% → 1.6%', 'ok'], ['Funding', 'SPAXX $850', 'ok'], ['Wash sales', 'None open', 'ok'], ['Lots and tax', 'No sale', 'ok'], ['Plan rules', 'Clears margin debit', 'ok']],
+    p5: [['Concentration', 'Satellite 12.4% → 14.6%', 'act'], ['Drift after', 'Satellite +4.4 → +6.6 pts', 'watch'], ['Funding', 'Margin · about $10 a month', 'act'], ['Wash sales', 'None open', 'ok'], ['Lots and tax', 'No sale', 'ok'], ['Plan rules', 'Breaks: no margin buys, cap', 'act']],
+  };
+  const COL = { ok: 'var(--mint)', watch: 'var(--mustard)', act: 'var(--coral)' };
+  const listEl = main.querySelector('#list');
+  let cur = (location.hash || '#p3').slice(1);
+  const drawList = () => {
+    listEl.innerHTML = D.PROPOSALS.map((p) => K.prop(p, { on: p.id === cur })).join('');
+    listEl.querySelectorAll('[data-prop]').forEach((c) => (c.onclick = () => { cur = c.dataset.prop; history.replaceState(null, '', `#${cur}`); drawList(); drawDetail(); }));
+  };
+  const drawDetail = () => {
+    const p = D.PROPOSALS.find((x) => x.id === cur) || D.PROPOSALS[2];
+    const pf = PF[p.id];
+    const blocked = pf.some((l) => l[2] === 'act');
+    const qty = p.kind === 'harvest' ? '60 shares' : p.kind === 'deposit_route' ? '$1,400 FSKAX · $600 FTIHX' : usd(p.amount);
+    main.querySelector('#detail').innerHTML = `
+      <div class="card">
+        <div class="card-head"><span style="display:flex;gap:10px;align-items:center"><span class="desk-ico ${p.desk}">${ico(K.DESK_ICO[p.desk])}</span><span><span class="kicker">${p.deskName} · ${p.kind.replace('_', ' ')} · profile v14</span><h2>${esc(p.title)}</h2></span></span>${K.conf(p.conf)}</div>
+        <div class="kv"><div><small>Symbol</small><b><a href="#" data-sym="${p.symbol === 'SPAXX' ? 'FSKAX' : p.symbol}" class="sym"><i style="--c:var(--s1)"></i>${p.symbol}</a></b></div><div><small>Amount</small><b>${usd(p.amount)}</b></div><div><small>Funding</small><b>${K.fundLabel[p.funding]}</b></div><div><small>Judge at</small><b>${p.horizon}</b></div></div>
+        <div class="split" style="margin-top:12px">
+          <div class="bb"><div class="bull"><b>Thesis</b>${esc(p.why)} ${p.desk === 'research' ? 'Two of the top five holdings raised guidance this quarter.' : ''}</div><div class="bear"><b>Bear case</b>${p.desk === 'research' ? 'Most holdings are unprofitable and the fund costs 0.75% a year. You already own more space than the plan allows.' : p.desk === 'tax' ? 'If RIVN rallies before Dec 10 you sit out the bounce. The loss is still yours either way.' : p.desk === 'me' ? 'Interest starts the day you buy; AAPL is already inside FSKAX and FTEC.' : 'None needed for a plan move.'}</div></div>
+          ${p.skeptic ? `<div class="bb"><div style="background:var(--lilac-soft);color:var(--ink)"><b>Skeptic · flag</b>${esc(p.skeptic)} It saw only the engine numbers, no web pages.</div><div style="background:var(--card-2)"><b>Invalidation</b>Launch backlog growth under 10% at the next report, or UFO below $26.</div></div>` : `<div class="bb"><div style="background:var(--card-2)"><b>Invalidation</b>${p.desk === 'tax' ? 'Any RIVN buy in any account before Dec 10 voids the loss.' : p.desk === 'me' ? 'None written yet. Add one before approving.' : 'US core back inside its band on its own.'}</div><div style="background:var(--card-2)"><b>Rule served</b>${esc(p.rule)}</div></div>`}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="tag mustard">Preflight</span><span class="acts">${K.lights(p, true)}<span class="muted" style="font-size:12px">Warns, never blocks</span></span></div>
+        <div class="annun">${pf.map(([n, v, t]) => `<div class="lamp" style="--c:${COL[t]}"><i></i><b>${n}</b><small>${v.replace(/(→ [^ ]+)/, '<em>$1</em>')}</small></div>`).join('')}</div>
+        ${blocked ? `<div class="override" style="margin-top:12px"><span><b>Two lights need a reason.</b> ${p.funding === 'margin' ? 'This costs about $10 a month in interest and pushes Satellite to 14.6%.' : 'Satellite would sit 3.5 points past its cap.'} Going ahead logs an override with your reason and scores it like any other call.</span><div style="display:flex;gap:8px;flex-wrap:wrap"><div class="field" style="flex:1;min-width:180px"><input aria-label="One-line reason" placeholder="One line on why"></div><button class="btn ghost" type="button">Go ahead anyway</button><button class="btn" type="button">${ico('x')}Pass and log it</button></div></div>` : ''}
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="tag mint">Order ticket</span><span class="chip">Copy into Fidelity</span></div>
+        <div class="ticket">
+          <span class="stamp">${blocked ? 'DRAFT' : 'READY'}</span>
+          <dl>
+            <dt>Account</dt><dd>Individual (taxable)</dd><span></span>
+            <dt>Action</dt><dd>${p.kind === 'harvest' ? 'Sell' : p.kind === 'hold_off' ? 'Pay margin debit' : 'Buy'}</dd><button class="copy" aria-label="Copy">${ico('copy')}</button>
+            <dt>Symbol</dt><dd>${p.kind === 'deposit_route' ? 'FSKAX, FTIHX' : p.symbol}</dd><button class="copy" aria-label="Copy">${ico('copy')}</button>
+            <dt>Quantity</dt><dd>${qty}</dd><button class="copy" aria-label="Copy">${ico('copy')}</button>
+            <dt>Order type</dt><dd>${p.kind === 'deposit_route' ? 'Market · fills at 4 PM NAV' : 'Limit · day'}</dd><span></span>
+            ${p.kind === 'harvest' ? '<dt>Lots</dt><dd>Specific shares · Jun 3, 2024</dd><button class="copy" aria-label="Copy">' + ico('copy') + '</button>' : ''}
+          </dl>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn" type="button">${ico('check')}${blocked ? 'Approve with reason' : 'Approve'}</button><button class="btn ghost" type="button">${ico('snooze')}Snooze a day</button><button class="btn ghost" type="button">${ico('x')}Dismiss</button><span class="muted" style="font-size:12px;align-self:center">Marked placed stays pending until the next mirror confirms the fill.</span></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="tag lilac">Sources</span><span class="chip">${p.desk === 'research' ? '4 · 2 primary' : 'Engine only'}</span></div>
+        ${p.desk === 'research' ? ['10-Q filing, top holding · SEC EDGAR', 'Launch manifest, Q3 · company release', 'Fund holdings N-PORT · SEC EDGAR', 'Industry backlog survey · trade press'].map((t, i) => `<div class="src"><span class="chip ${i < 1 || i === 2 ? 'ok' : ''}">${i < 1 || i === 2 ? 'Primary' : 'Web'}</span><a href="#">${t}</a><span class="muted" style="margin-left:auto;font-size:11.5px;white-space:nowrap">Nov ${3 + i}</span></div>`).join('') : '<p class="empty-hint">Built from the engine brief: plan.drift, cash.pending, tax.lots. No web pages read.</p>'}
+      </div>`;
+  };
+  drawList();
+  drawDetail();
+});
+</script>
+</body>
+</html>
