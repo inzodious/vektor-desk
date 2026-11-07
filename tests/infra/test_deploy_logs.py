@@ -62,3 +62,22 @@ def test_busy_only_when_runlock_says_so(tmp_path):
     assert busy(tmp_path, 0, "").stdout.strip() == "idle"
     assert busy(tmp_path, 75, "mirror (since 09:00)").stdout.strip() == "busy:mirror (since 09:00)"
     assert busy(tmp_path, 1, "Error: No such container").stdout.strip() == "idle"
+
+
+def test_app_card_sets_icon_and_web_ui_once(tmp_path):
+    yaml = pytest.importorskip("yaml")
+    app = tmp_path / "configs" / "vektor-desk"
+    app.mkdir(parents=True)
+    meta = app / "metadata.yaml"
+    meta.write_text("custom_app: true\nmetadata:\n  app_version: custom\n  title: Custom App\nportals: {}\nversion: 1.0.0\n")
+    env = {"DESK_ROOT": str(tmp_path), "DESK_APP_CONFIGS": str(tmp_path / "configs"), "PATH": "/usr/local/bin:/usr/bin:/bin"}
+
+    def run():
+        return subprocess.run(["bash", "-c", f'source "{DEPLOY}"; app_card'], capture_output=True, text=True, env=env, check=True)
+
+    assert "set" in run().stdout
+    data = yaml.safe_load(meta.read_text())
+    assert data["metadata"]["icon"] == "https://desk-lan.escape-vektor.com/icon-512.png"
+    assert data["metadata"]["title"] == "Custom App" and data["custom_app"] is True
+    assert data["portals"] == {"Web UI": "https://desk-lan.escape-vektor.com/"}
+    assert run().stdout == ""
