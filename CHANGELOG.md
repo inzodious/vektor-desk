@@ -4,6 +4,19 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.3 - 2026-11-07
+
+### Added
+
+- `python -m desk.decisions.profile init --deposits` prints a deposits block to paste into an existing desk.yaml ([#88])
+
+### Fixed
+
+- Snapshot changes Escape Vektor didn't log (deposits, contributions, margin buys) count as money in or out, not return, and plan funds valued from snapshots no longer fire daily-move alerts ([#87])
+- Deposit detection finds monthly brokerage transfers among one-off deposits, duplicate imports and transfer-coded rows, and the profile command runs without a warning ([#88])
+- The eval container accepts its workspace trust and Remote Control prompts on its own ([#86])
+- The TrueNAS app card's icon and Web UI button show without a manual refresh ([#85])
+
 ## 1.0.2 - 2026-11-07
 
 ### Changed
@@ -247,3 +260,7 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#80]: https://github.com/inzodious/vektor-desk/pull/80
 [#81]: https://github.com/inzodious/vektor-desk/pull/81
 [#83]: https://github.com/inzodious/vektor-desk/pull/83
+[#85]: https://github.com/inzodious/vektor-desk/pull/85
+[#86]: https://github.com/inzodious/vektor-desk/pull/86
+[#87]: https://github.com/inzodious/vektor-desk/pull/87
+[#88]: https://github.com/inzodious/vektor-desk/pull/88
