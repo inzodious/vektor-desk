@@ -65,3 +65,13 @@ def test_deposit_landed_queues_plan_keeper_tonight(cfg):
     rows = [{"as_of": "2026-12-02", "kind": "deposit_landed", "scope_id": "d1", "detail": "{}"}]
     req = store.get_request(cfg, console.process_triggers(cfg, FakeTriggers(rows))[0])
     assert (req["desk"], req["run_now"], req["source"]) == ("plan_keeper", 0, "trigger")
+
+
+def test_dry_run_on_the_real_engine(engine, monkeypatch, capsys):
+    from desk.agents.__main__ import main
+
+    monkeypatch.setenv("DESK_DATA_DIR", str(engine.data_dir))
+    assert main(["dry-run", "tax", "--question", "Any harvest room?"]) == 0
+    out = capsys.readouterr().out
+    assert "health" in out and "lots" in out and "Any harvest room?" in out and "## Prompt" in out
+    assert store.runs(engine) == []

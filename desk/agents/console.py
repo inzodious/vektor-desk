@@ -18,8 +18,9 @@ TRIGGER_DESKS = {
     "rule_breach": ("plan_keeper", True),
     "deposit_landed": ("plan_keeper", False),
 }
-DONE = {"ok": "done", "not_ready": "done", "disabled": "done", "unchanged": "done", "over_budget": "done"}
+DONE = {"ok": "done", "not_ready": "done", "disabled": "done", "unchanged": "done", "over_budget": "done", "unhealthy": "done", "guarded": "done"}
 MAX_PER_PASS = 10
+LOCK_WAIT = 300
 
 
 class Triggers(Protocol):
@@ -65,6 +66,7 @@ def process_queue(
     adapter: Adapter | None = None,
     lab: Lab | None = None,
     limit: int = MAX_PER_PASS,
+    wait: float = LOCK_WAIT,
 ) -> Pass:
     tally = Pass()
     while tally.ran < limit:
@@ -74,7 +76,7 @@ def process_queue(
         tally.ran += 1
         if req["desk"] == "strategy":
             report = run_strategy_desk(
-                cfg, question=req["question"], strategy_id=req["symbol"], lab=lab, decisions=decisions, adapter=adapter, trigger=req["source"], wait=300
+                cfg, question=req["question"], strategy_id=req["symbol"], lab=lab, decisions=decisions, adapter=adapter, trigger=req["source"], wait=wait
             )
         else:
             report = run_proposal_desk(
@@ -84,7 +86,7 @@ def process_queue(
                 decisions=decisions,
                 adapter=adapter,
                 trigger=req["source"],
-                wait=300,
+                wait=wait,
                 question=req["question"],
                 symbol=req["symbol"],
                 lab=lab,
@@ -96,14 +98,17 @@ def process_queue(
             if status == "ok":
                 alerts.answer_ready(cfg, req, answer)
             tally.done += 1
-        elif status in ("busy", "deferred") and req["source"] != "retry" and "deferred once" not in (req["note"] or ""):
+        elif status == "busy":
+            store.release(cfg, req["id"])
+            tally.requeued += 1
+            break
+        elif status == "deferred" and req["source"] != "retry" and "deferred once" not in (req["note"] or ""):
             store.requeue(cfg, req["id"], f"{status}; deferred once to tonight")
             tally.requeued += 1
-            if status == "busy":
-                break
+            break
         else:
             store.finish_request(cfg, req["id"], "failed", run_id=report.outcome.run_id, note=report.note)
-            if status in ("busy", "deferred"):
+            if status == "deferred":
                 alerts.run_failed(cfg, req["desk"], status, report.outcome.run_id, report.note)
             tally.failed += 1
     return tally
@@ -129,4 +134,4 @@ def process_triggers(cfg: Config, triggers: Triggers | None = None) -> list[int]
 
 
 def queue_retry(cfg: Config, desk: str) -> int:
-    return store.add_request(cfg, desk, "Retry of a scheduled run that hit the usage limit.", source="retry")
+    return store.add_request(cfg, desk, "Retry of a scheduled run that hit the usage limit or found another desk running.", source="retry")

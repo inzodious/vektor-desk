@@ -1,9 +1,10 @@
 import json
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 
 from desk.agents import alerts, briefs, store
 from desk.agents.adapter import Adapter
-from desk.agents.desks import get
+from desk.agents.desks import Desk, get
 from desk.agents.runner import Outcome, run_desk
 from desk.agents.sources import Decisions, Engine, Lab, NotReady, RealDecisions, RealEngine, RealLab
 from desk.config import Config
@@ -11,6 +12,7 @@ from desk.config import Config
 SKIP_UNCHANGED = {"plan_keeper"}
 SKEPTIC_FOR = {"research", "scout"}
 SKEPTIC_KINDS = {"buy", "sell"}
+STALE_ENGINE_HOURS = 36
 
 
 @dataclass
@@ -98,6 +100,81 @@ def _skeptic(cfg: Config, p: dict, record: dict, idx: dict, decisions: Decisions
     return verdict
 
 
+@dataclass
+class Prepared:
+    desk: Desk
+    version: str = "none"
+    slice_: dict = field(default_factory=dict)
+    digest: str = ""
+    symbol: str | None = None
+    prompt: str = ""
+    schema: dict = field(default_factory=dict)
+    skip: tuple[str, str] | None = None
+
+
+def health_problem(slice_: dict, now: datetime | None = None) -> str | None:
+    failing = [h for h in slice_.get("data_health") or () if h.get("status") == "fail"]
+    if failing:
+        return "Engine health is fail: " + "; ".join(f"{h.get('check')}: {h.get('detail') or 'failed'}" for h in failing)
+    stamp = slice_.get("as_of")
+    try:
+        when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00")) if stamp and "T" in str(stamp) else None
+    except ValueError:
+        when = None
+    if when is not None:
+        when = when if when.tzinfo else when.replace(tzinfo=UTC)
+        age = ((now or datetime.now(UTC)) - when).total_seconds() / 3600
+        if age > STALE_ENGINE_HOURS:
+            return f"Engine health is fail: the last engine run finished {age:.0f} hours ago (limit {STALE_ENGINE_HOURS})."
+    return None
+
+
+def prepare(
+    cfg: Config,
+    name: str,
+    *,
+    engine: Engine | None = None,
+    decisions: Decisions | None = None,
+    trigger: str = "schedule",
+    question: str | None = None,
+    symbol: str | None = None,
+    trigger_row: dict | None = None,
+    lab: Lab | None = None,
+) -> Prepared:
+    engine = engine or RealEngine()
+    decisions = decisions or RealDecisions()
+    desk = get(name)
+    version, profile = _profile(cfg, decisions)
+    agents = profile.get("agents") or {}
+    cap = ((profile.get("usage") or {}).get("weekly_runs") or {}).get(name)
+    if isinstance(cap, int):
+        desk = replace(desk, weekly_runs=cap)
+    prep = Prepared(desk, version)
+    if agents.get("enabled", True) is False or (agents.get("desks") or {}).get(name, True) is False:
+        prep.skip = ("disabled", "Switched off in desk.yaml.")
+    try:
+        prep.slice_ = engine.desk_slice(cfg, name)
+    except NotReady as e:
+        prep.skip = prep.skip or ("not_ready", f"Engine brief not ready: {e}")
+        return prep
+    problem = health_problem(prep.slice_)
+    if problem:
+        prep.skip = prep.skip or ("unhealthy", problem)
+    prep.digest = briefs.digest(prep.slice_)
+    if name in SKIP_UNCHANGED and trigger == "schedule" and store.last_digest(cfg, name) == prep.digest:
+        prep.skip = prep.skip or ("unchanged", "Nothing in the brief changed since the last run.")
+    extra, prep.symbol = _extra(cfg, name, prep.slice_, symbol, question, trigger_row, lab)
+    if name == "research" and not prep.symbol:
+        prep.skip = prep.skip or ("not_ready", "No holdings in the brief to research.")
+    try:
+        history = decisions.history(cfg, name, briefs.HISTORY_LIMIT)
+    except NotReady:
+        history = []
+    prep.prompt = briefs.build_prompt(name, prep.slice_, {"version": version} | profile, history, extra=extra)
+    prep.schema = briefs.schema_for(name)
+    return prep
+
+
 def run_proposal_desk(
     cfg: Config,
     name: str,
@@ -112,32 +189,13 @@ def run_proposal_desk(
     trigger_row: dict | None = None,
     lab: Lab | None = None,
 ) -> Report:
-    engine = engine or RealEngine()
     decisions = decisions or RealDecisions()
-    desk = get(name)
-    version, profile = _profile(cfg, decisions)
-    agents = profile.get("agents") or {}
-    if agents.get("enabled", True) is False or (agents.get("desks") or {}).get(name, True) is False:
-        return _log_skip(cfg, name, "disabled", "Switched off in desk.yaml.", trigger)
-    cap = ((profile.get("usage") or {}).get("weekly_runs") or {}).get(name)
-    if isinstance(cap, int):
-        desk = replace(desk, weekly_runs=cap)
-    try:
-        slice_ = engine.desk_slice(cfg, name)
-    except NotReady as e:
-        return _log_skip(cfg, name, "not_ready", f"Engine brief not ready: {e}", trigger)
-    digest = briefs.digest(slice_)
-    if name in SKIP_UNCHANGED and trigger == "schedule" and store.last_digest(cfg, name) == digest:
-        return _log_skip(cfg, name, "unchanged", "Nothing in the brief changed since the last run.", trigger)
-    extra, symbol = _extra(cfg, name, slice_, symbol, question, trigger_row, lab)
-    if name == "research" and not symbol:
-        return _log_skip(cfg, name, "not_ready", "No holdings in the brief to research.", trigger)
-    try:
-        history = decisions.history(cfg, name, briefs.HISTORY_LIMIT)
-    except NotReady:
-        history = []
-    prompt = briefs.build_prompt(name, slice_, {"version": version} | profile, history, extra=extra)
-    schema = briefs.schema_for(name)
+    prep = prepare(cfg, name, engine=engine, decisions=decisions, trigger=trigger, question=question, symbol=symbol, trigger_row=trigger_row, lab=lab)
+    if prep.skip:
+        report = _log_skip(cfg, name, *prep.skip, trigger)
+        report.symbol = prep.symbol
+        return report
+    desk, version, slice_, digest, symbol, prompt, schema = prep.desk, prep.version, prep.slice_, prep.digest, prep.symbol, prep.prompt, prep.schema
     outcome = run_desk(desk, briefs.system_prompt(name), prompt, cfg=cfg, schema=schema, adapter=adapter, trigger=trigger, wait=wait)
     if not outcome.ok:
         return Report(outcome, note=outcome.note, symbol=symbol)

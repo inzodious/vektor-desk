@@ -2,11 +2,14 @@ from dataclasses import asdict, dataclass
 
 from desk.agents import alerts, store
 from desk.agents.adapter import Adapter, AgentError, AgentResult, AgentTimeout, ClaudeCli, UsageLimitError
-from desk.agents.desks import Desk
+from desk.agents.desks import DESKS, Desk
 from desk.config import Config
 from desk.runlock import Busy, job_lock
 
 LOCK = "agents"
+FIRST_RUN = ("plan_keeper", "tax")
+CAPPED = ("schedule", "trigger", "retry", "lab")
+GUARD_NOTE = "First-run guard: only the Plan keeper and Tax desk run until you lift it with `python -m desk.agents guard off`."
 
 
 @dataclass
@@ -42,7 +45,9 @@ def run_desk(
 
     if not store.is_enabled(cfg, desk.name):
         return skip("disabled", "Switched off in Settings.")
-    if trigger == "schedule" and store.week_usage(cfg, desk.name)["runs"] >= desk.weekly_runs:
+    if desk.name in DESKS and desk.name not in FIRST_RUN and store.guard_on(cfg):
+        return skip("guarded", GUARD_NOTE)
+    if trigger in CAPPED and store.week_usage(cfg, desk.name)["runs"] >= desk.weekly_runs:
         return skip("over_budget", f"Weekly cap of {desk.weekly_runs} runs reached.")
     adapter = adapter or ClaudeCli()
     try:

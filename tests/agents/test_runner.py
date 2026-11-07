@@ -172,7 +172,7 @@ def test_status_api(cfg, app_client):
     tiles = {d["desk"]: d for d in body["desks"]}
     assert body["enabled"] is True and list(tiles)[0] == "plan_keeper"
     assert tiles["plan_keeper"]["last_run"]["status"] == "ok"
-    assert tiles["plan_keeper"]["week"] == {"runs": 1, "turns": 1, "tokens": tiles["plan_keeper"]["last_run"]["tokens"], "cap": 7}
+    assert tiles["plan_keeper"]["week"] == {"runs": 1, "turns": 1, "tokens": tiles["plan_keeper"]["last_run"]["tokens"], "cap": 10}
     assert client.put("/api/agents/tax/enabled", json={"enabled": False}).json() == {"desk": "tax", "enabled": False}
     assert client.put("/api/agents/nope/enabled", json={"enabled": False}).status_code == 404
     assert crew(cfg)["desks"][1]["enabled"] is False
