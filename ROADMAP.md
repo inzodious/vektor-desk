@@ -21,7 +21,9 @@ Draft, November 7, 2026. Phase contents firm up as the planning docs land.
 | 10 | Scout and FI scenarios | 3 | 📋 | 9 |
 | 1.0 | Hardening | | 📋 | 10 |
 
-Phases 6 and 7 can run in parallel with 5 once their dependencies land.
+Phases 6 and 7 can run in parallel with 5 once their dependencies land. The agent runner and its fake adapter are built alongside phases 3 and 4, so phase 5 only wires them to real engine outputs.
+
+**Who builds what inside a phase.** Preflight's checks are deterministic engine code (Statistics); Design renders them; agents call them. The decision record's fields come from the concept; agents write proposals into it.
 
 ## December target
 
@@ -45,7 +47,7 @@ Done when all six are merged and agree with each other.
 - [ ] Compose stack on TrueNAS: api, worker, web, Caddy, Tailscale sidecar
 - [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate
 - [ ] Read-only mirror of Escape Vektor's Firestore (positions, plans, activity, prices) into SQLite on a schedule
-- [ ] Claude CLI runner with a smoke run
+- [ ] Agents container with the Claude Code CLI, token as a Compose secret, one `claude -p` smoke run (no `--bare`; mounts only its run folder and a config volume, no Firestore key, database or API keys)
 - [ ] App shell in the Escape Vektor look: pill nav and phone dock, light and graphite dark
 - [ ] Settings: data freshness, token renewal date
 - [ ] Local lint, test and build scripts; synthetic fixtures
@@ -85,8 +87,9 @@ Tier 1 complete: 0.5.0.
 ### 6. Research 📋
 
 - [ ] Dossiers per symbol and theme, with sources and "what would change the call"
-- [ ] Research desk, on request (overnight by default) and on a weekly rotation
-- [ ] Watchlist with triggers into the queue
+- [ ] Research desk, on request (overnight by default) and on a weekly rotation, with a skeptic run checking each dossier
+- [ ] Console: request research and talk to the desks
+- [ ] Watchlist and engine triggers into the queue: big daily move, band crossed, margin debit appears, earnings date, new lot export
 - [ ] Source library: SEC EDGAR filings, insider trades, 13F, earnings dates, FRED series
 
 ### 7. Lab: Compare and risk 📋
