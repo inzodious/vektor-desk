@@ -13,6 +13,16 @@ class Engine(Protocol):
     def desk_slice(self, cfg: Config, desk: str) -> dict: ...
 
 
+class Lab(Protocol):
+    def features(self, cfg: Config) -> list[dict]: ...
+
+    def desk_view(self, cfg: Config, strategy_id: str) -> dict: ...
+
+    def pending_reviews(self, cfg: Config) -> list[dict]: ...
+
+    def eligible(self, cfg: Config) -> list[dict]: ...
+
+
 class Decisions(Protocol):
     def profile(self, cfg: Config) -> tuple[str, dict]: ...
 
@@ -34,10 +44,19 @@ def _module(name: str):
         raise
 
 
+def _fn(name: str, attr: str):
+    fn = getattr(_module(name), attr, None)
+    if fn is None:
+        raise NotReady(f"{name}.{attr} isn't built yet")
+    return fn
+
+
 @dataclass
 class RealEngine:
     def desk_slice(self, cfg: Config, desk: str) -> dict:
         brief = _module("desk.engine.brief")
+        if not hasattr(brief, "desk_slice"):
+            raise NotReady("desk.engine.brief.desk_slice isn't built yet")
         try:
             return brief.desk_slice(cfg, desk)
         except brief.NotReady as e:
@@ -47,23 +66,51 @@ class RealEngine:
 @dataclass
 class RealDecisions:
     def profile(self, cfg: Config) -> tuple[str, dict]:
-        p = _module("desk.decisions.profile").active_profile(cfg)
+        p = _fn("desk.decisions.profile", "active_profile")(cfg)
         return str(p.version), dict(p.data)
 
     def history(self, cfg: Config, desk: str, limit: int) -> list[dict]:
-        return list(_module("desk.decisions").desk_history(cfg, desk, limit=limit))
+        return list(_fn("desk.decisions", "desk_history")(cfg, desk, limit=limit))
 
     def create(self, cfg: Config, proposal: dict, desk: str, run_id: str) -> dict:
-        return _module("desk.decisions").create_proposal(cfg, proposal, desk, run_id=run_id)
+        return _fn("desk.decisions", "create_proposal")(cfg, proposal, desk, run_id=run_id)
 
     def reject(self, cfg: Config, proposal: dict, desk: str, reason: str, run_id: str) -> dict:
-        return _module("desk.decisions").reject_proposal(cfg, proposal, desk, reason, run_id=run_id)
+        return _fn("desk.decisions", "reject_proposal")(cfg, proposal, desk, reason, run_id=run_id)
 
     def attach_skeptic(self, cfg: Config, decision_id: object, verdict: str | None, counter_case: str | None) -> object:
-        return _module("desk.decisions").attach_skeptic(cfg, decision_id, verdict, counter_case)
+        return _fn("desk.decisions", "attach_skeptic")(cfg, decision_id, verdict, counter_case)
 
 
 @dataclass
 class RealTriggers:
     def today(self, cfg: Config) -> list[dict]:
-        return list(_module("desk.engine.triggers").today(cfg))
+        return list(_fn("desk.engine.triggers", "today")(cfg))
+
+
+@dataclass
+class RealLab:
+    def _lab(self):
+        mod = _module("desk.engine.lab")
+        return mod, getattr(mod, "NotReady", None) or getattr(_module("desk.engine.brief"), "NotReady", NotReady)
+
+    def _call(self, fn: str, *args):
+        mod, not_ready = self._lab()
+        if not hasattr(mod, fn):
+            raise NotReady(f"desk.engine.lab.{fn} isn't built yet")
+        try:
+            return getattr(mod, fn)(*args)
+        except not_ready as e:
+            raise NotReady(str(e) or "lab not ready") from None
+
+    def features(self, cfg: Config) -> list[dict]:
+        return list(self._call("features", cfg))
+
+    def desk_view(self, cfg: Config, strategy_id: str) -> dict:
+        return dict(self._call("desk_view", cfg, strategy_id))
+
+    def pending_reviews(self, cfg: Config) -> list[dict]:
+        return list(self._call("pending_reviews", cfg))
+
+    def eligible(self, cfg: Config) -> list[dict]:
+        return list(self._call("eligible", cfg))

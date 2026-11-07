@@ -1,12 +1,15 @@
 import argparse
 import json
 import sys
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from desk.agents.console import process_queue, process_triggers, queue_retry
 from desk.agents.desks import DESKS, Desk, get
 from desk.agents.pipeline import run_proposal_desk
 from desk.agents.runner import run_desk
 from desk.agents.status import crew
+from desk.agents.strategy import queue_reviews
 from desk.config import Config
 
 SMOKE = Desk("smoke", "Smoke test", "low", 0, 1, 1000)
@@ -23,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     queue = sub.add_parser("queue", help="work through Console and trigger requests")
     queue.add_argument("--now-only", action="store_true", help="only requests marked Run now")
     sub.add_parser("triggers", help="turn today's engine triggers into requests")
+    sub.add_parser("lab-reviews", help="queue a Strategy desk run for each new lab result")
     sub.add_parser("smoke", help="one-turn check that the CLI and token work")
     sub.add_parser("status", help="print the crew status as JSON")
     args = parser.parse_args(argv)
@@ -44,10 +48,17 @@ def main(argv: list[str] | None = None) -> int:
         made = process_triggers(cfg)
         print(f"triggers: {len(made)} new requests")
         return 0
+    if args.cmd == "lab-reviews":
+        made = queue_reviews(cfg)
+        print(f"lab-reviews: {len(made)} new requests")
+        return 0
     desk = get(args.desk)
     if not desk.live or not desk.schedules:
         print(f"{desk.title} doesn't run on its own.")
         return 2
+    if args.trigger == "schedule" and not desk.due_on(datetime.now(ZoneInfo(cfg.timezone)).date()):
+        print(f"{desk.title}: not due today.")
+        return 0
     report = run_proposal_desk(cfg, desk.name, trigger=args.trigger)
     if report.status == "deferred" and args.trigger == "schedule":
         queue_retry(cfg, desk.name)
