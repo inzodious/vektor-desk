@@ -285,6 +285,7 @@ status() {
   if [ "${crons:-0}" -gt 0 ]; then echo "Auto-deploy: on"; else echo "Auto-deploy: off (docs/setup.md, step 8)"; fi
   if [ -s "$AUTO_FAILED" ]; then echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or run deploy.sh now"; fi
   if [ ! -f "$PINNED" ]; then echo "Cron copy:   none at $PINNED (step 8)"; elif pinned_stale; then echo "Cron copy:   differs from the checkout's deploy.sh; read the change, then copy it again (docs/setup.md, After updates)"; fi
+  compose_drift
   echo
   docker exec vektor-desk-api python -m desk.status 2>/dev/null || echo "(the desk's own status isn't answering)"
   echo
@@ -325,6 +326,71 @@ check() {
   echo "  subscribe in the ntfy app: server https://desk.escape-vektor.com:8443, topics desk-alerts, desk-research, desk-ops"
   echo "Certificate:"
   docker logs vektor-desk-caddy 2>&1 | grep -E 'certificate obtained|could not get certificate|obtain' | tail -n 2 | sed 's/^/  /' || true
+}
+
+# ---- Compose on the box vs the checkout ----
+
+compose_drift() {
+  local drift
+  drift=$(python3 - "$APP_CONFIGS/$APP" "$SRC/deploy/compose.yaml" <<'PY'
+import glob
+import os
+import sys
+
+import yaml
+
+app, main = sys.argv[1:3]
+
+
+def load(p):
+    try:
+        with open(p) as f:
+            return yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+
+
+def installed():
+    for p in sorted(glob.glob(os.path.join(app, "versions", "*", "templates", "rendered", "*compose*.y*ml")), reverse=True):
+        if load(p).get("services"):
+            return load(p)
+    for p in sorted(glob.glob(os.path.join(app, "versions", "*", "user_config.yaml")), reverse=True):
+        cfg = load(p)
+        if isinstance(cfg.get("custom_compose_config"), dict) and cfg["custom_compose_config"].get("services"):
+            return cfg["custom_compose_config"]
+        if isinstance(cfg.get("custom_compose_config_string"), str):
+            try:
+                text = yaml.safe_load(cfg["custom_compose_config_string"]) or {}
+            except yaml.YAMLError:
+                continue
+            if text.get("services"):
+                return text
+    return None
+
+
+box, want = installed(), load(main).get("services") or {}
+if box is None or not want:
+    print("unknown")
+    sys.exit()
+have = box.get("services") or {}
+out = []
+for name in sorted(set(want) | set(have)):
+    if name not in have:
+        out.append(f"{name} missing")
+    elif name not in want:
+        out.append(f"{name} extra")
+    else:
+        keys = [k for k in want[name] if want[name][k] != have[name].get(k)]
+        if keys:
+            out.append(f"{name}: {', '.join(keys)}")
+print("; ".join(out) if out else "current")
+PY
+  ) || drift=unknown
+  case $drift in
+    current) echo "Compose:     matches the checkout" ;;
+    unknown) echo "Compose:     couldn't read the app's installed compose under $APP_CONFIGS/$APP" ;;
+    *) echo "Compose:     older than the checkout ($drift): run setup-truenas.sh, then paste deploy/compose.yaml into Apps → $APP → Edit (docs/setup.md, After updates)" ;;
+  esac
 }
 
 # ---- App card: icon and Web UI button in TrueNAS Apps ----

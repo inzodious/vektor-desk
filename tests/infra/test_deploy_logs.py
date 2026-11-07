@@ -120,3 +120,35 @@ def test_logs_export_includes_the_eval_debug_log_redacted_and_caps_it(tmp_path):
     assert len(exported.splitlines()) == 1000
     assert "vektor-desk-eval" in (out / "eval.log").read_text()
     assert debug.stat().st_size == 0
+
+
+def drift(tmp_path: Path, rendered: str | None = None, user_config: str | None = None) -> str:
+    src = tmp_path / "src"
+    (src / "deploy").mkdir(parents=True, exist_ok=True)
+    (src / "deploy" / "compose.yaml").write_text((DEPLOY.parent / "compose.yaml").read_text())
+    version = tmp_path / "app_configs" / "vektor-desk" / "versions" / "1.0.0"
+    shutil.rmtree(tmp_path / "app_configs", ignore_errors=True)
+    if rendered is not None:
+        (version / "templates" / "rendered").mkdir(parents=True)
+        (version / "templates" / "rendered" / "docker-compose.yaml").write_text(rendered)
+    if user_config is not None:
+        version.mkdir(parents=True, exist_ok=True)
+        (version / "user_config.yaml").write_text(user_config)
+    env = {"DESK_ROOT": str(tmp_path), "DESK_SRC": str(src), "DESK_APP_CONFIGS": str(tmp_path / "app_configs"), "PATH": "/usr/local/bin:/usr/bin:/bin"}
+    res = subprocess.run(["bash", "-c", f'source "{DEPLOY}"; compose_drift'], capture_output=True, text=True, env=env, check=True)
+    return res.stdout.strip()
+
+
+def test_status_says_when_the_installed_compose_is_older_than_the_checkout(tmp_path):
+    yaml = pytest.importorskip("yaml")
+    current = (DEPLOY.parent / "compose.yaml").read_text()
+    assert drift(tmp_path, rendered=current) == "Compose:     matches the checkout"
+    old = yaml.safe_load(current)
+    old["services"]["eval"]["command"] = ["sh", "-c", "exec claude remote-control --name vektor-desk-eval"]
+    del old["services"]["ntfy"]
+    line = drift(tmp_path, rendered=yaml.safe_dump(old))
+    assert line.startswith("Compose:     older than the checkout (eval: command; ntfy missing)")
+    assert "paste deploy/compose.yaml" in line
+    assert drift(tmp_path, user_config=yaml.safe_dump({"custom_compose_config_string": current})) == "Compose:     matches the checkout"
+    assert "eval: command" in drift(tmp_path, user_config=yaml.safe_dump({"custom_compose_config": old}))
+    assert "couldn't read" in drift(tmp_path)
