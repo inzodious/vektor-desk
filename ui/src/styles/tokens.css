@@ -1,0 +1,52 @@
+/* ---------- tokens: Jetset Orbit, copied from Escape Vektor, desk density ---------- */
+:root {
+  --f-poster: 'Bebas Neue', 'Arial Narrow', Impact, sans-serif;
+  --f-head: 'League Spartan Variable', 'League Spartan', 'Futura', 'Avenir Next', Arial, sans-serif;
+  --f-body: 'DM Sans Variable', 'DM Sans', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+
+  --r-card: 22px; --r-ctl: 12px;
+
+  --paper: #f6eedc; --paper-2: #efe3c8; --card: #fffaf0; --card-2: #fbf2df;
+  --ink: #173a40; --ink-2: #3c5a5e; --ink-3: #536a6b;
+  --line: rgba(23, 58, 64, .11); --line-2: rgba(23, 58, 64, .2); --track: rgba(23, 58, 64, .08); --grid: rgba(23, 58, 64, .08);
+  --mint: #6fcfae; --mint-soft: #d6f1e6; --mint-ink: #136b55;
+  --coral: #ff7b5f; --coral-soft: #ffe0d6; --coral-ink: #ad3a20;
+  --mustard: #f4b63f; --mustard-soft: #fcebc2; --mustard-ink: #855800;
+  --teal: #1f9a96; --teal-soft: #d0ecea; --teal-ink: #0d6461;
+  --sky: #78bde3; --sky-soft: #d9ecf7; --sky-ink: #1f5a7d;
+  --lilac: #b39ddb; --lilac-soft: #ebe3f7;
+  --sky-a: #fff6e2; --sky-b: #fde6c2; --sky-c: #fbc9a0; --sky-d: #f6a688;
+  --sun-disc: #ffe3a0; --hill-a: #8fd9be; --hill-b: #5bb8a3; --star-o: 0;
+  --board: #173a40; --board-2: #24535a; --flap: #ffe7bf; --flap-dim: #9fb9b6;
+  --shadow: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 2px 0 rgba(23, 58, 64, .05), 0 18px 34px -26px rgba(23, 58, 64, .45);
+  --pill-bg: rgba(255, 250, 240, .9); --btn: #173a40; --btn-ink: #fff7e8; --focus: #0d6461;
+  --dot: rgba(23, 58, 64, .07); --grain-o: .22; --grain-blend: multiply;
+
+  --s1: #1f9a96; --s2: #e0603f; --s3: #8f6fc8; --s4: #c98a12; --s5: #3f8fc4; --s-other: #b9c6c2;
+  --up: #1f9a96; --dn: #c98a12; --mid: #d9d3c4;
+  --seq-0: #eef6f5; --seq-1: #c4e4e1; --seq-2: #8ccac5; --seq-3: #4aa9a4; --seq-4: #1f7f7b;
+  --ok: #136b55; --watch: #855800; --act: #ad3a20; --info: #1f5a7d;
+  color-scheme: light;
+}
+html.dark {
+  --paper: #0d0e10; --paper-2: #17181b; --card: #202126; --card-2: #2a2c31;
+  --ink: #ffffff; --ink-2: #e6e7ea; --ink-3: #a3a7b0;
+  --line: #303238; --line-2: #3e4048; --track: #2a2c31; --grid: #2c2e34;
+  --mint: #86e8c9; --mint-soft: rgba(134, 232, 201, .15); --mint-ink: #95f0d3;
+  --coral: #ff9077; --coral-soft: rgba(255, 144, 119, .16); --coral-ink: #ffab97;
+  --mustard: #ffcb5c; --mustard-soft: rgba(255, 203, 92, .15); --mustard-ink: #ffd677;
+  --teal: #4fd6cb; --teal-soft: rgba(79, 214, 203, .15); --teal-ink: #7ce6dd;
+  --sky: #9fd4f2; --sky-soft: rgba(159, 212, 242, .15); --sky-ink: #b5e0f8;
+  --lilac: #c9b6f2; --lilac-soft: rgba(201, 182, 242, .16);
+  --sky-a: #0b2130; --sky-b: #16304d; --sky-c: #3a3160; --sky-d: #6e3d62;
+  --sun-disc: #ff9f6b; --hill-a: #164a4c; --hill-b: #0d3134; --star-o: .75;
+  --board: #17181b; --board-2: #2f3138; --flap: #ffd38a; --flap-dim: #7f9aa0;
+  --shadow: 0 1px 0 rgba(247, 236, 214, .05) inset, 0 20px 40px -28px rgba(0, 0, 0, .8);
+  --pill-bg: rgba(32, 33, 38, .92); --btn: #ffcb5c; --btn-ink: #0d0e10; --focus: #ffcb5c;
+  --dot: rgba(255, 255, 255, .035); --grain-o: .1; --grain-blend: screen;
+  --s1: #21a39d; --s2: #e6603f; --s3: #9a7ad6; --s4: #b37f14; --s5: #4a8fd0; --s-other: #4f6b72;
+  --up: #21a39d; --dn: #b37f14; --mid: #3a3c42;
+  --seq-0: #1e2a2b; --seq-1: #1d4645; --seq-2: #1f6764; --seq-3: #2b8f89; --seq-4: #4fd6cb;
+  --ok: #95f0d3; --watch: #ffd677; --act: #ffab97; --info: #b5e0f8;
+  color-scheme: dark;
+}
