@@ -39,7 +39,7 @@ The Claude Code CLI implementation follows the pattern Joshua's Hemline app alre
 cd "$(mktemp -d)"
 desk_prompt | claude -p \
   --system-prompt-file /app/desk/agents/prompts/plan-keeper.md \
-  --model sonnet --effort medium \
+  --model opus --effort high \
   --tools "" \
   --setting-sources "" --strict-mcp-config \
   --permission-mode dontAsk --permission-prompts none \
@@ -48,32 +48,42 @@ desk_prompt | claude -p \
   --output-format json --json-schema "$(cat /app/desk/agents/schemas/proposal.json)"
 ```
 
-Research and Scout swap `--tools ""` for `--tools "WebSearch,WebFetch"` and add `--allowedTools "WebSearch,WebFetch"`.
+Research, Scout and Strategy swap `--tools ""` for `--tools "WebSearch,WebFetch"` and add `--allowedTools "WebSearch,WebFetch"`.
 
 Notes, checked against the Claude Code docs on November 7, 2026:
 
 - **Auth.** `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`, only in the cron service's environment (root-only env file), with `HOME=/data/home`. CLI pinned (2.1.308 at time of writing) with `DISABLE_AUTOUPDATER=1`, so a CLI update never changes behaviour overnight.
 - **No `--bare`.** It is the docs' recommendation for scripts, but bare mode does not read `CLAUDE_CODE_OAUTH_TOKEN`. Isolation instead comes from an empty temp directory, `--setting-sources ""` and `--strict-mcp-config`, so no CLAUDE.md, memory, hooks or MCP servers load.
-- **No file tools at all.** The brief arrives on stdin, so four desks run with `--tools ""` and the two web desks get web tools only. No desk can read the disk, run a shell or write a file; work comes back as `structured_output`.
+- **No file tools at all.** The brief arrives on stdin, so four desks run with `--tools ""` and the three web desks get web tools only. No desk can read the disk, run a shell or write a file; work comes back as `structured_output`.
 - **Replace, don't append, the system prompt.** `--system-prompt-file` drops Claude Code's coding-assistant prompt, which these desks don't need, and keeps every run's instructions in one versioned file.
 - **`dontAsk` plus `--permission-prompts none`** denies anything outside the allow-list and carries on, rather than hanging on a prompt nobody will answer.
 - **Caps.** `--max-turns` per desk, and a 20-minute wall clock. A stuck run gets SIGINT first (SIGTERM drops the turn).
-- **`--model` takes aliases** (`sonnet`, `opus`), so model upgrades need no code change.
+- **`--model opus`** is an alias, so it follows the current Opus (Opus 5.5 today) and model upgrades need no code change.
 - **Reading the result.** Parse stdout as JSON; the answer is `structured_output`, and its absence is a failed run. Usage is logged from input, cache and output token counts. `is_error`, or a result matching usage limit, rate limit, 429 or overloaded, raises `UsageLimitError` and defers the run (see [Usage budget](#usage-budget)). Only dropped connections retry, at 5, 15, 30 and 60 seconds.
 - **One desk at a time.** A single lock serialises desk runs, so a busy night never fans out into parallel usage.
 
 ## Desks
 
-Joshua's parameters (risk level, industry focus, general opportunity, tax opportunities, growth) are **dials**, not separate agents. More agents means more usage and more overlapping noise; five desks reading shared dials covers every parameter.
+Joshua's parameters (risk level, industry focus, general opportunity, tax opportunities, growth) are **dials**, not separate agents. More agents means more usage and more overlapping noise; six standing desks reading shared dials cover every parameter, plus a Strategy desk that feeds the lab.
 
-| Desk | Runs (ET) | Reads | Writes | Model, effort, tools |
+| Desk | Runs (ET) | Reads | Writes | Effort, tools |
 |---|---|---|---|---|
-| **Plan keeper** | Daily 17:30, after the 17:00 mirror | Drift vs plan mix, cash, pending deposits, margin debit, rule status | Where the next deposit goes; rule-breach alerts; the 3 to 5 line daily Brief on Bridge | sonnet, medium; read tools |
-| **Tax desk** | Sunday 02:00; daily 02:00 in December; when a new lot export lands | Lots, unrealized gains and losses, wash-sale windows across all accounts, marginal rate from Escape Vektor's tax estimate | Harvest candidates, lot picks for Specific Shares, year-end deadline list | sonnet, high; read tools |
-| **Risk desk** | Saturday 02:00; also when the engine flags a trigger (below) | Concentration, correlation, drawdown scenarios, margin debit and interest cost | Weekly risk report; trim or "hold off" proposals | sonnet, high; read tools |
-| **Research desk** | Wednesday 01:00 (one holding a week, in rotation); on request; day after a holding reports earnings | Holding fundamentals from the brief, plus the web and SEC EDGAR | Dossier per holding, written and refreshed: thesis, bear case, valuation range, what would change the call, dated sources | opus, high; read tools, WebSearch, WebFetch |
-| **Scout** | First Sunday of the month, 03:00 | Industry focus, growth tilt, satellite room left | Up to N ideas inside the satellite cap, each with its bear case | opus, high; read tools, WebSearch, WebFetch |
-| **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | sonnet, high; read tools |
+| **Plan keeper** | Daily 17:30, after the 17:00 mirror | Drift vs plan mix, cash, pending deposits, margin debit, rule status | Where the next deposit goes; rule-breach alerts; the 3 to 5 line daily Brief on Bridge | high; no tools |
+| **Tax desk** | Sunday 02:00; daily 02:00 in December; when a new lot export lands | Lots, unrealized gains and losses, wash-sale windows across all accounts, marginal rate from Escape Vektor's tax estimate | Harvest candidates, lot picks for Specific Shares, year-end deadline list | high; no tools |
+| **Risk desk** | Saturday 02:00; also when the engine flags a trigger (below) | Concentration, correlation, drawdown scenarios, margin debit and interest cost | Weekly risk report; trim or "hold off" proposals | high; no tools |
+| **Research desk** | Wednesday 01:00 (one holding a week, in rotation); on request; day after a holding reports earnings | Holding fundamentals from the brief, plus the web and SEC EDGAR | Dossier per holding, written and refreshed: thesis, bear case, valuation range, what would change the call, dated sources | xhigh; WebSearch, WebFetch |
+| **Scout** | First Sunday of the month, 03:00 | Industry focus, growth tilt, satellite room left | Up to N ideas inside the satellite cap, each with its bear case | xhigh; WebSearch, WebFetch |
+| **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | high; no tools |
+| **Strategy desk** | On request from the Console; at most two new strategies a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
+
+**Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is a line in `desk/agents/desks.yaml`.
+
+**Usage impact.** Opus at high and extra-high effort draws down the 5-hour and weekly limits much faster than a smaller model would, and these runs share those limits with his interactive Claude Code and the cloud build threads. The plan keeps the model and controls frequency instead:
+
+- The plan keeper skips its daily run when nothing in its brief changed since the last one (no drift change past a threshold, no new cash, no trigger).
+- One desk at a time behind the run lock; overnight window; per-desk turn caps.
+- Strategy runs are capped per week, and each lab result costs one interpretation run, not a loop.
+- When the weekly budget is spent, lower-priority desks wait for the next week rather than switching model. If limits bite in practice, the first lever is fewer research and strategy runs, then `high` instead of `xhigh`.
 
 **Engine triggers** come from the engine's triggers table and fire a desk at most once a day: a margin debit appears; a position moves more than the risk dial's daily threshold; a single holding passes its concentration band; a holding reports earnings; a new lot export arrives. Live tracking itself is engine work and needs no agent.
 
@@ -91,6 +101,38 @@ Real settings live in `desk.yaml` on the TrueNAS box, outside the repo. The repo
 | `tax` | Harvest threshold in dollars, default lot method, year-end window, accounts that share wash-sale rules | Tax desk |
 | `growth` | Horizon in years, growth vs dividend tilt, link to the plan's FI target | Plan keeper, Research, Scout |
 | `usage` | Weekly run budget, overnight window, per-desk caps | Scheduler |
+
+## Strategy lab
+
+The lab tests trading strategies over 3, 5 and 10 year windows as paper trading, without real money. The engine owns the simulation (`docs/statistics.md`, "Backtests and honest limits"); the Strategy desk writes the hypotheses and reads the results.
+
+**The model cannot forget the future.** Opus was trained on market history up to its training cutoff. Asked to "pretend it's 2016 and ignore what came after", it still knows which companies won, and any strategy it designs will lean on that knowledge without meaning to. So:
+
+1. **The agent never runs the simulation.** It writes a strategy as rules (a spec), and the engine replays them point-in-time on stored prices and filings, using only data published by each date. The model's hindsight can shape which rules it writes, but it cannot leak into the trades.
+2. **The honest tests are the ones after the cutoff.** Every lab result reports the window after the model's training cutoff separately, and a strategy only counts as working if it holds there too.
+3. **Forward paper trading is the final test.** A strategy that passes the lab runs as a paper portfolio on live data for at least six months before it can generate real proposals. That period is free of any hindsight, the model's or ours.
+4. **Every variant counts.** Specs record their parent, so the lab knows how many versions of an idea were tried and can discount the winner for it.
+5. **Criteria are set before the test.** The spec states what "works" means (excess return vs the plan mix, maximum drawdown, minimum trades, how many windows it must hold in). Criteria cannot change after a result.
+
+**Stages:** `draft` → `lab` → `paper` (forward, six months minimum) → `eligible`. An eligible strategy can generate proposals inside the satellite cap, and they go through Preflight and the scorecard like any other proposal. A strategy that fails its paper period goes back to `draft` or is retired.
+
+**Strategy spec** (`desk/agents/schemas/strategy.json`, agreed with the statistics thread):
+
+| Field | Meaning |
+|---|---|
+| `id`, `version`, `parent_id` | Identity and lineage, for variant counting |
+| `title`, `hypothesis` | Plain-language idea and why the market might be missing it |
+| `universe` | Point-in-time rule, such as index members as of each date, a fixed fund list, or a screen; never "today's tickers" |
+| `signals` | List of `{metric_id, window, transform}` from the lab's feature list only |
+| `entry`, `exit`, `rebalance`, `sizing` | Rules over those signals |
+| `constraints` | Long only, no margin, maximum position %, maximum turnover |
+| `success_criteria` | Pre-registered thresholds, as above |
+| `horizons` | Any of 3, 5, 10 years; the lab picks rolling start dates |
+| `written_at`, `desk`, `model`, `effort` | Provenance |
+
+Trading costs, taxes and the benchmark (plan mix) are set by the lab, not the spec. The lab answers with a result per horizon, the post-cutoff window, variants tried, caveats such as survivorship, and a verdict: `pass`, `fail` or `inconclusive`. The Strategy desk then writes a short memo on what the result does and does not show.
+
+Expect most strategies to fail. That is the lab working: a cheap "no" in simulation beats an expensive one in the account.
 
 ## Proposal contract
 
@@ -142,7 +184,7 @@ A blocked proposal still appears, labelled with its cost, because the decision i
 Agent runs share the subscription's 5-hour and weekly limits with Joshua's interactive Claude Code and the cloud threads that build both apps.
 
 - **Overnight by default.** Scheduled runs sit between 01:00 and 06:00 ET, except the plan keeper's short daily run.
-- **Priority when the budget is tight:** plan keeper, then tax desk (first in December), risk desk, research desk, scout. The scheduler skips lower-priority runs rather than squeezing them in.
+- **Priority when the budget is tight:** plan keeper, then tax desk (first in December), risk desk, research desk, scout, strategy desk. The scheduler skips lower-priority runs rather than squeezing them in.
 - **Metered.** Each run logs turns, tokens and wall time. The status page shows usage per desk per week. Start with a small weekly budget and set the real one after two weeks of logs.
 - **Rate limits.** If a run fails on a usage or rate limit, it is marked `deferred` and retried once in the next window. No retry loops.
 - **Token health.** The `setup-token` token lasts a year. The status page shows the date it was created and warns 30 days before it expires. An authentication failure pauses every desk and shows a banner instead of failing silently each night.
@@ -195,7 +237,7 @@ Numbering follows `ROADMAP.md`.
 | **5. Plan keeper and tax desk** | Adapter, prompts, scheduler and run lock, crontab lines, plan keeper, tax desk, scorecard logging from the first proposal | Phase 4; the lot import |
 | **6. Research** | Research desk, Skeptic, Console requests, engine triggers, dossiers | Market-data and EDGAR fetchers; dossier and source views (design) |
 | **7. Lab risk** | Risk desk | Correlation and drawdown scenarios (statistics) |
-| **10. Scout** | Scout; keep-or-switch-off review once six months of scores exist; optional read-only MCP server | Scorecard method and reports (statistics) |
+| **10. Scout** | Scout, Strategy desk and strategy specs; keep-or-switch-off review once six months of scores exist; optional read-only MCP server | Scorecard method and reports, rule backtests and the lab (statistics) |
 
 ## Before you start
 
