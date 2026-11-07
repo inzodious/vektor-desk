@@ -48,7 +48,7 @@ Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deplo
 | Layer | Where | Tables | Rule |
 |---|---|---|---|
 | **raw** | `mirror.db`, plus `desk.db` | Mirror: `rows`, `row_history`. Engine: `raw_lot_files`, `raw_api(source, key, body, fetched_at)` | Verbatim, append-only. Lets any later number be recomputed from what was known on the day |
-| **core** | `desk.db` | `accounts`, `engine_snapshots` (every snapshot the mirror ever saw, with the one per day used as the anchor), `holdings_daily(date, account, symbol, shares, close, value, cost, reported_value, is_cash, source, anchor, quality)`, `lots`, `cash_flows(date, account, amount, kind, external)`, `prices_daily(symbol, date, close, adj_close, source)`, `benchmarks`, `factors_daily`, `macro_daily`, `fund_holdings(fund, as_of, holding, weight)`, `quotes_live(symbol, at, price)` | Normalized, deduplicated, one row per fact |
+| **core** | `desk.db` | `accounts`, `engine_snapshots` (every snapshot the mirror ever saw, with the one per day used as the anchor), `holdings_daily(date, account, symbol, shares, close, value, cost, reported_value, is_cash, source, anchor, quality)`, `lots`, `cash_flows(date, account, amount, kind, external)`, `prices_daily(symbol, date, close, adj_close, source)`, `benchmarks`, `factors_daily`, `macro_daily`, `fund_holdings(fund, as_of, holding, name, cusip, weight, asset_cat, country, accession)`, `quotes_live(symbol, at, price)` | Normalized, deduplicated, one row per fact |
 | **derived** | `desk.db` | `metric_values`, `series_daily`, `signals`, `proposals_scored`, `data_health` | Written by the engine run, tagged with `engine_version` |
 
 **Keep every pull.** Escape Vektor collapses synced snapshots to one per week. `row_history` keeps every version of every snapshot and position the mirror saw (`positions.json.snapshotId` joins to `snapshots.json.id`), so the engine rebuilds `holdings_daily` for every pull and, from the first day the mirror runs, has a daily history Escape Vektor does not. Earlier history is rebuilt the way Escape Vektor's `market.js` does it: the earliest snapshot's quantities rolled forward by activity rows, priced with daily closes, flagged `pro_forma` where no snapshot confirms it.
@@ -95,6 +95,7 @@ Each metric has an id, a formula, a minimum sample, and scopes (portfolio, accou
 | `ret.mwr` | Money-weighted return (XIRR) | Judges your actual dollars, including timing |
 | `ret.twr_ann` | Annualized TWR | 3Y and since start, only at 365 days or more |
 | `ret.contrib` | Contribution to return | Weight × return per holding; sums to the portfolio return |
+| `ret.after_tax` | After-tax return per account | Windows `YTD`, `1Y`, `ITD`. HSA, IRA, Roth and 401(k) keys equal `ret.twr`; taxable accounts subtract dividends and realized short-term gains at `tax.marginal_rate` and long-term gains at `DESK_LTCG_RATE_PCT` (default 15); `modelled` |
 
 Windows: 1D, 1W, MTD, QTD, YTD, 1Y, 3Y, since start. **Returns under a year are never annualized.** A 9% month shown as 180% a year is noise in a costume.
 
@@ -106,29 +107,31 @@ Windows: 1D, 1W, MTD, QTD, YTD, 1Y, 3Y, since start. **Returns under a year are 
 | `bm.sp500_shadow` | S&P 500 shadow | Same dollars, same dates, all in an S&P 500 index fund (total return) |
 | `bm.excess` | Excess return vs each shadow | In percent and in dollars. Dollars are the headline |
 | `bm.tracking_error` | Tracking error | Annualized volatility of daily excess return |
-| `bm.capture` | Up and down capture | Against the S&P 500 |
-| `bm.active_share` | Active share vs plan | Half the sum of absolute weight differences |
+| `bm.capture` | Up and down capture | Against the S&P 500, geometric, scope `benchmark` with `scope_id` `up` or `down`, window `ITD`, 63 days or more |
+| `bm.active_share` | Active share vs plan | Half the sum of absolute weight differences, invested weights against the plan targets |
 
 The shadows answer the only question that matters for a personal portfolio: would the same paychecks have done better on autopilot? The cumulative dollar gap to `bm.plan_shadow` is the desk's most important number and feeds the agent scorecard.
 
 ### Risk
 
+Portfolio rows use your actual daily returns once there are enough of them. Before that, they use today's invested weights over five years of holding prices (scaled by invested over total value, so margin shows), flagged `pro_forma`; a holding with less history borrows the S&P 500's return until it starts. The S&P 500 proxy is the first of SPY, FXAIX, VOO, IVV with prices.
+
 | Id | Metric | Min sample | Notes |
 |---|---|---|---|
 | `risk.vol` | Annualized volatility | 63 days | 63-day and 252-day windows |
-| `risk.downside_dev` | Downside deviation | 63 days | |
+| `risk.downside_dev` | Downside deviation | 63 days | Annualized, below zero; windows `63D`, `252D` |
 | `risk.mdd` | Max drawdown, duration, recovery | none | Plus `risk.dd_now` (current drawdown from the high) and `risk.mdd_days` (longest days under water) |
-| `risk.var95`, `risk.cvar95` | Historical 1-day and 1-month VaR and expected shortfall | 250 days | On short history, uses current weights over five years of holding prices, flagged `pro_forma` |
-| `risk.beta` | Beta to the S&P 500 | 252 days | |
-| `risk.corr` | Correlation matrix of holdings | 252 days | Feeds the comparison view |
-| `risk.sharpe`, `risk.sortino` | Risk-adjusted return | 1 year | Risk-free from FRED. Not shown under a year |
+| `risk.var95`, `risk.cvar95` | Historical 1-day and 1-month VaR and expected shortfall | 250 days | Loss in percent (positive), windows `1D` and `1M` (overlapping 21-day returns), up to five years of returns |
+| `risk.beta` | Beta to the S&P 500 | 252 days | Portfolio, and per holding (scope `holding`) on its own prices |
+| `risk.corr` | Correlations | 252 days | Scope `holding`: each holding against the S&P 500, windows `63D` and `252D`. Scope `pair`, `scope_id` `A\|B`: the matrix for the ten largest holdings |
+| `risk.sharpe`, `risk.sortino` | Risk-adjusted return | 1 year | Actual returns only, windows `1Y` and `ITD`. Risk-free is the average FRED 3-month bill over the window, else `DESK_RISK_FREE_PCT`, else 0 (`modelled`) |
 | `risk.top1`, `risk.top5` | Largest one and five weights | none | |
 | `risk.eff_n` | Effective number of holdings | none | 1 / sum of squared weights (inverse HHI) |
-| `risk.lookthrough` | Look-through exposure | none | Fund weights × N-PORT holdings, so an index fund and a sector fund that both hold the same megacaps show the true overlap |
-| `risk.sector` | Sector exposure | none | Through look-through holdings and profiles |
-| `risk.factor` | Factor exposure | 3 years | Market, size, value, profitability, investment and momentum betas from the French factors; on holdings' own histories, weighted |
-| `risk.scenario` | Scenario shocks in dollars | none | Historical (2008, March 2020, 2022) replayed on current weights, plus set shocks: market −20%, the single-stock satellite −50%, rates +2 points |
-| `risk.corr_shift` | Correlation shift | 252 days | 63-day vs 252-day correlation between each holding and the market; flags when diversification is quietly vanishing |
+| `risk.lookthrough` | Look-through exposure | none | Fund weights × N-PORT holdings plus direct stocks, so an index fund and a sector fund that both hold the same megacaps show the true overlap. Portfolio row (window `top10`) is the ten largest underlyings combined; scope `underlying` lists the top 25. `risk.lookthrough_coverage` is the share of invested value seen through |
+| `risk.sector` | Sector exposure | none | Scope `sector`. Underlyings by their Finnhub industry (or Escape Vektor's profile), mapped to the 11 GICS sectors; non-equity fund holdings are `Bonds and other`; sector ETFs without N-PORT map whole; anything else is `Unclassified` or `Funds without look-through` |
+| `risk.factor` | Factor exposure | 3 years | Market, size, value, profitability, investment and momentum betas from the French factors; on holdings' own histories, weighted (phase 11) |
+| `risk.scenario`, `risk.scenario_pct` | Scenario shocks in dollars and percent of value | none | Scope `scenario`. Historical replays on current positions: `gfc_2008` (2007-10-09 to 2009-03-09), `covid_2020` (2020-02-19 to 2020-03-23), `rates_2022` (2022-01-03 to 2022-10-12); a holding without prices then uses the S&P 500 times its beta (`pro_forma`). Set shocks: `market_-20` (beta-scaled, `modelled`), `satellite_-50` (single stocks outside the plan), `rates_+2` (each holding's sensitivity to daily 10-year yield moves over three years, `modelled`) |
+| `risk.corr_shift` | Correlation shift | 252 days | 63-day minus 252-day correlation with the market per holding; a move of 0.3 or more means diversification is quietly changing |
 
 ### Margin
 
@@ -150,7 +153,7 @@ The shadows answer the only question that matters for a personal portfolio: woul
 | `plan.drift_max` | Largest drift, in points, and which fund | The Bridge headline |
 | `plan.single_stock` | Single-stock share vs its band | |
 | `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling |
-| `plan.adherence` | Plan adherence | Share of invested dollars that went to the plan mix, by window |
+| `plan.adherence` | Plan adherence | Share of buy dollars (activity, core sweeps excluded) that went to plan funds; windows `MTD`, `QTD`, `YTD`, `1Y`, `ITD` |
 | `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points. Each a pass or fail with the evidence |
 
 ### Tax (needs the lot export)
@@ -188,7 +191,8 @@ Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamen
 
 | Id | Metric | Notes |
 |---|---|---|
-| `cost.expense`, `cost.expense_usd` | Weighted expense ratio and dollars a year | Expense ratios from the plan's funds |
+| `cost.expense`, `cost.expense_usd` | Weighted expense ratio and dollars a year | Expense ratios from the plan's funds; scope `holding` carries each fund's ratio |
+| `income.yield` | Trailing dividend yield | Scope `holding`, window `TTM`, from Escape Vektor's symbol profiles |
 | `cost.total` | All-in yearly cost | Expenses plus margin interest plus estimated dividend tax drag |
 
 ### FI progress
@@ -229,14 +233,32 @@ Patterns are descriptive context with a base rate attached, never a trigger. Eac
 
 ## Comparative analysis
 
-One comparison engine serves every "this vs that" view:
+One comparison engine (`desk.engine.compare`) serves every "this vs that" view: `GET /api/compare?ids=&window=`.
 
-- **Inputs:** two to five series (holdings, funds, benchmarks, shadows, accounts), one window.
-- **Alignment:** common trading days, total return (`adjClose`), rebased to 100 at the start.
-- **Table:** return, volatility, max drawdown, correlation, beta, expense ratio, yield, look-through overlap, and for accounts, after-tax return.
-- **Rule:** a window shorter than both series' histories is never silently chosen; the shorter history sets the start and the view says so.
+- **Inputs:** two to five ids, comma separated: a ticker, `portfolio`, `account:<key>`, or `shadow:plan_shadow` / `shadow:sp500_shadow`. Windows `1M`, `3M`, `6M`, `YTD`, `1Y` (default), `3Y`, `5Y`, `10Y`, `MAX`.
+- **Alignment:** common days only, total return (`adjClose`, else close; portfolio, accounts and shadows use their `twr_index`), rebased to 100 at the start.
+- **Rule:** a window longer than the shortest history is never silently shortened: the shortest series sets the start, `clipped` is true and `note` names it. A bad id, window or count is a 400.
+
+| Field | Meaning |
+|---|---|
+| `series` | `{id: [{date, value}]}`, rebased |
+| `start`, `end`, `days`, `requested_start`, `clipped`, `note` | The window actually used |
+| `table[]` | Per id: `return_pct`, `ann_return_pct` (365 days or more only), `vol_pct`, `mdd_pct`, `return_per_risk`, `corr` and `beta` to the first id, `corr_sp500`, `expense_pct`, `yield_pct`, `overlap_pct` (look-through overlap with the first id), `after_tax_pct` (accounts, `YTD`, `1Y`, `MAX`) |
 
 Standard comparisons: actual vs plan shadow vs S&P 500 shadow; fund vs fund inside a sleeve; any watchlist symbol vs the fund it would replace; Individual vs HSA vs 401(k).
+
+### Look-through job
+
+`python -m desk.engine lookthrough` runs Sundays at 02:10 and skips any source whose key is missing.
+
+| Step | Source | Notes |
+|---|---|---|
+| Fund to series | SEC `company_tickers_mf.json` | Weekly; `sec_funds` |
+| Latest N-PORT | Fund trust's submissions, newest `NPORT-P` whose series matches | Up to 40 documents scanned per fund; each document's series is cached in `nport_filings`, so a trust is read once a quarter. Refreshed every 30 days |
+| Holdings | `primary_doc.xml` | Name, CUSIP, ticker, percent of net assets, asset category, country into `fund_holdings`. Ticker from the filing, else the SEC company title match. DTDs are refused |
+| Sectors | Finnhub `stock/profile2` | Top underlyings plus direct stocks, up to `DESK_SECTOR_PROFILES` (default 150) a run, refreshed every 90 days, about one call a second; `sym_profiles` |
+
+The core run writes the exposure to `lookthrough(as_of, holding, name, weight, direct, via)` and warns in `data_health` (`lookthrough`) when a held fund has no holdings yet or its filing is over 150 days old. `GET /api/engine/lookthrough?fund=&limit=` serves the exposure rows (direct share and the funds behind each), sectors, funds covered, and one fund's holdings.
 
 ## Preflight (what-if)
 
@@ -422,7 +444,7 @@ triggers(as_of, kind, scope_id, detail)
 strategies, strategy_trials, paper_positions, paper_trades   (see Strategy lab)
 ```
 
-- `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`.
+- `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`, plus `pair`, `underlying`, `sector`, `scenario`, `macro`, `rule`, `tax`.
 - `quality`: `ok`, `stale`, `pro_forma`, `modelled`, `insufficient_history`.
 - `unit`: `usd`, `pct`, `pts`, `ratio`, `days`, `date`.
 
@@ -463,7 +485,8 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | `GET /api/engine/value?start=&end=&account=&symbol=` | Value over time, optionally one account or one position |
 | `GET /api/engine/prices?symbol=&start=&end=` | Daily closes `[{date, close}]` |
 | `GET /api/engine/lots?symbol=&account=` | Current tax lots and recent lot files |
-| `GET /api/compare?ids=&window=` | Aligned, rebased series plus the comparison table |
+| `GET /api/compare?ids=&window=` | Aligned, rebased series plus the comparison table; 400 on bad input |
+| `GET /api/engine/lookthrough?fund=&limit=` | Look-through exposure, sectors, funds covered, one fund's holdings |
 | `GET /api/live` | Latest quotes, live value, day change (market hours) |
 | `GET /api/live/intraday` | Today's quote ticks `{SYM: [{t, price}]}` |
 | `POST /api/preflight` | The Preflight answer for a hypothetical trade (nothing stored); 400 on a bad trade |
@@ -478,10 +501,11 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | When | Runs |
 |---|---|
 | Every 5 min, 9:30 to 16:00 ET weekdays | Quotes, live value, day change, intraday drawdown, margin call distance |
-| After each mirror (8:00, 17:00 ET) | Reconciliation, holdings, flows, returns, drift, rules, margin, tax (if lots are fresh), brief for the agents |
-| Nightly | Tiingo, EDGAR, FRED pulls; risk, correlations, comparisons, signals, scorecard |
+| After each mirror (8:00, 17:00 ET) | Reconciliation, holdings, flows, returns, drift, rules, margin, tax (if lots are fresh), risk, correlations, scenarios, look-through exposure, signals, brief for the agents. Comparisons are computed on request |
+| Nightly | Tiingo, EDGAR, FRED pulls; scorecard |
 | Nightly, after the 17:00 run | Forward paper portfolios step one day; queued lab backtests run overnight under `job_lock("lab")` |
-| Monthly | French factors, N-PORT look-through, Monte Carlo refresh, factor regression on holdings with three years or more of history |
+| Weekly, Sunday 02:10 | N-PORT look-through and sector profiles |
+| Monthly | French factors, Monte Carlo refresh, factor regression on holdings with three years or more of history |
 
 ## Stack and tests
 

@@ -10,7 +10,7 @@ SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
     "plan_keeper": {
         "value": ("value.market@portfolio", "value.market@account", "value.day_change", "value.gain", "flow.net_contrib", "income.dividends"),
         "cash": ("cash.*",),
-        "drift": ("plan.weight", "plan.target", "plan.drift", "plan.drift_max", "plan.in_mix", "plan.next_deposit"),
+        "drift": ("plan.weight", "plan.target", "plan.drift", "plan.drift_max", "plan.in_mix", "plan.next_deposit", "plan.adherence"),
         "rules": ("plan.rules", "plan.single_stock"),
         "margin": ("margin.*",),
         "benchmarks": ("bm.plan_shadow", "bm.sp500_shadow", "bm.excess"),
@@ -44,14 +44,14 @@ SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
         "value": ("value.market@portfolio", "cash.ready"),
         "drift": ("plan.drift", "plan.drift_max"),
         "margin": ("margin.debit", "margin.cost_month", "margin.call_drop"),
-        "risk": ("risk.top1", "risk.eff_n", "plan.single_stock", "value.weight@holding"),
+        "risk": ("risk.top1", "risk.eff_n", "risk.lookthrough@portfolio", "risk.scenario", "risk.var95", "plan.single_stock", "value.weight@holding"),
         "tax": ("tax.wash_window", "tax.marginal_rate"),
         "signals": ("sig.*", "fund.*"),
     },
     "strategy": {
         "returns": ("ret.*",),
         "benchmarks": ("bm.*",),
-        "risk": ("risk.vol", "risk.mdd", "risk.dd_now"),
+        "risk": ("risk.vol", "risk.mdd", "risk.dd_now", "risk.sharpe", "risk.sortino", "risk.beta@portfolio", "risk.downside_dev"),
         "macro": ("macro.*",),
     },
 }
