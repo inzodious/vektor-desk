@@ -177,7 +177,7 @@ A blocked proposal still appears, labelled with its cost, because the decision i
 **Containment:**
 
 - Desks have no file, shell or MCP tools, so they cannot reach the Firestore service-account key, `mirror.db`, `desk.db`, market-data keys or Porkbun keys even though the cron service can. Only the runner, which is plain Python, reads data and writes decision records.
-- No MCP servers before Phase 10. A read-only `desk-data` MCP server (SELECT on whitelisted views) is optional there.
+- No MCP servers before Phase 11. A read-only `desk-data` MCP server (SELECT on whitelisted views) is optional there.
 - Web pages are untrusted data. An injected instruction can at worst bias a memo's text, because the agent has nothing to act with. The Skeptic never sees web text, the runner drops any URL not listed in `sources`, and the UI renders agent text as plain text.
 - Agents never edit their own prompts, dials or history. Prompt changes are pull requests in this repo.
 - Kill switch: `agents.enabled: false` in `desk.yaml`, or the per-desk toggle in the UI, stops all scheduling at once.
@@ -240,7 +240,9 @@ Numbering follows `ROADMAP.md`.
 | **5. Plan keeper and tax desk** | Adapter, prompts, scheduler and run lock, crontab lines, plan keeper, tax desk, scorecard logging from the first proposal | Phase 4; the lot import |
 | **6. Research** | Research desk, Skeptic, Console requests, engine triggers, dossiers | Market-data and EDGAR fetchers; dossier and source views (design) |
 | **7. Lab risk** | Risk desk | Correlation and drawdown scenarios (statistics) |
-| **10. Scout** | Scout, Strategy desk and strategy specs; keep-or-switch-off review once six months of scores exist; optional read-only MCP server | Scorecard method and reports, rule backtests and the lab (statistics) |
+| **9. Strategy lab** | Strategy desk, strategy specs, tear-sheet memos | The lab, rule backtests and enough stored price and filing history for 10-year windows (statistics); Phases 3 and 6 |
+| **10. Flight record and Patterns** | Scorecard reports per desk | Scorecard method (statistics); 30 days of decision records |
+| **11. Scout** | Scout; keep-or-switch-off review once six months of scores exist; optional read-only MCP server | Eligible lab strategies for Scout to cite (Phase 9) |
 
 ## Before you start
 
