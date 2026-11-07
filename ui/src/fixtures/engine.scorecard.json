@@ -1,0 +1,2361 @@
+{
+ "as_of": "2026-11-06",
+ "groups": [
+  {
+   "by": "origin",
+   "group": "plan_keeper",
+   "window": "30D",
+   "n": 40,
+   "total_usd": -161.06,
+   "mean_usd": -4.03,
+   "hit_rate": 0.4,
+   "ci_low": -7.45,
+   "ci_high": -0.93,
+   "note": null
+  },
+  {
+   "by": "origin",
+   "group": "plan_keeper",
+   "window": "90D",
+   "n": 33,
+   "total_usd": -114.47,
+   "mean_usd": -3.47,
+   "hit_rate": 0.3939,
+   "ci_low": -8.89,
+   "ci_high": 2.32,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "origin",
+   "group": "risk",
+   "window": "30D",
+   "n": 4,
+   "total_usd": 500.15,
+   "mean_usd": 125.04,
+   "hit_rate": 1,
+   "ci_low": 78.33,
+   "ci_high": 172.56,
+   "note": null
+  },
+  {
+   "by": "origin",
+   "group": "risk",
+   "window": "90D",
+   "n": 4,
+   "total_usd": 666.33,
+   "mean_usd": 166.58,
+   "hit_rate": 1,
+   "ci_low": 99.96,
+   "ci_high": 253.54,
+   "note": null
+  },
+  {
+   "by": "origin",
+   "group": "scout",
+   "window": "30D",
+   "n": 11,
+   "total_usd": 120.97,
+   "mean_usd": 11,
+   "hit_rate": 0.5455,
+   "ci_low": -15.52,
+   "ci_high": 36.66,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "origin",
+   "group": "scout",
+   "window": "90D",
+   "n": 10,
+   "total_usd": 393.93,
+   "mean_usd": 39.39,
+   "hit_rate": 0.3,
+   "ci_low": -42.54,
+   "ci_high": 132.39,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "origin",
+   "group": "you",
+   "window": "30D",
+   "n": 6,
+   "total_usd": 359.9,
+   "mean_usd": 59.98,
+   "hit_rate": 0.5,
+   "ci_low": -5.2,
+   "ci_high": 124.73,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "origin",
+   "group": "you",
+   "window": "90D",
+   "n": 6,
+   "total_usd": -321.89,
+   "mean_usd": -53.65,
+   "hit_rate": 0.1667,
+   "ci_low": -79.91,
+   "ci_high": -24.44,
+   "note": null
+  },
+  {
+   "by": "kind",
+   "group": "buy",
+   "window": "30D",
+   "n": 17,
+   "total_usd": 480.87,
+   "mean_usd": 28.29,
+   "hit_rate": 0.5294,
+   "ci_low": -3.11,
+   "ci_high": 59.48,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "kind",
+   "group": "buy",
+   "window": "90D",
+   "n": 16,
+   "total_usd": 72.04,
+   "mean_usd": 4.5,
+   "hit_rate": 0.25,
+   "ci_low": -47.28,
+   "ci_high": 71.92,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "kind",
+   "group": "deposit_route",
+   "window": "30D",
+   "n": 26,
+   "total_usd": -150.86,
+   "mean_usd": -5.8,
+   "hit_rate": 0.3846,
+   "ci_low": -10.72,
+   "ci_high": -1.16,
+   "note": null
+  },
+  {
+   "by": "kind",
+   "group": "deposit_route",
+   "window": "90D",
+   "n": 21,
+   "total_usd": -120.86,
+   "mean_usd": -5.76,
+   "hit_rate": 0.381,
+   "ci_low": -13.11,
+   "ci_high": 1.11,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "kind",
+   "group": "hold_off",
+   "window": "30D",
+   "n": 4,
+   "total_usd": 500.15,
+   "mean_usd": 125.04,
+   "hit_rate": 1,
+   "ci_low": 78.33,
+   "ci_high": 172.56,
+   "note": null
+  },
+  {
+   "by": "kind",
+   "group": "hold_off",
+   "window": "90D",
+   "n": 4,
+   "total_usd": 666.33,
+   "mean_usd": 166.58,
+   "hit_rate": 1,
+   "ci_low": 99.96,
+   "ci_high": 253.54,
+   "note": null
+  },
+  {
+   "by": "kind",
+   "group": "rebalance",
+   "window": "30D",
+   "n": 6,
+   "total_usd": -21.13,
+   "mean_usd": -3.52,
+   "hit_rate": 0.1667,
+   "ci_low": -6.65,
+   "ci_high": -1.2,
+   "note": null
+  },
+  {
+   "by": "kind",
+   "group": "rebalance",
+   "window": "90D",
+   "n": 6,
+   "total_usd": -51.13,
+   "mean_usd": -8.52,
+   "hit_rate": 0.1667,
+   "ci_low": -14.2,
+   "ci_high": -1.53,
+   "note": null
+  },
+  {
+   "by": "kind",
+   "group": "trim",
+   "window": "30D",
+   "n": 8,
+   "total_usd": 10.93,
+   "mean_usd": 1.37,
+   "hit_rate": 0.625,
+   "ci_low": -3.52,
+   "ci_high": 6.25,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "kind",
+   "group": "trim",
+   "window": "90D",
+   "n": 6,
+   "total_usd": 57.52,
+   "mean_usd": 9.59,
+   "hit_rate": 0.6667,
+   "ci_low": 0.79,
+   "ci_high": 19.11,
+   "note": null
+  },
+  {
+   "by": "path",
+   "group": "clean",
+   "window": "30D",
+   "n": 36,
+   "total_usd": 328.16,
+   "mean_usd": 9.12,
+   "hit_rate": 0.4167,
+   "ci_low": -3.59,
+   "ci_high": 21.95,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "path",
+   "group": "clean",
+   "window": "90D",
+   "n": 31,
+   "total_usd": 494.34,
+   "mean_usd": 15.95,
+   "hit_rate": 0.4194,
+   "ci_low": -2.73,
+   "ci_high": 40.62,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "path",
+   "group": "flagged",
+   "window": "30D",
+   "n": 6,
+   "total_usd": 80.14,
+   "mean_usd": 13.36,
+   "hit_rate": 0.5,
+   "ci_low": -22.31,
+   "ci_high": 50.87,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "path",
+   "group": "flagged",
+   "window": "90D",
+   "n": 5,
+   "total_usd": 271.99,
+   "mean_usd": 54.4,
+   "hit_rate": 0.2,
+   "ci_low": -50.47,
+   "ci_high": 238.65,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "path",
+   "group": "override",
+   "window": "30D",
+   "n": 19,
+   "total_usd": 411.66,
+   "mean_usd": 21.67,
+   "hit_rate": 0.5789,
+   "ci_low": -2.04,
+   "ci_high": 49.48,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "path",
+   "group": "override",
+   "window": "90D",
+   "n": 17,
+   "total_usd": -142.43,
+   "mean_usd": -8.38,
+   "hit_rate": 0.4118,
+   "ci_low": -41.88,
+   "ci_high": 26.47,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "taken",
+   "group": "not_taken",
+   "window": "30D",
+   "n": 10,
+   "total_usd": 307.11,
+   "mean_usd": 30.71,
+   "hit_rate": 0.6,
+   "ci_low": -2.27,
+   "ci_high": 66.6,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "taken",
+   "group": "not_taken",
+   "window": "90D",
+   "n": 9,
+   "total_usd": 449.38,
+   "mean_usd": 49.93,
+   "hit_rate": 0.4444,
+   "ci_low": -20.87,
+   "ci_high": 138.65,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "taken",
+   "group": "taken",
+   "window": "30D",
+   "n": 51,
+   "total_usd": 512.85,
+   "mean_usd": 10.06,
+   "hit_rate": 0.451,
+   "ci_low": -0.99,
+   "ci_high": 22.74,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  },
+  {
+   "by": "taken",
+   "group": "taken",
+   "window": "90D",
+   "n": 44,
+   "total_usd": 174.52,
+   "mean_usd": 3.97,
+   "hit_rate": 0.3864,
+   "ci_low": -14.38,
+   "ci_high": 24.91,
+   "note": "The interval includes zero, so this is not yet different from following the plan."
+  }
+ ],
+ "desks": [
+  {
+   "desk": "plan_keeper",
+   "proposals": 43,
+   "approved": 39,
+   "scored_90": 33,
+   "record_usd": -114.47,
+   "summary_90": {
+    "n": 33,
+    "total_usd": -114.47,
+    "mean_usd": -3.47,
+    "hit_rate": 0.3939,
+    "ci_low": -8.89,
+    "ci_high": 2.32,
+    "note": "The interval includes zero, so this is not yet different from following the plan."
+   },
+   "calibration": {
+    "n": 33,
+    "brier": 0.3869,
+    "bins": [
+     {
+      "low": 0.4,
+      "high": 0.6,
+      "n": 8,
+      "said": 0.5337,
+      "happened": 0.625
+     },
+     {
+      "low": 0.6,
+      "high": 0.8,
+      "n": 11,
+      "said": 0.6964,
+      "happened": 0.0909
+     },
+     {
+      "low": 0.8,
+      "high": 1,
+      "n": 14,
+      "said": 0.9014,
+      "happened": 0.5
+     }
+    ]
+   },
+   "lag_days_median": 0.12,
+   "days_on": 340,
+   "chip": "behind"
+  },
+  {
+   "desk": "risk",
+   "proposals": 9,
+   "approved": 5,
+   "scored_90": 4,
+   "record_usd": 666.33,
+   "summary_90": {
+    "n": 4,
+    "total_usd": 666.33,
+    "mean_usd": 166.58,
+    "hit_rate": 1,
+    "ci_low": 99.96,
+    "ci_high": 253.54,
+    "note": null
+   },
+   "calibration": {
+    "n": 4,
+    "brier": 0.2479,
+    "bins": []
+   },
+   "lag_days_median": 0.12,
+   "days_on": 316,
+   "chip": "too_early"
+  },
+  {
+   "desk": "scout",
+   "proposals": 14,
+   "approved": 8,
+   "scored_90": 10,
+   "record_usd": 393.93,
+   "summary_90": {
+    "n": 10,
+    "total_usd": 393.93,
+    "mean_usd": 39.39,
+    "hit_rate": 0.3,
+    "ci_low": -42.54,
+    "ci_high": 132.39,
+    "note": "The interval includes zero, so this is not yet different from following the plan."
+   },
+   "calibration": {
+    "n": 10,
+    "brier": 0.2352,
+    "bins": []
+   },
+   "lag_days_median": 0.12,
+   "days_on": 347,
+   "chip": "keep"
+  },
+  {
+   "desk": "tax",
+   "proposals": 5,
+   "approved": 4,
+   "scored_90": 0,
+   "record_usd": 0,
+   "summary_90": {
+    "n": 0,
+    "total_usd": 0,
+    "mean_usd": null,
+    "hit_rate": null,
+    "ci_low": null,
+    "ci_high": null
+   },
+   "calibration": {
+    "n": 0,
+    "brier": null,
+    "bins": []
+   },
+   "lag_days_median": 0.12,
+   "days_on": 303,
+   "chip": "too_early"
+  }
+ ],
+ "saves": {
+  "n": 9,
+  "usd": 831.81
+ },
+ "offplan_gap": {
+  "n": 6,
+  "total_usd": -321.89,
+  "mean_usd": -53.65,
+  "hit_rate": 0.1667,
+  "ci_low": -79.91,
+  "ci_high": -24.44,
+  "note": null
+ },
+ "decisions": [
+  {
+   "id": "d_20251121140500_2120f6",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2025-12-24",
+     "usd": 56,
+     "quality": "ok",
+     "symbol_pct": 10.4478,
+     "plan_pct": -3.2103
+    },
+    "90D": {
+     "end": "2026-02-20",
+     "usd": 88.22,
+     "quality": "ok",
+     "symbol_pct": 21.393,
+     "plan_pct": -0.1243
+    }
+   },
+   "start": "2025-11-24",
+   "amount_usd": 410
+  },
+  {
+   "id": "d_20251128140500_63e5a0",
+   "origin": "plan_keeper",
+   "kind": "rebalance",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2025-12-31",
+     "usd": -3.57,
+     "quality": "ok",
+     "symbol_pct": -4.792,
+     "plan_pct": -2.2432
+    },
+    "90D": {
+     "end": "2026-02-27",
+     "usd": -20.98,
+     "quality": "ok",
+     "symbol_pct": -10.9753,
+     "plan_pct": 4.0083
+    }
+   },
+   "start": "2025-12-01",
+   "amount_usd": 140
+  },
+  {
+   "id": "d_20251212140500_428d5b",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-01-14",
+     "usd": -68.34,
+     "quality": "ok",
+     "symbol_pct": -8.6957,
+     "plan_pct": 2.6936
+    },
+    "90D": {
+     "end": "2026-03-13",
+     "usd": -118.64,
+     "quality": "ok",
+     "symbol_pct": -11.4493,
+     "plan_pct": 8.3248
+    }
+   },
+   "start": "2025-12-15",
+   "amount_usd": 600
+  },
+  {
+   "id": "d_20251216140500_d3ac7e",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-01-16",
+     "usd": 13.51,
+     "quality": "ok",
+     "symbol_pct": 10.0632,
+     "plan_pct": 5.2386
+    },
+    "90D": {
+     "end": "2026-03-17",
+     "usd": 20.53,
+     "quality": "ok",
+     "symbol_pct": 19.8238,
+     "plan_pct": 12.4918
+    }
+   },
+   "start": "2025-12-17",
+   "amount_usd": 280
+  },
+  {
+   "id": "d_20251223140500_5bf90d",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-01-23",
+     "usd": -37.16,
+     "quality": "ok",
+     "symbol_pct": -10.2481,
+     "plan_pct": 2.137
+    },
+    "90D": {
+     "end": "2026-03-24",
+     "usd": -31.43,
+     "quality": "ok",
+     "symbol_pct": -0.5296,
+     "plan_pct": 9.9468
+    }
+   },
+   "start": "2025-12-24",
+   "amount_usd": 300
+  },
+  {
+   "id": "d_20251224140500_6de0a2",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "NOVA",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-01-23",
+     "usd": null,
+     "quality": "ok"
+    },
+    "90D": {
+     "end": "2026-03-25",
+     "usd": null,
+     "quality": "ok"
+    }
+   },
+   "start": "2025-12-25",
+   "amount_usd": 490
+  },
+  {
+   "id": "d_20251225140500_a915e7",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-01-23",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-03-26",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2025-12-26",
+   "amount_usd": 540
+  },
+  {
+   "id": "d_20251226140500_4f8f4f",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "ACME",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-01-28",
+     "usd": 44.96,
+     "quality": "ok",
+     "avoided_vs_plan": 44.96
+    },
+    "90D": {
+     "end": "2026-03-27",
+     "usd": 53.68,
+     "quality": "ok",
+     "avoided_vs_plan": 53.68
+    }
+   },
+   "start": "2025-12-29",
+   "amount_usd": 340
+  },
+  {
+   "id": "d_20251226140500_1bc174",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-01-28",
+     "usd": -78.01,
+     "quality": "ok",
+     "symbol_pct": -10.9774,
+     "plan_pct": 2.2448
+    },
+    "90D": {
+     "end": "2026-03-27",
+     "usd": -93.15,
+     "quality": "ok",
+     "symbol_pct": -6.9173,
+     "plan_pct": 8.8702
+    }
+   },
+   "start": "2025-12-29",
+   "amount_usd": 590
+  },
+  {
+   "id": "d_20260102140500_81d741",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-04",
+     "usd": 11.75,
+     "quality": "ok",
+     "symbol_pct": 5.1815,
+     "plan_pct": 0.4826
+    },
+    "90D": {
+     "end": "2026-04-03",
+     "usd": 11.94,
+     "quality": "ok",
+     "symbol_pct": 14.5997,
+     "plan_pct": 9.8242
+    }
+   },
+   "start": "2026-01-05",
+   "amount_usd": 250
+  },
+  {
+   "id": "d_20260102140500_42564b",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-04",
+     "usd": -31.92,
+     "quality": "ok",
+     "symbol_pct": -8.1445,
+     "plan_pct": 0.4826
+    },
+    "90D": {
+     "end": "2026-04-03",
+     "usd": -11.97,
+     "quality": "ok",
+     "symbol_pct": 6.5897,
+     "plan_pct": 9.8242
+    }
+   },
+   "start": "2026-01-05",
+   "amount_usd": 370
+  },
+  {
+   "id": "d_20260106140500_4d6bc5",
+   "origin": "tax",
+   "kind": "harvest",
+   "symbol": "ACME",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-02-06",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-04-07",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-01-07",
+   "amount_usd": 650
+  },
+  {
+   "id": "d_20260106140500_6f555f",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-06",
+     "usd": -24.65,
+     "quality": "ok",
+     "symbol_pct": -5.9291,
+     "plan_pct": 1.3214
+    },
+    "90D": {
+     "end": "2026-04-07",
+     "usd": -35.08,
+     "quality": "ok",
+     "symbol_pct": -1.2197,
+     "plan_pct": 9.0991
+    }
+   },
+   "start": "2026-01-07",
+   "amount_usd": 340
+  },
+  {
+   "id": "d_20260109140500_b18365",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-11",
+     "usd": -11.26,
+     "quality": "ok",
+     "symbol_pct": -2.6888,
+     "plan_pct": 1.0659
+    },
+    "90D": {
+     "end": "2026-04-10",
+     "usd": -14.96,
+     "quality": "ok",
+     "symbol_pct": 4.0036,
+     "plan_pct": 8.9899
+    }
+   },
+   "start": "2026-01-12",
+   "amount_usd": 300
+  },
+  {
+   "id": "d_20260109140500_60245e",
+   "origin": "plan_keeper",
+   "kind": "trim",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-11",
+     "usd": -5.36,
+     "quality": "ok",
+     "symbol_pct": 3.5004,
+     "plan_pct": 1.0659
+    },
+    "90D": {
+     "end": "2026-04-10",
+     "usd": -5.54,
+     "quality": "ok",
+     "symbol_pct": 11.51,
+     "plan_pct": 8.9899
+    }
+   },
+   "start": "2026-01-12",
+   "amount_usd": 220
+  },
+  {
+   "id": "d_20260109140500_833c1f",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-02-11",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-04-10",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-01-12",
+   "amount_usd": 570
+  },
+  {
+   "id": "d_20260113140500_e2395c",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-02-13",
+     "usd": 6.05,
+     "quality": "ok",
+     "symbol_pct": 4.9122,
+     "plan_pct": 1.5508
+    },
+    "90D": {
+     "end": "2026-04-14",
+     "usd": 1.98,
+     "quality": "ok",
+     "symbol_pct": 11.08,
+     "plan_pct": 9.9789
+    }
+   },
+   "start": "2026-01-14",
+   "amount_usd": 180
+  },
+  {
+   "id": "d_20260126140500_339d5b",
+   "origin": "plan_keeper",
+   "kind": "trim",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-26",
+     "usd": -4.62,
+     "quality": "ok",
+     "symbol_pct": 4.157,
+     "plan_pct": 2.4453
+    },
+    "90D": {
+     "end": "2026-04-27",
+     "usd": 6.28,
+     "quality": "ok",
+     "symbol_pct": 8.2272,
+     "plan_pct": 10.5539
+    }
+   },
+   "start": "2026-01-27",
+   "amount_usd": 270
+  },
+  {
+   "id": "d_20260126140500_779604",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-26",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-04-27",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-01-27",
+   "amount_usd": 420
+  },
+  {
+   "id": "d_20260127140500_ef8814",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-27",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-04-28",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-01-28",
+   "amount_usd": 610
+  },
+  {
+   "id": "d_20260128140500_b0994c",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-02-27",
+     "usd": -16.37,
+     "quality": "ok",
+     "symbol_pct": 0.1264,
+     "plan_pct": 4.3246
+    },
+    "90D": {
+     "end": "2026-04-29",
+     "usd": 17.65,
+     "quality": "ok",
+     "symbol_pct": 14.7937,
+     "plan_pct": 10.2682
+    }
+   },
+   "start": "2026-01-29",
+   "amount_usd": 390
+  },
+  {
+   "id": "d_20260202140500_a8dd98",
+   "origin": "plan_keeper",
+   "kind": "rebalance",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-03-05",
+     "usd": -3.54,
+     "quality": "ok",
+     "symbol_pct": 0.7269,
+     "plan_pct": 3.9455
+    },
+    "90D": {
+     "end": "2026-05-04",
+     "usd": -5.89,
+     "quality": "ok",
+     "symbol_pct": 2.7624,
+     "plan_pct": 8.1208
+    }
+   },
+   "start": "2026-02-03",
+   "amount_usd": 110
+  },
+  {
+   "id": "d_20260212140500_b723f7",
+   "origin": "plan_keeper",
+   "kind": "rebalance",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-03-13",
+     "usd": -1.79,
+     "quality": "ok",
+     "symbol_pct": 1.859,
+     "plan_pct": 3.8451
+    },
+    "90D": {
+     "end": "2026-05-14",
+     "usd": -2.64,
+     "quality": "ok",
+     "symbol_pct": 2.4831,
+     "plan_pct": 5.4112
+    }
+   },
+   "start": "2026-02-13",
+   "amount_usd": 90
+  },
+  {
+   "id": "d_20260212140500_7c4b22",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-03-13",
+     "usd": null,
+     "quality": "ok"
+    },
+    "90D": {
+     "end": "2026-05-14",
+     "usd": null,
+     "quality": "ok"
+    }
+   },
+   "start": "2026-02-13",
+   "amount_usd": 700
+  },
+  {
+   "id": "d_20260227140500_0592b3",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-01",
+     "usd": -6.95,
+     "quality": "ok",
+     "symbol_pct": 1.7095,
+     "plan_pct": 3.8155
+    },
+    "90D": {
+     "end": "2026-05-29",
+     "usd": -11.62,
+     "quality": "ok",
+     "symbol_pct": 3.419,
+     "plan_pct": 6.9391
+    }
+   },
+   "start": "2026-03-02",
+   "amount_usd": 330
+  },
+  {
+   "id": "d_20260303140500_3a8b05",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-03",
+     "usd": 106.17,
+     "quality": "ok",
+     "avoided_vs_plan": 106.17
+    },
+    "90D": {
+     "end": "2026-06-02",
+     "usd": 320.16,
+     "quality": "ok",
+     "avoided_vs_plan": 320.16
+    }
+   },
+   "start": "2026-03-04",
+   "amount_usd": 710
+  },
+  {
+   "id": "d_20260304140500_0a5d6d",
+   "origin": "tax",
+   "kind": "harvest",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-03",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-06-03",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-03-05",
+   "amount_usd": 220
+  },
+  {
+   "id": "d_20260309140500_06e388",
+   "origin": "plan_keeper",
+   "kind": "trim",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-09",
+     "usd": 0.84,
+     "quality": "ok",
+     "symbol_pct": 2.9311,
+     "plan_pct": 3.5289
+    },
+    "90D": {
+     "end": "2026-06-08",
+     "usd": 4.28,
+     "quality": "ok",
+     "symbol_pct": 3.745,
+     "plan_pct": 6.8054
+    }
+   },
+   "start": "2026-03-10",
+   "amount_usd": 140
+  },
+  {
+   "id": "d_20260312140500_39e403",
+   "origin": "plan_keeper",
+   "kind": "trim",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-10",
+     "usd": 3.08,
+     "quality": "ok",
+     "symbol_pct": 1.9902,
+     "plan_pct": 3.5305
+    },
+    "90D": {
+     "end": "2026-06-11",
+     "usd": -3.86,
+     "quality": "ok",
+     "symbol_pct": 12.305,
+     "plan_pct": 10.3754
+    }
+   },
+   "start": "2026-03-13",
+   "amount_usd": 200
+  },
+  {
+   "id": "d_20260312140500_5bf12e",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-10",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-06-11",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-03-13",
+   "amount_usd": 310
+  },
+  {
+   "id": "d_20260316140500_0ee94e",
+   "origin": "plan_keeper",
+   "kind": "rebalance",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-16",
+     "usd": -1.29,
+     "quality": "ok",
+     "symbol_pct": 1.5645,
+     "plan_pct": 2.2088
+    },
+    "90D": {
+     "end": "2026-06-15",
+     "usd": -16.6,
+     "quality": "ok",
+     "symbol_pct": 0.678,
+     "plan_pct": 8.9804
+    }
+   },
+   "start": "2026-03-17",
+   "amount_usd": 200
+  },
+  {
+   "id": "d_20260320140500_4855d7",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-22",
+     "usd": -6.48,
+     "quality": "ok",
+     "symbol_pct": -2.9481,
+     "plan_pct": 0.6533
+    },
+    "90D": {
+     "end": "2026-06-19",
+     "usd": -3.07,
+     "quality": "ok",
+     "symbol_pct": 8.3102,
+     "plan_pct": 10.0149
+    }
+   },
+   "start": "2026-03-23",
+   "amount_usd": 180
+  },
+  {
+   "id": "d_20260326140500_3686da",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-24",
+     "usd": -3.28,
+     "quality": "ok",
+     "symbol_pct": 0.9456,
+     "plan_pct": 2.5097
+    },
+    "90D": {
+     "end": "2026-06-25",
+     "usd": -24.04,
+     "quality": "ok",
+     "symbol_pct": -0.4663,
+     "plan_pct": 10.9832
+    }
+   },
+   "start": "2026-03-27",
+   "amount_usd": 210
+  },
+  {
+   "id": "d_20260327140500_43a2dc",
+   "origin": "plan_keeper",
+   "kind": "rebalance",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-29",
+     "usd": 0.87,
+     "quality": "ok",
+     "symbol_pct": 3.7275,
+     "plan_pct": 3.2128
+    },
+    "90D": {
+     "end": "2026-06-26",
+     "usd": 7.54,
+     "quality": "ok",
+     "symbol_pct": 15.467,
+     "plan_pct": 11.0298
+    }
+   },
+   "start": "2026-03-30",
+   "amount_usd": 170
+  },
+  {
+   "id": "d_20260327140500_c8535c",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "ACME",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-04-29",
+     "usd": 178.42,
+     "quality": "ok",
+     "avoided_vs_plan": 178.42
+    },
+    "90D": {
+     "end": "2026-06-26",
+     "usd": 123.47,
+     "quality": "ok",
+     "avoided_vs_plan": 123.47
+    }
+   },
+   "start": "2026-03-30",
+   "amount_usd": 380
+  },
+  {
+   "id": "d_20260327140500_648cb0",
+   "origin": "tax",
+   "kind": "harvest",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-04-29",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-06-26",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-03-30",
+   "amount_usd": 760
+  },
+  {
+   "id": "d_20260331140500_19dc19",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-05-01",
+     "usd": 15.58,
+     "quality": "ok",
+     "symbol_pct": 4.9305,
+     "plan_pct": 0.7184
+    },
+    "90D": {
+     "end": "2026-06-30",
+     "usd": -15.78,
+     "quality": "ok",
+     "symbol_pct": 7.5816,
+     "plan_pct": 11.8467
+    }
+   },
+   "start": "2026-04-01",
+   "amount_usd": 370
+  },
+  {
+   "id": "d_20260403140500_c9a011",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-05-06",
+     "usd": -3.38,
+     "quality": "ok",
+     "symbol_pct": -1.1286,
+     "plan_pct": 0.2228
+    },
+    "90D": {
+     "end": "2026-07-03",
+     "usd": -32.56,
+     "quality": "ok",
+     "symbol_pct": -1.103,
+     "plan_pct": 11.9209
+    }
+   },
+   "start": "2026-04-06",
+   "amount_usd": 250
+  },
+  {
+   "id": "d_20260410140500_e00309",
+   "origin": "tax",
+   "kind": "harvest",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-05-13",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-07-10",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-04-13",
+   "amount_usd": 860
+  },
+  {
+   "id": "d_20260417140500_9d4507",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-05-20",
+     "usd": 94.69,
+     "quality": "ok",
+     "symbol_pct": 13.9466,
+     "plan_pct": -3.9187
+    },
+    "90D": {
+     "end": "2026-07-17",
+     "usd": 435.73,
+     "quality": "ok",
+     "symbol_pct": 89.3175,
+     "plan_pct": 7.1041
+    }
+   },
+   "start": "2026-04-20",
+   "amount_usd": 530
+  },
+  {
+   "id": "d_20260423140500_979974",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-05-22",
+     "usd": 43.57,
+     "quality": "ok",
+     "symbol_pct": 11.9318,
+     "plan_pct": -2.1241
+    },
+    "90D": {
+     "end": "2026-07-23",
+     "usd": 261.3,
+     "quality": "ok",
+     "symbol_pct": 90.625,
+     "plan_pct": 6.3352
+    }
+   },
+   "start": "2026-04-24",
+   "amount_usd": 310
+  },
+  {
+   "id": "d_20260427140500_5071ef",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-05-28",
+     "usd": -3.31,
+     "quality": "ok",
+     "symbol_pct": -0.897,
+     "plan_pct": 0.6794
+    },
+    "90D": {
+     "end": "2026-07-27",
+     "usd": 6.96,
+     "quality": "ok",
+     "symbol_pct": 7.8368,
+     "plan_pct": 4.5232
+    }
+   },
+   "start": "2026-04-28",
+   "amount_usd": 210
+  },
+  {
+   "id": "d_20260501140500_9c09c7",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-03",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-07-31",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-05-04",
+   "amount_usd": 320
+  },
+  {
+   "id": "d_20260506140500_831ee3",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-05",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-08-05",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-05-07",
+   "amount_usd": 510
+  },
+  {
+   "id": "d_20260508140500_b7837c",
+   "origin": "plan_keeper",
+   "kind": "trim",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-10",
+     "usd": 5.49,
+     "quality": "ok",
+     "symbol_pct": 5.7225,
+     "plan_pct": 8.0114
+    },
+    "90D": {
+     "end": "2026-08-07",
+     "usd": 28.94,
+     "quality": "ok",
+     "symbol_pct": -2.6028,
+     "plan_pct": 9.4569
+    }
+   },
+   "start": "2026-05-11",
+   "amount_usd": 240
+  },
+  {
+   "id": "d_20260508140500_60e72a",
+   "origin": "tax",
+   "kind": "harvest",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-10",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-08-07",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-05-11",
+   "amount_usd": 750
+  },
+  {
+   "id": "d_20260511140500_1725de",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-11",
+     "usd": -30.45,
+     "quality": "ok",
+     "symbol_pct": -0.5813,
+     "plan_pct": 7.8767
+    },
+    "90D": {
+     "end": "2026-08-10",
+     "usd": -31.32,
+     "quality": "ok",
+     "symbol_pct": -0.8397,
+     "plan_pct": 7.8616
+    }
+   },
+   "start": "2026-05-12",
+   "amount_usd": 360
+  },
+  {
+   "id": "d_20260514140500_5df03e",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-12",
+     "usd": -31.96,
+     "quality": "ok",
+     "symbol_pct": 0.1353,
+     "plan_pct": 10.1241
+    },
+    "90D": {
+     "end": "2026-08-13",
+     "usd": -50,
+     "quality": "ok",
+     "symbol_pct": -8.9688,
+     "plan_pct": 6.6558
+    }
+   },
+   "start": "2026-05-15",
+   "amount_usd": 320
+  },
+  {
+   "id": "d_20260515140500_a7d55b",
+   "origin": "plan_keeper",
+   "kind": "trim",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-17",
+     "usd": 20.98,
+     "quality": "ok",
+     "symbol_pct": 0.8169,
+     "plan_pct": 11.8601
+    },
+    "90D": {
+     "end": "2026-08-14",
+     "usd": 27.42,
+     "quality": "ok",
+     "symbol_pct": -8.8961,
+     "plan_pct": 5.5361
+    }
+   },
+   "start": "2026-05-18",
+   "amount_usd": 190
+  },
+  {
+   "id": "d_20260518140500_551f97",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-18",
+     "usd": 40.52,
+     "quality": "ok",
+     "symbol_pct": 24.3316,
+     "plan_pct": 12.413
+    },
+    "90D": {
+     "end": "2026-08-17",
+     "usd": -61.53,
+     "quality": "ok",
+     "symbol_pct": -13.1016,
+     "plan_pct": 4.9946
+    }
+   },
+   "start": "2026-05-19",
+   "amount_usd": 340
+  },
+  {
+   "id": "d_20260519140500_a0a1ea",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-19",
+     "usd": -33.97,
+     "quality": "ok",
+     "symbol_pct": 6.672,
+     "plan_pct": 13.2043
+    },
+    "90D": {
+     "end": "2026-08-18",
+     "usd": -47.41,
+     "quality": "ok",
+     "symbol_pct": -4.7839,
+     "plan_pct": 4.3328
+    }
+   },
+   "start": "2026-05-20",
+   "amount_usd": 520
+  },
+  {
+   "id": "d_20260522140500_ae2956",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-24",
+     "usd": -23.6,
+     "quality": "ok",
+     "symbol_pct": -0.2726,
+     "plan_pct": 10.9658
+    },
+    "90D": {
+     "end": "2026-08-21",
+     "usd": -7.15,
+     "quality": "ok",
+     "symbol_pct": 0.1168,
+     "plan_pct": 3.5216
+    }
+   },
+   "start": "2026-05-25",
+   "amount_usd": 210
+  },
+  {
+   "id": "d_20260528140500_75aa8d",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-06-26",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-08-27",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-05-29",
+   "amount_usd": 420
+  },
+  {
+   "id": "d_20260604140500_e44120",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-07-03",
+     "usd": 82.93,
+     "quality": "ok",
+     "symbol_pct": 27.2021,
+     "plan_pct": 9.1735
+    },
+    "90D": {
+     "end": "2026-09-03",
+     "usd": -46.44,
+     "quality": "ok",
+     "symbol_pct": -11.399,
+     "plan_pct": -1.3025
+    }
+   },
+   "start": "2026-06-05",
+   "amount_usd": 460
+  },
+  {
+   "id": "d_20260605140500_63b63b",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-07-08",
+     "usd": -18.2,
+     "quality": "ok",
+     "symbol_pct": 3.7652,
+     "plan_pct": 8.0986
+    },
+    "90D": {
+     "end": "2026-09-04",
+     "usd": -24.46,
+     "quality": "ok",
+     "symbol_pct": -7.7126,
+     "plan_pct": -1.8891
+    }
+   },
+   "start": "2026-06-08",
+   "amount_usd": 420
+  },
+  {
+   "id": "d_20260605140500_490dd9",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-07-08",
+     "usd": null,
+     "quality": "ok"
+    },
+    "90D": {
+     "end": "2026-09-04",
+     "usd": null,
+     "quality": "ok"
+    }
+   },
+   "start": "2026-06-08",
+   "amount_usd": 630
+  },
+  {
+   "id": "d_20260610140500_6a0e8b",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-07-10",
+     "usd": -25.55,
+     "quality": "ok",
+     "symbol_pct": 0.5413,
+     "plan_pct": 4.9471
+    },
+    "90D": {
+     "end": "2026-09-09",
+     "usd": -25.34,
+     "quality": "ok",
+     "symbol_pct": -10.343,
+     "plan_pct": -5.9743
+    }
+   },
+   "start": "2026-06-11",
+   "amount_usd": 580
+  },
+  {
+   "id": "d_20260615140500_f0e700",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-07-16",
+     "usd": -10.05,
+     "quality": "ok",
+     "symbol_pct": -1.6089,
+     "plan_pct": 1.981
+    },
+    "90D": {
+     "end": "2026-09-14",
+     "usd": 23.41,
+     "quality": "ok",
+     "symbol_pct": 0.8304,
+     "plan_pct": -7.5309
+    }
+   },
+   "start": "2026-06-16",
+   "amount_usd": 280
+  },
+  {
+   "id": "d_20260615140500_79663c",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-07-16",
+     "usd": 176.91,
+     "quality": "ok",
+     "symbol_pct": 37.3626,
+     "plan_pct": 1.981
+    },
+    "90D": {
+     "end": "2026-09-14",
+     "usd": -49.16,
+     "quality": "ok",
+     "symbol_pct": -17.3626,
+     "plan_pct": -7.5309
+    }
+   },
+   "start": "2026-06-16",
+   "amount_usd": 500
+  },
+  {
+   "id": "d_20260617140500_859ac8",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-07-17",
+     "usd": 153.85,
+     "quality": "ok",
+     "symbol_pct": 37.2043,
+     "plan_pct": -1.2589
+    },
+    "90D": {
+     "end": "2026-09-16",
+     "usd": -73.61,
+     "quality": "ok",
+     "symbol_pct": -27.957,
+     "plan_pct": -9.5551
+    }
+   },
+   "start": "2026-06-18",
+   "amount_usd": 400
+  },
+  {
+   "id": "d_20260622140500_c2b2e1",
+   "origin": "plan_keeper",
+   "kind": "rebalance",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-07-23",
+     "usd": -11.81,
+     "quality": "ok",
+     "symbol_pct": -8.7415,
+     "plan_pct": -2.8371
+    },
+    "90D": {
+     "end": "2026-09-21",
+     "usd": -12.56,
+     "quality": "ok",
+     "symbol_pct": -17.0997,
+     "plan_pct": -10.8207
+    }
+   },
+   "start": "2026-06-23",
+   "amount_usd": 200
+  },
+  {
+   "id": "d_20260626140500_f5e912",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-07-29",
+     "usd": 5.63,
+     "quality": "ok",
+     "symbol_pct": -0.8371,
+     "plan_pct": -2.2814
+    },
+    "90D": {
+     "end": "2026-09-25",
+     "usd": -1.12,
+     "quality": "ok",
+     "symbol_pct": -13.5579,
+     "plan_pct": -13.2698
+    }
+   },
+   "start": "2026-06-29",
+   "amount_usd": 390
+  },
+  {
+   "id": "d_20260702140500_345e51",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-07-31",
+     "usd": 134.6,
+     "quality": "ok",
+     "symbol_pct": 24.4399,
+     "plan_pct": -4.1991
+    },
+    "90D": {
+     "end": "2026-10-01",
+     "usd": -96.78,
+     "quality": "ok",
+     "symbol_pct": -36.2525,
+     "plan_pct": -15.6613
+    }
+   },
+   "start": "2026-07-03",
+   "amount_usd": 470
+  },
+  {
+   "id": "d_20260703140500_7bc580",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-08-05",
+     "usd": 7.52,
+     "quality": "ok",
+     "symbol_pct": -0.7258,
+     "plan_pct": -4.6813
+    },
+    "90D": {
+     "end": "2026-10-02",
+     "usd": 31.79,
+     "quality": "ok",
+     "symbol_pct": 1.3349,
+     "plan_pct": -15.3975
+    }
+   },
+   "start": "2026-07-06",
+   "amount_usd": 190
+  },
+  {
+   "id": "d_20260703140500_25babd",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-08-05",
+     "usd": -2.8,
+     "quality": "ok",
+     "symbol_pct": -5.1251,
+     "plan_pct": -4.6813
+    },
+    "90D": {
+     "end": "2026-10-02",
+     "usd": 25.89,
+     "quality": "ok",
+     "symbol_pct": -11.2877,
+     "plan_pct": -15.3975
+    }
+   },
+   "start": "2026-07-06",
+   "amount_usd": 630
+  },
+  {
+   "id": "d_20260708140500_9cc27e",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-08-07",
+     "usd": 0.97,
+     "quality": "ok",
+     "symbol_pct": -5.0701,
+     "plan_pct": -5.6381
+    },
+    "90D": {
+     "end": "2026-10-07",
+     "usd": 1.64,
+     "quality": "ok",
+     "symbol_pct": -14.5026,
+     "plan_pct": -15.4656
+    }
+   },
+   "start": "2026-07-09",
+   "amount_usd": 170
+  },
+  {
+   "id": "d_20260720140500_80bd67",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FTEC",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-08-20",
+     "usd": -2.46,
+     "quality": "ok",
+     "symbol_pct": -6.7489,
+     "plan_pct": -5.5785
+    },
+    "90D": {
+     "end": "2026-10-19",
+     "usd": -1.74,
+     "quality": "ok",
+     "symbol_pct": -14.0014,
+     "plan_pct": -13.1739
+    }
+   },
+   "start": "2026-07-21",
+   "amount_usd": 210
+  },
+  {
+   "id": "d_20260721140500_0e5d96",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-08-21",
+     "usd": null,
+     "quality": "ok"
+    },
+    "90D": {
+     "end": "2026-10-20",
+     "usd": null,
+     "quality": "ok"
+    }
+   },
+   "start": "2026-07-22",
+   "amount_usd": 650
+  },
+  {
+   "id": "d_20260728140500_8c4ca5",
+   "origin": "you",
+   "kind": "buy",
+   "symbol": "NOVA",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-08-28",
+     "usd": null,
+     "quality": "insufficient_history"
+    },
+    "90D": {
+     "end": "2026-10-27",
+     "usd": null,
+     "quality": "insufficient_history"
+    }
+   },
+   "start": "2026-07-29",
+   "amount_usd": 450
+  },
+  {
+   "id": "d_20260803140500_fa89d7",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "ACME",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-09-03",
+     "usd": 170.6,
+     "quality": "ok",
+     "avoided_vs_plan": 170.6
+    },
+    "90D": {
+     "end": "2026-11-02",
+     "usd": 169.02,
+     "quality": "ok",
+     "avoided_vs_plan": 169.02
+    }
+   },
+   "start": "2026-08-04",
+   "amount_usd": 640
+  },
+  {
+   "id": "d_20260806140500_c78cfe",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "ACME",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-09-04",
+     "usd": -55.37,
+     "quality": "ok",
+     "symbol_pct": -20.7852,
+     "plan_pct": -4.5
+    },
+    "90D": {
+     "end": "2026-11-05",
+     "usd": -67.5,
+     "quality": "ok",
+     "symbol_pct": -30.7159,
+     "plan_pct": -10.864
+    }
+   },
+   "start": "2026-08-07",
+   "amount_usd": 340
+  },
+  {
+   "id": "d_20260807140500_2ccf5a",
+   "origin": "scout",
+   "kind": "buy",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-09-09",
+     "usd": 4.69,
+     "quality": "ok",
+     "symbol_pct": -4.2632,
+     "plan_pct": -5.7765
+    }
+   },
+   "start": "2026-08-10",
+   "amount_usd": 310
+  },
+  {
+   "id": "d_20260810140500_bd5278",
+   "origin": "plan_keeper",
+   "kind": "trim",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-09-10",
+     "usd": -11.12,
+     "quality": "ok",
+     "symbol_pct": -1.1894,
+     "plan_pct": -5.6369
+    }
+   },
+   "start": "2026-08-11",
+   "amount_usd": 250
+  },
+  {
+   "id": "d_20260819140500_c991c5",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-09-18",
+     "usd": -2.48,
+     "quality": "ok",
+     "symbol_pct": -4.1136,
+     "plan_pct": -2.8744
+    }
+   },
+   "start": "2026-08-20",
+   "amount_usd": 200
+  },
+  {
+   "id": "d_20260824140500_17f269",
+   "origin": "risk",
+   "kind": "hold_off",
+   "symbol": "NOVA",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-09-24",
+     "usd": null,
+     "quality": "ok"
+    }
+   },
+   "start": "2026-08-25",
+   "amount_usd": 730
+  },
+  {
+   "id": "d_20260828140500_fe7849",
+   "origin": "plan_keeper",
+   "kind": "trim",
+   "symbol": "FXAIX",
+   "taken": false,
+   "scores": {
+    "30D": {
+     "end": "2026-09-30",
+     "usd": 1.64,
+     "quality": "ok",
+     "symbol_pct": -8.4776,
+     "plan_pct": -6.9829
+    }
+   },
+   "start": "2026-08-31",
+   "amount_usd": 110
+  },
+  {
+   "id": "d_20260901140500_0804eb",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-10-02",
+     "usd": -7.76,
+     "quality": "ok",
+     "symbol_pct": -8.9093,
+     "plan_pct": -6.6934
+    }
+   },
+   "start": "2026-09-02",
+   "amount_usd": 350
+  },
+  {
+   "id": "d_20260901140500_6a16fd",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-10-02",
+     "usd": 1.36,
+     "quality": "ok",
+     "symbol_pct": -6.17,
+     "plan_pct": -6.6934
+    }
+   },
+   "start": "2026-09-02",
+   "amount_usd": 260
+  },
+  {
+   "id": "d_20260907140500_2fd22f",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "VXUS",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-10-08",
+     "usd": 4.47,
+     "quality": "ok",
+     "symbol_pct": -3.9673,
+     "plan_pct": -5.4097
+    }
+   },
+   "start": "2026-09-08",
+   "amount_usd": 310
+  },
+  {
+   "id": "d_20260924140500_9adbff",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FTEC",
+   "taken": true,
+   "scores": {
+    "30D": {
+     "end": "2026-10-23",
+     "usd": 11.17,
+     "quality": "ok",
+     "symbol_pct": -0.036,
+     "plan_pct": -3.2262
+    }
+   },
+   "start": "2026-09-25",
+   "amount_usd": 350
+  },
+  {
+   "id": "d_20261102130500_405a45",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "FXAIX",
+   "taken": true,
+   "scores": {},
+   "start": "2026-11-03",
+   "amount_usd": 300
+  },
+  {
+   "id": "d_20261104130500_8c82ff",
+   "origin": "plan_keeper",
+   "kind": "rebalance",
+   "symbol": "BND",
+   "taken": false,
+   "scores": {},
+   "start": "2026-11-05",
+   "amount_usd": 40
+  },
+  {
+   "id": "d_20261106130500_b6af3c",
+   "origin": "plan_keeper",
+   "kind": "deposit_route",
+   "symbol": "BND",
+   "taken": true,
+   "scores": {},
+   "start": null,
+   "note": "waiting for the next close"
+  }
+ ],
+ "method": "Same dollars into the plan mix from the next trading day's close; 90% bootstrap interval for the mean"
+}

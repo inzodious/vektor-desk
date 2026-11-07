@@ -1,8 +1,10 @@
 import json
-from datetime import UTC, datetime
+import random
+from datetime import UTC, datetime, timedelta
 
 from desk.config import Config
 from desk.decisions import records
+from desk.decisions.records import DecisionError
 
 cfg = Config.from_env()
 
@@ -215,9 +217,8 @@ print("brief run", last)
 
 # ---------- research ----------
 import math  # noqa: E402
-import random  # noqa: E402
 import sqlite3  # noqa: E402
-from datetime import date, timedelta  # noqa: E402
+from datetime import date  # noqa: E402
 
 EDGAR = "https://www.sec.gov/edgar/search/"
 FRED = "https://fred.stlouisfed.org/series/"
@@ -441,3 +442,54 @@ with sqlite3.connect(cfg.desk_db) as conn:
         [(s, n, None, sec, "2026-11-06") for s, (n, sec) in MEGA.items()],
     )
 print("look-through funds", len(FUNDS))
+
+# ---------- flight record history ----------
+rng = random.Random(41)  # noqa: S311
+HISTORY = [
+    ("plan_keeper", "deposit_route", ("FXAIX", "VXUS", "BND", "FTEC"), (150, 400), "deposit", 26, 0.92),
+    ("plan_keeper", "trim", ("FTEC", "FXAIX"), (100, 300), "sale_proceeds", 8, 0.75),
+    ("plan_keeper", "rebalance", ("VXUS", "BND"), (80, 250), "cash", 6, 0.7),
+    ("scout", "buy", ("NOVA", "ACME", "FTEC"), (200, 600), "cash", 14, 0.45),
+    ("risk", "hold_off", ("ACME", "NOVA"), (300, 800), "cash", 9, 0.6),
+    ("tax", "harvest", ("VXUS", "ACME"), (200, 900), "sale_proceeds", 5, 0.8),
+    ("you", "buy", ("ACME", "NOVA", "FTEC"), (200, 700), "cash", 12, 1.0),
+]
+start = datetime(2025, 11, 10, 14, 5, tzinfo=UTC)
+span = (datetime(2026, 9, 25, 14, 5, tzinfo=UTC) - start).days
+made = 0
+for desk, kind, symbols, (lo, hi), funding, n, take in HISTORY:
+    for _k in range(n):
+        when = start + timedelta(days=rng.randrange(span))
+        if when.weekday() > 4:
+            when -= timedelta(days=when.weekday() - 4)
+        sym = rng.choice(symbols)
+        amount = round(rng.uniform(lo, hi) / 10) * 10
+        body = {
+            "kind": kind,
+            "symbol": sym,
+            "account": "individual-0001",
+            "amount_usd": amount,
+            "funding": funding,
+            "thesis": f"Synthetic {kind.replace('_', ' ')} on {sym} for the flight record.",
+            "confidence": round(min(0.95, max(0.2, rng.gauss(take - 0.1, 0.15))), 2),
+            "horizon": "3 months",
+        }
+        if kind == "buy":
+            body |= {"bear_case": "A small name can halve on one bad quarter.", "sources": SRC}
+        if kind == "harvest":
+            body["tax_impact"] = {"realized": -round(rng.uniform(80, 600), 2)}
+        d = records.draft(cfg, body, now=when) if desk == "you" else records.create_proposal(cfg, body, desk, run_id=f"r-hist-{made}", now=when)
+        if d["status"] != "proposed":
+            continue
+        later = when + timedelta(hours=3)
+        if rng.random() < take:
+            try:
+                ok = records.approve(cfg, d["id"], None, now=later)
+            except DecisionError:
+                ok = records.approve(cfg, d["id"], "Going ahead on purpose", now=later)
+            if ok["status"] == "approved":
+                records.mark_placed(cfg, d["id"], now=later + timedelta(hours=1))
+        else:
+            records.dismiss(cfg, d["id"], rng.choice(["Not this month", "Too small to bother with", "Waiting for the deposit"]), now=later)
+        made += 1
+print(json.dumps({"history": made}))

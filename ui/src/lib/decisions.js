@@ -108,6 +108,20 @@ export function scoreOf(d, window = '30D') {
   return typeof s.value === 'number' ? s.value : typeof s.usd === 'number' ? s.usd : typeof s.vs_plan === 'number' ? s.vs_plan : null;
 }
 
+export const SCORE_WINDOWS = [
+  { v: '30D', t: '30 days' },
+  { v: '90D', t: '90 days' },
+  { v: '365D', t: 'a year' },
+];
+
+export function latestScore(d) {
+  for (const w of [...SCORE_WINDOWS].reverse()) {
+    const v = scoreOf(d, w.v);
+    if (v != null) return { w: w.v, t: w.t, v };
+  }
+  return null;
+}
+
 export function scoresOn(d, days = 30) {
   if (!d?.created_at) return null;
   const t = new Date(Date.parse(d.created_at) + days * 86400000);

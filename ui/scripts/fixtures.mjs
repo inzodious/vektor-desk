@@ -104,7 +104,7 @@ save('decisions.journal', journal);
 save('decisions.summary', await get('/api/decisions/summary'));
 save('decisions.unmatched', await get('/api/decisions/unmatched'));
 save('decisions.calendar', await get('/api/decisions/calendar'));
-const ids = [...queue.items.map((d) => d.id), ...journal.days.flatMap((g) => g.items.map((d) => d.id))];
+const ids = [...queue.items.map((d) => d.id), ...journal.days.flatMap((g) => g.items.filter((d) => d.created_at >= '2026-11-01').map((d) => d.id))];
 for (const id of ids) {
   save(`decisions.${id}`, await get(`/api/decisions/${id}`));
   save(`decisions.${id}.ticket`, await get(`/api/decisions/${id}/ticket`));
@@ -165,3 +165,9 @@ save('lab.strategies', labList);
 save('lab.strategies.empty', { ...labList, strategies: [], rules: [] });
 for (const s of [...labList.strategies, ...labList.rules]) save(`lab.strategies.${s.id}`, await get(`/api/lab/strategies/${encodeURIComponent(s.id)}`));
 save('lab.strategies.pick-one', await get('/api/lab/strategies/pick-one'));
+
+// ---------- flight record and patterns ----------
+const card = await get('/api/engine/scorecard');
+save('engine.scorecard', card);
+save('engine.scorecard.empty', { ...card, groups: [], desks: [], saves: { n: 0, usd: 0 }, offplan_gap: { n: 0, total_usd: 0, mean_usd: null, hit_rate: null, ci_low: null, ci_high: null }, decisions: [] });
+save('engine.patterns', await get('/api/engine/patterns'));

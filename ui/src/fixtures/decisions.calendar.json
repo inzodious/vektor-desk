@@ -7,6 +7,34 @@
    "source": "desk"
   },
   {
+   "date": "2026-12-03",
+   "kind": "wash",
+   "title": "VXUS wash-sale window clears",
+   "source": "desk",
+   "decision_id": "d_20260304140500_0a5d6d"
+  },
+  {
+   "date": "2026-12-03",
+   "kind": "wash",
+   "title": "VXUS wash-sale window clears",
+   "source": "desk",
+   "decision_id": "d_20260410140500_e00309"
+  },
+  {
+   "date": "2026-12-03",
+   "kind": "wash",
+   "title": "VXUS wash-sale window clears",
+   "source": "desk",
+   "decision_id": "d_20260508140500_60e72a"
+  },
+  {
+   "date": "2026-12-07",
+   "kind": "wash",
+   "title": "ACME wash-sale window clears",
+   "source": "desk",
+   "decision_id": "d_20260327140500_648cb0"
+  },
+  {
    "date": "2026-12-31",
    "kind": "tax",
    "title": "Last trading day to realize gains or losses this year",

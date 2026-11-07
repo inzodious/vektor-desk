@@ -5,7 +5,7 @@ import { Combo } from '../components/Combo.jsx';
 import { Subtabs } from '../components/Subtabs.jsx';
 import { accountLabel } from '../live/context.js';
 import { postJson, useApi } from '../lib/api.js';
-import { DECISION_TABS, STATUS, kindName, originName, reasonOf, scoreOf, scoresOn } from '../lib/decisions.js';
+import { DECISION_TABS, STATUS, kindName, latestScore, originName, reasonOf, scoreOf, scoresOn } from '../lib/decisions.js';
 import { parseDay } from '../lib/charts.js';
 import { plural, usd } from '../lib/format.js';
 
@@ -31,7 +31,7 @@ function Ledger({ days }) {
       <div className="rows">
         {g.items.map((d) => {
           const st = statusWord(d);
-          const s30 = scoreOf(d);
+          const last = latestScore(d);
           const why = reasonOf(d);
           const amount = d.amount_usd ?? d.fill?.amount ?? null;
           return (
@@ -50,7 +50,9 @@ function Ledger({ days }) {
               <span className="origin">{originName(d.origin)}</span>
               <span className="v">
                 {amount != null ? usd(amount) : '—'}
-                <small className={s30 == null ? '' : s30 >= 0 ? 'up' : 'dn'}>{s30 == null ? (amount != null ? `Scores ${scoresOn(d)}` : '') : `${usd(s30, { sign: true })} vs plan`}</small>
+                <small className={last == null ? '' : last.v >= 0 ? 'up' : 'dn'} data-score={last?.w}>
+                  {last == null ? (amount != null ? `Scores ${scoresOn(d)}` : '') : `${usd(last.v, { sign: true })} vs plan, ${last.t}`}
+                </small>
               </span>
             </div>
           );
@@ -170,7 +172,7 @@ export default function Journal() {
     [days, origin, status],
   );
   const s = summary.data;
-  const scored = (o) => items.filter((d) => !!d.override === o && scoreOf(d) != null).map(scoreOf);
+  const scored = (o) => items.filter((d) => !!d.override === o && scoreOf(d) != null).map((d) => scoreOf(d));
   const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
   const ovAvg = avg(scored(true));
   const clAvg = avg(scored(false));

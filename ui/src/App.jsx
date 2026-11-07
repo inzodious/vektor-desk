@@ -13,14 +13,12 @@ import { ConsoleProvider } from './research/Console.jsx';
 import Compare from './pages/Compare.jsx';
 import Risk from './pages/Risk.jsx';
 import Boards from './pages/Boards.jsx';
+import Flight from './pages/Flight.jsx';
+import Patterns from './pages/Patterns.jsx';
 import Strategies from './pages/Strategies.jsx';
 import Strategy from './pages/Strategy.jsx';
-import { LAB_TABS } from './lib/lab.js';
-import { Subtabs } from './components/Subtabs.jsx';
-import { DECISION_TABS } from './lib/decisions.js';
 import { LiveProvider } from './live/LiveProvider.jsx';
 import { SymbolProvider } from './live/SymbolProvider.jsx';
-import Soon from './pages/Soon.jsx';
 import NotFound from './pages/NotFound.jsx';
 import { useTitle } from './lib/useTitle.js';
 
@@ -40,38 +38,14 @@ export default function App() {
               <Route path="research/*" element={<NotFound />} />
               <Route path="decisions" element={<Decisions />} />
               <Route path="decisions/journal" element={<Journal />} />
-              <Route
-                path="decisions/flight"
-                element={
-                  <Soon
-                    area="decisions"
-                    phase="10"
-                    title="Flight record"
-                    kicker="Decisions · Flight record"
-                    lands="Scores for every desk against the plan, calibration and the desk record table land here."
-                    foot={<Subtabs label="Decisions views" tabs={DECISION_TABS} />}
-                  />
-                }
-              />
+              <Route path="decisions/flight" element={<Flight />} />
               <Route path="decisions/*" element={<NotFound />} />
               <Route path="plan/*" element={<Plan />} />
               <Route path="lab" element={<Compare />} />
               <Route path="lab/risk" element={<Risk />} />
               <Route path="lab/strategies" element={<Strategies />} />
               <Route path="lab/strategies/:id" element={<Strategy />} />
-              <Route
-                path="lab/patterns"
-                element={
-                  <Soon
-                    area="lab"
-                    phase="10"
-                    title="Patterns"
-                    kicker="Lab · Patterns"
-                    lands="Market context, your own buys scored by setup, drawdown base rates, correlation shifts and seasonality land here."
-                    foot={<Subtabs label="Lab views" tabs={LAB_TABS} />}
-                  />
-                }
-              />
+              <Route path="lab/patterns" element={<Patterns />} />
               <Route path="lab/boards" element={<Boards />} />
               <Route path="lab/*" element={<NotFound />} />
               <Route path="settings" element={<Settings />} />
