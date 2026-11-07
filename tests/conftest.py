@@ -1,4 +1,7 @@
+import shutil
 from collections.abc import Callable
+from datetime import date
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -6,11 +9,26 @@ from fastapi.testclient import TestClient
 from desk.api.app import create_app
 from desk.config import Config
 from desk.db import apply_schemas, desk_conn
+from desk.demo import build_demo_mirror
 
 
 @pytest.fixture
 def cfg(tmp_path) -> Config:
     return Config(data_dir=tmp_path, project="demo-project", uid="user-1", claude_token_expires="2027-11-01")
+
+
+DEMO_TODAY = date(2026, 11, 6)
+
+
+@pytest.fixture(scope="session")
+def _demo_master(tmp_path_factory) -> Path:
+    return build_demo_mirror(tmp_path_factory.mktemp("demo-master") / "mirror.db", today=DEMO_TODAY)
+
+
+@pytest.fixture
+def demo_cfg(cfg, _demo_master) -> Config:
+    shutil.copy(_demo_master, cfg.mirror_db)
+    return cfg
 
 
 @pytest.fixture

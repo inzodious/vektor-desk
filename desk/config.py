@@ -36,6 +36,7 @@ class Config:
     timezone: str = "America/New_York"
     stale_hours: float = 14.0
     claude_token_expires: str = ""
+    demo: bool = False
 
     @property
     def mirror_db(self) -> Path:
@@ -52,8 +53,11 @@ class Config:
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> "Config":
         env = os.environ if env is None else env
+        demo = env.get("DESK_DEMO", "") == "1"
+        data_dir = Path(env.get("DESK_DATA_DIR", "/data"))
         return cls(
-            data_dir=Path(env.get("DESK_DATA_DIR", "/data")),
+            data_dir=data_dir / "demo" if demo else data_dir,
+            demo=demo,
             project=env.get("DESK_FIREBASE_PROJECT", "").strip(),
             uid=env.get("DESK_UID", "").strip(),
             credentials=Path(env.get("DESK_FIRESTORE_CREDENTIALS", "/run/secrets/firestore-reader")),

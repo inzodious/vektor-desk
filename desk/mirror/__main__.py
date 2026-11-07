@@ -15,6 +15,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--full", action="store_true", help="read every row, not just rows changed since the last pull (automatic once a week)")
     args = parser.parse_args(argv)
     cfg = Config.from_env()
+    if cfg.demo:
+        print(json.dumps({"ok": True, "skipped": "demo mode (DESK_DEMO=1) uses the synthetic mirror"}))
+        return 0
     try:
         reader = FirestoreReader(cfg.project, cfg.uid, service_account_session(str(cfg.credentials)))
         if args.list:

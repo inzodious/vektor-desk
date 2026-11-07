@@ -61,6 +61,7 @@ def status(cfg: Config | None = None, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     return {
         "version": __version__,
+        "demo": cfg.demo,
         "mirror": mirror_status(cfg, now),
         "claude_token": token_status(cfg, now.date()),
         "running": running(cfg),
