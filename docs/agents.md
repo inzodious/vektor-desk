@@ -21,9 +21,9 @@ scheduler ─▶ brief builder ─▶ claude -p (one desk) ─▶ Preflight ─�
 ```
 
 1. The scheduler picks a desk whose time or trigger has come and checks the usage budget.
-2. The brief builder assembles one prompt: `brief` (engine output for this desk only), `profile` (the active dials and their version), and `history` (the desk's last 20 proposals with Joshua's decisions and reasons).
+2. The brief builder assembles one prompt: `brief` (this desk's slice of engine metrics, each `{metric_id, scope_id, window, value, unit, as_of, quality}`, per `docs/statistics.md`), `profile` (the active dials and their version), and `history` (the desk's last 20 proposals with Joshua's decisions and reasons).
 3. The adapter pipes that prompt to `claude -p` on stdin and asks for output that matches `desk/agents/schemas/proposal.json`.
-4. The runner validates the JSON and hands it to Preflight, which re-checks every cited number against the brief, applies the hard rules, adds the tax impact, and stores the result as a decision record (`docs/concept.md`). Nothing the agent says reaches the UI without passing through this step.
+4. The runner validates the JSON, re-checks every cited number against the brief, and calls Preflight (`preflight(holdings, trade) -> lights`, written to the preflight table), which applies the hard rules and adds the tax impact. The runner then stores the result as a decision record (`docs/concept.md`). Nothing the agent says reaches the UI without passing through this step.
 
 ### The adapter
 
@@ -75,7 +75,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Scout** | First Sunday of the month, 03:00 | Industry focus, growth tilt, satellite room left | Up to N ideas inside the satellite cap, each with its bear case | opus, high; read tools, WebSearch, WebFetch |
 | **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | sonnet, high; read tools |
 
-**Engine triggers** (each fires a desk at most once a day): a margin debit appears; a position moves more than the risk dial's daily threshold; a single holding passes its concentration band; a holding reports earnings; a new lot export arrives. Live tracking itself is engine work and needs no agent.
+**Engine triggers** come from the engine's triggers table and fire a desk at most once a day: a margin debit appears; a position moves more than the risk dial's daily threshold; a single holding passes its concentration band; a holding reports earnings; a new lot export arrives. Live tracking itself is engine work and needs no agent.
 
 **Console.** The Console (Escape Vektor's Ask terminal look) is where Joshua talks to the desks. A question or research request is queued to the right desk and runs in the next overnight window unless he presses "Run now". It answers with a memo or dossier update plus any proposals. Settings shows each desk's last and next run, turns used, and an on/off toggle.
 
@@ -106,7 +106,7 @@ Every desk returns the same shape (`agents/schemas/proposal.json`). The UI and t
 | `rule_served` | Which plan rule or dial this advances |
 | `invalidation` | What would prove it wrong, checked by the engine where it can be (a price, a date, a reported number) |
 | `horizon` | When to judge it: 30 days, 90 days, or a date |
-| `numbers_used` | List of `{field, value}` taken from `brief.json` |
+| `numbers_used` | List of `{field, value}`, where `field` is the brief key `metric_id:scope_id:window` (for example `plan.drift:FXAIX:now`) and `value` must match the brief |
 | `sources` | URLs with titles; buy and sell need at least two, one primary (filing, company release, FRED) |
 | `confidence` | Probability from 0 to 1 that it beats the plan baseline at 90 days |
 | `expires` | Default five trading days; an expired ticket cannot be approved |
@@ -124,7 +124,7 @@ Decisions Joshua makes are stored against the proposal: `approved`, `dismissed`,
 | New single stock outside the satellite cap | `blocked` |
 | Holding would pass its concentration band | `blocked` for buys, flagged for anything else |
 | Wash-sale window open on that symbol in any account | `blocked` for harvests and buys that would trigger it, with the date it clears |
-| A cited number does not match the brief | Proposal rejected and logged against the desk |
+| A cited number does not match the brief (runner check, before Preflight) | Proposal rejected and logged against the desk |
 | Missing sources or bear case on a buy or sell | Proposal rejected |
 
 A blocked proposal still appears, labelled with its cost, because the decision is Joshua's. If he trades anyway it is logged as an `override` and scored like any other proposal. The tone stays friendly; a block reads "this costs about $X a month in interest", not a red warning wall.
