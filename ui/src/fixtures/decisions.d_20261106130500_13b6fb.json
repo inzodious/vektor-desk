@@ -1,69 +1,47 @@
 {
- "id": "d_20261109130500_438f88",
- "created_at": "2026-11-09T13:05:00+00:00",
- "updated_at": "2026-11-09T13:05:00+00:00",
+ "id": "d_20261106130500_13b6fb",
+ "created_at": "2026-11-06T13:05:00+00:00",
+ "updated_at": "2026-11-06T14:05:00+00:00",
  "origin": "plan_keeper",
- "run_id": "r-seed-1",
- "kind": "trim",
- "title": "Trim $150 FTEC",
- "symbol": "FTEC",
- "account": "individual-0001",
- "amount_usd": 150,
+ "run_id": "r-seed-4",
+ "kind": "deposit_route",
+ "title": "Route deposit to $25 BND",
+ "symbol": "BND",
+ "account": "hsa-0002",
+ "amount_usd": 25,
  "shares": null,
- "funding": "sale_proceeds",
- "thesis": "FTEC is 1.2 pts over target after a strong month. A small trim keeps the tech tilt inside the plan.",
- "bear_case": "Momentum could carry on for months, and a trim gives up some of that upside.",
- "invalidation": "Drift falls back under 1 pt on its own before the next deposit.",
- "horizon": "1 month",
+ "funding": "deposit",
+ "thesis": "BND gets its slice of the HSA deposit.",
+ "bear_case": null,
+ "invalidation": null,
+ "horizon": null,
  "rule_served": "drift-max",
- "confidence": 0.6,
- "numbers_used": [
-  {
-   "metric_id": "plan.drift",
-   "scope_id": "FTEC",
-   "unit": "pts",
-   "value": 1.2
-  }
- ],
- "sources": [
-  {
-   "date": "2026-11-02",
-   "title": "Synthetic fund factsheet",
-   "url": "https://example.com/synthetic/fund-factsheet"
-  },
-  {
-   "date": "2026-11-05",
-   "title": "Synthetic index weights",
-   "url": "https://example.com/synthetic/index-weights"
-  }
- ],
+ "confidence": 0.8,
+ "numbers_used": [],
+ "sources": [],
  "order_ticket": null,
- "skeptic": {
-  "at": "2026-11-09T13:05:00+00:00",
-  "counter_case": "1.2 pts is well inside the 5 pt band. Routing deposits away from FTEC does the same thing with no sale and no tax.",
-  "verdict": "flag"
- },
- "expires_at": "2026-11-16T21:00:00+00:00",
- "status": "proposed",
+ "skeptic": null,
+ "expires_at": "2026-11-13T21:00:00+00:00",
+ "status": "approved",
  "status_reason": null,
  "snoozed_until": null,
  "override": false,
  "override_reason": null,
- "preflight_status": "flagged",
+ "preflight_status": "clear",
  "preflight": {
   "as_of": "2026-11-06",
   "engine_version": "0.1.0",
   "lights": [
    {
-    "after": 20.2684,
-    "before": 21.1834,
-    "detail": "FTEC goes from 21.2% to 20.3%; the largest holding would be 58.9%.",
+    "after": 5.0849,
+    "before": 4.9402,
+    "detail": "BND goes from 4.9% to 5.1%; the largest holding would be 58.8%.",
     "id": "concentration",
     "label": "Concentration",
     "status": "ok"
    },
    {
-    "after": 1.3218,
+    "after": 1.3427,
     "before": 1.3218,
     "detail": "Largest drift stays near 1.3 points.",
     "id": "drift_after",
@@ -73,7 +51,7 @@
    {
     "after": 0,
     "before": 0,
-    "detail": "Proceeds go to cash.",
+    "detail": "Waits for the 2026-12-01 deposit.",
     "id": "funding",
     "label": "Funding",
     "status": "ok"
@@ -82,7 +60,7 @@
     "after": null,
     "before": null,
     "clears": null,
-    "detail": "This sale is a gain, so wash-sale rules do not apply.",
+    "detail": "No loss sale of this symbol in the last 30 days.",
     "id": "wash_sales",
     "label": "Wash sales",
     "status": "ok"
@@ -90,10 +68,10 @@
    {
     "after": null,
     "before": null,
-    "detail": "No lot export for this holding yet, so the gain and lot pick can't be checked.",
+    "detail": "Opens a new lot at about $77.35.",
     "id": "lots_tax",
     "label": "Lots and tax",
-    "status": "watch"
+    "status": "ok"
    },
    {
     "after": 3,
@@ -106,25 +84,25 @@
   ],
   "metrics": [
    {
-    "after": 16393.49,
+    "after": 16418.49,
     "before": 16393.49,
     "flag": "ok",
     "metric_id": "value.market"
    },
    {
-    "after": 58.8504,
+    "after": 58.7608,
     "before": 58.8504,
     "flag": "ok",
     "metric_id": "risk.top1"
    },
    {
-    "after": 0.4816,
+    "after": 0.4809,
     "before": 0.4816,
     "flag": "ok",
     "metric_id": "plan.single_stock"
    },
    {
-    "after": 1.3218,
+    "after": 1.3427,
     "before": 1.3218,
     "flag": "ok",
     "metric_id": "plan.drift_max"
@@ -148,32 +126,32 @@
     "metric_id": "margin.call_drop"
    },
    {
-    "after": 1.7812,
+    "after": 0.8649,
     "before": 0.8662,
     "flag": "ok",
     "metric_id": "cash.share"
    }
   ],
   "quality": "ok",
-  "status": "flagged",
+  "status": "clear",
   "tax": {
    "lot_method": "highest_cost",
    "lots": [],
    "wash_clear_date": null
   },
   "trade": {
-   "account": "individual-0001",
-   "amount_usd": 150,
-   "funding": "sale_proceeds",
-   "kind": "trim",
+   "account": "hsa-0002",
+   "amount_usd": 25,
+   "funding": "deposit",
+   "kind": "deposit_route",
    "lot_method": "highest_cost",
-   "price": 250.53,
-   "shares": 0.598731,
-   "side": "sell",
-   "symbol": "FTEC"
+   "price": 77.35,
+   "shares": 0.323206,
+   "side": "buy",
+   "symbol": "BND"
   }
  },
- "preflight_at": "2026-11-09T13:05:00+00:00",
+ "preflight_at": "2026-11-06T13:05:00+00:00",
  "tax_impact": {
   "lot_method": "highest_cost",
   "lots": [],
@@ -181,34 +159,32 @@
  },
  "profile_version": 1,
  "rules_version": 1,
- "decided_at": null,
+ "decided_at": "2026-11-06T14:05:00+00:00",
  "placed_at": null,
  "filled_at": null,
  "fill": null,
  "activity_id": null,
- "decision": null,
+ "decision": "approved",
  "events": [
   {
-   "at": "2026-11-09T13:05:00+00:00",
+   "at": "2026-11-06T13:05:00+00:00",
    "event": "proposed",
    "reason": null,
    "detail": null
   },
   {
-   "at": "2026-11-09T13:05:00+00:00",
+   "at": "2026-11-06T13:05:00+00:00",
    "event": "preflight",
    "reason": null,
    "detail": {
-    "status": "flagged"
+    "status": "clear"
    }
   },
   {
-   "at": "2026-11-09T13:05:00+00:00",
-   "event": "skeptic",
+   "at": "2026-11-06T14:05:00+00:00",
+   "event": "approved",
    "reason": null,
-   "detail": {
-    "verdict": "flag"
-   }
+   "detail": null
   }
  ]
 }

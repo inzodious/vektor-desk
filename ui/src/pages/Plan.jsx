@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon.jsx';
 import { Kpi } from '../components/Kpi.jsx';
 import { DriftRows } from '../components/DriftRows.jsx';
 import { TaxCalendar } from '../components/TaxCalendar.jsx';
+import { FiPath } from '../plan/FiPath.jsx';
 import { todayEt } from '../lib/tax.js';
 import { useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
@@ -323,6 +324,7 @@ export default function Plan() {
         <Funds funds={funds} live={ctx.symbols} names={ctx.names} />
         <Deposits funds={funds} deposits={p.deposits || []} deskValue={ctx.live?.value} />
         <Taxes m={tax} calendar={calendar} wash={wash} />
+        <FiPath />
       </section>
     </>
   );

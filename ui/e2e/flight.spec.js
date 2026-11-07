@@ -48,7 +48,7 @@ test('patterns show market context, holdings, drawdowns and habits', async ({ pa
   await page.goto('/lab/patterns');
   await expect(page.locator('.ph-big')).toContainText('S&P 500 below its high');
   await expect(page.getByTestId('market').locator('[data-pattern]')).toHaveCount(4);
-  await expect(page.getByTestId('market').locator('[data-pattern="pat.mkt_drawdown"]')).toContainText('Not enough history yet');
+  await expect(page.getByTestId('market').locator('[data-pattern="pat.mkt_drawdown"]')).toContainText('past cases were higher 12 months later');
   const h = page.getByTestId('holdings');
   await expect(h.locator('[data-scope="ACME"]').first()).toBeVisible();
   await h.getByRole('button', { name: /^Holding/ }).click();

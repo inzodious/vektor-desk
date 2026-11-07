@@ -3,7 +3,7 @@ import { Tip } from './Tip.jsx';
 import { useWidth } from '../lib/useWidth.js';
 import { divergingColor } from '../lib/charts.js';
 
-export function Heatmap({ rows, cols, values, color = divergingColor, fmt = (v) => v.toFixed(2), name = 'Value', label, cellH = 30, showVals = true, rowW = 64, tipHead, table = true, scale }) {
+export function Heatmap({ rows, cols, values, color = divergingColor, fmt = (v) => v.toFixed(2), name = 'Value', label, cellH = 30, showVals = true, rowW = 64, tipHead, table = true, scale, colsShort }) {
   const [ref, width] = useWidth(420);
   const [asTable, setAsTable] = useState(false);
   const [hover, setHover] = useState(null);
@@ -12,6 +12,7 @@ export function Heatmap({ rows, cols, values, color = divergingColor, fmt = (v) 
   const cw = (W - rowW) / Math.max(1, cols.length);
   const H = T + rows.length * cellH;
   const narrow = cw < 34;
+  const tight = colsShort && cw < Math.max(...cols.map((c) => c.length)) * 6.6 + 8;
 
   return (
     <div className="chart heat" ref={ref}>
@@ -54,7 +55,7 @@ export function Heatmap({ rows, cols, values, color = divergingColor, fmt = (v) 
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label || name}>
           {cols.map((c, j) => (
             <text key={c} x={rowW + j * cw + cw / 2} y={14} textAnchor="middle" className="hm-col">
-              {narrow && c.length > 3 ? c.slice(0, 3) : c}
+              {tight ? colsShort[j] : narrow && c.length > 3 ? c.slice(0, 3) : c}
             </text>
           ))}
           {rows.map((r, i) => (

@@ -4219,7 +4219,7 @@
   {
    "id": "FXAIX",
    "kind": "symbol",
-   "first": "2024-11-07",
+   "first": "2022-10-31",
    "return_pct": -2.1619,
    "ann_return_pct": -2.1619,
    "vol_pct": 16.3454,
@@ -4236,7 +4236,7 @@
   {
    "id": "FTEC",
    "kind": "symbol",
-   "first": "2024-11-07",
+   "first": "2022-10-31",
    "return_pct": 6.9909,
    "ann_return_pct": 6.9909,
    "vol_pct": 26.4405,
@@ -4253,7 +4253,7 @@
   {
    "id": "VXUS",
    "kind": "symbol",
-   "first": "2024-11-07",
+   "first": "2022-10-31",
    "return_pct": -3.3472,
    "ann_return_pct": -3.3472,
    "vol_pct": 15.5848,

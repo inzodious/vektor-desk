@@ -184,7 +184,7 @@ export function splitStrategies(data) {
 }
 
 export const FACTOR_LABEL = { alpha: 'Alpha left', factor_in_disguise: 'A factor in disguise', no_alpha: 'No alpha' };
-const FACTOR_WORD = { mkt_rf: 'Market', smb: 'Size', hml: 'Value', rmw: 'Profitability', cma: 'Investment', mom: 'Momentum' };
+export const FACTOR_WORD = { mkt_rf: 'Market', smb: 'Size', hml: 'Value', rmw: 'Profitability', cma: 'Investment', mom: 'Momentum' };
 
 export function factorItems(loadings = {}) {
   return Object.entries(loadings || {}).map(([k, l]) => ({ label: FACTOR_WORD[k] || k, value: l?.beta ?? null, hint: l?.t != null ? `t ${l.t}` : undefined }));

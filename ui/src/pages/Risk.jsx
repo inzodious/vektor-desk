@@ -5,6 +5,7 @@ import { Kpi } from '../components/Kpi.jsx';
 import { LineChart } from '../components/LineChart.jsx';
 import { Panel } from '../components/Panel.jsx';
 import { Scatter } from '../components/Scatter.jsx';
+import { Factors } from '../lab/Factors.jsx';
 import { LabHero } from '../lab/parts.jsx';
 import { useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
@@ -301,6 +302,7 @@ export default function Risk() {
           ) : null}
         </div>
         <Months held={held} start={start} />
+        <Factors />
       </section>
       <MetricDrawer id={open} rows={m.rows} onClose={() => setOpen(null)} />
     </>
