@@ -83,7 +83,7 @@ Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change 
 | When | Do |
 |---|---|
 | `deploy.sh` changed | Read the change (`git -C /mnt/Manifest/apps/vektor-desk-src log -p -1 -- deploy/deploy.sh`), then copy it again for the cron jobs: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`. The cron jobs run this pinned copy, so a push to `main` can't run new code as root |
-| `deploy/compose.yaml` changed | Run the setup script again (it keeps what's there and adds any new folder). Then go to Apps → `vektor-desk` → Edit and paste the new file |
+| `deploy/compose.yaml` changed | Run the setup script again (it keeps what's there and adds any new folder). Then go to Apps → `vektor-desk` → Edit and paste the new file. `deploy.sh status` says so on its `Compose:` line, naming each service that differs from the checkout |
 
 ## Home network
 
