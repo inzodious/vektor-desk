@@ -200,7 +200,7 @@ scripts/check.sh
 | pytest | the whole suite, quietly |
 | shellcheck | `deploy/*.sh`, `scripts/*.sh` |
 | secrets scan | tracked files for Claude, Tailscale, Porkbun, GitHub and private keys, and for `.csv`, `.xlsx`, `.ofx`, `.qfx`, `.pdf`, `.db` and `.env` files |
-| compose config | `docker compose -f deploy/compose.yaml config -q`, when Docker is there |
+| compose config | `docker compose -f deploy/compose.yaml config -q --no-env-resolution` (the env files only exist on the NAS), when Docker is there |
 | ui | `npm run lint`, `npm test` (each if defined) and `npm run build` in `ui/`, when it exists |
 | image builds | with `--docker`: both images; the Caddy build validates the Caddyfile |
 

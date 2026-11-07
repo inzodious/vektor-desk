@@ -25,6 +25,7 @@ Live tracking is one click from anywhere: every symbol opens the Symbol sheet wi
 | [docs/project-plan.md](docs/project-plan.md) | Lead | Goal, 1.0 bar, workstreams, how they coordinate, decisions, risks |
 | [docs/concept.md](docs/concept.md) | Concept | What the desk is for, the core loops, what it is not |
 | [docs/architecture.md](docs/architecture.md) | Infrastructure | TrueNAS stack, network, data mirror, storage, secrets |
+| [docs/setup.md](docs/setup.md) | Infrastructure | Your one-time box setup, step by step, and what to redo after updates |
 | [docs/statistics.md](docs/statistics.md) | Statistics | Metrics, methods, and the engine's output contract |
 | [docs/agents.md](docs/agents.md) | AI agents | Desks, schedules, prompts, guardrails, usage budget |
 | [docs/design.md](docs/design.md) | Dashboards and design | Look, navigation, pages, dashboards; mockups in `mockups/` |

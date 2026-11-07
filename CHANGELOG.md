@@ -4,6 +4,13 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+### Added
+
+- Phone alerts through a self-hosted ntfy server on the desk node: `desk.notify.publish()` for every package, alerts, research and ops topics, daily stale-mirror and token-renewal checks, and deploy and backup failure alerts ([#26])
+- Decisions: phone alerts for new desk proposals, late deposits, trades without a decision record and wash-sale windows clearing, with an `alerts.min_priority` dial ([#27])
+- Agents: phone alerts when a Console answer or research dossier is ready and when a desk run fails ([#28])
+- One-time setup checklist ([docs/setup.md](docs/setup.md)) and `scripts/check.sh`, which runs every local check a PR needs; auto-deploy alerts the phone when a deploy needs a hand step ([#29])
+
 ## 0.1.0 - 2026-11-07
 
 Foundation is code complete and runs on synthetic demo data; the box itself waits on the one-time setup. Early pieces of later phases landed alongside it.
@@ -53,3 +60,7 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#23]: https://github.com/inzodious/vektor-desk/pull/23
 [#24]: https://github.com/inzodious/vektor-desk/pull/24
 [#25]: https://github.com/inzodious/vektor-desk/pull/25
+[#26]: https://github.com/inzodious/vektor-desk/pull/26
+[#27]: https://github.com/inzodious/vektor-desk/pull/27
+[#28]: https://github.com/inzodious/vektor-desk/pull/28
+[#29]: https://github.com/inzodious/vektor-desk/pull/29

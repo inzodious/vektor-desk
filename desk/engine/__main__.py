@@ -7,7 +7,7 @@ import requests
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, schema
+from desk.engine import ENGINE_VERSION, core, schema
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.live import refresh_quotes
@@ -36,6 +36,24 @@ def run_holdings(cfg: Config) -> dict:
     finally:
         mirror.close()
         desk.close()
+
+
+def run_core(cfg: Config) -> dict:
+    mirror = open_mirror(cfg)
+    if mirror is None:
+        return {"ok": False, "error": "mirror.db does not exist yet; run python -m desk.mirror first."}
+    try:
+        result = _with_desk(cfg, "core", lambda desk: {"ok": True, **core.store(desk, core.compute(cfg, mirror, desk))})
+    finally:
+        mirror.close()
+    return result
+
+
+def run_daily(cfg: Config) -> dict:
+    held = run_holdings(cfg)
+    if not held.get("ok"):
+        return held
+    return {"ok": True, "holdings": held, "core": run_core(cfg)}
 
 
 def run_lots(cfg: Config) -> dict:
@@ -72,7 +90,7 @@ def run_market_backfill(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "backfill", lambda desk: run_backfill(desk, http or http_session()))
 
 
-JOBS = {"holdings": run_holdings, "lots": run_lots, "quotes": run_quotes, "backfill": run_market_backfill}
+JOBS = {"holdings": run_holdings, "core": run_core, "daily": run_daily, "lots": run_lots, "quotes": run_quotes, "backfill": run_market_backfill}
 
 
 def main(argv: list[str] | None = None) -> int:
