@@ -2,14 +2,14 @@
 
 Each phase is one pull request (or one short series) and one minor version: phase 3 ships as 0.3.0. Status: ✅ done, 🚧 in progress, ⏭️ next, 📋 planned. Areas and tiers come from [docs/concept.md](docs/concept.md).
 
-Draft, November 7, 2026. Phase contents firm up as the planning docs land.
+Planning merged November 7, 2026. Building now; several workstreams build their pieces of a phase in parallel.
 
 ## Phases
 
 | # | Phase | Tier | Status | Depends on |
 |---|---|---|---|---|
-| 0 | Planning docs | | 🚧 | |
-| 1 | Foundation | 1 | 📋 | 0 |
+| 0 | Planning docs | | ✅ | |
+| 1 | Foundation | 1 | 🚧 | 0 |
 | 2 | Bridge and Symbol sheet | 1 | 📋 | 1 |
 | 3 | Engine core and Plan | 1 | 📋 | 2 |
 | 4 | Decisions and Preflight | 1 | 📋 | 3 |
@@ -32,25 +32,25 @@ Concept's success measure is that December's loss-sale plan comes from the desk.
 
 ## Phase detail
 
-### 0. Planning docs 🚧
+### 0. Planning docs ✅
 
-- [ ] README, ROADMAP, project plan, repo conventions (Lead, [#3])
-- [ ] Concept: purpose, areas, loops, tiers (Concept, [#1])
-- [ ] Architecture: stack, network, mirror, storage, secrets, alerts (Infrastructure, [#5])
-- [ ] Statistics: metric catalogue, methods, engine output contract (Statistics, [#4])
-- [ ] Agents: desks, schedules, tools, guardrails, usage budget, proposal record (AI agents, [#2])
-- [ ] Design: look, navigation, page and board mockups (Dashboards and design, [#6])
+- [x] README, ROADMAP, project plan, repo conventions (Lead, [#3])
+- [x] Concept: purpose, areas, loops, tiers (Concept, [#1])
+- [x] Architecture: stack, network, mirror, storage, secrets, alerts (Infrastructure, [#5])
+- [x] Statistics: metric catalogue, methods, engine output contract (Statistics, [#4])
+- [x] Agents: desks, schedules, tools, guardrails, usage budget, proposal record (AI agents, [#2])
+- [x] Design: look, navigation, page and board mockups (Dashboards and design, [#6])
 
 Done when all six are merged and agree with each other.
 
-### 1. Foundation 📋
+### 1. Foundation 🚧
 
-- [ ] Compose stack on TrueNAS: Tailscale sidecar, Caddy, api (serves the built UI), cron (scheduler, engine and agents) ([#5])
+- [x] Compose stack on TrueNAS: Tailscale sidecar, Caddy, api (serves the built UI), cron (scheduler, engine and agents) ([#5])
 - [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate (built in [#5]; needs Joshua's one-time setup steps in `docs/architecture.md`)
-- [ ] Read-only mirror of every `lockIn/{uid}` collection into SQLite, incremental by change time with a weekly full pass, with change history ([#5])
+- [x] Read-only mirror of every `lockIn/{uid}` collection into SQLite, incremental by change time with a weekly full pass, with change history ([#5])
 - [ ] `holdings_daily` built from the mirror history from day one (Statistics)
 - [ ] Claude Code CLI in the cron service (Hemline's pattern), token in a root-only env file, smoke run with `deploy.sh check` (no `--bare`) ([#5]); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout
-- [ ] Backups of the desk database ([#5])
+- [x] Backups of the desk database ([#5])
 - [ ] App shell in the Escape Vektor look: tokens in `ui/src/styles`, pill nav and phone dock, light and graphite dark
 - [ ] Settings: data freshness and token card (`/api/status` in [#5]; page by Design)
 - [ ] Local lint, test and build scripts; synthetic fixtures
