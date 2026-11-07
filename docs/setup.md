@@ -105,7 +105,7 @@ Open the desk at home without Tailscale, the way Hemline has its own address. Ca
 | You'd rather use one name everywhere | If the router can override DNS, point `desk.escape-vektor.com` at `192.168.0.116` there. At home it goes to the alias, away it resolves to the tailnet address |
 | Phone alerts at home | The ntfy app still talks to `desk.escape-vektor.com:8443`, so keep Tailscale on the phone for alerts |
 
-**App card.** In TrueNAS Apps, the app gets its own icon and a **Web UI** button that opens `https://desk-lan.escape-vektor.com`. TrueNAS forgets both when you edit the app's YAML, so `deploy.sh now`, and `auto` within 5 minutes, put them back. To do it straight away, run `deploy.sh card` and refresh the Apps page. The icon is served by the desk itself (`/icon-512.png`), so it shows when your browser is on the home network.
+**App card.** In TrueNAS Apps, the app gets its own icon and a **Web UI** button that opens `https://desk-lan.escape-vektor.com`. TrueNAS forgets both when you edit the app's YAML, so `deploy.sh now`, and `auto` within 5 minutes, put them back and rebuild TrueNAS's app list (`midclt call app.metadata.generate`). To do it straight away, run `deploy.sh card` and hard-refresh the Apps page. The icon is served by the desk itself (`/icon-512.png`), so it shows when your browser is on the home network.
 
 ## Later
 

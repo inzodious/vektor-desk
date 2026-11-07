@@ -329,29 +329,49 @@ check() {
 # ---- App card: icon and Web UI button in TrueNAS Apps ----
 
 app_card() {
-  local file=$APP_CONFIGS/$APP/metadata.yaml
+  local file=$APP_CONFIGS/$APP/metadata.yaml changed
   [ -f "$file" ] || return 0
-  python3 - "$file" "$ICON_URL" "$PORTAL_URL" <<'PY'
+  changed=$(python3 - "$file" "$APP_CONFIGS/../metadata.yaml" "$APP" "$ICON_URL" "$PORTAL_URL" <<'PY'
 import os
 import sys
 
 import yaml
 
-path, icon, portal = sys.argv[1:4]
-with open(path) as f:
-    data = yaml.safe_load(f) or {}
-meta = data.setdefault("metadata", {})
-if meta.get("icon") == icon and data.get("portals") == {"Web UI": portal}:
-    sys.exit(0)
-meta["icon"] = icon
-data["portals"] = {"Web UI": portal}
-tmp = path + ".vektor-desk"
-with open(tmp, "w") as f:
-    yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
-os.chmod(tmp, os.stat(path).st_mode)
-os.replace(tmp, path)
-print("App card: icon and Web UI button set")
+path, collective, app, icon, portal = sys.argv[1:6]
+
+
+def load(p):
+    try:
+        with open(p) as f:
+            return yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+
+
+def card_set(entry):
+    return entry.get("metadata", {}).get("icon") == icon and entry.get("portals") == {"Web UI": portal}
+
+
+data = load(path)
+if not card_set(data):
+    data.setdefault("metadata", {})["icon"] = icon
+    data["portals"] = {"Web UI": portal}
+    tmp = path + ".vektor-desk"
+    with open(tmp, "w") as f:
+        yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+    os.chmod(tmp, os.stat(path).st_mode)
+    os.replace(tmp, path)
+if not card_set(load(collective).get(app, {})):
+    print("stale")
 PY
+  ) || return 1
+  [ "$changed" = stale ] || return 0
+  if timeout 60 midclt call app.metadata.generate >/dev/null 2>&1; then
+    echo "App card: icon and Web UI button set; refresh the Apps page"
+  else
+    echo "App card: set for $APP, but TrueNAS didn't rebuild its app list; run: midclt call app.metadata.generate" >&2
+    return 1
+  fi
 }
 
 # ---- Logs for the eval container ----
