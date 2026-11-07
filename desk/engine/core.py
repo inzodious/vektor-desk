@@ -54,6 +54,7 @@ class Out:
     lookthrough: list[tuple] | None = None
     signals: list[tuple] | None = None
     views: dict[str, dict] = field(default_factory=dict)
+    implied: dict[tuple[str, str], float] = field(default_factory=dict)
 
     def m(
         self,
@@ -248,6 +249,10 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
         if f["external_portfolio"]:
             pflow[f["date"]] += f["amount"]
         aflow[f["account"]][f["date"]] += f["amount"]
+    out.implied = implied_flows(days, holdings, aflow, income(activity))
+    for (acct, d), amount in out.implied.items():
+        pflow[d] += amount
+        aflow[acct][d] += amount
     flows_on = [_flows_between(days, pflow, i) for i in range(len(days))]
     values = [totals[d] for d in days]
     q_now = quality_by_day[as_of]
@@ -300,6 +305,29 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
         out.m("cash.pending_days", (date.fromisoformat(when) - date.fromisoformat(as_of)).days, "days", quality="modelled")
     _health(out, cfg, mirror, desk, holdings, now)
     return out
+
+
+def implied_flows(days: list[str], holdings: dict[str, list[dict]], aflow, income_rows) -> dict[tuple[str, str], float]:
+    found: dict[tuple[str, str], float] = {}
+    for i in range(1, len(days)):
+        lo, hi = days[i - 1], days[i]
+        today = holdings[hi]
+        snapped = {h["account"] for h in today if h["source"] == "snapshot"}
+        if not snapped:
+            continue
+        price = {h["symbol"]: h["close"] for h in today if not h["is_cash"] and h["close"]}
+        for acct in sorted(snapped | {h["account"] for h in holdings[lo]}):
+            if acct not in snapped and any(h["account"] == acct for h in today):
+                continue
+            prev = [h for h in holdings[lo] if h["account"] == acct]
+            repriced = sum(h["value"] if h["is_cash"] else h["shares"] * (price.get(h["symbol"]) or h["close"] or 0.0) for h in prev)
+            now_value = sum(h["value"] for h in today if h["account"] == acct)
+            known = sum(a for d, a in aflow.get(acct, {}).items() if lo < d <= hi)
+            paid = sum(a for d, ac, _, a in income_rows if ac == acct and lo < d <= hi)
+            residual = now_value - repriced - known - paid
+            if abs(residual) > max(1.0, abs(repriced) * 0.0005):
+                found[(acct, hi)] = round(residual, 2)
+    return found
 
 
 def _flows_between(days: list[str], flows: dict[str, float], i: int) -> float:
@@ -741,6 +769,23 @@ def _value_check(rows, day: str) -> tuple[str, str, str]:
     return "value", "warn", f"{'; '.join(bad)}.{why} Fix: usually the broker priced at a different time; it clears once the day's official closes land."
 
 
+def _flows_check(implied: dict[tuple[str, str], float], holdings) -> tuple[str, str, str]:
+    snaps = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
+    if not snaps:
+        return "flows", "ok", "No snapshots yet."
+    last = max(snaps)
+    mine = {a: v for (a, d), v in implied.items() if d == last}
+    if not mine:
+        return "flows", "ok", f"The {last} snapshot matches prices plus recorded activity."
+    parts = "; ".join(f"{a} {v:+,.2f}" for a, v in sorted(mine.items()))
+    return (
+        "flows",
+        "ok",
+        f"The {last} snapshot moved {parts} beyond prices and recorded activity; counted as money in or out, not return "
+        "(deposits, payroll contributions or a margin buy Escape Vektor didn't log).",
+    )
+
+
 def _market_keys() -> tuple[str, str, str]:
     need = [(k, why) for k, why in MARKET_KEYS if not os.environ.get(k)]
     if not need:
@@ -763,6 +808,7 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
     as_of = out.as_of
     rows = holdings[as_of]
     out.h(*_closes_check(desk, rows, as_of))
+    out.h(*_flows_check(out.implied, holdings))
     snap_days = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
     if snap_days:
         out.h(*_value_check(holdings[max(snap_days)], max(snap_days)))
