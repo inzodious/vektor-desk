@@ -1,0 +1,118 @@
+{
+ "enabled": false,
+ "busy": false,
+ "desks": [
+  {
+   "desk": "plan_keeper",
+   "title": "Plan keeper",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 7
+   }
+  },
+  {
+   "desk": "tax",
+   "title": "Tax desk",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 8
+   }
+  },
+  {
+   "desk": "risk",
+   "title": "Risk desk",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 3
+   }
+  },
+  {
+   "desk": "research",
+   "title": "Research desk",
+   "model": "opus",
+   "effort": "xhigh",
+   "live": true,
+   "enabled": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 4
+   }
+  },
+  {
+   "desk": "skeptic",
+   "title": "Skeptic",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 10
+   }
+  },
+  {
+   "desk": "scout",
+   "title": "Scout",
+   "model": "opus",
+   "effort": "xhigh",
+   "live": true,
+   "enabled": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 1
+   }
+  },
+  {
+   "desk": "strategy",
+   "title": "Strategy desk",
+   "model": "opus",
+   "effort": "xhigh",
+   "live": true,
+   "enabled": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 2
+   }
+  }
+ ]
+}

@@ -79,6 +79,16 @@ const SHOTS = [
   { name: 'health-fail', path: '/?scenario=fail', fixtures: true, clock: MONDAY },
   { name: 'health-warn', path: '/plan?scenario=warn', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('health-banner').getByText('1 more check').click() },
   { name: 'bridge-long', path: '/?scenario=long', fixtures: true, clock: MONDAY },
+  { name: 'fresh-bridge', path: '/?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'fresh-research', path: '/research?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'fresh-decisions', path: '/decisions?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'fresh-journal', path: '/decisions/journal?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'fresh-flight', path: '/decisions/flight?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'fresh-plan', path: '/plan?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'fresh-lab-risk', path: '/lab/risk?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'fresh-lab-strategies', path: '/lab/strategies?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'fresh-settings', path: '/settings?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'settings-profile-error', path: '/settings?scenario=failing', fixtures: true, clock: MONDAY, el: 'profile' },
 ];
 
 // ---------- contrast ----------

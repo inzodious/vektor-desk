@@ -1,0 +1,45 @@
+{
+ "path": "/data/desk.yaml",
+ "exists": true,
+ "source": "/data/desk.yaml",
+ "version": 3,
+ "loaded_at": "2026-11-07T14:02:11+00:00",
+ "error": "desk.yaml line 14: tax.harvest_threshold_usd must be a number; using the last good version (v3).",
+ "warnings": [
+  "agents.desks.scout is on but agents.weekly cap for scout is 0, so it never runs."
+ ],
+ "set": [
+  "risk_level",
+  "opportunity.satellite_cap_pct",
+  "tax.harvest_threshold_usd",
+  "growth.tilt",
+  "agents.enabled",
+  "agents.desks",
+  "deposits",
+  "rules"
+ ],
+ "defaults": [
+  "industry_focus.themes",
+  "industry_focus.exclude",
+  "opportunity.ideas_per_month",
+  "opportunity.min_confidence",
+  "tax.lot_method",
+  "tax.year_end_start",
+  "tax.wash_sale_accounts",
+  "growth.horizon_years",
+  "growth.fi_target_from_plan",
+  "usage.overnight_window",
+  "usage.weekly_runs",
+  "alerts.min_priority"
+ ],
+ "agents_enabled": true,
+ "desks_on": [
+  "plan_keeper",
+  "risk",
+  "skeptic",
+  "tax"
+ ],
+ "deposits": 2,
+ "rules": 4,
+ "starter": null
+}
