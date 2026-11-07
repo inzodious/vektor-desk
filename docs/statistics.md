@@ -156,10 +156,10 @@ The shadows answer the only question that matters for a personal portfolio: woul
 
 | Id | Metric | Notes |
 |---|---|---|
-| `tax.lots` | Lots with unrealized gain or loss | Short or long term, days to long term |
-| `tax.harvestable` | Harvestable loss | Total and per lot, highest cost first |
-| `tax.wash_window` | Wash-sale calendar | 30 days either side of every sale and buy, across the brokerage, HSA and 401(k) (where a fund could be substantially identical, it is flagged for review rather than decided) |
-| `tax.realized_ytd` | Realized short- and long-term gains this year | From the realized gain/loss export |
+| `tax.lots` | Lots with unrealized gain or loss | Short or long term, days to long term. Totals ship as `tax.unrealized_st` and `tax.unrealized_lt` |
+| `tax.harvestable` | Harvestable loss | Total and per holding: losses at or over `tax.harvest_threshold_usd` (default $250) with no buy in the last 30 days |
+| `tax.wash_window` | Wash-sale calendar | Days until each symbol's window clears (scope `holding`). Windows open on every loss sale and every buy (activity, reinvests and lots acquired in the last 30 days), across all accounts unless `tax.wash_sale_accounts` narrows them. S&P 500 and total-market trackers that could be substantially identical are flagged for review rather than decided. Served by `GET /api/engine/wash` |
+| `tax.realized_st`, `tax.realized_lt`, `tax.wash_disallowed` | Realized short- and long-term gains this year, and disallowed wash losses | From the realized gain/loss export, window `YTD` |
 | `tax.offset` | Ordinary-income offset used and carryforward | The $3,000 annual limit |
 | `tax.harvest_value` | Tax value of a harvest | Loss × `tax.marginal_rate` |
 | `tax.marginal_rate` | Marginal federal and state rate | From Escape Vektor's tax estimate in the mirror, else `desk.yaml`; quality `modelled` either way |
@@ -233,6 +233,25 @@ Before a proposal or one of your own trade ideas reaches an order ticket, the en
 | Lots | For a sale: the lot pick (highest cost first by default), realized short- and long-term gain or loss, `tax.harvest_value` |
 
 Preflight is engine code, owned here: `preflight(holdings, trade) -> lights`. Agents call it on every proposal (their block and flag statuses are in [agents.md](agents.md)), the Decisions page calls it on hand-typed ideas, and both get the same answer. It never changes stored metrics; it writes `preflight(ticket_id, metric_id, before, after, flag)` rows the ticket shows side by side.
+
+Code: `desk.engine.preflight.check_trade(cfg, trade, ticket_id=None)`; the trade is `{kind, symbol, account, side, amount_usd, shares, funding, lot_method, limit}`. The answer:
+
+| Field | Shape |
+|---|---|
+| `status` | `clear`, `flagged` (any `watch`) or `blocked` (any `act`) |
+| `lights` | Six lamps `{id, label, status: ok\|watch\|act, before, after, detail}`: `concentration`, `drift_after`, `funding`, `wash_sales` (plus `clears`), `lots_tax`, `plan_rules` |
+| `tax` | `{lot_method, lots: [{acquired, shares, cost, proceeds, gain, term}], realized_st, realized_lt, realized, harvest_loss, wash_clear_date}` |
+| `metrics` | `{metric_id, before, after, flag}` for `value.market`, `risk.top1`, `plan.single_stock`, `plan.drift_max`, `margin.debit`, `margin.cost_month`, `margin.call_drop`, `cash.share`, and `tax.realized` on a sale |
+| `trade` | The trade as checked: account picked, shares and dollars filled in at the latest price (or the limit) |
+
+| Lamp | `act` when | `watch` when |
+|---|---|---|
+| Concentration | A buy opens a new single stock, or takes one past its band | A sale leaves one past its band; a buy of a symbol whose kind is unknown |
+| Drift after | | Largest drift grows past the drift limit |
+| Funding | A buy is margin-funded or cash runs short, with the monthly interest in dollars and the drop to a call | |
+| Wash sales | A buy within 30 days of a loss sale of that symbol; a loss sale within 30 days of a buy of it in any account | A scheduled deposit or dividend reinvest would buy it back; a possibly identical fund |
+| Lots and tax | | No lot export; lots cover fewer shares than the sale; a harvest that realizes a gain |
+| Plan rules | A buy breaks a rule that held before | A sale breaks one; a rule already off before and no worse |
 
 ## Scoring decisions
 
@@ -407,7 +426,9 @@ strategies, strategy_trials, paper_positions, paper_trades   (see Strategy lab)
 | `GET /api/compare?ids=&window=` | Aligned, rebased series plus the comparison table |
 | `GET /api/live` | Latest quotes, live value, day change (market hours) |
 | `GET /api/live/intraday` | Today's quote ticks `{SYM: [{t, price}]}` |
-| `POST /api/preflight` | Before and after metrics for a hypothetical trade |
+| `POST /api/preflight` | The Preflight answer for a hypothetical trade (nothing stored); 400 on a bad trade |
+| `GET /api/engine/preflight?ticket_id=` | Stored before and after rows for a ticket |
+| `GET /api/engine/wash` | Open wash-sale windows `{symbol, kind, date, clears, account, amount}` |
 | `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status and tear sheet |
 
 **Display rules for design.** Show `as_of` on every KPI; show any non-`ok` quality as a small, friendly tag, not a red error; never annualize under a year; Monte Carlo as percentile lines or markers, not a filled band.

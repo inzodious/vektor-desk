@@ -1,6 +1,7 @@
 import sqlite3
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
 from desk.api.deps import get_cfg
@@ -8,6 +9,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
+from desk.engine.preflight import PreflightError, check_trade
 
 router = APIRouter(tags=["engine"])
 
@@ -217,3 +219,38 @@ def health(request: Request) -> JSONResponse:
         conn.close()
     status = "fail" if any(c["status"] == "fail" for c in checks) else ("warn" if any(c["status"] == "warn" for c in checks) else "ok")
     return _json({"as_of": day, "status": status if checks else "fail", "checks": checks, "last_run": dict(last) if last else None})
+
+
+@router.post("/api/preflight")
+def post_preflight(request: Request, trade: Annotated[dict, Body()]) -> JSONResponse:
+    cfg = get_cfg(request)
+    if not cfg.desk_db.exists():
+        return JSONResponse({"error": "No holdings yet; the engine has not run"}, status_code=409)
+    try:
+        return _json(check_trade(cfg, trade))
+    except PreflightError as e:
+        return JSONResponse({"error": str(e)}, status_code=400 if "No holdings" not in str(e) else 409)
+
+
+@router.get("/api/engine/preflight")
+def get_preflight(request: Request, ticket_id: str) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "preflight"):
+        return _json({"ticket_id": ticket_id, "rows": []})
+    try:
+        rows = [dict(r) for r in conn.execute("SELECT metric_id, before, after, flag, at FROM preflight WHERE ticket_id=? ORDER BY metric_id", (ticket_id,))]
+    finally:
+        conn.close()
+    return _json({"ticket_id": ticket_id, "rows": rows})
+
+
+@router.get("/api/engine/wash")
+def wash(request: Request) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "wash_windows"):
+        return _json({"as_of": None, "windows": []})
+    try:
+        rows = [dict(r) for r in conn.execute("SELECT * FROM wash_windows ORDER BY clears, symbol")]
+    finally:
+        conn.close()
+    return _json({"as_of": rows[0]["as_of"] if rows else None, "windows": rows})
