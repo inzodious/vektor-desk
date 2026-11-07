@@ -9,7 +9,10 @@ from desk.db import connect
 from desk.engine import schema
 
 # ---------- synthetic goal ----------
-FI = {"key": "fi", "value": {"birthDate": "1991-03-20", "fiTargetAge": 60, "fiYearlySpend": 28000, "fiMultiple": 25, "inflation": 0.03, "inflationAdjusted": True}}
+FI = {
+    "key": "fi",
+    "value": {"birthDate": "1991-03-20", "fiTargetAge": 60, "fiYearlySpend": 28000, "fiMultiple": 25, "inflation": 0.03, "inflationAdjusted": True},
+}
 BACK_YEARS = 2
 VOL = {"FXAIX": 0.16, "FTEC": 0.26, "VXUS": 0.15, "BND": 0.05, "ACME": 0.55}
 DRIFT = {"FXAIX": 0.10, "FTEC": 0.14, "VXUS": 0.06, "BND": 0.02, "ACME": 0.05}
