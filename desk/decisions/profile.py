@@ -24,6 +24,7 @@ DEFAULTS: dict = {
     "usage": {"overnight_window": "01:00-05:00", "weekly_runs": {}},
     "agents": {"enabled": False, "desks": {d: False for d in DESKS}},
     "deposits": [],
+    "alerts": {"min_priority": "default"},
     "rules": [
         {"id": "no-margin-buys", "kind": "no_margin_buys"},
         {"id": "no-new-single-stocks", "kind": "no_new_single_stocks"},
@@ -171,6 +172,9 @@ def validate(data) -> list[str]:
                 warnings.append(f"agents.desks.{desk} is not a known desk")
             if not isinstance(on, bool):
                 errors.append(f"agents.desks.{desk} must be true or false")
+    alerts = _section(errors, data, "alerts")
+    if "min_priority" in alerts:
+        _choice(errors, "alerts.min_priority", alerts["min_priority"], ("min", "low", "default", "high", "urgent"))
     if "deposits" in data:
         from desk.decisions.plan import validate_deposits
 

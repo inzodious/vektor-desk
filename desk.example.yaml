@@ -50,6 +50,9 @@ agents:
     scout: false
     strategy: false
 
+alerts:
+  min_priority: default
+
 deposits:
   - id: payday
     account: brokerage
