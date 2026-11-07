@@ -6,9 +6,10 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
+from desk.engine.live import live_view
 from desk.engine.lots import current_lots
 
-router = APIRouter(prefix="/api/engine", tags=["engine"])
+router = APIRouter(tags=["engine"])
 
 QUALITY_ORDER = ("ok", "trimmed", "pro_forma", "modelled", "mismatch", "stale", "insufficient_history")
 
@@ -32,7 +33,7 @@ def _json(body: dict) -> JSONResponse:
     return JSONResponse(body, headers={"Cache-Control": "no-store"})
 
 
-@router.get("/holdings")
+@router.get("/api/engine/holdings")
 def holdings(request: Request, date: str | None = None) -> JSONResponse:
     conn = _open(get_cfg(request))
     if conn is None:
@@ -54,7 +55,7 @@ def holdings(request: Request, date: str | None = None) -> JSONResponse:
     )
 
 
-@router.get("/value")
+@router.get("/api/engine/value")
 def value(request: Request, start: str | None = None, end: str | None = None, account: str | None = None) -> JSONResponse:
     conn = _open(get_cfg(request))
     if conn is None:
@@ -80,7 +81,7 @@ def value(request: Request, start: str | None = None, end: str | None = None, ac
     return _json({"series": [{"date": r["date"], "value": r["value"], "source": r["source"], "quality": worst((r["q"] or "").split(","))} for r in rows]})
 
 
-@router.get("/lots")
+@router.get("/api/engine/lots")
 def lots(request: Request, symbol: str | None = None, account: str | None = None) -> JSONResponse:
     cfg = get_cfg(request)
     if not cfg.desk_db.exists():
@@ -94,3 +95,17 @@ def lots(request: Request, symbol: str | None = None, account: str | None = None
     finally:
         conn.close()
     return _json({"lots": rows, "files": files})
+
+
+@router.get("/api/live")
+def live(request: Request) -> JSONResponse:
+    cfg = get_cfg(request)
+    conn = _open(cfg)
+    if conn is None:
+        return _json({"state": None, "quality": "insufficient_history", "rows": [], "value": 0.0, "day_change": 0.0})
+    try:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='quotes_live'").fetchone() is None:
+            return _json({"state": None, "quality": "insufficient_history", "rows": [], "value": 0.0, "day_change": 0.0})
+        return _json(live_view(conn))
+    finally:
+        conn.close()
