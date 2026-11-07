@@ -1,5 +1,6 @@
 import calendar
 import json
+import re
 import secrets
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -13,6 +14,8 @@ CADENCES = ("weekly", "biweekly", "semimonthly", "monthly")
 LAND_WINDOW_DAYS = 3
 LAND_TOLERANCE = 0.25
 LOOKBACK_DAYS = 14
+CASH_IN_WORDS = re.compile(r"TRANSFER|\bEFT\b|\bACH\b|ELECTRONIC|DEPOSIT|CONTRIB|RECEIVED|WIRE", re.I)
+CASH_OUT_WORDS = re.compile(r"JOURNAL|TRANSFERRED TO|\bPAID\b|WITHDRAW|DEBIT|DISTRIBUTION", re.I)
 
 
 # ---- Deposit schedule ----
@@ -93,6 +96,45 @@ def schedule_dates(d: dict, start: date, end: date) -> list[date]:
     return sorted({x for x in out if start <= x <= end and (until is None or x <= until)})
 
 
+def is_cash_in(a: dict) -> bool:
+    amount = a.get("amount")
+    if isinstance(amount, bool) or not isinstance(amount, int | float) or amount <= 0 or not a.get("accountKey") or not a.get("date"):
+        return False
+    kind = a.get("kind")
+    if kind == "deposit":
+        return True
+    if kind not in ("transfer", "other") or (a.get("symbol") and not a.get("core")):
+        return False
+    text = f"{a.get('action') or ''} {a.get('description') or ''}"
+    return bool(CASH_IN_WORDS.search(text)) and not CASH_OUT_WORDS.search(text)
+
+
+def cash_in(rows) -> list[dict]:
+    found = []
+    for rid, a in rows:
+        if not is_cash_in(a):
+            continue
+        try:
+            date.fromisoformat(str(a["date"])[:10])
+        except ValueError:
+            continue
+        found.append({"activity_id": rid, "date": str(a["date"])[:10], "accountKey": a["accountKey"], "amount": float(a["amount"]), "source": a.get("source")})
+    found.sort(key=lambda x: (x["accountKey"], x["date"], x["activity_id"] or ""))
+    kept: list[dict] = []
+    for x in found:
+        day = date.fromisoformat(x["date"])
+        twin = any(
+            k["accountKey"] == x["accountKey"]
+            and k["source"] != x["source"]
+            and round(k["amount"] * 100) == round(x["amount"] * 100)
+            and abs((date.fromisoformat(k["date"]) - day).days) <= LAND_WINDOW_DAYS
+            for k in kept[-20:]
+        )
+        if not twin:
+            kept.append(x)
+    return sorted(kept, key=lambda x: (x["date"], x["accountKey"]))
+
+
 def mirror_deposits(conn, since: str) -> list[dict]:
     if not has_mirror(conn):
         return []
@@ -100,15 +142,15 @@ def mirror_deposits(conn, since: str) -> list[dict]:
         rows = conn.execute("SELECT id, json FROM mirror.rows WHERE tbl='activity'").fetchall()
     except Exception:  # noqa: BLE001
         return []
-    out = []
+    parsed = []
     for r in rows:
         try:
             a = json.loads(r["json"])
         except (TypeError, ValueError):
             continue
-        if a.get("kind") == "deposit" and str(a.get("date", "")) >= since and (a.get("amount") or 0) > 0:
-            out.append({"activity_id": r["id"], "date": str(a["date"]), "accountKey": a.get("accountKey"), "amount": a.get("amount")})
-    return sorted(out, key=lambda a: a["date"])
+        if isinstance(a, dict) and str(a.get("date", "")) >= since:
+            parsed.append((r["id"], a))
+    return [{k: v for k, v in x.items() if k != "source"} for x in cash_in(parsed)]
 
 
 def _today(cfg: Config, now: datetime | None) -> date:

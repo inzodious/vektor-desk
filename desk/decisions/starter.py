@@ -10,11 +10,16 @@ import yaml
 
 from desk.config import Config
 from desk.db import connect
+from desk.decisions.plan import cash_in
 from desk.decisions.profile import DEFAULTS, ProfileError, active_profile, parse, profile_path
 
 WINDOW_DAYS = 180
+SERIES_TOLERANCE = 0.05
+MIN_SERIES = 3
+STALE_DAYS = 45
 PAYS_PER_MONTH = {"weekly": 52 / 12, "biweekly": 26 / 12, "semimonthly": 2, "monthly": 1}
 STARTER_DESKS = ("plan_keeper", "tax", "risk", "skeptic")
+BROKERAGE_KINDS = ("individual", "brokerage", "joint")
 STARTER_RUNS = {"plan_keeper": 10}
 
 
@@ -97,28 +102,88 @@ def cadence(days: list[date]) -> dict | None:
     return None
 
 
+def _activity(conn: sqlite3.Connection, since: date) -> list[tuple[str, dict]]:
+    try:
+        cursor = conn.execute("SELECT id, json FROM rows WHERE tbl='activity'")
+    except sqlite3.Error:
+        return []
+    out = []
+    for r in cursor:
+        try:
+            a = json.loads(r["json"])
+        except (TypeError, ValueError):
+            continue
+        if isinstance(a, dict) and (d := _day(a.get("date"))) is not None and d >= since:
+            out.append((r["id"], a))
+    return out
+
+
+def _groups(items: list[tuple[date, float]]) -> list[list[tuple[date, float]]]:
+    groups: list[list[tuple[date, float]]] = []
+    for d, amount in sorted(items, key=lambda x: (x[1], x[0])):
+        if groups and amount <= groups[-1][0][1] * (1 + SERIES_TOLERANCE):
+            groups[-1].append((d, amount))
+        else:
+            groups.append([(d, amount)])
+    return groups
+
+
+def series(items: list[tuple[date, float]], today: date) -> tuple[list[dict], int, int]:
+    found, used, stale = [], 0, 0
+    for g in sorted(_groups(items), key=len, reverse=True):
+        if len(g) < MIN_SERIES:
+            continue
+        hit = cadence([d for d, _ in g])
+        if hit is None:
+            continue
+        if (today - max(d for d, _ in g)).days > STALE_DAYS:
+            stale += 1
+            continue
+        found.append({**hit, "amount_usd": round(statistics.median(a for _, a in g)), "_n": len(g)})
+        used += len(g)
+    if not found and not stale:
+        hit = cadence([d for d, _ in items])
+        if hit is not None:
+            found.append({**hit, "amount_usd": round(statistics.median(a for _, a in items)), "_n": len(items)})
+            used = len(items)
+    return sorted(found, key=lambda x: -x["amount_usd"]), len(items) - used, stale
+
+
+def _inbound_hint(rows: list[tuple[str, dict]], key: str) -> str:
+    seen = Counter(
+        f'{a.get("kind") or "?"} "{" ".join(str(a.get("action") or "").split()[:4])}"'
+        for _, a in rows
+        if a.get("accountKey") == key and isinstance(a.get("amount"), int | float) and a["amount"] > 0 and not a.get("symbol")
+    )
+    return ", ".join(f"{label} x{n}" for label, n in seen.most_common(3)) or "none"
+
+
 def deposit_schedule(conn: sqlite3.Connection, plan: dict, accts: list[dict], today: date) -> tuple[list[dict], list[str]]:
     since = today - timedelta(days=WINDOW_DAYS)
-    by_account: dict[str, dict[date, float]] = {}
-    for a in _rows(conn, "activity"):
-        d = _day(a.get("date"))
-        amount = a.get("amount")
-        if a.get("kind") != "deposit" or d is None or d < since or not isinstance(amount, int | float) or amount <= 0 or not a.get("accountKey"):
-            continue
-        days = by_account.setdefault(a["accountKey"], {})
-        days[d] = days.get(d, 0) + float(amount)
+    rows = _activity(conn, since)
+    by_account: dict[str, list[tuple[date, float]]] = {}
+    for x in cash_in(rows):
+        by_account.setdefault(x["accountKey"], []).append((date.fromisoformat(x["date"]), x["amount"]))
     out: list[dict] = []
     notes: list[str] = []
     for key in sorted(by_account):
-        seen = by_account[key]
-        found = cadence(list(seen))
-        if found is None:
-            notes.append(f"{key}: {len(seen)} deposits since {since.isoformat()}, no steady pattern, so it is left out")
-            continue
-        amount = round(statistics.median(seen.values()))
-        out.append({"id": _slug(key, out), "account": key, **found, "amount_usd": amount})
-        notes.append(f"{key}: {found['cadence']} from {len(seen)} deposits since {since.isoformat()}")
-    if out:
+        items = by_account[key]
+        found, loose, stale = series(items, today)
+        for hit in found:
+            n = hit.pop("_n")
+            out.append({"id": _slug(key, out), "account": key, **hit})
+            notes.append(f"{key}: {hit['cadence']} from {n} deposits since {since.isoformat()}")
+        if loose:
+            notes.append(f"{key}: {loose} one-off deposits left out")
+        if stale:
+            notes.append(f"{key}: {stale} schedule(s) with no deposit in {STALE_DAYS} days left out")
+        if not found and not stale:
+            notes.append(f"{key}: {len(items)} deposits since {since.isoformat()}, no steady pattern, so it is left out")
+    for a in accts:
+        if a["key"] not in by_account and a["kind"] in BROKERAGE_KINDS:
+            notes.append(f"{a['key']}: no deposits seen since {since.isoformat()}; money-in rows there: {_inbound_hint(rows, a['key'])}")
+    brokerage = {a["key"] for a in accts if a["kind"] in BROKERAGE_KINDS}
+    if out and (not brokerage or any(d["account"] in brokerage for d in out)):
         return out, notes
     pay = [d for d in (_day(s.get("payDate")) for s in _rows(conn, "paystubs")) if d and d >= since]
     source = "paystubs"
@@ -130,10 +195,10 @@ def deposit_schedule(conn: sqlite3.Connection, plan: dict, accts: list[dict], to
         ]
         source = "payroll transactions"
     found = cadence(pay)
-    target = next((a["key"] for a in accts if a["kind"] in ("individual", "brokerage", "joint")), accts[0]["key"] if accts else None)
+    target = min(brokerage) if brokerage else (accts[0]["key"] if accts else None)
     if found is None or target is None:
         notes.append("No deposit pattern in the mirror yet; add deposits by hand")
-        return [], notes
+        return out, notes
     item = {"id": "payday", "account": target, **found}
     monthly, _ = _plan_monthly(plan)
     if monthly:
@@ -261,6 +326,33 @@ def init(cfg: Config, path: Path | None = None, *, today: date | None = None, dr
         with open(path, "x") as f:
             f.write(text)
     return path, text
+
+
+def deposits_block(cfg: Config, *, today: date | None = None) -> str:
+    if not cfg.mirror_db.exists():
+        raise StarterError(f"No mirror at {cfg.mirror_db}. Run the mirror first (deploy.sh mirror).")
+    today = today or datetime.now(UTC).date()
+    conn = connect(cfg.mirror_db, readonly=True)
+    try:
+        deposits, notes = deposit_schedule(conn, latest_plan(conn), accounts(conn), today)
+    finally:
+        conn.close()
+    current = active_profile(cfg)
+    lines = [
+        f"# Deposits detected from the mirror on {today.isoformat()} by `python -m desk.decisions.profile init --deposits`.",
+        f"# Your desk.yaml ({current.source}) lists {len(current.get('deposits') or [])} now. To use these, replace its deposits: section.",
+        "#",
+        *[f"# - {n}" for n in notes],
+        "",
+    ]
+    if not deposits:
+        return "\n".join([*lines, "# No deposit pattern found, so there is no block to paste.", ""])
+    block = yaml.safe_dump({"deposits": deposits}, sort_keys=False, default_flow_style=False).rstrip()
+    try:
+        parse(block)
+    except ProfileError as e:
+        raise StarterError(f"The detected deposits didn't validate ({e}).") from e
+    return "\n".join([*lines, block, ""])
 
 
 # ---- Status ----

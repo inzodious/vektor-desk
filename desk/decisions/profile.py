@@ -307,6 +307,7 @@ def main(argv: list[str] | None = None) -> int:
     init = sub.add_parser("init", help="write a draft desk.yaml from the mirror; never overwrites")
     init.add_argument("--path", type=Path, help="where to write (default $DESK_PROFILE or /data/desk.yaml)")
     init.add_argument("--print", dest="dry_run", action="store_true", help="print the draft instead of writing it")
+    init.add_argument("--deposits", action="store_true", help="print only the detected deposits block, to paste into an existing desk.yaml")
     sub.add_parser("status", help="show the active version and which settings are still defaults")
     args = parser.parse_args(argv)
     cfg = Config.from_env()
@@ -314,6 +315,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(starter.status(cfg), indent=2))
         return 0
     try:
+        if args.deposits:
+            print(starter.deposits_block(cfg))
+            return 0
         path, text = starter.init(cfg, args.path, dry_run=args.dry_run)
     except starter.StarterError as e:
         print(e, file=sys.stderr)

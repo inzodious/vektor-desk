@@ -1,6 +1,10 @@
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 from datetime import date, timedelta
+from pathlib import Path
 
 import pytest
 
@@ -123,3 +127,97 @@ def test_bad_draft_is_never_written(demo_cfg, monkeypatch):
     with pytest.raises(StarterError, match="didn't validate"):
         init(demo_cfg, today=TODAY)
     assert not (demo_cfg.data_dir / "desk.yaml").exists()
+
+
+def test_cli_runs_as_a_module_without_warnings(demo_cfg):
+    root = Path(__file__).resolve().parents[2]
+    env = {
+        "PATH": os.environ.get("PATH", ""),
+        "PYTHONPATH": str(root),
+        "DESK_DATA_DIR": str(demo_cfg.data_dir),
+        "DESK_PROFILE": str(demo_cfg.data_dir / "desk.yaml"),
+    }
+    run = [sys.executable, "-W", "error", "-m", "desk.decisions.profile"]
+    before = subprocess.run([*run, "status"], cwd=root, env=env, capture_output=True, text=True, timeout=60)
+    assert before.returncode == 0, before.stderr
+    assert before.stderr == "" and json.loads(before.stdout)["exists"] is False
+    made = subprocess.run([*run, "init"], cwd=root, env=env, capture_output=True, text=True, timeout=60)
+    assert made.returncode == 0 and made.stderr == "", made.stderr
+    after = subprocess.run([*run, "status"], cwd=root, env=env, capture_output=True, text=True, timeout=60)
+    assert after.returncode == 0 and after.stderr == "", after.stderr
+    assert json.loads(after.stdout)["exists"] is True
+
+
+def _act(d: date, acct: str, kind: str, action: str, amount: float, **extra) -> tuple[str, dict]:
+    return ("activity", {"date": d.isoformat(), "accountKey": acct, "kind": kind, "action": action, "amount": amount, "symbol": None, "core": False, **extra})
+
+
+MONTHLY = [date(2026, 6, 3), date(2026, 7, 3), date(2026, 8, 3), date(2026, 9, 3), date(2026, 10, 5), date(2026, 11, 3)]
+ONE_OFFS = [(date(2026, 8, 20), 1000), (date(2026, 9, 20), 250), (date(2026, 10, 12), 400), (date(2026, 11, 5), 1500), (date(2026, 11, 18), 2800)]
+
+
+def _brokerage_shape(cfg, monthly_rows, one_offs=True):
+    snap = {"id": 4, "asOf": "2026-11-19T16:00", "accounts": [{"key": "individual-0100", "kind": "individual"}, {"key": "hsa-0200", "kind": "hsa"}]}
+    hsa = [_act(d, "hsa-0200", "deposit", "CONTRIBUTION", 183) for d in _every(date(2026, 6, 5), 14, 12)]
+    extra = [_act(d, "individual-0100", "deposit", "Electronic Funds Transfer Received (Cash)", amt) for d, amt in ONE_OFFS if one_offs]
+    _mirror(cfg, [("snapshots", snap), *hsa, *monthly_rows, *extra])
+
+
+EXPECTED = [
+    {"id": "hsa", "account": "hsa-0200", "cadence": "biweekly", "anchor": "2026-11-06", "amount_usd": 183},
+    {"id": "individual", "account": "individual-0100", "cadence": "monthly", "days": [3], "weekend": "after", "amount_usd": 3000},
+]
+
+
+def test_monthly_transfer_found_among_one_offs_and_csv_sync_twins(cfg):
+    csv = [_act(d, "individual-0100", "deposit", "Electronic Funds Transfer Received (Cash)", 3000) for d in MONTHLY]
+    sync = [_act(d + timedelta(days=1), "individual-0100", "deposit", "ELECTRONIC FUNDS TRANSFER RECEIVED", 3000, source="sync") for d in MONTHLY]
+    _brokerage_shape(cfg, [*csv, *sync])
+    data, _ = parse(init(cfg, dry_run=True, today=TODAY)[1])
+    assert data["deposits"] == EXPECTED
+
+
+def test_monthly_transfer_coded_as_transfer_or_other_still_counts(cfg):
+    rows = [
+        _act(d, "individual-0100", "transfer" if i % 2 else "other", "TRANSFER Electronic Funds Transfer" if i % 2 else "EFT RECEIVED FROM BANK", 3000)
+        for i, d in enumerate(MONTHLY)
+    ]
+    noise = [
+        _act(date(2026, 10, 20), "individual-0100", "transfer", "JOURNALED SPAXX TO MARGIN", 3000),
+        _act(date(2026, 10, 21), "individual-0100", "transfer", "TRANSFER OF ASSETS", 3000, symbol="AAAA"),
+    ]
+    _brokerage_shape(cfg, [*rows, *noise])
+    _, text = init(cfg, dry_run=True, today=TODAY)
+    data, _ = parse(text)
+    assert data["deposits"] == EXPECTED
+    assert "individual-0100: 5 one-off deposits left out" in text
+
+
+def test_stopped_schedule_is_left_out_and_explained(cfg):
+    old = [_act(d, "individual-0100", "deposit", "EFT RECEIVED", 3000) for d in MONTHLY[:4]]
+    _brokerage_shape(cfg, old)
+    _, text = init(cfg, dry_run=True, today=TODAY)
+    data, _ = parse(text)
+    assert data["deposits"] == EXPECTED[:1]
+    assert "individual-0100: 1 schedule(s) with no deposit in 45 days left out" in text
+
+
+def test_no_money_in_on_the_brokerage_says_what_it_saw(cfg):
+    _brokerage_shape(cfg, [_act(d, "individual-0100", "other", "SOMETHING ELSE", 3000) for d in MONTHLY], one_offs=False)
+    text = starter.deposits_block(cfg, today=TODAY)
+    assert 'individual-0100: no deposits seen since 2026-05-24; money-in rows there: other "SOMETHING ELSE" x6' in text
+    assert parse(text)[0]["deposits"] == EXPECTED[:1]
+
+
+def test_init_deposits_prints_a_block_without_touching_desk_yaml(cfg, monkeypatch, capsys):
+    monkeypatch.setattr("desk.decisions.profile.Config.from_env", lambda: cfg)
+    csv = [_act(d, "individual-0100", "deposit", "EFT RECEIVED", 3000) for d in MONTHLY]
+    _brokerage_shape(cfg, csv)
+    path = cfg.data_dir / "desk.yaml"
+    path.write_text("risk_level: 2\n")
+    assert main(["init", "--deposits"]) == 0
+    out = capsys.readouterr().out
+    assert path.read_text() == "risk_level: 2\n"
+    data, _ = parse(out)
+    assert data["deposits"] == EXPECTED
+    assert "lists 0 now" in out and "replace its deposits: section" in out

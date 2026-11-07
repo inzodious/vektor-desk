@@ -1,56 +1,49 @@
-from desk.decisions.plan import add_event, calendar_events, delete_event, deposits_landed, upcoming_deposits
-from desk.decisions.profile import Profile, active_profile
-from desk.decisions.records import (
-    DecisionError,
-    approve,
-    attach_skeptic,
-    confirm_fills,
-    create_proposal,
-    desk_history,
-    dismiss,
-    draft,
-    get,
-    journal,
-    log_trade,
-    mark_placed,
-    pass_on,
-    queue,
-    reject_proposal,
-    rerun_preflight,
-    scoring_rows,
-    snooze,
-    summary,
-    unmatched,
-)
-from desk.decisions.rules import active_rules
+import importlib
 
-__all__ = [
-    "add_event",
-    "calendar_events",
-    "delete_event",
-    "deposits_landed",
-    "upcoming_deposits",
-    "DecisionError",
-    "Profile",
-    "active_profile",
-    "active_rules",
-    "approve",
-    "attach_skeptic",
-    "confirm_fills",
-    "create_proposal",
-    "desk_history",
-    "dismiss",
-    "draft",
-    "get",
-    "journal",
-    "log_trade",
-    "mark_placed",
-    "pass_on",
-    "queue",
-    "reject_proposal",
-    "rerun_preflight",
-    "scoring_rows",
-    "snooze",
-    "summary",
-    "unmatched",
-]
+# ---- Lazy exports: `python -m desk.decisions.<module>` must not find its module already imported ----
+
+_EXPORTS = {
+    "add_event": "plan",
+    "calendar_events": "plan",
+    "delete_event": "plan",
+    "deposits_landed": "plan",
+    "upcoming_deposits": "plan",
+    "Profile": "profile",
+    "active_profile": "profile",
+    "active_rules": "rules",
+    "DecisionError": "records",
+    "approve": "records",
+    "attach_skeptic": "records",
+    "confirm_fills": "records",
+    "create_proposal": "records",
+    "desk_history": "records",
+    "dismiss": "records",
+    "draft": "records",
+    "get": "records",
+    "journal": "records",
+    "log_trade": "records",
+    "mark_placed": "records",
+    "pass_on": "records",
+    "queue": "records",
+    "reject_proposal": "records",
+    "rerun_preflight": "records",
+    "scoring_rows": "records",
+    "snooze": "records",
+    "summary": "records",
+    "unmatched": "records",
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name: str):
+    module = _EXPORTS.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(importlib.import_module(f"{__name__}.{module}"), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    return sorted([*globals(), *_EXPORTS])
