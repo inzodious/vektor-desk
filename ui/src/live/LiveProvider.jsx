@@ -8,15 +8,16 @@ export function LiveProvider({ children }) {
   const [intraday, setIntraday] = useState({});
   const state = live.data?.state;
   const asOf = live.data?.as_of;
+  const day = live.data?.day;
 
   useEffect(() => {
-    if (!state) return undefined;
+    if (!state || !LIVE_STATES.includes(state)) return undefined;
     const ctl = new AbortController();
     getJson('/api/live/intraday', { signal: ctl.signal })
-      .then((d) => setIntraday(d && typeof d === 'object' ? d : {}))
+      .then((d) => setIntraday(d && d.symbols && (!d.day || d.day === day) ? d.symbols : {}))
       .catch(() => {});
     return () => ctl.abort();
-  }, [state, asOf]);
+  }, [state, asOf, day]);
 
   const value = useMemo(() => {
     const names = {};

@@ -11,7 +11,7 @@ function PriceHistory({ symbol, row, lots }) {
   const last = new Date().toISOString().slice(0, 10);
   const start = periodStart('1Y', last);
   const prices = useApi(`/api/engine/prices?symbol=${encodeURIComponent(symbol)}&start=${start}`);
-  const pts = useMemo(() => (Array.isArray(prices.data?.series) ? prices.data.series.filter((p) => p.close != null) : []), [prices.data]);
+  const pts = useMemo(() => (Array.isArray(prices.data?.rows) ? prices.data.rows.filter((p) => p.close != null) : []), [prices.data]);
   const avg = row && row.shares && row.cost ? row.cost / row.shares : null;
   const markers = useMemo(() => {
     if (!pts.length) return [];
