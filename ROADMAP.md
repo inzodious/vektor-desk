@@ -17,11 +17,12 @@ Draft, November 7, 2026. Phase contents firm up as the planning docs land.
 | 6 | Research | 2 | 📋 | 4 |
 | 7 | Lab: Compare and risk | 2 | 📋 | 3 |
 | 8 | Phone alerts | 2 | 📋 | 5 |
-| 9 | Flight record and Patterns | 3 | 📋 | 30 days of decision records |
-| 10 | Scout, Strategy and FI scenarios | 3 | 📋 | 9 |
-| 1.0 | Hardening | | 📋 | 10 |
+| 9 | Strategy lab | 3 | 📋 | 3, 6 |
+| 10 | Flight record and Patterns | 3 | 📋 | 30 days of decision records |
+| 11 | Scout and FI scenarios | 3 | 📋 | 10 |
+| 1.0 | Hardening | | 📋 | 11 |
 
-Phases 6 and 7 can run in parallel with 5 once their dependencies land. The agent runner and its fake adapter are built alongside phases 3 and 4, so phase 5 only wires them to real engine outputs.
+Phases 6 and 7 can run in parallel with 5 once their dependencies land, and phase 9 can run beside 7, 8 and 10. Start the Strategy lab as early as its dependencies allow: six months of forward paper trading is its graduation bar. The agent runner and its fake adapter are built alongside phases 3 and 4, so phase 5 only wires them to real engine outputs.
 
 **Who builds what inside a phase.** Preflight's checks are deterministic engine code (Statistics); Design renders them; agents call them. The decision record's fields come from the concept; agents write proposals into it.
 
@@ -68,6 +69,7 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run.
 - [ ] Shadow portfolios: plan mix and S&P 500
 - [ ] Drift and rules, margin (interest in dollars, price drop to a call), costs, basic concentration and drawdown
 - [ ] Output contract v1
+- [ ] Background price backfill for the Strategy lab starts here (Tiingo's free tier caps symbols, so the broad single-stock history fills over months)
 - [ ] Bridge KPI row complete
 - [ ] Plan: target mix and bands, drift, rules (versioned), deposit routing
 
@@ -109,19 +111,30 @@ Tier 1 complete: 0.5.0.
 
 - [ ] Self-hosted push (choice in `docs/architecture.md`): rule breach, trigger hit, wash-sale window, stale mirror, research ready
 
-### 9. Flight record and Patterns 📋
+### 9. Strategy lab 📋
+
+Research hypotheses become strategies, tested on history without seeing the future, then paper-traded forward before any of them can inform a proposal.
+
+- [ ] Feature library and strategy spec validation
+- [ ] Walk-forward runner over 3, 5 and 10 year windows, point-in-time data only; ETF and Ken French universes first
+- [ ] Trial ledger: every strategy tried is recorded, so overfitting tests count them all
+- [ ] Deflated Sharpe and overfitting tests
+- [ ] Strategy desk: turns research desk hypotheses into specs, reads results
+- [ ] Forward paper portfolios; a strategy is eligible only after six months of forward results
+- [ ] Rule backtests for the plan's own rules
+
+### 10. Flight record and Patterns 📋
 
 - [ ] Every decision scored at 30, 90 and 365 days against following the plan (next-close baseline, bootstrap intervals, Brier score)
 - [ ] Summaries by origin, type, and overrides versus clean Preflights
 - [ ] Patterns: market and his own behavior
 - [ ] Saved boards
 
-### 10. Scout, Strategy and FI scenarios 📋
+### 11. Scout and FI scenarios 📋
 
 - [ ] Scout desk: monthly ideas within the desk profile, each argued against first
 - [ ] FI projection scenarios (Monte Carlo percentiles)
-- [ ] Factor exposure, rule backtests
-- [ ] Strategy desk and lab: spec, point-in-time backtest, six months of forward paper trading, then eligible (needs ten years of stored price and filing history)
+- [ ] Factor exposure
 
 ### 1.0 Hardening 📋
 
