@@ -195,6 +195,14 @@ services:
 networks:
   eval: {}
 
+# The Web UI button in TrueNAS Apps. TrueNAS reads this on install; deploy.sh card keeps it, and the icon, after edits.
+x-portals:
+  - name: Web UI
+    scheme: https
+    host: desk-lan.escape-vektor.com
+    port: 443
+    path: /
+
 x-notes: |
   ## Vektor Desk
 

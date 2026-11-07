@@ -12,6 +12,8 @@
 #                      home-network addresses, a test phone alert
 #   deploy.sh logs     redacted tails of every desk service's log into data/run/logs, for the eval container
 #                      (docs/eval-access.md); auto does this every 5 minutes
+#   deploy.sh card     the app's icon and Web UI button in TrueNAS Apps; TrueNAS drops them when the YAML is edited, so
+#                      now and auto put them back
 # Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
 set -Eeuo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -26,6 +28,9 @@ BACKUPS=${DESK_BACKUPS:-/mnt/Singularity/backups/vektor-desk}
 BRANCH=${DESK_BRANCH:-main}
 CREDENTIALS=${DESK_GIT_CREDENTIALS:-/mnt/Manifest/apps/.git-credentials}
 PINNED=${DESK_PINNED:-/mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh}
+APP_CONFIGS=${DESK_APP_CONFIGS:-/mnt/.ix-apps/app_configs}
+ICON_URL=${DESK_ICON_URL:-https://desk-lan.escape-vektor.com/icon-512.png}
+PORTAL_URL=${DESK_PORTAL_URL:-https://desk-lan.escape-vektor.com/}
 KEEP=${DESK_BACKUP_KEEP:-14}
 HEALTH_WAIT=${DESK_HEALTH_WAIT:-120}
 LOG=$ROOT/deploy.log
@@ -321,6 +326,34 @@ check() {
   docker logs vektor-desk-caddy 2>&1 | grep -E 'certificate obtained|could not get certificate|obtain' | tail -n 2 | sed 's/^/  /' || true
 }
 
+# ---- App card: icon and Web UI button in TrueNAS Apps ----
+
+app_card() {
+  local file=$APP_CONFIGS/$APP/metadata.yaml
+  [ -f "$file" ] || return 0
+  python3 - "$file" "$ICON_URL" "$PORTAL_URL" <<'PY'
+import os
+import sys
+
+import yaml
+
+path, icon, portal = sys.argv[1:4]
+with open(path) as f:
+    data = yaml.safe_load(f) or {}
+meta = data.setdefault("metadata", {})
+if meta.get("icon") == icon and data.get("portals") == {"Web UI": portal}:
+    sys.exit(0)
+meta["icon"] = icon
+data["portals"] = {"Web UI": portal}
+tmp = path + ".vektor-desk"
+with open(tmp, "w") as f:
+    yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
+os.chmod(tmp, os.stat(path).st_mode)
+os.replace(tmp, path)
+print("App card: icon and Web UI button set")
+PY
+}
+
 # ---- Logs for the eval container ----
 
 secret_values() {
@@ -382,6 +415,7 @@ main() {
       exec 9>"$LOCK"
       flock -n 9 || die "a deploy is already running: tail -f $LOG"
       deploy
+      app_card || true
       if pinned_stale; then log "deploy.sh changed: copy it again for the cron jobs (docs/setup.md, After updates)"; fi
       ;;
     backup)
@@ -391,14 +425,16 @@ main() {
       ;;
     auto)
       auto
+      app_card >/dev/null 2>&1 || true
       logs_export || true
       ;;
+    card) app_card ;;
     logs) logs_export ;;
     status) status ;;
     restore-test) restore_test ;;
     check) check ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card]" >&2
       exit 2
       ;;
   esac
