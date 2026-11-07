@@ -47,7 +47,7 @@ Done when all six are merged and agree with each other.
 - [ ] Compose stack on TrueNAS: api, worker, web, Caddy, Tailscale sidecar
 - [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate
 - [ ] Read-only mirror of Escape Vektor's Firestore (positions, plans, activity, prices) into SQLite on a schedule
-- [ ] Agents container with the Claude Code CLI, token as a Compose secret, one `claude -p` smoke run (no `--bare`; mounts only its run folder and a config volume, no Firestore key, database or API keys)
+- [ ] Claude Code CLI in the scheduler service (Hemline's pattern), token as a Compose secret, one `claude -p` smoke run (no `--bare`); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout
 - [ ] App shell in the Escape Vektor look: pill nav and phone dock, light and graphite dark
 - [ ] Settings: data freshness, token renewal date
 - [ ] Local lint, test and build scripts; synthetic fixtures
