@@ -55,7 +55,7 @@ export function Shell({ badges }) {
       </a>
       <header className="topbar">
         <Link className="brand" to="/" aria-label="Vektor Desk home">
-          <img src="/mark.svg" alt="" />
+          <img src="/favicon.svg" alt="" />
           <b>
             Vektor <em>Desk</em>
           </b>
