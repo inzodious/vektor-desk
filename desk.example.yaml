@@ -31,7 +31,7 @@ growth:
 usage:
   overnight_window: "01:00-05:00"
   weekly_runs:
-    plan_keeper: 7
+    plan_keeper: 10
     tax: 8
     risk: 3
     research: 4

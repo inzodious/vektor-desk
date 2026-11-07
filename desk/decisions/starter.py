@@ -15,6 +15,7 @@ from desk.decisions.profile import DEFAULTS, ProfileError, active_profile, parse
 WINDOW_DAYS = 180
 PAYS_PER_MONTH = {"weekly": 52 / 12, "biweekly": 26 / 12, "semimonthly": 2, "monthly": 1}
 STARTER_DESKS = ("plan_keeper", "tax", "risk", "skeptic")
+STARTER_RUNS = {"plan_keeper": 10}
 
 
 class StarterError(Exception):
@@ -216,6 +217,7 @@ def draft(cfg: Config, *, today: date | None = None) -> tuple[dict, list[str]]:
         notes.append("Rules from the plan's guardrails plus no margin buys and no new single stocks")
     else:
         notes.append("No plan in the mirror; rules stay at the defaults")
+    data["usage"] = {"weekly_runs": dict(STARTER_RUNS)}
     data["agents"] = {"enabled": False, "desks": {d: d in STARTER_DESKS for d in DEFAULTS["agents"]["desks"]}}
     notes.append("Agents stay off until you set agents.enabled: true")
     return data, notes
