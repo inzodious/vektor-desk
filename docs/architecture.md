@@ -82,7 +82,7 @@ The box is a Ryzen 5 5600GT (6 cores, 12 threads) with 15 GiB of RAM and no swap
 
 The image carries the Claude Code CLI 2.1.308, pinned through npm the way Hemline does it, with `DISABLE_AUTOUPDATER=1` and `HOME=/data/home`. The `cron` service is the only one with `CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token` (one year, billed to your subscription, no API spend). How agents call it is in [agents.md](agents.md). `deploy.sh check` runs a one-line smoke test.
 
-The desk status page counts down to `DESK_CLAUDE_TOKEN_EXPIRES` and flags renewal 30 days ahead. To renew: `claude setup-token` on your PC, run `setup-truenas.sh` again and answer "n" to keeping `desk.env`, then `midclt call app.redeploy vektor-desk`.
+The desk status page counts down to `DESK_CLAUDE_TOKEN_EXPIRES` and flags renewal 30 days ahead. Renewal steps are in [setup.md](setup.md#later).
 
 ## Phone alerts
 
@@ -148,31 +148,7 @@ The same pattern as Hemline: `deploy/deploy.sh` runs as root on the NAS.
 
 ## One-time setup
 
-In order. Steps 1–4 happen in a browser or on your PC; 5–9 happen in the TrueNAS shell (`sudo -i`); 10 is on your phone.
-
-1. **Tailscale.** In the admin console, Access controls, add `"tag:desk": ["autogroup:admin"]` to `tagOwners`, beside `tag:starlite`. Then go to Settings → Keys → Generate auth key, with reusable off and tag `tag:desk`. Tagged devices don't expire, so the node stays signed in.
-2. **Porkbun.** Account → API Access: create a key and keep both the API key and the secret. Then go to Domain Management → `escape-vektor.com` → Details and turn on **API Access** for that domain.
-3. **Firestore reader.** In the Google Cloud console for Escape Vektor's Firebase project, go to IAM & Admin → Service Accounts → Create service account (`vektor-desk-reader`). Give it the role **Cloud Datastore Viewer** and nothing else. Then Keys → Add key → JSON. Copy it to the NAS with `scp vektor-desk-reader.json truenas_admin@192.168.0.113:/tmp/` and delete it from your PC once it's in your password manager. Note your Firebase project ID and your user UID (Firebase console → Authentication → Users).
-4. **Claude token.** On your PC, run `claude setup-token` and keep the token it prints.
-5. **Checkout and setup.** Clone the repo with the token the other apps use, then run the setup script. It creates the datasets and folders, asks for each value (nothing is echoed), moves the key into place, pins the cron copy of `deploy.sh` and builds both images:
-
-   ```sh
-   git -c credential.helper="store --file=/mnt/Manifest/apps/.git-credentials" clone https://github.com/inzodious/vektor-desk.git /mnt/Manifest/apps/vektor-desk-src
-   bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh /tmp/vektor-desk-reader.json
-   ```
-
-6. **Install the app.** Apps → Discover Apps → ⋮ → **Install via YAML**, name it `vektor-desk`, and paste `deploy/compose.yaml` as it is.
-7. **DNS record.** `docker exec vektor-desk-tailscale tailscale ip -4` prints the node's address. At Porkbun, add an A record with host `desk`, that address, and TTL 600.
-8. **Cron jobs.** System → Advanced Settings → Cron Jobs → **Add**, user `root`, for each one (tick Hide Standard Output and Hide Standard Error on the auto-deploy):
-
-   | Description | Command | Schedule |
-   |---|---|---|
-   | Vektor Desk backup | `bash /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh backup` | Daily at 03:45 |
-   | Vektor Desk auto-deploy | `bash /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh auto` | Custom: minutes `*/5` |
-
-   The cron jobs run the pinned copy, not the checkout, so a push to `main` can't run new code as root. After reading any change to `deploy.sh`, copy it again: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`.
-9. **Check.** Run `bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh check`, then `docker exec vektor-desk-cron python -m desk.mirror`. On your phone with Tailscale on, `https://desk.escape-vektor.com` should list today's positions.
-10. **Phone alerts.** Install the ntfy app. Settings → Default server → `https://desk.escape-vektor.com:8443`. Subscribe to `desk-alerts`, `desk-research` and `desk-ops`. The test alert from step 9 shows up in `desk-ops`; send another any time with `docker exec vektor-desk-cron python -m desk.notify test`.
+The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free. It also covers what to do after `deploy.sh` or `compose.yaml` changes, the RAM upgrade, and token renewal.
 
 ## Day to day
 
@@ -215,9 +191,19 @@ The image's `ui` stage builds `ui/` with `npm ci` and `npm run build` (or `npm i
 
 ```sh
 uv venv && . .venv/bin/activate && uv pip install -e ".[dev]"
-ruff check . && ruff format --check . && pytest
-shellcheck deploy/*.sh
-docker build -t vektor-desk:local . && docker build -t vektor-desk/caddy:local deploy/caddy
+scripts/check.sh
 ```
+
+| `scripts/check.sh` step | Runs |
+|---|---|
+| ruff check, ruff format | `ruff check .`, `ruff format --check .` (also formats Python blocks in docs) |
+| pytest | the whole suite, quietly |
+| shellcheck | `deploy/*.sh`, `scripts/*.sh` |
+| secrets scan | tracked files for Claude, Tailscale, Porkbun, GitHub and private keys, and for `.csv`, `.xlsx`, `.ofx`, `.qfx`, `.pdf`, `.db` and `.env` files |
+| compose config | `docker compose -f deploy/compose.yaml config -q`, when Docker is there |
+| ui | `npm run lint`, `npm test` (each if defined) and `npm run build` in `ui/`, when it exists |
+| image builds | with `--docker`: both images; the Caddy build validates the Caddyfile |
+
+It prints one line per step and exits non-zero when any fail. Paste the summary into the PR body. Screenshots for visual changes stay with the UI's own Playwright script.
 
 Tests use synthetic rows only (`tests/fakes.py`, `desk/demo.py`), never real data.

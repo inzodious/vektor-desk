@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# First-time setup of Vektor Desk on TrueNAS SCALE (docs/architecture.md, step 5). Run as root, from anywhere:
+# First-time setup of Vektor Desk on TrueNAS SCALE (docs/setup.md, step 5). Run as root, from anywhere:
 #   sudo bash setup-truenas.sh [path to the service account key .json]
 # Safe to run again: it keeps what's already there and only asks for what's missing.
 set -Eeuo pipefail
@@ -118,4 +118,4 @@ install -D -m 700 "$SRC/deploy/deploy.sh" "$PINNED"
 echo "5. Building the images (a few minutes)"
 bash "$SRC/deploy/deploy.sh" now
 echo
-echo "Next: Apps → Discover Apps → ⋮ → Install via YAML, name it vektor-desk, paste $SRC/deploy/compose.yaml (docs/architecture.md, step 6)."
+echo "Next: Apps → Discover Apps → ⋮ → Install via YAML, name it vektor-desk, paste $SRC/deploy/compose.yaml (docs/setup.md, step 6)."

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vektor Desk on TrueNAS SCALE (docs/architecture.md). Run as root:
+# Vektor Desk on TrueNAS SCALE (docs/architecture.md, docs/setup.md). Run as root:
 #   deploy.sh now      pull main, build what changed, back up, restart the app; back to the previous images if it isn't
 #                      healthy. Waits for nothing: refuses while a desk job (mirror, engine, agent, lab) is running.
 #   deploy.sh auto     what the auto-deploy cron job runs every 5 minutes: deploys when main has moved, quietly does nothing
@@ -126,7 +126,7 @@ backup() {
 # ---- Commands ----
 
 update_checkout() {
-  [ -d "$SRC/.git" ] || die "there's no checkout in $SRC (docs/architecture.md, step 5)"
+  [ -d "$SRC/.git" ] || die "there's no checkout in $SRC (docs/setup.md, step 5)"
   repo fetch --quiet origin "$BRANCH" 2>>"$LOG" || die "couldn't fetch from GitHub (has the token in $CREDENTIALS expired, or does it lack vektor-desk?)"
   [ -z "$(repo status --porcelain --untracked-files=no)" ] || die "$SRC has local edits; run 'git -C $SRC status' and undo them"
   repo merge --ff-only --quiet "origin/$BRANCH" 2>>"$LOG" || die "$SRC can't fast-forward to origin/$BRANCH"
@@ -168,11 +168,12 @@ deploy() {
   done
 
   if [ "$state" = MISSING ]; then
-    log "Built ${built[*]} at ${target:0:7}. There's no app called $APP yet: install it from deploy/compose.yaml (docs/architecture.md, step 6)"
+    log "Built ${built[*]} at ${target:0:7}. There's no app called $APP yet: install it from deploy/compose.yaml (docs/setup.md, step 6)"
     return 0
   fi
   if [ -n "$before" ] && ! repo diff --quiet "$before" "$target" -- deploy/compose.yaml; then
-    log "deploy/compose.yaml changed since ${before:0:7}: paste it into Apps → $APP → Edit after this deploy"
+    log "deploy/compose.yaml changed since ${before:0:7}: run setup-truenas.sh, then paste it into Apps → $APP → Edit (docs/setup.md, After updates)"
+    alert "Desk needs you" "compose.yaml changed. Run setup-truenas.sh, then paste it into Apps, Edit. See docs/setup.md."
   fi
 
   files=$(backup) || die "the backup failed, so nothing was restarted"
@@ -233,7 +234,9 @@ auto() {
   trap 'auto_stopped $?' EXIT
   deploy
   trap - EXIT
-  if pinned_stale; then note "deploy.sh changed on main; read it, then copy it again for the cron jobs (docs/architecture.md, step 8)" || true; fi
+  if pinned_stale && note "deploy.sh changed on main; read it, then copy it again for the cron jobs (docs/setup.md, After updates)"; then
+    alert "Desk needs you" "deploy.sh changed. Read it, then copy it again for the cron jobs. See docs/setup.md."
+  fi
 }
 
 status() {
@@ -246,9 +249,9 @@ status() {
   printf 'Tailnet IP:  %s\n' "$(docker exec vektor-desk-tailscale tailscale ip -4 2>/dev/null || echo '?')"
   echo "Backups:     $(find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" 2>/dev/null | wc -l) in $BACKUPS"
   crons=$(midclt call cronjob.query 2>/dev/null | jq -r '[.[] | select(.enabled and (.command | test("vektor-desk-deploy/deploy\\.sh auto")))] | length' 2>/dev/null || true)
-  if [ "${crons:-0}" -gt 0 ]; then echo "Auto-deploy: on"; else echo "Auto-deploy: off (docs/architecture.md, step 8)"; fi
+  if [ "${crons:-0}" -gt 0 ]; then echo "Auto-deploy: on"; else echo "Auto-deploy: off (docs/setup.md, step 8)"; fi
   if [ -s "$AUTO_FAILED" ]; then echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or run deploy.sh now"; fi
-  if [ ! -f "$PINNED" ]; then echo "Cron copy:   none at $PINNED (step 8)"; elif pinned_stale; then echo "Cron copy:   differs from the checkout's deploy.sh; read the change, then copy it again (step 8)"; fi
+  if [ ! -f "$PINNED" ]; then echo "Cron copy:   none at $PINNED (step 8)"; elif pinned_stale; then echo "Cron copy:   differs from the checkout's deploy.sh; read the change, then copy it again (docs/setup.md, After updates)"; fi
   echo
   docker exec vektor-desk-api python -m desk.status 2>/dev/null || echo "(the desk's own status isn't answering)"
   echo
@@ -294,7 +297,7 @@ main() {
       exec 9>"$LOCK"
       flock -n 9 || die "a deploy is already running: tail -f $LOG"
       deploy
-      if pinned_stale; then log "deploy.sh changed: copy it again for the cron jobs (step 8)"; fi
+      if pinned_stale; then log "deploy.sh changed: copy it again for the cron jobs (docs/setup.md, After updates)"; fi
       ;;
     backup)
       ALERTS="Nightly backup failed"
