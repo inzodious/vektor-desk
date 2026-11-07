@@ -128,6 +128,9 @@ services:
     user: "568:568"
     command: ["python", "-m", "desk.engine.lab"]
     network_mode: none
+    # The image's health check calls the API, which a container with no network can't reach.
+    healthcheck:
+      disable: true
     environment:
       DESK_LAB_WORKERS: "3"
     volumes:

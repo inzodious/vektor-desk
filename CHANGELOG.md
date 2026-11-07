@@ -4,6 +4,18 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.9.0 - 2026-11-07
+
+Flight record and Patterns are done: every decision is scored against following the plan, and each desk has a record you can judge it by.
+
+### Added
+
+- Flight record and Patterns pages; Journal rows show their latest score; plainer holdout copy on strategy pages ([#61])
+
+### Fixed
+
+- The setup script no longer stops when the checkout folder already exists, and it says where it stopped when something fails ([#60])
+
 ## 0.8.0 - 2026-11-07
 
 The Strategy lab is done: strategies are specced, tested on history without seeing the future, and paper-traded for six months before any of them can inform a proposal.
@@ -154,3 +166,5 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#55]: https://github.com/inzodious/vektor-desk/pull/55
 [#57]: https://github.com/inzodious/vektor-desk/pull/57
 [#58]: https://github.com/inzodious/vektor-desk/pull/58
+[#60]: https://github.com/inzodious/vektor-desk/pull/60
+[#61]: https://github.com/inzodious/vektor-desk/pull/61
