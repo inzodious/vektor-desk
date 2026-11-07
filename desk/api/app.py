@@ -75,6 +75,10 @@ def create_app(cfg: Config | None = None, *, packages: list[str] | None = None, 
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        if cfg.demo:
+            from desk.demo import ensure_demo
+
+            ensure_demo(cfg)
         if schemas:
             app.state.schemas = apply_schemas(cfg, only=packages)
         yield
@@ -84,7 +88,7 @@ def create_app(cfg: Config | None = None, *, packages: list[str] | None = None, 
 
     @app.get("/api/health")
     def health() -> dict:
-        return {"ok": True, "build": BUILD, "version": __version__}
+        return {"ok": True, "build": BUILD, "version": __version__, "demo": cfg.demo}
 
     @app.get("/api/status")
     def get_status() -> JSONResponse:

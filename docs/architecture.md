@@ -169,6 +169,16 @@ Each package under `desk/` plugs in through three optional modules, found on the
 
 Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
+## Demo data
+
+`desk/demo.py` builds one synthetic `mirror.db`. It covers two years of a made-up investor with an Individual and an HSA account, a four-fund plan mix and one losing single stock (ACME, half sold). It has monthly deposits and buys, quarterly dividends reinvested, weekly snapshots, pay stubs, card spending, a price board, yearly closes and profiles. Every table has the same shapes Escape Vektor writes, and `row_history` holds about 100 weekly pulls. The same seed always gives the same world.
+
+| Use | How |
+|---|---|
+| Tests | the `demo_cfg` fixture (a copy, built once per test run, dated November 6, 2026) |
+| By hand | `python -m desk.demo /tmp/mirror.db [--today YYYY-MM-DD] [--seed N]` |
+| Demo mode | `DESK_DEMO=1`: data moves to `/data/demo/`, the API rebuilds the demo mirror daily, `/api/health` says `"demo": true`, and the real mirror job is skipped, so real data is never mixed in |
+
 ## Developing
 
 ```sh
@@ -178,4 +188,4 @@ shellcheck deploy/*.sh
 docker build -t vektor-desk:local . && docker build -t vektor-desk/caddy:local deploy/caddy
 ```
 
-Tests use synthetic rows only (`tests/fakes.py`), never real data.
+Tests use synthetic rows only (`tests/fakes.py`, `desk/demo.py`), never real data.

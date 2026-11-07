@@ -88,13 +88,15 @@ class MirrorStore:
                 (now_iso(), int(ok), error, *(stats.get(c) for c in cols), run_id),
             )
 
-    def apply(self, full: dict[str, list[Row]], delta: dict[str, list[Row]] | None = None, *, prune: Iterable[str] = ()) -> dict[str, int]:
+    def apply(
+        self, full: dict[str, list[Row]], delta: dict[str, list[Row]] | None = None, *, prune: Iterable[str] = (), stamp: str | None = None
+    ) -> dict[str, int]:
         delta = delta or {}
         everything = sum(self.counts().values())
         before = sum(n for t, n in self.counts().items() if t in full)
         if full and before and not sum(len(v) for v in full.values()):
             raise MirrorRefused("Firestore returned no rows at all; keeping the last good mirror. Check DESK_UID and the service account.")
-        stamp = now_iso()
+        stamp = stamp or now_iso()
         changed = 0
         with self.conn:
             for tbl, rows in full.items():
