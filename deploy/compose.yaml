@@ -177,7 +177,10 @@ services:
       - /mnt/Manifest/apps/vektor-desk/eval/home:/home/eval
       - /mnt/Manifest/apps/vektor-desk/eval/work:/work
     read_only: true
-    tmpfs: [/tmp]
+    # data/home is HOME for api, cron and lab: the desks' Claude config and transcripts. Masked with an empty, unwritable tmpfs.
+    tmpfs:
+      - /tmp
+      - /data/home:size=64k,mode=0500
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     cpus: 2

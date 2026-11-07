@@ -8,7 +8,7 @@ A sealed container on the box, `vektor-desk-eval`, runs Claude Code Remote Contr
 |---|---|
 | Reads | `data/` (databases, inbox, lab) read-only at `/data`; the source checkout read-only at `/src`; redacted service logs in `/data/run/logs`, refreshed every 5 minutes |
 | Writes | Only `eval/work` (its `/work`) and its own sign-in in `eval/home` |
-| Can't | See any key or env file; reach the API, ntfy or the tailnet (own network); use Docker; gain privileges (all capabilities dropped) |
+| Can't | See any key or env file, or `data/home` (the desks' own Claude config and transcripts, masked by an empty tmpfs); reach the API, ntfy or the tailnet (own network); use Docker; gain privileges (all capabilities dropped) |
 | Costs | Sessions draw on your Claude subscription's limits, like any Claude Code session |
 
 The working rules Claude follows inside it are in [deploy/eval/CLAUDE.md](../deploy/eval/CLAUDE.md).

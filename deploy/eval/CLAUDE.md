@@ -4,7 +4,7 @@ You are in `vektor-desk-eval` on Joshua's TrueNAS box, to evaluate and QA the li
 
 | Path | What | Access |
 |---|---|---|
-| `/data` | The live desk's data: `mirror.db`, `desk.db`, `inbox/`, `lab/`, `run/` | Read-only |
+| `/data` | The live desk's data: `mirror.db`, `desk.db`, `inbox/`, `lab/`, `run/` (`home/` is masked) | Read-only |
 | `/data/run/logs` | Redacted tails of each service's log, `deploy.log`, `containers.txt`; refreshed every 5 minutes | Read-only |
 | `/src` | The checkout the box deploys from (`main`) | Read-only |
 | `/work` | Scratch: copies, re-runs, notes | Read-write |
