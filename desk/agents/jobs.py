@@ -5,4 +5,5 @@ JOBS: list[tuple[str, str]] = [
     ("45 17 * * *", "python -m desk.agents triggers"),
     ("* * * * *", "python -m desk.agents queue --now-only"),
     ("30 1 * * *", "python -m desk.agents queue"),
+    ("30 6 * * *", "python -m desk.agents lab-reviews"),
 ]

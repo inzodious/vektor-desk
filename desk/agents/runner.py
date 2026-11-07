@@ -1,6 +1,6 @@
 from dataclasses import asdict, dataclass
 
-from desk.agents import store
+from desk.agents import alerts, store
 from desk.agents.adapter import Adapter, AgentError, AgentResult, AgentTimeout, ClaudeCli, UsageLimitError
 from desk.agents.desks import Desk
 from desk.config import Config
@@ -55,13 +55,16 @@ def run_desk(
                 return Outcome("deferred", run_id, note=str(e))
             except AgentTimeout as e:
                 store.finish_run(cfg, run_id, "timeout", note=str(e))
+                alerts.run_failed(cfg, desk.name, "timeout", run_id, str(e))
                 return Outcome("timeout", run_id, note=str(e))
             except AgentError as e:
                 store.finish_run(cfg, run_id, "failed", note=str(e))
+                alerts.run_failed(cfg, desk.name, "failed", run_id, str(e))
                 return Outcome("failed", run_id, note=str(e))
             if schema is not None and result.structured is None:
                 note = "No structured answer came back."
                 store.finish_run(cfg, run_id, "failed", usage=_usage(result), note=note)
+                alerts.run_failed(cfg, desk.name, "failed", run_id, note)
                 return Outcome("failed", run_id, result, note)
             store.finish_run(cfg, run_id, "ok", usage=_usage(result))
             return Outcome("ok", run_id, result)

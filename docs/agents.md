@@ -93,6 +93,17 @@ Trigger kinds and where they go: `margin_debit`, `daily_move` and `concentration
 
 **Console.** The Console (Escape Vektor's Ask terminal look) is where Joshua talks to the desks. A question or research request is queued to the right desk and runs in the next overnight window unless he presses "Run now". It answers with a memo or dossier update plus any proposals. Settings shows each desk's last and next run, turns used, and an on/off toggle.
 
+**Phone alerts** (`desk/agents/alerts.py`, through `desk.notify.publish`; dollar amounts stripped, never blocks a run):
+
+| Event | Topic | Priority | Opens | Repeats |
+|---|---|---|---|---|
+| Console or trigger request answered | research | default | `/research` (`/lab` for strategy) | once per request |
+| Scheduled research dossier saved | research | low | `/research` | once per run |
+| Desk run failed or timed out | ops | default | `/settings` | once per desk, status and day |
+| Request dropped after busy or usage limit twice | ops | default | `/settings` | once per desk, status and day |
+
+A first usage-limit hit stays quiet because it retries that night. A Console research run sends only the answer, not a second dossier alert.
+
 ### Dials
 
 Real settings live in `desk.yaml` on the TrueNAS box, outside the repo. The repo carries `desk.example.yaml` with made-up values. Every change is stored as a new profile version in SQLite, and every proposal records the version it was made under.

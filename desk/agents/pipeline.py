@@ -1,11 +1,11 @@
 import json
 from dataclasses import dataclass, field, replace
 
-from desk.agents import briefs, store
+from desk.agents import alerts, briefs, store
 from desk.agents.adapter import Adapter
 from desk.agents.desks import get
 from desk.agents.runner import Outcome, run_desk
-from desk.agents.sources import Decisions, Engine, NotReady, RealDecisions, RealEngine
+from desk.agents.sources import Decisions, Engine, Lab, NotReady, RealDecisions, RealEngine, RealLab
 from desk.config import Config
 
 SKIP_UNCHANGED = {"plan_keeper"}
@@ -58,8 +58,15 @@ def rotation_pick(cfg: Config, slice_: dict) -> str | None:
     return min(held, key=lambda s: (ages.get(s, ""), held.index(s)))
 
 
-def _extra(cfg: Config, name: str, slice_: dict, symbol: str | None, question: str | None, trigger_row: dict | None) -> tuple[dict, str | None]:
+def _extra(
+    cfg: Config, name: str, slice_: dict, symbol: str | None, question: str | None, trigger_row: dict | None, lab: Lab | None
+) -> tuple[dict, str | None]:
     extra: dict = {}
+    if name == "scout":
+        try:
+            extra["eligible_strategies"] = (lab or RealLab()).eligible(cfg)
+        except NotReady:
+            extra["eligible_strategies"] = []
     if name == "research":
         symbol = symbol or rotation_pick(cfg, slice_)
         prev = store.latest_dossier(cfg, symbol) if symbol else None
@@ -101,6 +108,7 @@ def run_proposal_desk(
     question: str | None = None,
     symbol: str | None = None,
     trigger_row: dict | None = None,
+    lab: Lab | None = None,
 ) -> Report:
     engine = engine or RealEngine()
     decisions = decisions or RealDecisions()
@@ -119,7 +127,7 @@ def run_proposal_desk(
     digest = briefs.digest(slice_)
     if name in SKIP_UNCHANGED and trigger == "schedule" and store.last_digest(cfg, name) == digest:
         return _log_skip(cfg, name, "unchanged", "Nothing in the brief changed since the last run.", trigger)
-    extra, symbol = _extra(cfg, name, slice_, symbol, question, trigger_row)
+    extra, symbol = _extra(cfg, name, slice_, symbol, question, trigger_row, lab)
     if name == "research" and not symbol:
         return _log_skip(cfg, name, "not_ready", "No holdings in the brief to research.", trigger)
     try:
@@ -136,7 +144,10 @@ def run_proposal_desk(
     proposals = [p for p in answer.get("proposals") or () if isinstance(p, dict)]
     store.save_brief(cfg, outcome.run_id, name, slice_.get("as_of"), digest, version, summary, json.dumps(answer, sort_keys=True))
     if name == "research" and isinstance(answer.get("dossier"), dict):
-        store.save_dossier(cfg, answer["dossier"].get("symbol") or symbol, outcome.run_id, json.dumps(answer["dossier"], sort_keys=True))
+        dossier_symbol = answer["dossier"].get("symbol") or symbol
+        store.save_dossier(cfg, dossier_symbol, outcome.run_id, json.dumps(answer["dossier"], sort_keys=True))
+        if trigger == "schedule":
+            alerts.dossier_ready(cfg, dossier_symbol, outcome.run_id, summary)
     report = Report(outcome, summary, symbol=symbol)
     idx = briefs.index(slice_)
     run_id = str(outcome.run_id)

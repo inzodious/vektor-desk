@@ -15,6 +15,7 @@ TrueNAS SCALE 24.10 ─ custom app "vektor-desk" (deploy/compose.yaml)
   ├─ caddy      https://desk.escape-vektor.com on that node's address; certificate through Porkbun's DNS API
   ├─ api        FastAPI on :8000, compose network only; serves the UI once it lands
   ├─ cron       python -m desk.scheduler running deploy/crontab: mirror, engine, agents (claude -p)
+  ├─ ntfy       phone alerts at https://desk.escape-vektor.com:8443, through the same caddy
   └─ lab        strategy sweeps, no network at all (commented out until desk.lab lands)
 ```
 
@@ -81,13 +82,37 @@ The box is a Ryzen 5 5600GT (6 cores, 12 threads) with 15 GiB of RAM and no swap
 
 The image carries the Claude Code CLI 2.1.308, pinned through npm the way Hemline does it, with `DISABLE_AUTOUPDATER=1` and `HOME=/data/home`. The `cron` service is the only one with `CLAUDE_CODE_OAUTH_TOKEN`, from `claude setup-token` (one year, billed to your subscription, no API spend). How agents call it is in [agents.md](agents.md). `deploy.sh check` runs a one-line smoke test.
 
-The desk status page counts down to `DESK_CLAUDE_TOKEN_EXPIRES` and flags renewal 30 days ahead. To renew: `claude setup-token` on your PC, run `setup-truenas.sh` again and answer "n" to keeping `desk.env`, then `midclt call app.redeploy vektor-desk`.
+The desk status page counts down to `DESK_CLAUDE_TOKEN_EXPIRES` and flags renewal 30 days ahead. Renewal steps are in [setup.md](setup.md#later).
 
 ## Phone alerts
 
-Recommendation for phase 8: **self-hosted ntfy** as one more service on the `desk` node, with `upstream-base-url: https://ntfy.sh`. Messages and their history stay on the NAS. ntfy.sh only relays a "poll now" wake-up, which the iPhone app needs for instant delivery. It's free, there's no account, and the phone subscribes over Tailscale at `https://desk.escape-vektor.com/alerts/<topic>`. Alert text stays generic ("Tax desk: 2 proposals"), with no amounts or symbols. Topics are named in [agents.md](agents.md).
+Self-hosted **ntfy** (`binwiederhier/ntfy:v2.33.1`) runs as the `ntfy` service. Caddy serves it at `https://desk.escape-vektor.com:8443` behind the same tailnet fence (ntfy can't live under a sub-path, so it gets its own port on the same name and certificate). Messages and a week of history stay on the NAS. With `upstream-base-url: https://ntfy.sh`, ntfy.sh only relays a "poll now" wake-up keyed by a hash of the topic, which the iPhone app needs for instant delivery. Free, no account.
 
-The fallback is the public ntfy.sh with a long random topic, the way Hemline's job alerts work. It's simpler, but the text then passes through a third party.
+| Topic | Server name | Carries |
+|---|---|---|
+| `alerts` | `desk-alerts` | Rule breaches, Preflight blocks, trigger hits, wash-sale windows |
+| `research` | `desk-research` | Research ready, the daily brief, proposals waiting |
+| `ops` | `desk-ops` | Stale or failing mirror, Claude token renewal, a stopped auto-deploy or failed nightly backup |
+
+Calling it from a package:
+
+```python
+from desk.notify import publish
+
+publish("alerts", "Plan keeper: rule breach", "Satellite cap passed. Open Decisions.", "high", click="/decisions", key="cap-2026-11-07")
+```
+
+| Rule | Detail |
+|---|---|
+| Never raises on delivery | A down server or bad answer returns `False` and logs `failed`; bad topic or priority names raise `ValueError` |
+| Generic text | Dollar amounts become `$…`; title cut at 80 characters, body at 280. Keep symbols and figures in the desk, not the alert |
+| Links | `click` must be a desk path (`/decisions/…`) or a full `https://desk.escape-vektor.com/…` link; anything else is dropped |
+| Dedupe | Same `key` within 20 hours (`dedupe_hours=`) sends once; failed sends don't count, so the next try goes out |
+| Off switches | Settings toggles per topic (`PUT /api/notify/topics/{topic}`); demo mode logs `demo` and sends nothing; an empty `DESK_NTFY_URL` logs `off` |
+| Log | Every attempt goes to `notify_log` in `desk.db`; `GET /api/notify/recent` and `GET /api/notify/topics` read it |
+| Ops check | `python -m desk.notify ops` at 9:20 and 18:20, after the mirror pulls; once a day per mirror state, once a week for the token |
+
+The fallback, if self-hosting ever gets in the way, is the public ntfy.sh with a long random topic. It's simpler, but the text then passes through a third party.
 
 ## Secrets
 
@@ -108,7 +133,7 @@ The service account can also read life-stack's `users/` data in the same Firebas
 - **Nightly at 3:45** (TrueNAS cron job, `deploy.sh backup`): consistent copies of every SQLite file through SQLite's backup API, each checked with `quick_check`, plus `inbox/`, as a dated tarball in `/mnt/Singularity/backups/vektor-desk`. The newest 14 are kept. Every deploy takes one first too.
 - **What matters.** `desk.db` (decisions, proposals, scorecards) and `inbox/` can't be rebuilt. `mirror.db` can be re-pulled from Firestore at any time.
 - **Restore.** Stop the app, then `tar -xzf /mnt/Singularity/backups/vektor-desk/vektor-desk-<date>.tar.gz -C /mnt/Manifest/apps/vektor-desk/data`, then `chown -R 568:568` that folder and start the app.
-- **Pool health.** Manifest is a single disk, which is why backups go to Singularity. The November 7 system report shows Singularity with an unrecoverable device error. Run `zpool status -v Singularity` and check the disk's SMART data before trusting it as the only other copy.
+- **Why Singularity.** Manifest is a single disk, so backups go to the RAIDZ1 pool.
 
 ## Deploys
 
@@ -117,35 +142,13 @@ The same pattern as Hemline: `deploy/deploy.sh` runs as root on the NAS.
 - `now` pulls `main`, builds `vektor-desk:local` and `vektor-desk/caddy:local` stamped with the commit, backs up, runs `app.redeploy`, and waits for the API to report healthy at that commit. If it doesn't, it rolls back to the previous images. It refuses while a desk job holds a run lock.
 - `auto` does the same every 5 minutes when `main` has moved, waits out running jobs, and doesn't retry a failed commit until the next push.
 - `status` shows what's live, GitHub, container health, the tailnet address, backups and the desk's own status.
-- `check` tests the Claude sign-in, Firestore read access, the DNS record against the tailnet address, and the certificate.
+- `check` tests the Claude sign-in, Firestore read access, the DNS record against the tailnet address and the certificate, and sends a test alert to `desk-ops`.
+- `auto` and `backup` send a high-priority `desk-ops` alert when they stop on an error; `now` doesn't, since you're watching it.
 - A change to `deploy/compose.yaml` isn't picked up by a redeploy. The deploy log says when it changed; paste it into Apps → vektor-desk → Edit.
 
 ## One-time setup
 
-In order. Steps 1–4 happen in a browser or on your PC; 5–9 happen in the TrueNAS shell (`sudo -i`).
-
-1. **Tailscale.** In the admin console, Access controls, add `"tag:desk": ["autogroup:admin"]` to `tagOwners`, beside `tag:starlite`. Then go to Settings → Keys → Generate auth key, with reusable off and tag `tag:desk`. Tagged devices don't expire, so the node stays signed in.
-2. **Porkbun.** Account → API Access: create a key and keep both the API key and the secret. Then go to Domain Management → `escape-vektor.com` → Details and turn on **API Access** for that domain.
-3. **Firestore reader.** In the Google Cloud console for Escape Vektor's Firebase project, go to IAM & Admin → Service Accounts → Create service account (`vektor-desk-reader`). Give it the role **Cloud Datastore Viewer** and nothing else. Then Keys → Add key → JSON. Copy it to the NAS with `scp vektor-desk-reader.json truenas_admin@192.168.0.113:/tmp/` and delete it from your PC once it's in your password manager. Note your Firebase project ID and your user UID (Firebase console → Authentication → Users).
-4. **Claude token.** On your PC, run `claude setup-token` and keep the token it prints.
-5. **Checkout and setup.** Clone the repo with the token the other apps use, then run the setup script. It creates the datasets and folders, asks for each value (nothing is echoed), moves the key into place, pins the cron copy of `deploy.sh` and builds both images:
-
-   ```sh
-   git -c credential.helper="store --file=/mnt/Manifest/apps/.git-credentials" clone https://github.com/inzodious/vektor-desk.git /mnt/Manifest/apps/vektor-desk-src
-   bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh /tmp/vektor-desk-reader.json
-   ```
-
-6. **Install the app.** Apps → Discover Apps → ⋮ → **Install via YAML**, name it `vektor-desk`, and paste `deploy/compose.yaml` as it is.
-7. **DNS record.** `docker exec vektor-desk-tailscale tailscale ip -4` prints the node's address. At Porkbun, add an A record with host `desk`, that address, and TTL 600.
-8. **Cron jobs.** System → Advanced Settings → Cron Jobs → **Add**, user `root`, for each one (tick Hide Standard Output and Hide Standard Error on the auto-deploy):
-
-   | Description | Command | Schedule |
-   |---|---|---|
-   | Vektor Desk backup | `bash /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh backup` | Daily at 03:45 |
-   | Vektor Desk auto-deploy | `bash /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh auto` | Custom: minutes `*/5` |
-
-   The cron jobs run the pinned copy, not the checkout, so a push to `main` can't run new code as root. After reading any change to `deploy.sh`, copy it again: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`.
-9. **Check.** Run `bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh check`, then `docker exec vektor-desk-cron python -m desk.mirror`. On your phone with Tailscale on, `https://desk.escape-vektor.com` should list today's positions.
+The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free. It also covers what to do after `deploy.sh` or `compose.yaml` changes, the RAM upgrade, and token renewal.
 
 ## Day to day
 
@@ -156,6 +159,7 @@ In order. Steps 1–4 happen in a browser or on your PC; 5–9 happen in the Tru
 | Pull Escape Vektor now | `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
 | Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log` |
 | Add a schedule | A line in `deploy/crontab` (minute hour day month weekday command, Eastern time) |
+| Test phone alerts | `docker exec vektor-desk-cron python -m desk.notify test`; recent ones with `... desk.notify recent` |
 
 ## Package seams
 
@@ -167,7 +171,7 @@ Each package under `desk/` plugs in through three optional modules, found on the
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
 | `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command"}` dicts | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
 
-Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
+Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
 ## Web app
 
@@ -187,9 +191,19 @@ The image's `ui` stage builds `ui/` with `npm ci` and `npm run build` (or `npm i
 
 ```sh
 uv venv && . .venv/bin/activate && uv pip install -e ".[dev]"
-ruff check . && ruff format --check . && pytest
-shellcheck deploy/*.sh
-docker build -t vektor-desk:local . && docker build -t vektor-desk/caddy:local deploy/caddy
+scripts/check.sh
 ```
+
+| `scripts/check.sh` step | Runs |
+|---|---|
+| ruff check, ruff format | `ruff check .`, `ruff format --check .` (also formats Python blocks in docs) |
+| pytest | the whole suite, quietly |
+| shellcheck | `deploy/*.sh`, `scripts/*.sh` |
+| secrets scan | tracked files for Claude, Tailscale, Porkbun, GitHub and private keys, and for `.csv`, `.xlsx`, `.ofx`, `.qfx`, `.pdf`, `.db` and `.env` files |
+| compose config | `docker compose -f deploy/compose.yaml config -q`, when Docker is there |
+| ui | `npm run lint`, `npm test` (each if defined) and `npm run build` in `ui/`, when it exists |
+| image builds | with `--docker`: both images; the Caddy build validates the Caddyfile |
+
+It prints one line per step and exits non-zero when any fail. Paste the summary into the PR body. Screenshots for visual changes stay with the UI's own Playwright script.
 
 Tests use synthetic rows only (`tests/fakes.py`, `desk/demo.py`), never real data.

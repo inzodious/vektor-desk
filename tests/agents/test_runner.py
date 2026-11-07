@@ -186,5 +186,5 @@ def test_cli_entrypoint(cfg, monkeypatch, capsys):
     monkeypatch.setenv("DESK_DATA_DIR", str(cfg.data_dir))
     assert main(["status"]) == 0
     assert '"plan_keeper"' in capsys.readouterr().out
-    assert main(["run", "scout"]) == 2
+    assert main(["run", "skeptic"]) == 2
     assert "doesn't run on its own" in capsys.readouterr().out

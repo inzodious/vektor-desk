@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# First-time setup of Vektor Desk on TrueNAS SCALE (docs/architecture.md, step 5). Run as root, from anywhere:
+# First-time setup of Vektor Desk on TrueNAS SCALE (docs/setup.md, step 5). Run as root, from anywhere:
 #   sudo bash setup-truenas.sh [path to the service account key .json]
 # Safe to run again: it keeps what's already there and only asks for what's missing.
 set -Eeuo pipefail
@@ -21,8 +21,8 @@ REPO=https://github.com/inzodious/vektor-desk.git
 for d in Manifest/apps/vektor-desk Manifest/apps/vektor-desk-src Singularity/backups/vektor-desk; do
   zfs list -H "$d" >/dev/null 2>&1 || midclt call pool.dataset.create "{\"name\": \"$d\"}" >/dev/null
 done
-mkdir -p "$ROOT"/data/{home,inbox/fidelity,run,lab/data,lab/queue,lab/runs} "$ROOT"/caddy/{data,config} "$ROOT"/tailscale
-chown -R 568:568 "$ROOT/data"
+mkdir -p "$ROOT"/data/{home,inbox/fidelity,run,lab/data,lab/queue,lab/runs} "$ROOT"/caddy/{data,config} "$ROOT"/tailscale "$ROOT"/ntfy
+chown -R 568:568 "$ROOT/data" "$ROOT/ntfy"
 chmod 700 "$ROOT/tailscale" "$ROOT/caddy"
 echo "1. Datasets and folders ready under $ROOT"
 
@@ -118,4 +118,4 @@ install -D -m 700 "$SRC/deploy/deploy.sh" "$PINNED"
 echo "5. Building the images (a few minutes)"
 bash "$SRC/deploy/deploy.sh" now
 echo
-echo "Next: Apps → Discover Apps → ⋮ → Install via YAML, name it vektor-desk, paste $SRC/deploy/compose.yaml (docs/architecture.md, step 6)."
+echo "Next: Apps → Discover Apps → ⋮ → Install via YAML, name it vektor-desk, paste $SRC/deploy/compose.yaml (docs/setup.md, step 6)."

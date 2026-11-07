@@ -1,3 +1,4 @@
+from desk.decisions.plan import add_event, calendar_events, delete_event, deposits_landed, upcoming_deposits
 from desk.decisions.profile import Profile, active_profile
 from desk.decisions.records import (
     DecisionError,
@@ -24,6 +25,11 @@ from desk.decisions.records import (
 from desk.decisions.rules import active_rules
 
 __all__ = [
+    "add_event",
+    "calendar_events",
+    "delete_event",
+    "deposits_landed",
+    "upcoming_deposits",
     "DecisionError",
     "Profile",
     "active_profile",

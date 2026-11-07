@@ -3,6 +3,7 @@ import json
 import sys
 
 from desk.config import Config
+from desk.decisions.alerts import send_alerts
 from desk.decisions.profile import active_profile
 from desk.decisions.records import confirm_fills, expire_due, rerun_preflight
 from desk.decisions.store import now_iso, session
@@ -17,6 +18,7 @@ def sync(cfg: Config) -> dict:
         ]
     checked = sum(rerun_preflight(cfg, d)["preflight_status"] not in ("pending", "error") for d in pending)
     filled = confirm_fills(cfg)
+    alerts = send_alerts(cfg)
     return {
         "profile_version": profile.version,
         "rules_version": profile.rules_version,
@@ -25,6 +27,7 @@ def sync(cfg: Config) -> dict:
         "expired": expired,
         "preflight_rerun": checked,
         "filled": len(filled),
+        "alerts": len(alerts),
     }
 
 
