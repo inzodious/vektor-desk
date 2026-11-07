@@ -7,6 +7,8 @@ describe('format', () => {
     expect(usd(-12.345, { cents: true })).toBe('−$12.35');
     expect(usd(40, { sign: true })).toBe('+$40');
     expect(usd(null)).toBe('—');
+    expect(usd(-0.2, { sign: true })).toBe('$0');
+    expect(pct(-0.00001, 2, true)).toBe('0.00%');
   });
 
   it('formats percents and points', () => {

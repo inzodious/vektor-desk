@@ -49,13 +49,13 @@ function PanelBody({ open, onClose, kind = 'drawer', title, sub, crumbs, head, c
   return createPortal(
     <>
       <div className={`scrim${on ? ' on' : ''}`} style={{ pointerEvents: 'auto' }} data-testid="scrim" onClick={onClose} />
-      <div ref={box} className={`${cls}${on ? ' on' : ''}`} role="dialog" aria-modal="true" aria-label={label || title}>
+      <div ref={box} className={`${cls}${on ? ' on' : ''}`} role="dialog" aria-modal="true" aria-label={label || (typeof title === 'string' ? title : undefined)}>
         <header>
           {head}
           <div className="t">
             {crumbs && crumbs.length ? (
               <div className="crumbs">
-                {crumbs.map((c) => (
+                {crumbs.map((c, i) => (
                   <span key={c.label} style={{ display: 'contents' }}>
                     {c.go ? (
                       <button type="button" onClick={c.go}>
@@ -64,10 +64,10 @@ function PanelBody({ open, onClose, kind = 'drawer', title, sub, crumbs, head, c
                     ) : (
                       <span>{c.label}</span>
                     )}
-                    <span className="sep">›</span>
+                    {typeof title === 'string' || i < crumbs.length - 1 ? <span className="sep">›</span> : null}
                   </span>
                 ))}
-                <span>{title}</span>
+                {typeof title === 'string' ? <span>{title}</span> : null}
               </div>
             ) : null}
             <h3>{title}</h3>

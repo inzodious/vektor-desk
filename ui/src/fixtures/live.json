@@ -1,0 +1,125 @@
+{
+ "state": "open",
+ "day": "2026-11-09",
+ "opens_at": "2026-11-09T14:30:00+00:00",
+ "closes_at": "2026-11-09T21:00:00+00:00",
+ "as_of": "2026-11-09T16:40:00+00:00",
+ "holdings_date": "2026-11-06",
+ "value": 19504.66,
+ "day_change": 22.1,
+ "day_change_pct": 0.11,
+ "quality": "ok",
+ "rows": [
+  {
+   "account": "individual-0001",
+   "symbol": "FXAIX",
+   "shares": 38.704,
+   "price": 207.72,
+   "prev_close": 207.72,
+   "value": 8039.59,
+   "day_change": 0.0,
+   "source": "holdings"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "FTEC",
+   "shares": 11.551,
+   "price": 253.49,
+   "prev_close": 250.53,
+   "value": 2928.06,
+   "day_change": 34.19,
+   "source": "finnhub"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "VXUS",
+   "shares": 29.684,
+   "price": 62.75,
+   "prev_close": 62.95,
+   "value": 1862.67,
+   "day_change": -5.94,
+   "source": "finnhub"
+  },
+  {
+   "account": "hsa-0002",
+   "symbol": "FXAIX",
+   "shares": 7.741,
+   "price": 207.72,
+   "prev_close": 207.72,
+   "value": 1607.96,
+   "day_change": 0.0,
+   "source": "holdings"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "RKLB",
+   "shares": 55,
+   "price": 25.56,
+   "prev_close": 24.85,
+   "value": 1405.8,
+   "day_change": 39.05,
+   "source": "finnhub"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "SMR",
+   "shares": 40,
+   "price": 29.91,
+   "prev_close": 31.2,
+   "value": 1196.4,
+   "day_change": -51.6,
+   "source": "finnhub"
+  },
+  {
+   "account": "hsa-0002",
+   "symbol": "FSKAX",
+   "shares": 6.2,
+   "price": 161.4,
+   "prev_close": 161.4,
+   "value": 1000.68,
+   "day_change": 0.0,
+   "source": "holdings"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "BND",
+   "shares": 8.725,
+   "price": 77.3,
+   "prev_close": 77.35,
+   "value": 674.44,
+   "day_change": -0.44,
+   "source": "finnhub"
+  },
+  {
+   "account": "hsa-0002",
+   "symbol": "FTEC",
+   "shares": 2.31,
+   "price": 253.49,
+   "prev_close": 250.53,
+   "value": 585.56,
+   "day_change": 6.84,
+   "source": "finnhub"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "SPAXX",
+   "shares": 142.0,
+   "price": 1.0,
+   "prev_close": 1.0,
+   "value": 142.0,
+   "day_change": 0.0,
+   "source": "cash"
+  },
+  {
+   "account": "hsa-0002",
+   "symbol": "SPAXX",
+   "shares": 61.5,
+   "price": 1.0,
+   "prev_close": 1.0,
+   "value": 61.5,
+   "day_change": 0.0,
+   "source": "cash"
+  }
+ ],
+ "benchmarks": {}
+}

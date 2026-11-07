@@ -1,0 +1,116 @@
+{
+ "asOf": "2026-11-06T16:00",
+ "total": 19482.56,
+ "positions": [
+  {
+   "accountKey": "individual-0001",
+   "symbol": "FXAIX",
+   "description": "Sample 500 Index Fund",
+   "quantity": 38.704,
+   "lastPrice": 207.72,
+   "value": 8039.59,
+   "cost": 8134.69,
+   "isCash": false
+  },
+  {
+   "accountKey": "individual-0001",
+   "symbol": "FTEC",
+   "description": "Sample Tech Index ETF",
+   "quantity": 11.551,
+   "lastPrice": 250.53,
+   "value": 2893.87,
+   "cost": 2394.69,
+   "isCash": false
+  },
+  {
+   "accountKey": "individual-0001",
+   "symbol": "VXUS",
+   "description": "Sample International ETF",
+   "quantity": 29.684,
+   "lastPrice": 62.95,
+   "value": 1868.61,
+   "cost": 1686.43,
+   "isCash": false
+  },
+  {
+   "accountKey": "individual-0001",
+   "symbol": "BND",
+   "description": "Sample Bond ETF",
+   "quantity": 8.725,
+   "lastPrice": 77.35,
+   "value": 674.88,
+   "cost": 598.59,
+   "isCash": false
+  },
+  {
+   "accountKey": "individual-0001",
+   "symbol": "SMR",
+   "description": "Sample Nuclear Co",
+   "quantity": 40,
+   "lastPrice": 31.2,
+   "value": 1248.0,
+   "cost": 1299.09,
+   "isCash": false
+  },
+  {
+   "accountKey": "individual-0001",
+   "symbol": "RKLB",
+   "description": "Sample Launch Co",
+   "quantity": 55,
+   "lastPrice": 24.85,
+   "value": 1366.75,
+   "cost": 1398.2,
+   "isCash": false
+  },
+  {
+   "accountKey": "hsa-0002",
+   "symbol": "FXAIX",
+   "description": "Sample 500 Index Fund",
+   "quantity": 7.741,
+   "lastPrice": 207.72,
+   "value": 1607.96,
+   "cost": 1748.9,
+   "isCash": false
+  },
+  {
+   "accountKey": "hsa-0002",
+   "symbol": "FTEC",
+   "description": "Sample Tech Index ETF",
+   "quantity": 2.31,
+   "lastPrice": 250.53,
+   "value": 578.72,
+   "cost": 489.65,
+   "isCash": false
+  },
+  {
+   "accountKey": "hsa-0002",
+   "symbol": "FSKAX",
+   "description": "Sample Total Market Fund",
+   "quantity": 6.2,
+   "lastPrice": 161.4,
+   "value": 1000.68,
+   "cost": 947.22,
+   "isCash": false
+  },
+  {
+   "accountKey": "individual-0001",
+   "symbol": "SPAXX",
+   "description": "Sample Money Market",
+   "quantity": 142.0,
+   "lastPrice": 1,
+   "value": 142.0,
+   "cost": 142.0,
+   "isCash": true
+  },
+  {
+   "accountKey": "hsa-0002",
+   "symbol": "SPAXX",
+   "description": "Sample Money Market",
+   "quantity": 61.5,
+   "lastPrice": 1,
+   "value": 61.5,
+   "cost": 61.5,
+   "isCash": true
+  }
+ ]
+}
