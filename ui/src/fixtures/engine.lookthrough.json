@@ -1,0 +1,150 @@
+{
+ "as_of": "2026-11-06",
+ "rows": [
+  {
+   "as_of": "2026-11-06",
+   "holding": "AAA",
+   "name": "Synthetic Megacap A",
+   "weight": 7.949,
+   "direct": 0,
+   "via": {
+    "FTEC": 3.7706,
+    "FXAIX": 4.1784
+   }
+  },
+  {
+   "as_of": "2026-11-06",
+   "holding": "BBB",
+   "name": "Synthetic Megacap B",
+   "weight": 7.071,
+   "direct": 0,
+   "via": {
+    "FTEC": 3.3046,
+    "FXAIX": 3.7664
+   }
+  },
+  {
+   "as_of": "2026-11-06",
+   "holding": "CCC",
+   "name": "Synthetic Megacap C",
+   "weight": 5.8994,
+   "direct": 0,
+   "via": {
+    "FTEC": 2.3725,
+    "FXAIX": 3.4722,
+    "VXUS": 0.0547
+   }
+  },
+  {
+   "as_of": "2026-11-06",
+   "holding": "FFF",
+   "name": "Synthetic Chips F",
+   "weight": 2.4103,
+   "direct": 0,
+   "via": {
+    "FTEC": 1.2922,
+    "FXAIX": 1.1182
+   }
+  },
+  {
+   "as_of": "2026-11-06",
+   "holding": "DDD",
+   "name": "Synthetic Retail D",
+   "weight": 2.2363,
+   "direct": 0,
+   "via": {
+    "FXAIX": 2.2363
+   }
+  },
+  {
+   "as_of": "2026-11-06",
+   "holding": "EEE",
+   "name": "Synthetic Bank E",
+   "weight": 1.2359,
+   "direct": 0,
+   "via": {
+    "FXAIX": 1.2359
+   }
+  },
+  {
+   "as_of": "2026-11-06",
+   "holding": "ACME",
+   "name": "Acme Orbital (synthetic)",
+   "weight": 0.511,
+   "direct": 0.4816,
+   "via": {
+    "FXAIX": 0.0294
+   }
+  },
+  {
+   "as_of": "2026-11-06",
+   "holding": "GGG",
+   "name": "Synthetic Global G",
+   "weight": 0.2599,
+   "direct": 0,
+   "via": {
+    "VXUS": 0.2599
+   }
+  }
+ ],
+ "sectors": [
+  {
+   "sector": "Technology",
+   "weight": 23.3298,
+   "quality": "ok"
+  },
+  {
+   "sector": "Consumer Discretionary",
+   "weight": 2.2363,
+   "quality": "ok"
+  },
+  {
+   "sector": "Financials",
+   "weight": 1.2359,
+   "quality": "ok"
+  },
+  {
+   "sector": "Industrials",
+   "weight": 0.7299,
+   "quality": "ok"
+  },
+  {
+   "sector": "Bonds and other",
+   "weight": 0.3112,
+   "quality": "ok"
+  },
+  {
+   "sector": "Health Care",
+   "weight": 0.2599,
+   "quality": "ok"
+  },
+  {
+   "sector": "Consumer Staples",
+   "weight": 0.1778,
+   "quality": "ok"
+  }
+ ],
+ "funds": [
+  {
+   "fund": "BND",
+   "as_of": "2026-09-30",
+   "holdings": 3
+  },
+  {
+   "fund": "FTEC",
+   "as_of": "2026-09-30",
+   "holdings": 4
+  },
+  {
+   "fund": "FXAIX",
+   "as_of": "2026-09-30",
+   "holdings": 7
+  },
+  {
+   "fund": "VXUS",
+   "as_of": "2026-09-30",
+   "holdings": 4
+  }
+ ],
+ "holdings": []
+}

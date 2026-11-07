@@ -40,4 +40,7 @@ For real shapes, run the API in demo mode (`DESK_DEMO=1`) and use `npm run dev`.
 | `/research` | 6 | Dossier list, watchlist and market backdrop; open dossier with verdict, valuation range, thesis and bear case, price against the core fund, triggers, key numbers, filings and sources (`?s=` picks one) |
 | `/research/sources`, `/watchlist`, `/calendar` | 6 | Every cited source by kind; watchlist with add and remove; upcoming earnings, recent filings and insider trades, Treasury yields |
 | Console, symbol search | 6 | Robot button or `?open=console`: history, suggested questions, Tonight and Run now. `/` or the search button finds a symbol and opens its sheet, now with the dossier |
-| `/decisions/flight`, `/lab` | 7 to 11 | Hero and a "lands in phase" card |
+| `/lab` Compare | 7 | Two to five slots (ticker, portfolio, account, shadow) in `?ids=`, window combo `?w=`; growth of 100, fund overlap, six small multiples, side-by-side table |
+| `/lab/risk` | 7 | Drop from the high, six risk KPIs with drawers, return against risk, correlation heatmap, drawdowns, scenario shocks, look-through and sectors, month-by-month heatmap |
+| `/lab/boards` | 7 | Saved Compare and Risk views with their slicers, kept in this browser |
+| `/decisions/flight`, `/lab/patterns` | 10 | Hero and a "lands in phase" card |

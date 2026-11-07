@@ -30,3 +30,23 @@ export function useResearchMany(symbols) {
   }, [key]);
   return { data: state.key === key ? state.data : {}, loading: !!key && state.key !== key };
 }
+
+export function useJsonMany(paths) {
+  const key = [...new Set(paths.filter(Boolean))].join('\n');
+  const [state, setState] = useState({ key: null, data: {} });
+  useEffect(() => {
+    if (!key) return undefined;
+    const ctl = new AbortController();
+    Promise.all(
+      key.split('\n').map((p) =>
+        getJson(p, { signal: ctl.signal })
+          .then((d) => [p, d])
+          .catch((e) => [p, { error: e.message, status: e.status }]),
+      ),
+    ).then((pairs) => {
+      if (!ctl.signal.aborted) setState({ key, data: Object.fromEntries(pairs) });
+    });
+    return () => ctl.abort();
+  }, [key]);
+  return { data: state.key === key ? state.data : {}, loading: !!key && state.key !== key };
+}

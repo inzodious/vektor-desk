@@ -1,5 +1,7 @@
-import { readFileSync, writeFileSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { groupLive } from '../src/live/context.js';
+import { chunkIds } from '../src/lib/lab.js';
 
 const API = process.env.DESK_API || 'http://127.0.0.1:8000';
 const OUT = fileURLToPath(new URL('../src/fixtures/', import.meta.url));
@@ -134,14 +136,25 @@ for (const sym of researched) {
 }
 save('engine.research.any', { symbol: null, filings: [], fundamentals: {}, earnings: [], insiders: [], signals: [] });
 
-// ---------- version in status fixtures ----------
-const { version } = await get('/api/status');
-for (const name of ['status', 'status.stale', 'status.failing', 'status.empty']) {
-  const file = `${OUT}${name}.json`;
-  const body = JSON.parse(readFileSync(file, 'utf8'));
-  if (body.version !== version) {
-    body.version = version;
-    writeFileSync(file, `${JSON.stringify(body, null, 1)}\n`);
-    console.log(`set ${name}.json to ${version}`);
-  }
+// ---------- lab ----------
+const slug = (ids) => ids.join(',').replace(/[^A-Za-z0-9]+/g, '_');
+const held = symbols.slice(0, 3);
+const compareSets = [
+  [...held, 'shadow:plan_shadow'],
+  ['portfolio', 'shadow:plan_shadow', 'shadow:sp500_shadow'],
+  ['FXAIX', 'FTEC', 'VXUS'],
+];
+for (const rows of [openRows, closed.rows]) {
+  const order = groupLive(rows).symbols.map((g) => g.symbol);
+  compareSets.push(...chunkIds([...order, 'portfolio', 'shadow:plan_shadow']));
 }
+const seen = new Set();
+for (const ids of compareSets) {
+  if (ids.length < 2 || seen.has(slug(ids))) continue;
+  seen.add(slug(ids));
+  const body = await get(`/api/compare?ids=${encodeURIComponent(ids.join(','))}&window=1Y`);
+  save(`compare.${slug(ids)}`, body);
+}
+save('compare', await get(`/api/compare?ids=${encodeURIComponent(compareSets[0].join(','))}&window=1Y`));
+save('engine.lookthrough', await get('/api/engine/lookthrough?limit=8'));
+save('engine.series.all', await get('/api/engine/series?id=value&scope=portfolio&scope_id=all'));

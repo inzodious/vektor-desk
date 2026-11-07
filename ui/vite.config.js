@@ -5,6 +5,15 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 const FIXTURES = fileURLToPath(new URL('./src/fixtures/', import.meta.url));
+const DESK_INIT = fileURLToPath(new URL('../desk/__init__.py', import.meta.url));
+
+function deskVersion() {
+  try {
+    return /__version__\s*=\s*"([^"]+)"/.exec(readFileSync(DESK_INIT, 'utf8'))?.[1] || null;
+  } catch {
+    return null;
+  }
+}
 
 function fixtureApi() {
   const serve = (req, res, next) => {
@@ -13,8 +22,9 @@ function fixtureApi() {
     const scenario = req.headers['x-desk-scenario'] || url.searchParams.get('scenario') || '';
     const symbol = (url.searchParams.get('symbol') || '').toUpperCase();
     const scopeId = url.searchParams.get('scope_id') || '';
+    const ids = (url.searchParams.get('ids') || '').replace(/[^A-Za-z0-9]+/g, '_');
     const base = url.pathname.slice(5).replace(/\/+$/, '').replace(/\//g, '.') || 'index';
-    const tries = [scenario && `${base}.${scenario}`, symbol && `${base}.${symbol}`, scopeId && `${base}.${scopeId}`, symbol && `${base}.any`, base].filter(Boolean);
+    const tries = [scenario && `${base}.${scenario}`, ids && `${base}.${ids}`, symbol && `${base}.${symbol}`, scopeId && `${base}.${scopeId}`, symbol && `${base}.any`, base].filter(Boolean);
     const file = tries.map((t) => `${FIXTURES}${t}.json`).find((f) => existsSync(f));
     res.setHeader('Cache-Control', 'no-store');
     if (!file) {
@@ -23,6 +33,10 @@ function fixtureApi() {
       return res.end(JSON.stringify({ detail: 'Not Found' }));
     }
     res.setHeader('Content-Type', 'application/json');
+    if (base === 'status') {
+      const body = JSON.parse(readFileSync(file, 'utf8'));
+      return res.end(JSON.stringify({ ...body, version: deskVersion() || body.version }));
+    }
     res.end(readFileSync(file));
   };
   return {

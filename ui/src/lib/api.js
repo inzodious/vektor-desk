@@ -25,7 +25,10 @@ export async function getJson(path, { signal } = {}) {
     if (e.name === 'AbortError') throw e;
     throw new ApiError(0, 'offline');
   }
-  if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ApiError(res.status, typeof body?.detail === 'string' ? body.detail : `HTTP ${res.status}`);
+  }
   try {
     return await res.json();
   } catch {

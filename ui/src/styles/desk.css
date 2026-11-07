@@ -414,13 +414,6 @@ html.dark .lamp small em { color: var(--flap); }
 .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s; }
 .switch[aria-checked='true'] { background: var(--teal); border-color: var(--teal); }
 .switch[aria-checked='true']::after { transform: translateX(18px); }
-.slots { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.slot { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 10px; border-radius: var(--r-ctl); background: var(--card); border: 1px solid var(--line-2); font-weight: 700; font-size: 12.5px; color: var(--ink); white-space: nowrap; }
-.slot i { width: 12px; height: 4px; border-radius: 2px; background: var(--c); display: inline-block; }
-.slot button { width: 22px; height: 22px; border-radius: 7px; border: 0; background: var(--track); cursor: pointer; display: grid; place-items: center; padding: 0; color: var(--ink-3); }
-.slot button svg { width: 12px; height: 12px; }
-.slot.add { border-style: dashed; color: var(--ink-3); padding: 0 12px; cursor: pointer; background: transparent; }
-.slot.add svg { width: 14px; height: 14px; }
 .scale { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 11.5px; color: var(--ink-3); font-weight: 600; }
 .scale i { flex: 1; max-width: 180px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--dn), var(--mid), var(--up)); }
 .scale i.seq { background: linear-gradient(90deg, var(--seq-0), var(--seq-2), var(--seq-4)); }
@@ -699,4 +692,37 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 }
 @media (max-width: 480px) {
   .subtabs a { padding: 6px 10px; }
+}
+
+/* ---------- lab ---------- */
+.lab-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.slots { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+.slot { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 6px 0 10px; border-radius: var(--r-ctl); background: var(--card); border: 1px solid var(--line-2); font-weight: 700; font-size: 12.5px; color: var(--ink); white-space: nowrap; }
+.slot i { width: 12px; height: 4px; border-radius: 2px; background: var(--c); display: inline-block; }
+.slot .slot-name { font: inherit; color: inherit; }
+.slot-x { width: 22px; height: 22px; border-radius: 7px; border: 0; background: var(--track); cursor: pointer; display: grid; place-items: center; padding: 0; color: var(--ink-3); }
+.slot-x svg { width: 12px; height: 12px; }
+.slot.add { border-style: dashed; color: var(--ink-3); padding: 0 12px; cursor: pointer; background: transparent; }
+.slot.add svg { width: 14px; height: 14px; }
+.slot-add { position: relative; }
+.slot-pop { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; width: min(320px, calc(100vw - 32px)); padding: 10px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow), 0 20px 40px -20px rgba(0, 0, 0, .35); display: grid; gap: 8px; }
+.slot-quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.scale { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--ink-3); font-weight: 600; }
+.scale i { flex: 1; max-width: 160px; min-width: 60px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--dn), var(--mid), var(--up)); }
+.chart .hb-lbl { font-size: 11.5px; }
+.chart .hb-val { fill: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart .hb-none { fill: var(--ink-3); font-style: italic; }
+.chart .hm-col { font-weight: 700; }
+.chart .hm-val { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.chart .axis-name { font-weight: 700; }
+.chart .sym-pt { cursor: pointer; }
+
+.grid.mult .card-head { margin-bottom: 6px; }
+.compare-t td { vertical-align: middle; }
+
+@media (max-width: 860px) {
+  .lab-bar { align-items: stretch; }
+  .slots { position: relative; }
+  .slot-add { position: static; }
+  .slot-pop { left: 0; }
 }
