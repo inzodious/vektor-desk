@@ -159,3 +159,56 @@ ready = records.create_proposal(
 )
 records.approve(cfg, ready["id"], None, now=at(6, 14))
 print("ready", ready["id"])
+
+# ---------- agent runs and the brief ----------
+from desk.agents import store  # noqa: E402
+
+RUNS = [
+    ("plan_keeper", "schedule", "timeout", "2026-11-04T22:30:00+00:00", 600000, 14, 61000, "Stopped at the 10 minute limit"),
+    ("plan_keeper", "schedule", "ok", "2026-11-05T22:30:00+00:00", 212000, 6, 38400, None),
+    ("research", "schedule", "ok", "2026-11-04T06:00:00+00:00", 431000, 11, 94200, "Dossier: ACME"),
+    ("skeptic", "after_proposal", "ok", "2026-11-04T06:08:00+00:00", 64000, 2, 12800, None),
+    ("risk", "schedule", "not_ready", "2026-11-01T07:00:00+00:00", 0, 0, 0, "Waiting on 30 days of history"),
+    ("tax", "schedule", "unchanged", "2026-11-07T07:00:00+00:00", 0, 0, 0, "Nothing changed since the last run"),
+    ("plan_keeper", "schedule", "ok", "2026-11-06T22:30:00+00:00", 198000, 5, 36100, None),
+]
+BRIEF = "\n".join(
+    [
+        "You are $883 behind the plan shadow this year, mostly from the tech tilt.",
+        "Largest drift is VXUS at -1.3 pts, well inside the 5 pt band.",
+        "$142 cash is ready and a $500 deposit is modelled for next week.",
+        "Nothing needs you today. The VXUS deposit route is the one to look at.",
+    ]
+)
+
+with store.db(cfg) as conn:
+    last = None
+    for desk, trigger, status, started, ms, turns, tokens, note in RUNS:
+        end = datetime.fromisoformat(started).timestamp() + ms / 1000
+        cur = conn.execute(
+            "INSERT INTO agent_runs (desk, trigger, status, started_at, finished_at, model, effort, turns, "
+            "input_tokens, output_tokens, cache_tokens, duration_ms, note) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                desk,
+                trigger,
+                status,
+                started,
+                datetime.fromtimestamp(end, UTC).isoformat(timespec="seconds"),
+                "opus",
+                "high",
+                turns,
+                tokens // 2,
+                tokens // 4,
+                tokens - tokens // 2 - tokens // 4,
+                ms,
+                note,
+            ),
+        )
+        if desk == "plan_keeper" and status == "ok":
+            last = cur.lastrowid
+    conn.execute(
+        "INSERT OR REPLACE INTO agent_briefs (run_id, desk, as_of, digest, profile_version, summary, answer, created_at) VALUES (?,?,?,?,?,?,?,?)",
+        (last, "plan_keeper", "2026-11-06", "seed", "1", BRIEF, "{}", "2026-11-06T22:33:18+00:00"),
+    )
+print("brief run", last)

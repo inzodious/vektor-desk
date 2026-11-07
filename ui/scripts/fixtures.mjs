@@ -107,3 +107,10 @@ for (const id of ids) {
   save(`decisions.${id}`, await get(`/api/decisions/${id}`));
   save(`decisions.${id}.ticket`, await get(`/api/decisions/${id}/ticket`));
 }
+
+// ---------- agents and tax ----------
+save('agents.status', await get('/api/agents/status'));
+save('agents.brief', await get('/api/agents/brief'));
+save('agents.brief.empty', { summary: null });
+save('agents.runs', await get('/api/agents/runs?limit=50'));
+save('engine.wash', await get('/api/engine/wash'));

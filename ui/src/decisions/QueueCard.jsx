@@ -7,7 +7,7 @@ import { needsReason } from '../lib/decisions.js';
 
 const TOP = 3;
 
-export function QueueCard({ queue, i = 7 }) {
+export function QueueCard({ queue, i = 7, span = 'c12' }) {
   const nav = useNavigate();
   const [busy, setBusy] = useState(null);
   const [note, setNote] = useState(null);
@@ -38,7 +38,7 @@ export function QueueCard({ queue, i = 7 }) {
   };
 
   return (
-    <div className="card c12" style={{ '--i': i }} data-testid="bridge-queue">
+    <div className={`card ${span}`} style={{ '--i': i }} data-testid="bridge-queue">
       <div className="card-head">
         <span className="tag coral">Queue</span>
         <span className="acts">
