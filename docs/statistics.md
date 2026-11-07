@@ -129,7 +129,7 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 | `risk.eff_n` | Effective number of holdings | none | 1 / sum of squared weights (inverse HHI) |
 | `risk.lookthrough` | Look-through exposure | none | Fund weights × N-PORT holdings plus direct stocks, so an index fund and a sector fund that both hold the same megacaps show the true overlap. Portfolio row (window `top10`) is the ten largest underlyings combined; scope `underlying` lists the top 25. `risk.lookthrough_coverage` is the share of invested value seen through |
 | `risk.sector` | Sector exposure | none | Scope `sector`. Underlyings by their Finnhub industry (or Escape Vektor's profile), mapped to the 11 GICS sectors; non-equity fund holdings are `Bonds and other`; sector ETFs without N-PORT map whole; anything else is `Unclassified` or `Funds without look-through` |
-| `risk.factor` | Factor exposure | 3 years | Market, size, value, profitability, investment and momentum betas from the French factors; on holdings' own histories, weighted (phase 11) |
+| `risk.factor` | Factor exposure | 3 years | Market, size, value, profitability, investment and momentum betas from the French factors; on holdings' own histories, weighted (phase 11). Scope `factor`, scope_id the factor, window `3Y`; each holding needs about 680 of the last 756 factor days. `risk.factor_coverage` is the weight covered. Per-holding loadings and alpha at `GET /api/engine/factors` |
 | `risk.scenario`, `risk.scenario_pct` | Scenario shocks in dollars and percent of value | none | Scope `scenario`. Historical replays on current positions: `gfc_2008` (2007-10-09 to 2009-03-09), `covid_2020` (2020-02-19 to 2020-03-23), `rates_2022` (2022-01-03 to 2022-10-12); a holding without prices then uses the S&P 500 times its beta (`pro_forma`). Set shocks: `market_-20` (beta-scaled, `modelled`), `satellite_-50` (single stocks outside the plan), `rates_+2` (each holding's sensitivity to daily 10-year yield moves over three years, `modelled`) |
 | `risk.corr_shift` | Correlation shift | 252 days | 63-day minus 252-day correlation with the market per holding; a move of 0.3 or more means diversification is quietly changing |
 
@@ -204,6 +204,27 @@ Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamen
 | `fi.date_pctl` | FI date at the 10th, 50th and 90th percentile | Monte Carlo, below |
 
 **Monte Carlo.** Block bootstrap (12-month blocks) of real US market and bond returns since 1926 from the French library, scaled to the plan's mix and fees, with the plan's deposit schedule. Ten thousand paths, fixed seed per run so numbers do not wobble between refreshes. Output is percentiles, not a single date. It repeats history's range; it cannot imagine a worse one, and the page says so.
+
+**As built (phase 11).** `desk.engine.fi`, inside every core run (about 1.5 s for 10,000 paths of 50 years).
+
+| Input | From |
+|---|---|
+| FI number, target date | Escape Vektor pref `fi`: `fiYearlySpend × fiMultiple`, birth date plus `fiTargetAge` |
+| Real or nominal | The same pref's `inflationAdjusted` and `inflation`; real paths deflate each month at that rate |
+| Start value | `value.market` (the desk's accounts only) |
+| Deposits | Mean of the plan's `monthly_plan` contributions, else `accounts.individual.monthly_contribution`, else none (caveat) |
+| Mix and fees | Plan targets; bond funds (a known list, `DESK_BOND_FUNDS`, or a sleeve named bond or fixed income) earn the French T-bill rate, the rest the French US market; weighted expense ratios come off monthly |
+| History | `F-F_Research_Data_Factors` monthly (`mkt_rf_m`, `rf_m`, July 1926 on), fetched by the `french` job |
+
+| Metric | Unit | Notes |
+|---|---|---|
+| `fi.number` | usd | From the pref |
+| `fi.progress` | pct | `value.market` / FI number, `modelled` |
+| `fi.required_return` | pct | Annual return that reaches the number by the target date with the current deposits (bisection) |
+| `fi.date_pctl` | days from `as_of` | Windows `p10`, `p50`, `p90` of the first month a path reaches the number; null when fewer paths than that percentile reach it within the horizon (target plus 10 years, at least 30, at most 50) |
+| `fi.on_time` | pct | Share of paths that reach it by the target date |
+
+`GET /api/engine/fi` has the dates, the yearly p10, p50 and p90 value lines for the chart (lines, never a band), the inputs and the caveats. `DESK_MC_PATHS` sets the path count.
 
 ### Decision KPIs
 
@@ -498,7 +519,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 | Table | From | Holds |
 |---|---|---|
-| `factors_daily(series, date, value)` | 5 factors (2x3) and momentum, daily | `mkt_rf`, `smb`, `hml`, `rmw`, `cma`, `rf`, `mom`, in percent |
+| `factors_daily(series, date, value)` | 5 factors (2x3) and momentum, daily; 3 factors monthly | `mkt_rf`, `smb`, `hml`, `rmw`, `cma`, `rf`, `mom`, and monthly `mkt_rf_m`, `rf_m` (dated the 1st), in percent |
 | `french_returns(set_name, name, date, ret)` | Value-weighted block only | `industry_12`, `industry_49`, `size_deciles`, `momentum_deciles` (deciles by name) |
 
 The lab loads a French set only when a spec asks for it, sharing one calendar across the set, so 49 industries over 60 years cost about 40 MB per worker. `FF.MKT` (market plus bill) is built from the factors.
@@ -557,14 +578,14 @@ What agents and dashboards build against. Owned by this doc; changes go through 
 metric_values(metric_id, scope, scope_id, window, as_of, value, unit, n_obs, quality, engine_version)
 series_daily(series_id, scope, scope_id, date, value, quality)
 signals(signal_id, scope_id, as_of, value, base_rate, ci_low, ci_high, n_obs, note)
-engine_views(name, as_of, body)   (latest scorecard and patterns JSON)
+engine_views(name, as_of, body)   (latest scorecard, patterns, fi and factors JSON)
 data_health(as_of, check, status, detail)
 preflight(ticket_id, metric_id, before, after, flag)
 triggers(as_of, kind, scope_id, detail)
 paper_portfolios, paper_positions, paper_trades   (Strategy lab; the trial ledger is lab/runs/ledger.db)
 ```
 
-- `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`, plus `pair`, `underlying`, `sector`, `scenario`, `macro`, `rule`, `tax`, `decision`, `group`, `desk`.
+- `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`, plus `pair`, `underlying`, `sector`, `scenario`, `macro`, `rule`, `tax`, `decision`, `group`, `desk`, `factor`.
 - `quality`: `ok`, `stale`, `pro_forma`, `modelled`, `insufficient_history`.
 - `unit`: `usd`, `pct`, `pts`, `ratio`, `days`, `date`.
 
@@ -615,6 +636,8 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status, feature catalog and grammar; one strategy's tear sheet, verdict and paper trades |
 | `GET /api/engine/scorecard?origin=` | Flight record: groups, desks, saves, off-plan gap, per-decision scores |
 | `GET /api/engine/patterns` | Patterns: market, holdings, drawdown tables, seasonality, correlation shifts, behavior |
+| `GET /api/engine/fi` | FI Monte Carlo: dates, percentile lines, inputs, caveats |
+| `GET /api/engine/factors` | Factor loadings per holding and weighted |
 | `GET`, `POST /api/engine/watchlist`, `DELETE /api/engine/watchlist/{symbol}` | Watchlist rows; desk rows editable, `DESK_WATCHLIST` rows read-only |
 
 **Display rules for design.** Show `as_of` on every KPI; show any non-`ok` quality as a small, friendly tag, not a red error; never annualize under a year; Monte Carlo as percentile lines or markers, not a filled band.
@@ -628,7 +651,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Nightly | Tiingo, EDGAR, FRED pulls (the scorecard and patterns refresh with each core run) |
 | Nightly, 00:55 | `lab-export`: fresh `lab/data/lab.db`, then paper portfolios replay to the newest bar. Queued lab experiments run 01:00 to 06:00 ET under `job_lock("lab")` |
 | Weekly, Sunday 02:10 | N-PORT look-through and sector profiles |
-| Monthly, 2nd at 03:30 | `french`: factors and portfolios from the Ken French library. Phase 11 adds the Monte Carlo refresh and factor regression on holdings with three years or more of history |
+| Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Stack and tests
 

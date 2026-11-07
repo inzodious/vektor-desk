@@ -10,6 +10,7 @@ BASE = "https://mba.tuck.dartmouth.edu/pages/faculty/ken.French/ftp/{name}"
 FACTOR_FILES = {
     "F-F_Research_Data_5_Factors_2x3_daily_CSV.zip": {"Mkt-RF": "mkt_rf", "SMB": "smb", "HML": "hml", "RMW": "rmw", "CMA": "cma", "RF": "rf"},
     "F-F_Momentum_Factor_daily_CSV.zip": {"Mom": "mom"},
+    "F-F_Research_Data_Factors_CSV.zip": {"Mkt-RF": "mkt_rf_m", "RF": "rf_m"},
 }
 PORTFOLIO_FILES = {
     "industry_12": "12_Industry_Portfolios_daily_CSV.zip",
@@ -27,14 +28,14 @@ MISSING = (-99.99, -999.0)
 
 def first_block(text: str) -> tuple[list[str], list[tuple[str, list[float | None]]]]:
     header: list[str] | None = None
-    rows: list[tuple[str, list[float | None]]] = []
+    rows: list[tuple[str, list[float | None], str]] = []
     for line in text.splitlines():
         cells = [c.strip() for c in line.split(",")]
         if header is None:
             if len(cells) > 1 and cells[0] == "" and any(cells[1:]):
                 header = cells[1:]
             continue
-        if not cells or not re.fullmatch(r"\d{8}", cells[0]):
+        if not cells or not re.fullmatch(r"\d{8}|\d{6}", cells[0]) or (rows and len(cells[0]) != len(rows[0][2])):
             if rows:
                 break
             continue
@@ -46,8 +47,8 @@ def first_block(text: str) -> tuple[list[str], list[tuple[str, list[float | None
                 v = None
             values.append(None if v is None or v in MISSING else v)
         d = cells[0]
-        rows.append((f"{d[:4]}-{d[4:6]}-{d[6:]}", values))
-    return header or [], rows
+        rows.append((f"{d[:4]}-{d[4:6]}-{d[6:] or '01'}", values, d))
+    return header or [], [(d, v) for d, v, _ in rows]
 
 
 def unzip_csv(content: bytes) -> str:

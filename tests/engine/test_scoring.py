@@ -209,7 +209,7 @@ def test_core_writes_the_flight_record_and_patterns(cfg, mirror, app_client):
     desk = connect(cfg.desk_db)
     names = {r[0] for r in desk.execute("SELECT name FROM engine_views")}
     desk.close()
-    assert names == {"scorecard", "patterns"}
+    assert names == {"scorecard", "patterns", "fi", "factors"}
     client = app_client(packages=["engine"])
     card = client.get("/api/engine/scorecard").json()
     assert card["as_of"] == "2026-11-04" and card["decisions"] == [] and card["method"]

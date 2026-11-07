@@ -9,7 +9,7 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION, lookthrough, patterns, risk, scoring
+from desk.engine import ENGINE_VERSION, fi, lookthrough, patterns, risk, scoring
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
 from desk.engine.lots import current_lots
@@ -257,6 +257,9 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _after_tax(out, cfg, mirror, desk, accounts, income(activity))
     _research_metrics(out, desk, kinds)
     _flight_record(out, cfg, desk, tr, targets, kinds, now_rows)
+    market = next((m[5] for m in out.metrics if m[0] == "value.market" and m[1] == "portfolio"), total)
+    out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), fi.fi_prefs(current_rows(mirror, "prefs")), desk, market)
+    out.views["factors"] = fi.exposure(out, tr, desk, {s: w / 100 for s, w in symbol_weights(now_rows, total).items()})
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:
         out.m("cash.pending_days", (date.fromisoformat(when) - date.fromisoformat(as_of)).days, "days", quality="modelled")
