@@ -72,7 +72,7 @@ else
 fi
 step "secrets scan" no_secrets
 if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then
-  step "compose config" docker compose -f deploy/compose.yaml config -q
+  step "compose config" docker compose -f deploy/compose.yaml config -q --no-env-resolution
 else
   skip "compose config" "no docker compose"
 fi
