@@ -1,0 +1,142 @@
+import json
+from datetime import UTC, datetime, timedelta
+
+from desk.config import Config
+from desk.db import connect
+from desk.engine.lab.data import NotReady, ledger_path
+from desk.engine.lab.library import TRANSFORMS, catalog
+
+__all__ = ["NotReady", "desk_view", "eligible", "features", "grammar", "pending_reviews", "strategies"]
+
+REVIEW_DAYS = 14
+
+
+def grammar() -> dict:
+    return {
+        "universe": {
+            "fund_list": 'symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks. {"type": "fund_list", "set": "sector_etfs"}',
+            "screen": "single stocks in the backfill universe; min_history_days, min_price. Carries a survivorship caveat",
+        },
+        "signals": "metric_id from features, window like 63d, 6m or 1y (or {param}d), transform: " + ", ".join(TRANSFORMS),
+        "entry": '{"top_n": 3 or "param:top_n", "min_signal": 0} (min_signal applies to the first signal\'s raw value), or "top 3 by rank"',
+        "exit": '"rebalance", or {"hold_rank": 5} to keep a holding while it ranks in the top 5',
+        "rebalance": "weekly, monthly or quarterly; signals at the close, trades at the next open",
+        "sizing": "equal, inverse_vol (63-day) or rank",
+        "params": '{"top_n": {"min": 2, "max": 5, "default": 3}} or a list of allowed values; grid values must sit inside',
+        "costs": "set by the lab: 5 bps funds, 15 bps stocks, 25 bps thin stocks",
+    }
+
+
+def features(cfg: Config) -> list[dict]:
+    return catalog()
+
+
+def _ledger(cfg: Config):
+    path = ledger_path(cfg)
+    if not path.exists():
+        return None
+    return connect(path, readonly=True)
+
+
+def strategies(cfg: Config) -> list[dict]:
+    conn = _ledger(cfg)
+    if conn is None:
+        return []
+    try:
+        rows = [
+            dict(r) for r in conn.execute("SELECT id, version, title, status, registered_at, spec_hash, parent_id FROM strategies ORDER BY registered_at DESC")
+        ]
+        counts = {(r[0], r[1]): r[2] for r in conn.execute("SELECT strategy_id, version, count(*) FROM strategy_trials GROUP BY strategy_id, version")}
+    finally:
+        conn.close()
+    paper = _paper(cfg)
+    for r in rows:
+        r["trials"] = counts.get((r["id"], r["version"]), 0)
+        p = paper.get((r["id"], r["version"]))
+        if p:
+            r["paper"] = p
+            r["status"] = p["status"] if p["status"] != "paper" else r["status"]
+    return rows
+
+
+def _paper(cfg: Config) -> dict:
+    if not cfg.desk_db.exists():
+        return {}
+    conn = connect(cfg.desk_db, readonly=True)
+    try:
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='paper_portfolios'").fetchone():
+            return {}
+        return {(r["strategy_id"], r["version"]): dict(r) for r in conn.execute("SELECT * FROM paper_portfolios")}
+    finally:
+        conn.close()
+
+
+def desk_view(cfg: Config, strategy_id: str) -> dict:
+    conn = _ledger(cfg)
+    if conn is None:
+        raise NotReady("The lab has not run anything yet.")
+    try:
+        results = [
+            json.loads(r["body"])
+            for r in conn.execute("SELECT body FROM lab_results WHERE strategy_id=? ORDER BY version DESC, result_at DESC", (strategy_id,))
+        ]
+        row = conn.execute("SELECT * FROM strategies WHERE id=? ORDER BY version DESC LIMIT 1", (strategy_id,)).fetchone()
+    finally:
+        conn.close()
+    if not results:
+        return {"strategy_id": strategy_id, "status": None, "folds": [], "tear_sheet": None, "note": "No lab results for this id."}
+    latest_version = results[0]["version"]
+    mine = [r for r in results if r["version"] == latest_version]
+    exp = next((r for r in mine if r["kind"] == "experiment"), None)
+    fin = next((r for r in mine if r["kind"] == "finalize"), None)
+    rejected = next((r for r in mine if r["kind"] == "rejected"), None)
+    view = {
+        "strategy_id": strategy_id,
+        "version": latest_version,
+        "status": row["status"] if row and row["version"] == latest_version else "rejected",
+        "spec_hash": row["spec_hash"] if row else None,
+        "folds": exp["folds"] if exp else [],
+        "tear_sheet": {k: exp.get(k) for k in ("windows", "variants", "trials_family", "walk_forward", "horizons", "deflated_sharpe", "pbo", "caveats")}
+        if exp
+        else None,
+        "analyses": exp.get("analyses") if exp else {},
+        "rejected": rejected["problems"] if rejected and (not exp or rejected["result_at"] > exp["result_at"]) else None,
+        "grammar": grammar(),
+    }
+    if fin:
+        view["final"] = {k: fin.get(k) for k in ("verdict", "bars", "params", "holdout", "post_cutoff", "paper_start", "note")}
+    paper = _paper(cfg).get((strategy_id, latest_version))
+    if paper:
+        view["paper"] = paper
+    return view
+
+
+def pending_reviews(cfg: Config, now: datetime | None = None) -> list[dict]:
+    conn = _ledger(cfg)
+    if conn is None:
+        return []
+    cut = ((now or datetime.now(UTC)) - timedelta(days=REVIEW_DAYS)).isoformat(timespec="seconds")
+    try:
+        rows = conn.execute(
+            "SELECT strategy_id, version, kind, max(result_at) AS result_at FROM lab_results WHERE result_at >= ? "
+            "GROUP BY strategy_id, version, kind ORDER BY result_at",
+            (cut,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [dict(r) for r in rows]
+
+
+def eligible(cfg: Config) -> list[dict]:
+    out = []
+    for (sid, version), p in sorted(_paper(cfg).items()):
+        if p["status"] == "eligible":
+            out.append(
+                {
+                    "strategy_id": sid,
+                    "version": version,
+                    "title": p["title"],
+                    "summary": f"Passed the lab and {p['days']} days of paper trading, {p['excess_pts']:+.2f} points against its benchmark.",
+                }
+            )
+    return out

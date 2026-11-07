@@ -415,6 +415,42 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 `strategies(id, spec_hash, registered_at, status)`, `strategy_trials(strategy_id, params, window, metrics, run_at)`, `paper_positions(strategy_id, date, symbol, shares, value)`, `paper_trades(strategy_id, date, symbol, side, shares, price, cost)`, plus a tear sheet per run: equity curve vs benchmark (lines, no fill), drawdowns, yearly returns, turnover, after-tax return, factor loadings, deflated Sharpe, overfitting probability, and the trial count.
 
+### As built (phase 9, first cut)
+
+**Where things live.** The lab is `desk.engine.lab`; its service is `python -m desk.engine.lab` (overnight window `DESK_LAB_HOURS`, default `1-6` ET, under `job_lock("lab")`; `--once` runs the queue now). It has no network and opens nothing but:
+
+| Path | Writer | Holds |
+|---|---|---|
+| `lab/data/lab.db` | Engine `lab-export` job (00:55 nightly), atomic replace | `bars` (price bars plus mirror closes), `symbols` (kind, role, first and last day), `macro`, `plan_mix`, `settings` (marginal rate). SQLite, not Parquet: no new dependencies |
+| `lab/queue/*.json` | Strategy desk runner | Experiment and finalize requests |
+| `lab/runs/ledger.db` | Lab only | `strategies`, `strategy_trials` (kinds `train`, `test`, `full`, `holdout`; never pruned), `lab_results` (`experiment`, `finalize`, `rejected` bodies), `queue_done` |
+| `desk.db` | Engine `lab-export` job | `paper_portfolios`, `paper_positions`, `paper_trades` |
+
+**Spec grammar** (also served as `grammar` by `GET /api/lab/strategies` and in every `desk_view`):
+
+| Field | Accepted |
+|---|---|
+| `universe` | `{"type": "fund_list", "set": "sector_etfs" \| "core_etfs" \| "benchmarks"}`, `{"type": "fund_list", "symbols": [funds only]}`, a `rule` naming a set, or `{"type": "screen", "min_history_days", "min_price"}` for single stocks (survivorship caveat). A hand-picked stock list is rejected |
+| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `range_52w`, `dd`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
+| `entry` | `{"top_n": 3 \| "param:top_n", "min_signal": 0}` or "top 3 by rank". `min_signal` applies to the first signal's raw value; slots it leaves empty stay in cash |
+| `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
+| `rebalance`, `sizing` | Weekly, monthly or quarterly; `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash |
+| `params`, `grid` | `{"top_n": {"min": 1, "max": 4, "default": 3}}` or a list; grid values must sit inside. Over the trial budget (max 200), a seeded, deterministic subset runs |
+
+**A run.** Signals at the close, fills at the next open (`adjClose`-scaled), costs 5 bps for funds, 15 for stocks, 25 under $20M a day. FIFO lots, year-end tax on net realized gains at the exported marginal rate (else 24%) and 15% long-term, losses carried. Cash earns the 3-month bill. A symbol whose bars stop before the data ends is sold at its last price less 30%. The benchmark is `spec.benchmark`, else the plan mix, else the S&P 500, rebalanced monthly; the S&P 500 is always reported.
+
+**Walk-forward.** The two years before the newest bar are the holdout and never run before finalize. The range before it splits into folds of 3 years train and 1 year test (2 and 0.5 under 4 years; under 2.5 years is rejected). Each fold picks the variant with the best training Sharpe that meets `max_turnover` (read as turnover a year), then runs it on the test year; test years are stitched into the walk-forward record. Every variant also runs over the whole range for the overfitting tests.
+
+**What the desk sees** (`desk_view`): folds, the walk-forward summary, the start-month distribution per horizon (walk-forward when long enough, else the full range flagged `in_sample`), deflated Sharpe (trials counted across the spec's whole `parent_id` family, Sharpe variance across variants), PBO by combinatorial cross-validation over 10 blocks, the analyses it asked for (`param_sensitivity`, `regime_split` bull/bear and high/low rates, `turnover_cost` at 1×, 2×, 4×; `factor_regression` waits for phase 11), caveats, and rejection reasons. A changed spec under the same version, or any spec after finalize, is rejected.
+
+**Finalize** runs the last fold's parameters on the holdout and on the days after the writing model's cutoff (`DESK_LAB_MODEL_CUTOFFS`, a JSON map of model to date, default 2026-06-30), then checks the bars: start-month 5th percentile above zero on the longest horizon, deflated Sharpe over 0.95, PBO under 0.2, holdout excess positive and at least half the walk-forward excess, and the spec's own `excess_vs_plan_pts`, `max_drawdown_pct`, `min_trades`. Any failed bar is `fail`; all computed bars passing is `pass`; anything missing is `inconclusive`. The factor bar is reported as `null` until phase 11 and does not block. A pass moves the strategy to `paper`.
+
+**Paper.** Each night the engine replays a paper strategy with its finalized parameters from the finalize day to the newest bar on fresh data, so it can never be tuned after the fact. After 182 days it becomes `eligible` if it is level with or ahead of its benchmark, otherwise `retired`. `desk.engine.lab.eligible` lists the eligible ones for Scout.
+
+**API.** `GET /api/lab/strategies` (list, trial counts, paper state, feature catalog, grammar) and `GET /api/lab/strategies/{id}` (the desk view plus paper trades). Workers: `DESK_LAB_WORKERS` (default 1) processes.
+
+**Not in this cut.** Rule backtests (rebalance bands, deposit steering, harvest thresholds, margin rules), the French portfolio universes and the factor check (phase 11 data), point-in-time fundamentals and insider signals from the SEC bulk data sets, and reconstructed index membership.
+
 ## Honest limits
 
 Rule backtests (rebalance bands, deposit steering, harvest thresholds, margin rules) use the same lab machinery and the same bars.
@@ -441,7 +477,7 @@ signals(signal_id, scope_id, as_of, value, base_rate, ci_low, ci_high, n_obs, no
 data_health(as_of, check, status, detail)
 preflight(ticket_id, metric_id, before, after, flag)
 triggers(as_of, kind, scope_id, detail)
-strategies, strategy_trials, paper_positions, paper_trades   (see Strategy lab)
+paper_portfolios, paper_positions, paper_trades   (Strategy lab; the trial ledger is lab/runs/ledger.db)
 ```
 
 - `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`, plus `pair`, `underlying`, `sector`, `scenario`, `macro`, `rule`, `tax`.
@@ -492,7 +528,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | `POST /api/preflight` | The Preflight answer for a hypothetical trade (nothing stored); 400 on a bad trade |
 | `GET /api/engine/preflight?ticket_id=` | Stored before and after rows for a ticket |
 | `GET /api/engine/wash` | Open wash-sale windows `{symbol, kind, date, clears, account, amount}` |
-| `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status and tear sheet |
+| `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status, feature catalog and grammar; one strategy's tear sheet, verdict and paper trades |
 
 **Display rules for design.** Show `as_of` on every KPI; show any non-`ok` quality as a small, friendly tag, not a red error; never annualize under a year; Monte Carlo as percentile lines or markers, not a filled band.
 
@@ -503,7 +539,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Every 5 min, 9:30 to 16:00 ET weekdays | Quotes, live value, day change, intraday drawdown, margin call distance |
 | After each mirror (8:00, 17:00 ET) | Reconciliation, holdings, flows, returns, drift, rules, margin, tax (if lots are fresh), risk, correlations, scenarios, look-through exposure, signals, brief for the agents. Comparisons are computed on request |
 | Nightly | Tiingo, EDGAR, FRED pulls; scorecard |
-| Nightly, after the 17:00 run | Forward paper portfolios step one day; queued lab backtests run overnight under `job_lock("lab")` |
+| Nightly, 00:55 | `lab-export`: fresh `lab/data/lab.db`, then paper portfolios replay to the newest bar. Queued lab experiments run 01:00 to 06:00 ET under `job_lock("lab")` |
 | Weekly, Sunday 02:10 | N-PORT look-through and sector profiles |
 | Monthly | French factors, Monte Carlo refresh, factor regression on holdings with three years or more of history |
 

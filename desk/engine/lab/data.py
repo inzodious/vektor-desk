@@ -1,0 +1,155 @@
+import os
+import sqlite3
+from bisect import bisect_right
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+
+from desk.config import Config
+from desk.db import connect
+from desk.engine.market import BENCHMARKS
+
+FUND_KINDS = ("fund", "etf")
+EXPORT_SCHEMA = """
+CREATE TABLE bars (
+  symbol TEXT NOT NULL, date TEXT NOT NULL, open REAL, close REAL NOT NULL, adj_close REAL, volume REAL, PRIMARY KEY (symbol, date)
+) WITHOUT ROWID;
+CREATE TABLE symbols (symbol TEXT PRIMARY KEY, kind TEXT NOT NULL, role TEXT, first TEXT, last TEXT) WITHOUT ROWID;
+CREATE TABLE macro (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
+CREATE TABLE plan_mix (symbol TEXT PRIMARY KEY, weight REAL NOT NULL) WITHOUT ROWID;
+CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
+"""
+
+
+class NotReady(RuntimeError):
+    pass
+
+
+def lab_dir(cfg: Config) -> Path:
+    return cfg.data_dir / "lab"
+
+
+def data_path(cfg: Config) -> Path:
+    return lab_dir(cfg) / "data" / "lab.db"
+
+
+def ledger_path(cfg: Config) -> Path:
+    return lab_dir(cfg) / "runs" / "ledger.db"
+
+
+# ---- Export (engine side) ----
+
+
+def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets: dict[str, float], *, now: datetime | None = None) -> dict:
+    now = now or datetime.now(UTC)
+    final = data_path(cfg)
+    final.parent.mkdir(parents=True, exist_ok=True)
+    tmp = final.with_name(".lab.db.tmp")
+    tmp.unlink(missing_ok=True)
+    out = sqlite3.connect(tmp)
+    try:
+        out.executescript(EXPORT_SCHEMA)
+        bars: dict[tuple[str, str], tuple] = {}
+        for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM price_bars"):
+            bars[(r["symbol"], r["date"])] = (r["symbol"], r["date"], r["open"], r["close"], r["adj_close"], r["volume"])
+        for r in desk.execute("SELECT symbol, date, close, adj_close FROM prices_daily"):
+            bars.setdefault((r["symbol"], r["date"]), (r["symbol"], r["date"], None, r["close"], r["adj_close"], None))
+        out.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?)", bars.values())
+        roles = {r["symbol"]: r["role"] for r in desk.execute("SELECT symbol, role FROM market_symbols")}
+        spans = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, min(date), max(date) FROM bars GROUP BY symbol")}
+        rows = []
+        for sym, (first, last) in spans.items():
+            kind = kinds.get(sym) or ("fund" if sym in BENCHMARKS or sym in targets else "unknown")
+            rows.append((sym, kind, roles.get(sym), first, last))
+        out.executemany("INSERT INTO symbols VALUES (?, ?, ?, ?, ?)", rows)
+        if desk.execute("SELECT 1 FROM sqlite_master WHERE name='macro_daily'").fetchone():
+            out.executemany("INSERT INTO macro VALUES (?, ?, ?)", [tuple(r) for r in desk.execute("SELECT series, date, value FROM macro_daily")])
+        out.executemany("INSERT INTO plan_mix VALUES (?, ?)", list(targets.items()))
+        rate = desk.execute(
+            "SELECT value FROM metric_values WHERE metric_id='tax.marginal_rate' AND scope='portfolio' AND value IS NOT NULL ORDER BY as_of DESC LIMIT 1"
+        ).fetchone()
+        settings = {"exported_at": now.isoformat(timespec="seconds"), "marginal_rate_pct": str(rate[0]) if rate else None}
+        out.executemany("INSERT INTO settings VALUES (?, ?)", list(settings.items()))
+        out.commit()
+    finally:
+        out.close()
+    os.replace(tmp, final)
+    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": len(bars)}
+
+
+# ---- Load (lab side) ----
+
+
+@dataclass
+class Series:
+    dates: list[str]
+    adj: list[float]
+    open_adj: list[float]
+    volume: list[float | None]
+    index: dict[str, int] = field(default_factory=dict)
+
+    def at(self, day: str) -> int | None:
+        i = bisect_right(self.dates, day) - 1
+        return i if i >= 0 else None
+
+
+@dataclass
+class LabData:
+    series: dict[str, Series]
+    kinds: dict[str, str]
+    roles: dict[str, str | None]
+    last: dict[str, str]
+    macro: dict[str, tuple[list[str], list[float]]]
+    plan_mix: dict[str, float]
+    settings: dict[str, str | None]
+    calendar: list[str]
+
+    @property
+    def end(self) -> str:
+        return self.calendar[-1]
+
+    def macro_at(self, series: str, day: str) -> float | None:
+        dates, values = self.macro.get(series, ([], []))
+        i = bisect_right(dates, day)
+        return values[i - 1] if i else None
+
+
+def load(path: Path) -> LabData:
+    if not path.exists():
+        raise NotReady("No lab data yet; the engine's lab-export job writes it nightly.")
+    conn = connect(path, readonly=True)
+    try:
+        series: dict[str, Series] = {}
+        cur, rows = None, []
+
+        def flush():
+            if cur and rows:
+                dates = [r[0] for r in rows]
+                adj = [r[2] if r[2] else r[1] for r in rows]
+                opens = [(r[3] * (r[2] / r[1]) if r[2] and r[1] else r[3]) if r[3] else a for r, a in zip(rows, adj, strict=True)]
+                s = Series(dates, adj, opens, [r[4] for r in rows])
+                s.index = {d: i for i, d in enumerate(dates)}
+                series[cur] = s
+
+        for r in conn.execute("SELECT symbol, date, close, adj_close, open, volume FROM bars ORDER BY symbol, date"):
+            if r[0] != cur:
+                flush()
+                cur, rows = r[0], []
+            rows.append((r[1], r[2], r[3], r[4], r[5]))
+        flush()
+        kinds, roles, last = {}, {}, {}
+        for r in conn.execute("SELECT symbol, kind, role, last FROM symbols"):
+            kinds[r[0]], roles[r[0]], last[r[0]] = r[1], r[2], r[3]
+        macro: dict[str, tuple[list[str], list[float]]] = {}
+        for r in conn.execute("SELECT series, date, value FROM macro ORDER BY series, date"):
+            d, v = macro.setdefault(r[0], ([], []))
+            d.append(r[1])
+            v.append(r[2])
+        plan = {r[0]: r[1] for r in conn.execute("SELECT symbol, weight FROM plan_mix")}
+        settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings")}
+    finally:
+        conn.close()
+    ref = next((s for s in ("SPY", "VTI", "FXAIX") if s in series), None) or max(series, key=lambda s: len(series[s].dates), default=None)
+    if not ref:
+        raise NotReady("The lab data has no prices yet.")
+    return LabData(series, kinds, roles, last, macro, plan, settings, list(series[ref].dates))

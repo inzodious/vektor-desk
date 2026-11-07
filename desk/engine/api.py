@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
+from desk.engine import lab
 from desk.engine.compare import CompareError, compare
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
@@ -352,3 +353,35 @@ def lookthrough_view(request: Request, fund: str | None = None, limit: int = 50)
     finally:
         conn.close()
     return _json({"as_of": rows[0]["as_of"] if rows else day, "rows": rows, "sectors": sectors, "funds": funds, "holdings": holdings})
+
+
+@router.get("/api/lab/strategies")
+def lab_strategies(request: Request) -> JSONResponse:
+    cfg = get_cfg(request)
+    return _json({"strategies": lab.strategies(cfg), "features": lab.features(cfg), "grammar": lab.grammar()})
+
+
+@router.get("/api/lab/strategies/{strategy_id}")
+def lab_strategy(request: Request, strategy_id: str) -> JSONResponse:
+    cfg = get_cfg(request)
+    try:
+        view = lab.desk_view(cfg, strategy_id)
+    except lab.NotReady as e:
+        return JSONResponse({"detail": str(e)}, status_code=404)
+    if view.get("status") is None:
+        return JSONResponse({"detail": view.get("note")}, status_code=404)
+    trades = []
+    if cfg.desk_db.exists():
+        conn = connect(cfg.desk_db, readonly=True)
+        try:
+            if _has(conn, "paper_trades"):
+                trades = [
+                    dict(r)
+                    for r in conn.execute(
+                        "SELECT date, symbol, side, shares, price, cost FROM paper_trades WHERE strategy_id=? AND version=? ORDER BY date DESC LIMIT 200",
+                        (strategy_id, view["version"]),
+                    )
+                ]
+        finally:
+            conn.close()
+    return _json(view | {"paper_trades": trades})

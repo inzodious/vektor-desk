@@ -1,0 +1,474 @@
+import json
+import os
+import sqlite3
+from collections import Counter, namedtuple
+from concurrent.futures import ProcessPoolExecutor
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+
+from desk.config import Config
+from desk.db import connect
+from desk.engine.lab import stats
+from desk.engine.lab.data import LabData, data_path, lab_dir, ledger_path, load
+from desk.engine.lab.sim import simulate
+from desk.engine.lab.spec import Spec, SpecError, Variant, parse, resolve, variants
+
+HOLDOUT_YEARS = 2
+DEFAULT_CUTOFF = "2026-06-30"
+POST_CUTOFF_MIN_DAYS = 63
+DSR_BAR = 0.95
+PBO_BAR = 0.2
+LEDGER = """
+CREATE TABLE IF NOT EXISTS strategies (
+  id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  spec_hash TEXT NOT NULL,
+  parent_id TEXT,
+  title TEXT,
+  status TEXT NOT NULL CHECK (status IN ('lab', 'paper', 'failed', 'inconclusive')),
+  registered_at TEXT NOT NULL,
+  model TEXT,
+  written_at TEXT,
+  spec TEXT NOT NULL,
+  PRIMARY KEY (id, version)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS strategy_trials (
+  id INTEGER PRIMARY KEY,
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  params TEXT NOT NULL,
+  window TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  metrics TEXT NOT NULL,
+  run_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS strategy_trials_sid ON strategy_trials (strategy_id, version);
+CREATE TABLE IF NOT EXISTS lab_results (
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('experiment', 'finalize', 'rejected')),
+  result_at TEXT NOT NULL,
+  body TEXT NOT NULL,
+  PRIMARY KEY (strategy_id, version, kind, result_at)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS queue_done (
+  file TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  done_at TEXT NOT NULL
+) WITHOUT ROWID;
+"""
+
+
+def ledger(cfg: Config) -> sqlite3.Connection:
+    conn = connect(ledger_path(cfg))
+    conn.executescript(LEDGER)
+    return conn
+
+
+def _stamp(now: datetime) -> str:
+    return now.isoformat(timespec="seconds")
+
+
+def _shift(day: str, years: float) -> str:
+    d = date.fromisoformat(day)
+    if float(years).is_integer():
+        try:
+            return d.replace(year=d.year + int(years)).isoformat()
+        except ValueError:
+            return d.replace(year=d.year + int(years), day=28).isoformat()
+    return (d + timedelta(days=round(365.25 * years))).isoformat()
+
+
+def cutoff_for(model: str) -> str:
+    try:
+        table = json.loads(os.environ.get("DESK_LAB_MODEL_CUTOFFS", "") or "{}")
+    except ValueError:
+        table = {}
+    return str(table.get(model) or table.get("default") or DEFAULT_CUTOFF)
+
+
+def _record(conn, spec: Spec, kind: str, body: dict, now: datetime) -> dict:
+    body = {"strategy_id": spec.id, "version": spec.version, "kind": kind, "result_at": _stamp(now), **body}
+    with conn:
+        conn.execute("INSERT OR REPLACE INTO lab_results VALUES (?, ?, ?, ?, ?)", (spec.id, spec.version, kind, body["result_at"], json.dumps(body)))
+    return body
+
+
+def _reject(conn, raw: dict, problems: list[str], now: datetime) -> dict:
+    sid, version = str(raw.get("id") or raw.get("strategy_id") or "unknown"), int(raw.get("version") or 1)
+    body = {"strategy_id": sid, "version": version, "kind": "rejected", "result_at": _stamp(now), "problems": problems}
+    with conn:
+        conn.execute("INSERT OR REPLACE INTO lab_results VALUES (?, ?, 'rejected', ?, ?)", (sid, version, body["result_at"], json.dumps(body)))
+    return body
+
+
+def _trial(conn, spec: Spec, v: Variant, window: str, kind: str, metrics: dict, now: datetime):
+    conn.execute(
+        "INSERT INTO strategy_trials (strategy_id, version, params, window, kind, metrics, run_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (spec.id, spec.version, v.key, window, kind, json.dumps(metrics), _stamp(now)),
+    )
+
+
+def family_trials(conn, strategy_id: str) -> int:
+    parents = {r["id"]: r["parent_id"] for r in conn.execute("SELECT id, parent_id FROM strategies")}
+
+    def root(sid):
+        seen = set()
+        while parents.get(sid) and sid not in seen:
+            seen.add(sid)
+            sid = parents[sid]
+        return sid
+
+    mine = root(strategy_id)
+    ids = [sid for sid in parents if root(sid) == mine] or [strategy_id]
+    marks = ",".join("?" * len(ids))
+    q = f"SELECT count(*) FROM (SELECT DISTINCT strategy_id, version, params FROM strategy_trials WHERE strategy_id IN ({marks}) AND kind='full')"
+    return conn.execute(q, ids).fetchone()[0]
+
+
+# ---- Walk-forward ----
+
+
+def windows(data: LabData, date_range: dict) -> dict:
+    holdout = _shift(data.end, -HOLDOUT_YEARS)
+    start = max(str(date_range.get("start") or data.calendar[0]), data.calendar[0])
+    end = min(str(date_range.get("end") or data.end), (date.fromisoformat(holdout) - timedelta(days=1)).isoformat())
+    span = (date.fromisoformat(end) - date.fromisoformat(start)).days / 365.25 if end > start else 0
+    if span >= 4:
+        train, test = 3.0, 1.0
+    elif span >= 2.5:
+        train, test = 2.0, 0.5
+    else:
+        raise SpecError([f"the walk-forward range {start} to {end} is {span:.1f} years; it needs 2.5 or more before the two-year holdout"])
+    folds, t0 = [], start
+    while _shift(t0, train) < end:
+        test_start = _shift(t0, train)
+        folds.append({"train": (t0, test_start), "test": (test_start, min(_shift(test_start, test), end))})
+        t0 = _shift(t0, test)
+    return {"start": start, "end": end, "holdout_start": holdout, "folds": folds, "clipped": str(date_range.get("end") or end) > end}
+
+
+Run = namedtuple("Run", "params summary rets bench days")
+_DATA: LabData | None = None
+_SPEC: Spec | None = None
+
+
+def _init(path: str, raw: dict, model: str):
+    global _DATA, _SPEC
+    _DATA = load(Path(path))
+    _SPEC = parse(raw, _DATA, model=model)
+
+
+def _job(args):
+    params, start, end, cost_mult = args
+    v = resolve(_SPEC, params)
+    res = simulate(_DATA, _SPEC, v, start, end, cost_mult=cost_mult)
+    return Run(params, stats.summary(res), stats.rets(res.values), stats.rets(res.bench), res.days)
+
+
+def _run_many(cfg, data, spec, jobs: list[tuple]):
+    workers = max(1, int(os.environ.get("DESK_LAB_WORKERS", "1") or 1))
+    if workers > 1 and len(jobs) > 4:
+        with ProcessPoolExecutor(max_workers=workers, initializer=_init, initargs=(str(data_path(cfg)), spec.raw, spec.model)) as pool:
+            return list(pool.map(_job, jobs, chunksize=4))
+    global _DATA, _SPEC
+    _DATA, _SPEC = data, spec
+    return [_job(j) for j in jobs]
+
+
+def _ok(spec: Spec, summary: dict) -> bool:
+    cap = spec.constraints.get("max_turnover")
+    return cap is None or (summary.get("turnover_per_year") or 0) <= float(cap)
+
+
+def _best(spec: Spec, results: list[tuple]) -> dict | None:
+    allowed = [r for r in results if _ok(spec, r.summary) and r.summary.get("sharpe") is not None]
+    if not allowed:
+        return None
+    return max(allowed, key=lambda r: (r.summary["sharpe"], json.dumps(r.params, sort_keys=True))).params
+
+
+def _stitch(pieces: list[Run]) -> tuple[list[str], list[float], list[float | None]]:
+    if not pieces:
+        return [], [], []
+    days, vals, bench = [pieces[0].days[0]], [1.0], [1.0]
+    for run in pieces:
+        for d, x, y in zip(run.days[1:], run.rets, run.bench, strict=True):
+            days.append(d)
+            vals.append(vals[-1] * (1 + (x or 0.0)))
+            bench.append(bench[-1] * (1 + y) if y is not None and bench[-1] is not None else None)
+    return days, vals, bench
+
+
+def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) -> dict:
+    raw = request.get("spec") or {}
+    try:
+        spec = parse(raw, data, model=str(request.get("model") or ""))
+        known = conn.execute("SELECT spec_hash, status FROM strategies WHERE id=? AND version=?", (spec.id, spec.version)).fetchone()
+        if known and known["spec_hash"] != spec.hash:
+            raise SpecError([f"{spec.id} v{spec.version} is registered with a different spec; a change needs a new version"])
+        if known and known["status"] != "lab":
+            raise SpecError([f"{spec.id} v{spec.version} is finalized ({known['status']}); a change needs a new version"])
+        grid_variants = variants(spec, request.get("grid"), int(request.get("trial_budget") or 200), int(request.get("seed") or 0))
+        win = windows(data, request.get("date_range") or {})
+    except SpecError as e:
+        return _reject(conn, raw, e.problems, now)
+    if not known:
+        with conn:
+            conn.execute(
+                "INSERT INTO strategies VALUES (?, ?, ?, ?, ?, 'lab', ?, ?, ?, ?)",
+                (spec.id, spec.version, spec.hash, spec.parent_id, spec.title, _stamp(now), spec.model, request.get("written_at"), json.dumps(raw)),
+            )
+    params = [v.params for v in grid_variants]
+    folds, pieces, chosen = [], [], []
+    for f in win["folds"]:
+        train = _run_many(cfg, data, spec, [(p, *f["train"], 1.0) for p in params])
+        pick = _best(spec, train)
+        with conn:
+            for run in train:
+                _trial(conn, spec, resolve(spec, run.params), f"{f['train'][0]}..{f['train'][1]}", "train", run.summary, now)
+        window = {"train_window": list(f["train"]), "test_window": list(f["test"])}
+        if pick is None:
+            folds.append(window | {"params": None, "note": "No variant met the constraints on this training window."})
+            continue
+        (test,) = _run_many(cfg, data, spec, [(pick, *f["test"], 1.0)])
+        with conn:
+            _trial(conn, spec, resolve(spec, pick), f"{f['test'][0]}..{f['test'][1]}", "test", test.summary, now)
+        train_sum = next(run.summary for run in train if run.params == pick)
+        folds.append(window | {"params": pick, "train_sharpe": train_sum.get("sharpe"), "test": test.summary})
+        pieces.append(test)
+        chosen.append(json.dumps(pick, sort_keys=True))
+    full = _run_many(cfg, data, spec, [(p, win["start"], win["end"], 1.0) for p in params])
+    with conn:
+        for run in full:
+            _trial(conn, spec, resolve(spec, run.params), f"{win['start']}..{win['end']}", "full", run.summary, now)
+    oos_days, oos_vals, oos_bench = _stitch(pieces)
+    oos_r = [x for x in stats.rets(oos_vals) if x is not None]
+    trials = family_trials(conn, spec.id)
+    srs = [s for s in (stats.sharpe_daily([x for x in run.rets if x is not None]) for run in full) if s is not None]
+    var_sr = stats._sd(srs) ** 2 if len(srs) > 1 else 0.0
+    skew, kurt = stats.moments(oos_r)
+    sr = stats.sharpe_daily(oos_r)
+    dsr = stats.deflated_sharpe(sr, max(trials, len(params)), var_sr, len(oos_r), skew, kurt) if sr is not None else None
+    pbo = stats.pbo([[x or 0.0 for x in run.rets] for run in full])
+    deploy = json.loads(chosen[-1]) if chosen else None
+    favorite = json.loads(Counter(chosen).most_common(1)[0][0]) if chosen else None
+    horizons = _horizons(spec, oos_days, oos_vals, oos_bench, favorite, data, win)
+    body = {
+        "status": "ok",
+        "spec_hash": spec.hash,
+        "windows": {"start": win["start"], "end": win["end"], "holdout_start": win["holdout_start"], "clipped_to_holdout": win["clipped"]},
+        "variants": len(params),
+        "trials_family": trials,
+        "folds": folds,
+        "walk_forward": _oos_summary(oos_vals, oos_bench, oos_days),
+        "horizons": horizons,
+        "deflated_sharpe": round(dsr, 4) if dsr is not None else None,
+        "pbo": round(pbo, 4) if pbo is not None else None,
+        "deploy_params": deploy,
+        "analyses": _analyses(cfg, data, spec, request.get("analyses") or [], full, favorite, win),
+        "caveats": spec.caveats + _caveats(spec),
+    }
+    return _record(conn, spec, "experiment", body, now)
+
+
+def _oos_summary(vals, bench, days) -> dict:
+    if len(vals) < 2:
+        return {"days": 0}
+    r = [x for x in stats.rets(vals) if x is not None]
+    s_c = stats.cagr(vals, days)
+    b_ok = [b for b in bench if b is not None]
+    b_c = stats.cagr(b_ok, days[: len(b_ok)]) if len(b_ok) == len(days) else None
+    sd = stats._sd(r)
+    return {
+        "start": days[0],
+        "end": days[-1],
+        "days": len(days),
+        "ann_return_pct": stats._pct(s_c),
+        "excess_pts": stats._pct(s_c - b_c) if s_c is not None and b_c is not None else None,
+        "sharpe": round(stats._mean(r) / sd * 252**0.5, 4) if sd else None,
+        "mdd_pct": stats._pct(stats.drawdown(vals)),
+    }
+
+
+def _horizons(spec, oos_days, oos_vals, oos_bench, favorite, data, win) -> list[dict]:
+    out = []
+    for years in spec.horizons:
+        d = stats.start_months(oos_days, oos_vals, oos_bench, years) if oos_days else {"starts": 0}
+        if d["starts"]:
+            out.append(d | {"basis": "walk_forward"})
+            continue
+        if favorite is not None:
+            res = simulate(data, spec, resolve(spec, favorite), win["start"], win["end"])
+            d = stats.start_months(res.days, res.values, res.bench, years)
+            if d["starts"]:
+                out.append(d | {"basis": "in_sample"})
+                continue
+        out.append({"years": years, "starts": 0, "basis": None, "note": f"Fewer than {years} years of data before the holdout."})
+    return out
+
+
+def _caveats(spec: Spec) -> list[str]:
+    out = [
+        "Factor check (alpha after the French factors) arrives with phase 11; until then it is not part of the verdict.",
+        "Unrealized gains at the end of a window are not taxed, and the benchmark is untaxed.",
+    ]
+    if spec.horizons and 3 in spec.horizons:
+        out.append("A 3-year horizon is mostly noise.")
+    return out
+
+
+def _analyses(cfg, data, spec, wanted, full, favorite, win) -> dict:
+    out = {}
+    if "param_sensitivity" in wanted:
+        table = {}
+        for run in full:
+            for k, val in run.params.items():
+                table.setdefault(k, {}).setdefault(json.dumps(val), []).append(run.summary.get("sharpe") or 0.0)
+        out["param_sensitivity"] = {k: {val: round(stats._mean(xs), 4) for val, xs in vals.items()} for k, vals in table.items()}
+    if favorite is not None and "turnover_cost" in wanted:
+        rows = _run_many(cfg, data, spec, [(favorite, win["start"], win["end"], m) for m in (1.0, 2.0, 4.0)])
+        out["turnover_cost"] = [
+            {"cost_x": m, "excess_vs_bench_pts": run.summary.get("excess_vs_bench_pts")} for m, run in zip((1.0, 2.0, 4.0), rows, strict=True)
+        ]
+    if favorite is not None and "regime_split" in wanted:
+        res = simulate(data, spec, resolve(spec, favorite), win["start"], win["end"])
+        out["regime_split"] = _regimes(data, res)
+    if "factor_regression" in wanted:
+        out["factor_regression"] = {"status": "not_available", "note": "French factors arrive with phase 11."}
+    return out
+
+
+def _regimes(data, res) -> dict:
+    r, b = stats.rets(res.values), stats.rets(res.bench)
+    rates = [data.macro_at("DGS3MO", d) for d in res.days[1:]]
+    known = sorted(x for x in rates if x is not None)
+    median = known[len(known) // 2] if known else None
+    groups: dict[str, list[tuple[float, float]]] = {}
+    for i, (x, y) in enumerate(zip(r, b, strict=True)):
+        if x is None or y is None:
+            continue
+        lo = max(0, i - 252)
+        trail = res.bench[i] / res.bench[lo] - 1 if res.bench[i] and res.bench[lo] else None
+        if trail is not None:
+            groups.setdefault("bull" if trail > 0 else "bear", []).append((x, y))
+        if median is not None and rates[i] is not None:
+            groups.setdefault("high_rates" if rates[i] > median else "low_rates", []).append((x, y))
+    out = {}
+    for name, pairs in groups.items():
+        s = stats._mean([p[0] for p in pairs]) * 252
+        bm = stats._mean([p[1] for p in pairs]) * 252
+        out[name] = {"days": len(pairs), "ann_return_pct": round(s * 100, 4), "excess_pts": round((s - bm) * 100, 4)}
+    return out
+
+
+# ---- Finalize ----
+
+
+def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) -> dict:
+    sid, version = str(request.get("strategy_id") or ""), int(request.get("version") or 0)
+    row = conn.execute("SELECT * FROM strategies WHERE id=? AND version=?", (sid, version)).fetchone()
+    raw = {"id": sid, "version": version}
+    if row is None:
+        return _reject(conn, raw, [f"{sid} v{version} was never run; send an experiment first"], now)
+    if row["status"] != "lab":
+        return _reject(conn, raw, [f"{sid} v{version} is already finalized ({row['status']})"], now)
+    exp = conn.execute(
+        "SELECT body FROM lab_results WHERE strategy_id=? AND version=? AND kind='experiment' ORDER BY result_at DESC LIMIT 1", (sid, version)
+    ).fetchone()
+    if exp is None:
+        return _reject(conn, raw, [f"{sid} v{version} has no experiment result yet"], now)
+    exp = json.loads(exp["body"])
+    spec = parse(json.loads(row["spec"]), data, model=row["model"] or "")
+    if not exp.get("deploy_params"):
+        body = {"verdict": "fail", "bars": {}, "note": "No variant met the constraints in any fold."}
+        _close(conn, spec, "failed")
+        return _record(conn, spec, "finalize", body, now)
+    v = resolve(spec, exp["deploy_params"])
+    hold = simulate(data, spec, v, exp["windows"]["holdout_start"], data.end)
+    holdout = stats.summary(hold)
+    cutoff = cutoff_for(spec.model)
+    post = None
+    if cutoff < data.end:
+        res = simulate(data, spec, v, max(cutoff, exp["windows"]["start"]), data.end)
+        post = stats.summary(res) if len(res.days) >= POST_CUTOFF_MIN_DAYS else {"days": len(res.days), "note": "Too short to read yet."}
+    with conn:
+        _trial(conn, spec, v, f"{exp['windows']['holdout_start']}..{data.end}", "holdout", holdout, now)
+    bars = _bars(spec, exp, holdout)
+    computed = [x for k, x in bars.items() if k != "factor"]
+    verdict = "fail" if any(x is False for x in computed) else ("pass" if computed and all(x is True for x in computed) else "inconclusive")
+    status = {"pass": "paper", "fail": "failed", "inconclusive": "inconclusive"}[verdict]
+    _close(conn, spec, status)
+    body = {
+        "verdict": verdict,
+        "bars": bars,
+        "params": exp["deploy_params"],
+        "walk_forward": exp.get("walk_forward"),
+        "holdout": holdout,
+        "post_cutoff": {"cutoff": cutoff, **(post or {"days": 0, "note": "The data ends before the model's training cutoff."})},
+        "paper_start": data.end if verdict == "pass" else None,
+        "caveats": exp.get("caveats", []),
+    }
+    return _record(conn, spec, "finalize", body, now)
+
+
+def _close(conn, spec: Spec, status: str):
+    with conn:
+        conn.execute("UPDATE strategies SET status=? WHERE id=? AND version=?", (status, spec.id, spec.version))
+
+
+def _bars(spec: Spec, exp: dict, holdout: dict) -> dict:
+    wf = exp.get("walk_forward") or {}
+    longest = next((h for h in sorted(exp.get("horizons") or [], key=lambda h: -h["years"]) if h.get("starts")), None)
+    bars = {
+        "excess_interval": (longest["p5_pts"] > 0) if longest else None,
+        "deflated_sharpe": (exp["deflated_sharpe"] > DSR_BAR) if exp.get("deflated_sharpe") is not None else None,
+        "pbo": (exp["pbo"] < PBO_BAR) if exp.get("pbo") is not None else None,
+        "factor": None,
+    }
+    wf_x, h_x = wf.get("excess_pts"), holdout.get("excess_vs_bench_pts")
+    bars["holdout"] = None if wf_x is None or h_x is None else bool(wf_x > 0 and h_x > 0 and h_x >= wf_x / 2)
+    crit = spec.success_criteria
+    if "excess_vs_plan_pts" in crit and wf_x is not None:
+        bars["criteria_excess"] = wf_x >= float(crit["excess_vs_plan_pts"])
+    if "max_drawdown_pct" in crit and wf.get("mdd_pct") is not None:
+        bars["criteria_drawdown"] = wf["mdd_pct"] >= -abs(float(crit["max_drawdown_pct"]))
+    if "min_trades" in crit:
+        trades = sum((f.get("test") or {}).get("trades", 0) for f in exp.get("folds", []))
+        bars["criteria_trades"] = trades >= int(crit["min_trades"])
+    return bars
+
+
+# ---- Queue ----
+
+
+def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
+    now = now or datetime.now(UTC)
+    folder = lab_dir(cfg) / "queue"
+    if not folder.exists():
+        return {"ok": True, "done": []}
+    data = load(data_path(cfg))
+    conn = ledger(cfg)
+    done = []
+    try:
+        for path in sorted(folder.glob("*.json")):
+            if conn.execute("SELECT 1 FROM queue_done WHERE file=?", (path.name,)).fetchone():
+                continue
+            try:
+                request = json.loads(path.read_text())
+            except (OSError, ValueError):
+                status = "unreadable"
+            else:
+                kind = request.get("request")
+                if kind == "experiment":
+                    status = run_experiment(cfg, conn, data, request, now=now)["kind"]
+                elif kind == "finalize":
+                    status = finalize(cfg, conn, data, request, now=now)["kind"]
+                else:
+                    status = "unknown_request"
+            with conn:
+                conn.execute("INSERT OR REPLACE INTO queue_done VALUES (?, ?, ?)", (path.name, status, _stamp(now)))
+            done.append({"file": path.name, "status": status})
+    finally:
+        conn.close()
+    return {"ok": True, "done": done}

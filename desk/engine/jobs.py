@@ -5,4 +5,5 @@ JOBS = [
     ("10 1-6 * * *", "python -m desk.engine backfill"),
     ("40 0 * * *", "python -m desk.engine research"),
     ("10 2 * * 0", "python -m desk.engine lookthrough"),
+    ("55 0 * * *", "python -m desk.engine lab-export"),
 ]
