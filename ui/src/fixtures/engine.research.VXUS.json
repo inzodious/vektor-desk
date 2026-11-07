@@ -1,0 +1,16 @@
+{
+ "symbol": "VXUS",
+ "filings": [
+  {
+   "form": "NPORT-P",
+   "filed": "2026-10-29",
+   "report_date": "2026-09-30",
+   "description": "Portfolio holdings, Sep 30, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  }
+ ],
+ "fundamentals": {},
+ "earnings": [],
+ "insiders": [],
+ "signals": []
+}

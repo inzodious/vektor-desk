@@ -11,7 +11,7 @@ Vite + React. Hand-rolled SVG charts, no chart library. Tokens are copied from E
 | `npm run build` | Builds `dist/`, served by the API |
 | `npm run test:e2e` | Playwright on a fixtures preview, desktop 1440 and phone 390 |
 | `npm run fixtures` | Rebuilds the fixtures from a demo API (`DESK_DEMO=1`) with seeded intraday moves |
-| `python scripts/demo_seed.py` | Seeds synthetic proposals, agent runs and a brief into a demo data dir (run with `DESK_DEMO=1 DESK_DATA_DIR=…` before `npm run fixtures`) |
+| `python scripts/demo_seed.py` | Seeds synthetic proposals, agent runs, a brief, research rows (filings, earnings, insiders, FRED), a watched symbol, dossiers and Console questions into a demo data dir (run with `DESK_DEMO=1 DESK_DATA_DIR=…` before `npm run fixtures`) |
 | `npm run screens -- <dir>` | Screens at 1920, 1440, 390 in light and dark (needs a preview on 4318, fixtures on 4319) |
 
 ## Fixtures
@@ -37,4 +37,7 @@ For real shapes, run the API in demo mode (`DESK_DEMO=1`) and use `npm run dev`.
 | `/plan` | 3, 5 | Plan KPIs, drift bullets, rules with desk.yaml version, funds, modelled deposit split with drift after, tax calendar with wash windows |
 | `/decisions` | 4 | Queue of proposal cards, detail with Preflight annunciator, override box, order ticket, sources and history; To place list |
 | `/decisions/journal` | 4 | Stamped ledger, discipline streak, overrides against clean, unmatched trades with Log it |
-| `/decisions/flight`, `/research`, `/lab` | 6 to 11 | Hero and a "lands in phase" card |
+| `/research` | 6 | Dossier list, watchlist and market backdrop; open dossier with verdict, valuation range, thesis and bear case, price against the core fund, triggers, key numbers, filings and sources (`?s=` picks one) |
+| `/research/sources`, `/watchlist`, `/calendar` | 6 | Every cited source by kind; watchlist with add and remove; upcoming earnings, recent filings and insider trades, Treasury yields |
+| Console, symbol search | 6 | Robot button or `?open=console`: history, suggested questions, Tonight and Run now. `/` or the search button finds a symbol and opens its sheet, now with the dossier |
+| `/decisions/flight`, `/lab` | 7 to 11 | Hero and a "lands in phase" card |

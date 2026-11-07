@@ -34,6 +34,8 @@ describe('decisions helpers', () => {
     expect(scoreOf({ scores: { '30d': 12.5 } })).toBe(12.5);
     expect(scoreOf({ scores: { '30d': { value: -4 } } })).toBe(-4);
     expect(scoreOf({ scores: {} })).toBeNull();
+    expect(scoreOf({ scores: { '30D': 7 } })).toBe(7);
+    expect(scoreOf({ scores: { '90D': { usd: -3 } } }, '90D')).toBe(-3);
   });
 
   it('keeps the first sentence of a thesis', () => {

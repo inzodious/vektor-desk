@@ -1,29 +1,40 @@
 {
- "id": "d_20261104130500_654395",
- "created_at": "2026-11-04T13:05:00+00:00",
- "updated_at": "2026-11-04T16:05:00+00:00",
+ "id": "d_20261109130500_0c5779",
+ "created_at": "2026-11-09T13:05:00+00:00",
+ "updated_at": "2026-11-09T13:05:00+00:00",
  "origin": "plan_keeper",
- "run_id": "r-seed-0",
- "kind": "rebalance",
- "title": "Rebalance $40 BND",
- "symbol": "BND",
- "account": "hsa-0002",
- "amount_usd": 40,
+ "run_id": "r-seed-1",
+ "kind": "deposit_route",
+ "title": "Route deposit to $180 VXUS",
+ "symbol": "VXUS",
+ "account": "individual-0001",
+ "amount_usd": 180,
  "shares": null,
- "funding": "cash",
- "thesis": "Top up BND in the HSA.",
+ "funding": "deposit",
+ "thesis": "VXUS is the most under target. Routing part of the next deposit there pulls it back without selling anything.",
  "bear_case": null,
  "invalidation": null,
- "horizon": null,
- "rule_served": null,
- "confidence": 0.5,
- "numbers_used": [],
+ "horizon": "next deposit",
+ "rule_served": "drift-max",
+ "confidence": 0.8,
+ "numbers_used": [
+  {
+   "metric_id": "plan.drift",
+   "scope_id": "VXUS",
+   "unit": "pts",
+   "value": -1.3
+  }
+ ],
  "sources": [],
  "order_ticket": null,
- "skeptic": null,
- "expires_at": "2026-11-11T21:00:00+00:00",
- "status": "dismissed",
- "status_reason": "Too small to bother with",
+ "skeptic": {
+  "at": "2026-11-09T13:05:00+00:00",
+  "counter_case": "Deposit routing with no sale and no tax. Nothing to argue with.",
+  "verdict": "pass"
+ },
+ "expires_at": "2026-11-16T21:00:00+00:00",
+ "status": "proposed",
+ "status_reason": null,
  "snoozed_until": null,
  "override": false,
  "override_reason": null,
@@ -33,25 +44,25 @@
   "engine_version": "0.1.0",
   "lights": [
    {
-    "after": null,
-    "before": null,
-    "detail": "Nothing to trade.",
+    "after": 14.6157,
+    "before": 13.6782,
+    "detail": "VXUS goes from 13.7% to 14.6%; the largest holding would be 58.2%.",
     "id": "concentration",
     "label": "Concentration",
     "status": "ok"
    },
    {
-    "after": null,
-    "before": null,
-    "detail": "Nothing to trade.",
+    "after": 1.7887,
+    "before": 1.3218,
+    "detail": "Largest drift stays near 1.8 points.",
     "id": "drift_after",
     "label": "Drift after",
     "status": "ok"
    },
    {
-    "after": null,
-    "before": null,
-    "detail": "Nothing to trade.",
+    "after": 0,
+    "before": 0,
+    "detail": "Waits for the 2026-12-01 deposit.",
     "id": "funding",
     "label": "Funding",
     "status": "ok"
@@ -59,7 +70,8 @@
    {
     "after": null,
     "before": null,
-    "detail": "Nothing to trade.",
+    "clears": null,
+    "detail": "No loss sale of this symbol in the last 30 days.",
     "id": "wash_sales",
     "label": "Wash sales",
     "status": "ok"
@@ -67,15 +79,15 @@
    {
     "after": null,
     "before": null,
-    "detail": "Nothing to trade.",
+    "detail": "Opens a new lot at about $62.95.",
     "id": "lots_tax",
     "label": "Lots and tax",
     "status": "ok"
    },
    {
-    "after": null,
-    "before": null,
-    "detail": "Nothing to trade.",
+    "after": 3,
+    "before": 3,
+    "detail": "All 3 rules hold.",
     "id": "plan_rules",
     "label": "Plan rules",
     "status": "ok"
@@ -83,25 +95,25 @@
   ],
   "metrics": [
    {
-    "after": 16393.49,
+    "after": 16573.49,
     "before": 16393.49,
     "flag": "ok",
     "metric_id": "value.market"
    },
    {
-    "after": 58.8504,
+    "after": 58.2113,
     "before": 58.8504,
     "flag": "ok",
     "metric_id": "risk.top1"
    },
    {
-    "after": 0.4816,
+    "after": 0.4764,
     "before": 0.4816,
     "flag": "ok",
     "metric_id": "plan.single_stock"
    },
    {
-    "after": 1.3218,
+    "after": 1.7887,
     "before": 1.3218,
     "flag": "ok",
     "metric_id": "plan.drift_max"
@@ -125,7 +137,7 @@
     "metric_id": "margin.call_drop"
    },
    {
-    "after": 0.8662,
+    "after": 0.8568,
     "before": 0.8662,
     "flag": "ok",
     "metric_id": "cash.share"
@@ -134,41 +146,45 @@
   "quality": "ok",
   "status": "clear",
   "tax": {
+   "lot_method": "highest_cost",
+   "lots": [],
    "wash_clear_date": null
   },
   "trade": {
-   "account": "hsa-0002",
-   "amount_usd": null,
-   "funding": "cash",
-   "kind": "rebalance",
+   "account": "individual-0001",
+   "amount_usd": 180,
+   "funding": "deposit",
+   "kind": "deposit_route",
    "lot_method": "highest_cost",
-   "price": 77.35,
-   "shares": null,
-   "side": null,
-   "symbol": "BND"
+   "price": 62.95,
+   "shares": 2.859412,
+   "side": "buy",
+   "symbol": "VXUS"
   }
  },
- "preflight_at": "2026-11-04T13:05:00+00:00",
+ "preflight_at": "2026-11-09T13:05:00+00:00",
  "tax_impact": {
+  "lot_method": "highest_cost",
+  "lots": [],
   "wash_clear_date": null
  },
  "profile_version": 1,
  "rules_version": 1,
- "decided_at": "2026-11-04T16:05:00+00:00",
+ "decided_at": null,
  "placed_at": null,
  "filled_at": null,
  "fill": null,
  "activity_id": null,
- "decision": "dismissed",
+ "decision": null,
  "events": [
   {
-   "at": "2026-11-04T13:05:00+00:00",
+   "at": "2026-11-09T13:05:00+00:00",
    "event": "proposed",
    "reason": null,
    "detail": null
   },
   {
-   "at": "2026-11-04T13:05:00+00:00",
+   "at": "2026-11-09T13:05:00+00:00",
    "event": "preflight",
    "reason": null,
    "detail": {
@@ -176,10 +192,12 @@
    }
   },
   {
-   "at": "2026-11-04T16:05:00+00:00",
-   "event": "dismissed",
-   "reason": "Too small to bother with",
-   "detail": null
+   "at": "2026-11-09T13:05:00+00:00",
+   "event": "skeptic",
+   "reason": null,
+   "detail": {
+    "verdict": "pass"
+   }
   }
  ]
 }

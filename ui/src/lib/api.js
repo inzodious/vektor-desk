@@ -40,6 +40,7 @@ export function useApi(path, { every } = {}) {
   const reload = useCallback(() => setNonce((n) => n + 1), []);
 
   useEffect(() => {
+    if (!path) return undefined;
     const ctl = new AbortController();
     if (!first.current) setState((s) => ({ ...s, loading: true }));
     first.current = false;
@@ -51,14 +52,14 @@ export function useApi(path, { every } = {}) {
     return () => ctl.abort();
   }, [path, nonce]);
 
-  const ms = typeof every === 'function' ? every(state.data) : every;
+  const ms = !path ? 0 : typeof every === 'function' ? every(state.data) : every;
   useEffect(() => {
     if (!ms) return undefined;
     const id = setInterval(reload, ms);
     return () => clearInterval(id);
   }, [ms, reload]);
 
-  return { ...state, reload };
+  return path ? { ...state, reload } : { data: null, error: null, loading: false, reload };
 }
 
 export async function postJson(path, body = {}, { method = 'POST' } = {}) {

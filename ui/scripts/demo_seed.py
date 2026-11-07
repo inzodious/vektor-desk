@@ -212,3 +212,188 @@ with store.db(cfg) as conn:
         (last, "plan_keeper", "2026-11-06", "seed", "1", BRIEF, "{}", "2026-11-06T22:33:18+00:00"),
     )
 print("brief run", last)
+
+# ---------- research ----------
+import math  # noqa: E402
+import random  # noqa: E402
+import sqlite3  # noqa: E402
+from datetime import date, timedelta  # noqa: E402
+
+EDGAR = "https://www.sec.gov/edgar/search/"
+FRED = "https://fred.stlouisfed.org/series/"
+rng = random.Random(6)  # noqa: S311
+
+FILINGS = [
+    ("ACME", "8-K", "2026-11-03", "2026-11-03", "Launch schedule update, synthetic"),
+    ("ACME", "10-Q", "2026-10-30", "2026-09-30", "Quarterly report, Q3, synthetic"),
+    ("ACME", "4", "2026-10-21", "2026-10-17", "Director sale under a 10b5-1 plan, synthetic"),
+    ("ACME", "10-Q", "2026-07-31", "2026-06-30", "Quarterly report, Q2, synthetic"),
+    ("ACME", "10-K", "2026-02-27", "2025-12-31", "Annual report, synthetic"),
+    ("NOVA", "S-1/A", "2026-10-28", None, "Follow-on offering amendment, synthetic"),
+    ("NOVA", "10-Q", "2026-10-24", "2026-09-30", "Quarterly report, Q3, synthetic"),
+    ("FTEC", "NPORT-P", "2026-11-04", "2026-09-30", "Portfolio holdings, Sep 30, synthetic"),
+    ("FTEC", "497K", "2026-09-26", None, "Summary prospectus, synthetic"),
+    ("VXUS", "NPORT-P", "2026-10-29", "2026-09-30", "Portfolio holdings, Sep 30, synthetic"),
+]
+FACTS = []
+for sym, base, margin, ops, shares in (("ACME", 410e6, 0.31, 0.06, 182e6), ("NOVA", 96e6, 0.18, -0.22, 74e6)):
+    for k, fy in enumerate((2023, 2024, 2025)):
+        rev = base * (1.24**k)
+        FACTS += [
+            (sym, "revenue", f"{fy}-01-01", f"{fy}-12-31", fy, "FY", "10-K", f"{fy + 1}-02-27", rev, "USD"),
+            (sym, "gross_profit", f"{fy}-01-01", f"{fy}-12-31", fy, "FY", "10-K", f"{fy + 1}-02-27", rev * (margin + 0.02 * k), "USD"),
+            (sym, "operating_income", f"{fy}-01-01", f"{fy}-12-31", fy, "FY", "10-K", f"{fy + 1}-02-27", rev * (ops + 0.03 * k), "USD"),
+            (sym, "net_income", f"{fy}-01-01", f"{fy}-12-31", fy, "FY", "10-K", f"{fy + 1}-02-27", rev * (ops + 0.03 * k - 0.04), "USD"),
+        ]
+    for q, end in enumerate(("2025-09-30", "2025-12-31", "2026-03-31", "2026-06-30", "2026-09-30")):
+        FACTS.append((sym, "shares_outstanding", None, end, 2025 + (q > 1), f"Q{q % 4 + 1}", "10-Q", end, shares * (1.012**q), "shares"))
+EARNINGS = [
+    ("ACME", "2026-11-12", "amc", 3, 2026, 0.21, None, 152e6, None),
+    ("ACME", "2026-07-30", "amc", 2, 2026, 0.16, 0.19, 131e6, 136e6),
+    ("ACME", "2026-04-29", "amc", 1, 2026, 0.12, 0.11, 118e6, 117e6),
+    ("NOVA", "2026-11-18", "bmo", 3, 2026, -0.14, None, 33e6, None),
+    ("NOVA", "2026-08-06", "bmo", 2, 2026, -0.18, -0.15, 29e6, 31e6),
+]
+INSIDERS = [
+    ("ACME", "Synthetic Director A", "2026-10-21", "2026-10-17", "S", -12000, 88000, 3.14),
+    ("ACME", "Synthetic Officer B", "2026-09-12", "2026-09-10", "P", 3000, 41000, 3.41),
+    ("ACME", "Synthetic Officer C", "2026-08-20", "2026-08-18", "M", 5000, 60000, 0.95),
+    ("NOVA", "Synthetic CEO", "2026-10-08", "2026-10-06", "P", 20000, 1250000, 31.2),
+]
+
+with sqlite3.connect(cfg.desk_db) as conn:
+    conn.executemany(
+        "INSERT OR REPLACE INTO filings (accession, symbol, cik, form, filed, report_date, description, url) VALUES (?,?,?,?,?,?,?,?)",
+        [(f"0000000000-26-{k:06d}", s, 0, f, d, r, t, EDGAR) for k, (s, f, d, r, t) in enumerate(FILINGS)],
+    )
+    conn.executemany("INSERT INTO fundamentals VALUES (?,?,?,?,?,?,?,?,?,?)", FACTS)
+    conn.executemany("INSERT OR REPLACE INTO earnings VALUES (?,?,?,?,?,?,?,?,?)", EARNINGS)
+    conn.executemany("INSERT OR IGNORE INTO insider_trades VALUES (?,?,?,?,?,?,?,?)", INSIDERS)
+    conn.execute("INSERT OR REPLACE INTO market_symbols (symbol, role, priority, added_at) VALUES ('NOVA', 'watch', 5, '2026-10-02T14:00:00+00:00')")
+    conn.executemany(
+        "INSERT OR REPLACE INTO sym_profiles (symbol, name, industry, sector, fetched_at) VALUES (?,?,?,?,?)",
+        [
+            ("ACME", "Acme Orbital (synthetic)", "Aerospace", "Industrials", "2026-11-06"),
+            ("NOVA", "Nova Fission (synthetic)", "Utilities", "Utilities", "2026-11-06"),
+        ],
+    )
+    day, px, rows = date(2024, 11, 7), 14.0, []
+    while day <= date(2026, 11, 6):
+        if day.weekday() < 5:
+            px *= math.exp(rng.gauss(0.0006, 0.032))
+            rows.append(("NOVA", day.isoformat(), round(px, 2), round(px, 2), "seed"))
+        day += timedelta(days=1)
+    conn.executemany("INSERT OR REPLACE INTO prices_daily VALUES (?,?,?,?,?)", rows)
+    macro = []
+    for series, start, drift, vol in (
+        ("DGS3MO", 4.6, -0.0012, 0.01),
+        ("DGS2", 4.1, -0.0008, 0.03),
+        ("DGS10", 4.3, -0.0002, 0.03),
+        ("BAMLH0A0HYM2", 3.4, -0.0005, 0.04),
+        ("VIXCLS", 17.0, 0, 0.6),
+    ):
+        day, v = date(2025, 11, 3), start
+        while day <= date(2026, 11, 6):
+            if day.weekday() < 5:
+                v = max(0.1, v + drift + rng.gauss(0, vol) - (0.02 * (v - start) if series == "VIXCLS" else 0))
+                macro.append((series, day.isoformat(), round(v, 2)))
+            day += timedelta(days=1)
+    for k in range(13):
+        m = date(2025 + (10 + k) // 12, (10 + k) % 12 + 1, 1)
+        macro.append(("CPIAUCSL", m.isoformat(), round(318.0 * (1.0025**k), 3)))
+    conn.executemany("INSERT OR REPLACE INTO macro_daily VALUES (?,?,?)", macro)
+print("research rows", len(FILINGS), len(FACTS), len(EARNINGS), len(INSIDERS), len(macro))
+
+# ---------- dossiers and console ----------
+DOSSIERS = [
+    (
+        "FTEC",
+        "2026-11-05T06:12:00+00:00",
+        {
+            "symbol": "FTEC",
+            "verdict": "hold",
+            "thesis": (
+                "FTEC is the plan's tech tilt at 20% of the mix. It tracks the broad US tech index for 0.084% a year, "
+                "and the plan already caps it so one sector can't run the portfolio."
+            ),
+            "bear_case": (
+                "The top three holdings are 45% of the fund. A bad quarter for any one of them moves FTEC far more than the S&P 500, "
+                "and it overlaps a third with the core fund."
+            ),
+            "valuation_range": {"low": 24, "high": 35, "basis": "forward P/E of the fund", "now": 32},
+            "what_would_change": "Top three weights pass 50%.\nForward P/E above 35x.\nThe plan drops the tech tilt.",
+            "changes_since_last": "Top three weight is up 2 points since the June holdings.",
+            "sources": [
+                {"url": EDGAR, "title": "N-PORT holdings, Sep 30 (synthetic) · SEC EDGAR", "date": "2026-11-04"},
+                {"url": f"{FRED}DGS10", "title": "10-year Treasury yield · FRED", "date": "2026-11-05"},
+                {"url": "https://example.com/synthetic/sector-recap", "title": "Sector earnings recap (synthetic)", "date": "2026-11-02"},
+                {"url": "note:2026-09-12", "title": "Your note: keep the tilt at 20%, no higher", "date": "2026-09-12"},
+            ],
+        },
+    ),
+    (
+        "ACME",
+        "2026-11-04T06:07:00+00:00",
+        {
+            "symbol": "ACME",
+            "verdict": "avoid",
+            "thesis": "ACME grew revenue 24% a year for three years and turned an operating profit in 2025. The launch backlog is two years deep.",
+            "bear_case": (
+                "It is a single stock outside the plan, share count is up 5% in a year, and a director sold under a 10b5-1 plan last month. "
+                "One launch scrub resets the story."
+            ),
+            "valuation_range": {"low": 2.4, "high": 4.2, "basis": "price per share, $", "now": None},
+            "what_would_change": "Two clean launches in a row.\nShare count stops growing.\nThe plan makes room for a satellite sleeve.",
+            "changes_since_last": None,
+            "sources": [
+                {"url": EDGAR, "title": "10-Q, Q3 (synthetic) · SEC EDGAR", "date": "2026-10-30"},
+                {"url": EDGAR, "title": "Form 4, director sale (synthetic) · SEC EDGAR", "date": "2026-10-21"},
+                {"url": "https://example.com/synthetic/launch-tracker", "title": "Launch tracker (synthetic)", "date": "2026-11-03"},
+            ],
+        },
+    ),
+    (
+        "NOVA",
+        "2026-10-29T06:20:00+00:00",
+        {
+            "symbol": "NOVA",
+            "verdict": "watch",
+            "thesis": "NOVA is the watchlist's nuclear theme pick. The CEO bought $624K of stock in October and revenue grew 24% last year.",
+            "bear_case": "It still loses money, a follow-on offering is on file, and it would be a new single stock, which the plan rules out.",
+            "valuation_range": {"low": 28, "high": 44, "basis": "price per share, $", "now": None},
+            "what_would_change": "Price under $28 with the offering done.\nFirst operating profit.",
+            "changes_since_last": "New S-1/A on file since the last look.",
+            "sources": [{"url": EDGAR, "title": "S-1/A (synthetic) · SEC EDGAR", "date": "2026-10-28"}],
+        },
+    ),
+]
+
+with store.db(cfg) as conn:
+    research_run = conn.execute("SELECT id FROM agent_runs WHERE desk='research' ORDER BY id DESC LIMIT 1").fetchone()[0]
+for sym, _created, body in DOSSIERS:
+    store.save_dossier(cfg, sym, research_run, json.dumps(body, sort_keys=True))
+with store.db(cfg) as conn:
+    for sym, created, _ in DOSSIERS:
+        conn.execute("UPDATE agent_dossiers SET created_at=? WHERE symbol=?", (created, sym))
+
+ASKS = [
+    (
+        "tax",
+        "Why is the tax desk quiet about ACME?",
+        None,
+        "done",
+        "2026-11-06T01:04:00+00:00",
+        "The ACME position is $79, too small to clear the $250 harvest threshold even at a full loss. The desk speaks up once a lot can clear it.",
+    ),
+    ("research", "Deep dive on NOVA for the nuclear theme", "NOVA", "queued", None, None),
+]
+for desk, q, sym, status, done_at, answer in ASKS:
+    rid = store.add_request(cfg, desk, q, symbol=sym)
+    if status == "done":
+        store.finish_request(cfg, rid, "done", run_id=research_run, answer=answer)
+        with store.db(cfg) as conn:
+            conn.execute("UPDATE agent_requests SET created_at=?, started_at=?, finished_at=? WHERE id=?", ("2026-11-05T21:40:00+00:00", done_at, done_at, rid))
+    else:
+        with store.db(cfg) as conn:
+            conn.execute("UPDATE agent_requests SET created_at=? WHERE id=?", ("2026-11-07T12:50:00+00:00", rid))
+print("dossiers", len(DOSSIERS), "asks", len(ASKS))

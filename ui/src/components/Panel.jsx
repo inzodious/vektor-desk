@@ -18,7 +18,7 @@ function PanelBody({ open, onClose, kind = 'drawer', title, sub, crumbs, head, c
     back.current = document.activeElement;
     const id = requestAnimationFrame(() => {
       setOn(true);
-      box.current?.querySelector('[data-close]')?.focus({ preventScroll: true });
+      (box.current?.querySelector('[data-autofocus]') || box.current?.querySelector('[data-close]'))?.focus({ preventScroll: true });
     });
     return () => {
       cancelAnimationFrame(id);

@@ -1,6 +1,11 @@
 export const ROUTES = [
   { path: '/', h1: 'Bridge' },
   { path: '/research', h1: 'Research' },
+  { path: '/research?s=ACME', h1: 'Research' },
+  { path: '/research/sources', h1: 'Research' },
+  { path: '/research/watchlist', h1: 'Research' },
+  { path: '/research/calendar', h1: 'Research' },
+  { path: '/?open=console', h1: 'Bridge' },
   { path: '/decisions', h1: 'Decisions' },
   { path: '/decisions/journal', h1: 'Journal' },
   { path: '/decisions/flight', h1: 'Flight record' },

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { Panel } from '../components/Panel.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { LineChart } from '../components/LineChart.jsx';
@@ -6,6 +7,8 @@ import { accountLabel, priceStatus, useLive } from './context.js';
 import { useApi } from '../lib/api.js';
 import { count, etStamp, pct, px, usd } from '../lib/format.js';
 import { dayLabel, periodStart } from '../lib/charts.js';
+import { useConsole } from '../research/consoleContext.js';
+import { freshness, verdictOf } from '../lib/research.js';
 
 function PriceHistory({ symbol, row, lots }) {
   const last = new Date().toISOString().slice(0, 10);
@@ -40,7 +43,60 @@ function PriceHistory({ symbol, row, lots }) {
   );
 }
 
-function SheetBody({ symbol }) {
+// ---------- dossier ----------
+function DossierBit({ symbol, onClose }) {
+  const api = useApi(`/api/agents/dossiers/${encodeURIComponent(symbol)}`);
+  const { openConsole } = useConsole();
+  const entry = api.data?.dossier ? api.data : null;
+  const v = verdictOf(entry);
+  const f = entry ? freshness(entry.created_at) : null;
+  return (
+    <div data-testid="sheet-dossier">
+      <div className="card-head" style={{ marginBottom: 4 }}>
+        <span className="kicker">Dossier</span>
+        <span className="acts">
+          {v ? <span className={`chip ${v.tone}`}>{v.t}</span> : null}
+          {f ? <span className={`chip ${f.tone}`}>{f.t}</span> : null}
+        </span>
+      </div>
+      {entry ? (
+        <div className="bb">
+          <div className="bull">
+            <b>Thesis</b>
+            {entry.dossier.thesis}
+          </div>
+          <div className="bear">
+            <b>Bear case</b>
+            {entry.dossier.bear_case}
+          </div>
+        </div>
+      ) : (
+        <p className="empty-hint">{api.loading ? 'Looking for a dossier…' : `No dossier on ${symbol} yet.`}</p>
+      )}
+      <div className="sheet-acts">
+        {entry ? (
+          <Link className="btn sm ghost" to={`/research?s=${encodeURIComponent(symbol)}`} onClick={onClose}>
+            <Icon name="book" />
+            Open the dossier
+          </Link>
+        ) : null}
+        <button
+          className="btn sm ghost"
+          type="button"
+          onClick={() => {
+            onClose();
+            openConsole({ desk: 'research', symbol, question: entry ? `Refresh the ${symbol} dossier` : `Deep dive on ${symbol}` });
+          }}
+        >
+          <Icon name="telescope" />
+          {entry ? 'Ask for a refresh' : 'Request a deep dive'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SheetBody({ symbol, onClose }) {
   const ctx = useLive();
   const row = ctx.symbols.find((s) => s.symbol === symbol);
   const cost = ctx.cost[symbol];
@@ -52,12 +108,19 @@ function SheetBody({ symbol }) {
 
   if (!row) {
     return (
-      <div className="note">
-        <Icon name="eye" />
-        <span>
-          <b style={{ color: 'var(--ink)' }}>Not held.</b> {symbol} isn&apos;t in the latest holdings. Watchlist and research for it land in phase 6.
-        </span>
-      </div>
+      <>
+        <div className="note">
+          <Icon name="eye" />
+          <span>
+            <b style={{ color: 'var(--ink)' }}>Not held.</b> {symbol} isn&apos;t in the latest holdings, so this shows closes and research only.
+          </span>
+        </div>
+        <div>
+          <span className="kicker">Price, 1 year</span>
+          <PriceHistory symbol={symbol} row={null} lots={[]} />
+        </div>
+        <DossierBit symbol={symbol} onClose={onClose} />
+      </>
     );
   }
 
@@ -177,6 +240,7 @@ function SheetBody({ symbol }) {
           <p className="empty-hint">No lot export yet. Drop one in the desk inbox and lots show here.</p>
         )}
       </div>
+      <DossierBit symbol={symbol} onClose={onClose} />
       {ctx.live?.as_of ? <p className="muted" style={{ fontSize: 11.5 }}>Quotes as of {etStamp(ctx.live.as_of)}</p> : null}
     </>
   );
@@ -202,7 +266,7 @@ export function SymbolSheet({ symbol, onClose }) {
       sub={name}
       crumbs={[{ label: row ? 'Holding' : 'Symbol' }, ...(row ? [{ label: row.accounts.map((a) => accountLabel(a.account)).join(' + ') }] : [])]}
     >
-      {symbol ? <SheetBody symbol={symbol} /> : null}
+      {symbol ? <SheetBody symbol={symbol} onClose={onClose} /> : null}
     </Panel>
   );
 }

@@ -1,0 +1,36 @@
+{
+ "symbol": "ACME",
+ "run_id": 3,
+ "created_at": "2026-11-04T06:07:00+00:00",
+ "dossier": {
+  "bear_case": "It is a single stock outside the plan, share count is up 5% in a year, and a director sold under a 10b5-1 plan last month. One launch scrub resets the story.",
+  "changes_since_last": null,
+  "sources": [
+   {
+    "date": "2026-10-30",
+    "title": "10-Q, Q3 (synthetic) · SEC EDGAR",
+    "url": "https://www.sec.gov/edgar/search/"
+   },
+   {
+    "date": "2026-10-21",
+    "title": "Form 4, director sale (synthetic) · SEC EDGAR",
+    "url": "https://www.sec.gov/edgar/search/"
+   },
+   {
+    "date": "2026-11-03",
+    "title": "Launch tracker (synthetic)",
+    "url": "https://example.com/synthetic/launch-tracker"
+   }
+  ],
+  "symbol": "ACME",
+  "thesis": "ACME grew revenue 24% a year for three years and turned an operating profit in 2025. The launch backlog is two years deep.",
+  "valuation_range": {
+   "basis": "price per share, $",
+   "high": 4.2,
+   "low": 2.4,
+   "now": null
+  },
+  "verdict": "avoid",
+  "what_would_change": "Two clean launches in a row.\nShare count stops growing.\nThe plan makes room for a satellite sleeve."
+ }
+}

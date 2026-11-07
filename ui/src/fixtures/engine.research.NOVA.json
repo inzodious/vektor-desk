@@ -1,0 +1,336 @@
+{
+ "symbol": "NOVA",
+ "filings": [
+  {
+   "form": "S-1/A",
+   "filed": "2026-10-28",
+   "report_date": null,
+   "description": "Follow-on offering amendment, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  },
+  {
+   "form": "10-Q",
+   "filed": "2026-10-24",
+   "report_date": "2026-09-30",
+   "description": "Quarterly report, Q3, synthetic",
+   "url": "https://www.sec.gov/edgar/search/"
+  }
+ ],
+ "fundamentals": {
+  "gross_profit": [
+   {
+    "start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 32474112,
+    "unit": "USD"
+   },
+   {
+    "start": "2024-01-01",
+    "period_end": "2024-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 23807999.999999996,
+    "unit": "USD"
+   },
+   {
+    "start": "2023-01-01",
+    "period_end": "2023-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 17280000,
+    "unit": "USD"
+   }
+  ],
+  "net_income": [
+   {
+    "start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": -29521920,
+    "unit": "USD"
+   },
+   {
+    "start": "2024-01-01",
+    "period_end": "2024-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": -27379200,
+    "unit": "USD"
+   },
+   {
+    "start": "2023-01-01",
+    "period_end": "2023-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": -24960000,
+    "unit": "USD"
+   }
+  ],
+  "operating_income": [
+   {
+    "start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": -23617536,
+    "unit": "USD"
+   },
+   {
+    "start": "2024-01-01",
+    "period_end": "2024-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": -22617600,
+    "unit": "USD"
+   },
+   {
+    "start": "2023-01-01",
+    "period_end": "2023-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": -21120000,
+    "unit": "USD"
+   }
+  ],
+  "revenue": [
+   {
+    "start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 147609600,
+    "unit": "USD"
+   },
+   {
+    "start": "2024-01-01",
+    "period_end": "2024-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 119040000,
+    "unit": "USD"
+   },
+   {
+    "start": "2023-01-01",
+    "period_end": "2023-12-31",
+    "fp": "FY",
+    "form": "10-K",
+    "value": 96000000,
+    "unit": "USD"
+   }
+  ],
+  "shares_outstanding": [
+   {
+    "start": null,
+    "period_end": "2026-09-30",
+    "fp": "Q1",
+    "form": "10-Q",
+    "value": 77616449.02246399,
+    "unit": "shares"
+   },
+   {
+    "start": null,
+    "period_end": "2026-06-30",
+    "fp": "Q4",
+    "form": "10-Q",
+    "value": 76696095.872,
+    "unit": "shares"
+   },
+   {
+    "start": null,
+    "period_end": "2026-03-31",
+    "fp": "Q3",
+    "form": "10-Q",
+    "value": 75786656,
+    "unit": "shares"
+   },
+   {
+    "start": null,
+    "period_end": "2025-12-31",
+    "fp": "Q2",
+    "form": "10-Q",
+    "value": 74888000,
+    "unit": "shares"
+   },
+   {
+    "start": null,
+    "period_end": "2025-09-30",
+    "fp": "Q1",
+    "form": "10-Q",
+    "value": 74000000,
+    "unit": "shares"
+   }
+  ]
+ },
+ "earnings": [
+  {
+   "symbol": "NOVA",
+   "date": "2026-11-18",
+   "hour": "bmo",
+   "quarter": 3,
+   "year": 2026,
+   "eps_estimate": -0.14,
+   "eps_actual": null,
+   "revenue_estimate": 33000000,
+   "revenue_actual": null
+  },
+  {
+   "symbol": "NOVA",
+   "date": "2026-08-06",
+   "hour": "bmo",
+   "quarter": 2,
+   "year": 2026,
+   "eps_estimate": -0.18,
+   "eps_actual": -0.15,
+   "revenue_estimate": 29000000,
+   "revenue_actual": 31000000
+  }
+ ],
+ "insiders": [
+  {
+   "name": "Synthetic CEO",
+   "filing_date": "2026-10-08",
+   "txn_date": "2026-10-06",
+   "code": "P",
+   "change": 20000,
+   "shares_after": 1250000,
+   "price": 31.2
+  }
+ ],
+ "signals": [
+  {
+   "metric_id": "fund.gross_margin",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "FY",
+   "as_of": "2026-11-06",
+   "value": 22,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fund.net_margin",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "FY",
+   "as_of": "2026-11-06",
+   "value": -20,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fund.operating_margin",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "FY",
+   "as_of": "2026-11-06",
+   "value": -16,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "fund.revenue_growth",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "FY",
+   "as_of": "2026-11-06",
+   "value": 24,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.dilution",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "1Y",
+   "as_of": "2026-11-06",
+   "value": 4.8871,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.earnings_days",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 12,
+   "unit": "days",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.earnings_since",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 92,
+   "unit": "days",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.eps_surprise",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 16.6667,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.insider_buyers",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": 1,
+   "unit": "count",
+   "n_obs": 1,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.insider_net",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "90D",
+   "as_of": "2026-11-06",
+   "value": 624000,
+   "unit": "usd",
+   "n_obs": 1,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  },
+  {
+   "metric_id": "sig.revenue_surprise",
+   "scope": "holding",
+   "scope_id": "NOVA",
+   "window": "now",
+   "as_of": "2026-11-06",
+   "value": 6.8966,
+   "unit": "pct",
+   "n_obs": null,
+   "quality": "ok",
+   "engine_version": "0.1.0"
+  }
+ ]
+}
