@@ -22,7 +22,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
 1. **Tailscale.** In the admin console, go to Access controls and add `"tag:desk": ["autogroup:admin"]` to `tagOwners`, beside `tag:starlite`. Then go to Settings → Keys → Generate auth key. Leave reusable off and give it the tag `tag:desk`. Tagged devices don't expire, so the node stays signed in.
 2. **Porkbun.** Go to Account → API Access, create a key, and keep both the API key and the secret. Then go to Domain Management → `escape-vektor.com` → Details and turn on **API Access** for that domain.
 3. **Firestore reader.**
-   - In the Google Cloud console for Escape Vektor's Firebase project, go to IAM & Admin → Service Accounts → Create service account and name it `vektor-desk-reader`.
+   - In the Google Cloud console, first switch the project picker at the top to Escape Vektor's Firebase project (`life-stack`), not a new project. Then go to IAM & Admin → Service Accounts → Create service account and name it `vektor-desk-reader`.
    - Give it the role **Cloud Datastore Viewer** and nothing else.
    - Then go to Keys → Add key → JSON.
    - Copy it to the NAS with `scp vektor-desk-reader.json truenas_admin@192.168.0.113:/tmp/`. Once it's in your password manager, delete it from your PC.
@@ -68,7 +68,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
     | `check` line | Good looks like | If not |
     |---|---|---|
     | Claude | `signed in, answered: OK` | Redo step 4. Then run the setup script again, answer "n" to keeping `desk.env`, and run `midclt call app.redeploy vektor-desk` |
-    | Firestore | `read access ok, N tables` | Check the role in step 3 and the project ID and UID in `settings.env` |
+    | Firestore | `read access ok, N tables` | A 403 means the account has no role in the Firebase project. If it was made in another project, grant its `client_email` the Cloud Datastore Viewer role under IAM in the Firebase project. Then check the project ID and UID in `settings.env` |
     | Address | `match` | Redo step 7 with the printed address, then wait up to 10 minutes |
     | Phone alerts | `ops: sent`, and the alert arrives in `desk-ops` | Check that Tailscale is on and the server in step 9 has `:8443` |
     | Certificate | `certificate obtained` | Check that Porkbun API Access is on for the domain (step 2) |
@@ -90,4 +90,5 @@ Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change 
 |---|---|
 | RAM goes to 32 GB | In Apps → `vektor-desk` → Edit, raise cron to `2g`. When the lab is switched on, raise it to `8g`, `cpus: 8` and `DESK_LAB_WORKERS` 8 (the notes in `compose.yaml` say where) |
 | 30 days before the Claude token expires | Settings and a `desk-ops` alert flag it. Run `claude setup-token`, run the setup script again, answer "n" to keeping `desk.env` and `settings.env`, then run `midclt call app.redeploy vektor-desk` |
+| The morning after the first nightly backup | `bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh restore-test`: it should end with "Restore drill passed" |
 | A market key arrives | Run the setup script again and answer "n" to keeping `desk.env` |

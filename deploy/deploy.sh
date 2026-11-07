@@ -6,6 +6,8 @@
 #                      otherwise, waits out a running job, and doesn't retry a commit that failed
 #   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
 #   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
+#   deploy.sh restore-test  restore drill: unpacks the newest backup into a scratch folder and checks every database
+#                      opens, passes its integrity check and has the expected tables; the live data isn't touched
 #   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS record against the tailnet address,
 #                      a test phone alert
 # Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
@@ -124,6 +126,24 @@ backup() {
 }
 
 # ---- Commands ----
+
+restore_test() {
+  local latest scratch=$ROOT/restore-test rc=0
+  latest=$(find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -n 1 | cut -d' ' -f2-)
+  [ -n "$latest" ] || die "there are no backups in $BACKUPS yet; run deploy.sh backup first"
+  rm -rf "$scratch"
+  mkdir -p "$scratch"
+  tar -xzf "$latest" -C "$scratch" || die "couldn't unpack $latest"
+  chown -R 568:568 "$scratch"
+  echo "Restoring $(basename "$latest") into $scratch"
+  docker run --rm --network none --user 568:568 -v "$scratch:/restore" vektor-desk:local python -m desk.backup --verify /restore || rc=$?
+  rm -rf "$scratch"
+  if [ "$rc" -eq 0 ]; then
+    log "Restore drill passed: $(basename "$latest")"
+  else
+    die "the restore drill failed for $(basename "$latest"); see the problems above"
+  fi
+}
 
 update_checkout() {
   [ -d "$SRC/.git" ] || die "there's no checkout in $SRC (docs/setup.md, step 5)"
@@ -306,9 +326,10 @@ main() {
       ;;
     auto) auto ;;
     status) status ;;
+    restore-test) restore_test ;;
     check) check ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | check]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check]" >&2
       exit 2
       ;;
   esac
