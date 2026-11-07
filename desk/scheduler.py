@@ -89,9 +89,13 @@ def package_jobs(only: list[str] | None = None) -> list[Job]:
     jobs = []
     for pkg, mod in seams("jobs", only).items():
         for i, entry in enumerate(getattr(mod, "JOBS", [])):
-            timing, command = entry[0], entry[1]
+            if isinstance(entry, dict):
+                timing, command, name = entry["schedule"], entry["command"], entry.get("name")
+            else:
+                timing, command, name = entry[0], entry[1], None
             cmd = shlex.split(command) if isinstance(command, str) else list(command)
-            held = ["python", "-m", "desk.runlock", "--hold", lock_name(pkg, cmd), "--", *cmd]
+            lock = re.sub(r"[^A-Za-z0-9_-]+", "-", f"{pkg}-{name}")[:60] if name else lock_name(pkg, cmd)
+            held = ["python", "-m", "desk.runlock", "--hold", lock, "--", *cmd]
             jobs.append(make_job(f"{pkg}.jobs[{i}]", timing, held))
     return jobs
 

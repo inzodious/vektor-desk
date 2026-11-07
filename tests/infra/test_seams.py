@@ -30,7 +30,10 @@ FILES = {
             conn.execute("INSERT INTO alpha_things (name) SELECT 'seed' WHERE NOT EXISTS (SELECT 1 FROM alpha_things)")
     """,
     "alpha/jobs.py": """
-        JOBS = [("15 8,17 * * *", "python -m desk.alpha refresh --fast")]
+        JOBS = [
+            ("15 8,17 * * *", "python -m desk.alpha refresh --fast"),
+            {"name": "sync", "schedule": "10 8,17 * * *", "command": "python -m desk.alpha sync"},
+        ]
     """,
     "beta/__init__.py": "",
     "beta/schema.py": """
@@ -85,7 +88,8 @@ def test_app_includes_package_routers_and_applies_schemas(fake_packages, cfg):
 
 
 def test_package_jobs_run_under_a_run_lock(fake_packages):
-    (job,) = package_jobs(fake_packages)
+    job, named = package_jobs(fake_packages)
+    assert named.command[4] == "alpha-sync" and named.due(__import__("datetime").datetime(2026, 11, 9, 8, 10))
     assert job.line == "alpha.jobs[0]"
     assert job.command[:5] == ["python", "-m", "desk.runlock", "--hold", "alpha-alpha-refresh"]
     assert job.command[6:] == ["python", "-m", "desk.alpha", "refresh", "--fast"]
