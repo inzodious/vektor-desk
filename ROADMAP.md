@@ -34,24 +34,25 @@ Concept's success measure is that December's loss-sale plan comes from the desk.
 
 ### 0. Planning docs 🚧
 
-- [ ] README, ROADMAP, project plan, repo conventions (Lead)
-- [ ] Concept: purpose, areas, loops, tiers (Concept)
-- [ ] Architecture: stack, network, mirror, storage, secrets, alerts (Infrastructure)
-- [ ] Statistics: metric catalogue, methods, engine output contract (Statistics)
-- [ ] Agents: desks, schedules, tools, guardrails, usage budget, proposal record (AI agents)
+- [ ] README, ROADMAP, project plan, repo conventions (Lead, [#3])
+- [ ] Concept: purpose, areas, loops, tiers (Concept, [#1])
+- [ ] Architecture: stack, network, mirror, storage, secrets, alerts (Infrastructure, [#5])
+- [ ] Statistics: metric catalogue, methods, engine output contract (Statistics, [#4])
+- [ ] Agents: desks, schedules, tools, guardrails, usage budget, proposal record (AI agents, [#2])
 - [ ] Design: look, navigation, page and board mockups (Dashboards and design)
 
 Done when all six are merged and agree with each other.
 
 ### 1. Foundation 📋
 
-- [ ] Compose stack on TrueNAS: api, worker, web, Caddy, Tailscale sidecar
-- [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate
-- [ ] Read-only mirror of Escape Vektor's Firestore (positions, plans, activity, prices) into SQLite on a schedule
-- [ ] Raw layer and `holdings_daily`, keeping every mirror pull from day one
-- [ ] Claude Code CLI in the scheduler service (Hemline's pattern), token as a Compose secret, one `claude -p` smoke run (no `--bare`); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout
+- [ ] Compose stack on TrueNAS: Tailscale sidecar, Caddy, api (serves the built UI), cron (scheduler, engine and agents) ([#5])
+- [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate (built in [#5]; needs Joshua's one-time setup steps in `docs/architecture.md`)
+- [ ] Read-only mirror of every `lockIn/{uid}` collection into SQLite, incremental by change time with a weekly full pass, with change history ([#5])
+- [ ] `holdings_daily` built from the mirror history from day one (Statistics)
+- [ ] Claude Code CLI in the cron service (Hemline's pattern), token in a root-only env file, smoke run with `deploy.sh check` (no `--bare`) ([#5]); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout
+- [ ] Backups of the desk database ([#5])
 - [ ] App shell in the Escape Vektor look: pill nav and phone dock, light and graphite dark
-- [ ] Settings: data freshness, token renewal date
+- [ ] Settings: data freshness and token renewal date (`/api/status` in [#5]; page by Design)
 - [ ] Local lint, test and build scripts; synthetic fixtures
 
 Done when a phone on Tailscale opens the desk and sees the mirror's last run.
@@ -109,7 +110,7 @@ Tier 1 complete: 0.5.0.
 
 ### 8. Phone alerts 📋
 
-- [ ] Self-hosted push (choice in `docs/architecture.md`): rule breach, trigger hit, wash-sale window, stale mirror, research ready
+- [ ] Self-hosted ntfy on the box, relaying through ntfy.sh for phone delivery: rule breach, trigger hit, wash-sale window, stale mirror, research ready
 
 ### 9. Strategy lab 📋
 
@@ -138,7 +139,7 @@ Research hypotheses become strategies, tested on history without seeing the futu
 
 ### 1.0 Hardening 📋
 
-- [ ] Backups of the desk database
+- [ ] Restore from backup tested
 - [ ] Every page checked at 1920, 1440 and 390 in light and dark
 - [ ] Six months of Flight record reviewed; desks that do not beat following the plan are switched off
 
@@ -154,3 +155,9 @@ Research hypotheses become strategies, tested on history without seeing the futu
 ## Backlog
 
 - Options and crypto, if he starts holding them
+
+[#1]: https://github.com/inzodious/vektor-desk/pull/1
+[#2]: https://github.com/inzodious/vektor-desk/pull/2
+[#3]: https://github.com/inzodious/vektor-desk/pull/3
+[#4]: https://github.com/inzodious/vektor-desk/pull/4
+[#5]: https://github.com/inzodious/vektor-desk/pull/5
