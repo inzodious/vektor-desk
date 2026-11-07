@@ -29,7 +29,7 @@ services:
     restart: unless-stopped
     # Listens on the tailscale service's address only, so https://desk.escape-vektor.com answers on the tailnet and nowhere else.
     network_mode: service:tailscale
-    depends_on: [tailscale, api]
+    depends_on: [tailscale, api, ntfy]
     environment:
       DESK_DOMAIN: desk.escape-vektor.com
     # PORKBUN_API_KEY and PORKBUN_API_SECRET_KEY, for the certificate's DNS check.
@@ -46,6 +46,8 @@ services:
     restart: unless-stopped
     init: true
     user: "568:568"
+    environment:
+      DESK_NTFY_URL: http://ntfy:8080
     # DESK_FIREBASE_PROJECT, DESK_UID, DESK_CLAUDE_TOKEN_EXPIRES: settings, no secrets.
     env_file: /mnt/Manifest/apps/vektor-desk/settings.env
     volumes:
@@ -68,6 +70,7 @@ services:
     command: ["python", "-m", "desk.scheduler", "/app/deploy/crontab"]
     environment:
       DESK_FIRESTORE_CREDENTIALS: /run/secrets/firestore-reader
+      DESK_NTFY_URL: http://ntfy:8080
     # settings.env, then desk.env: CLAUDE_CODE_OAUTH_TOKEN, TIINGO_API_KEY, FINNHUB_API_KEY, FRED_API_KEY, DESK_SEC_USER_AGENT.
     env_file:
       - /mnt/Manifest/apps/vektor-desk/settings.env
@@ -85,6 +88,34 @@ services:
       timeout: 10s
     # 640m on 16 GB of RAM; 2g after the upgrade to 32 GB.
     mem_limit: 640m
+
+  # Phone alerts (docs/architecture.md): the desk publishes here, the phone subscribes at https://desk.escape-vektor.com:8443
+  # over the tailnet, and ntfy.sh only relays a "poll now" wake-up to the iPhone app. Messages stay here for a week.
+  ntfy:
+    image: binwiederhier/ntfy:v2.33.1
+    container_name: vektor-desk-ntfy
+    restart: unless-stopped
+    user: "568:568"
+    command: ["serve"]
+    environment:
+      NTFY_BASE_URL: https://desk.escape-vektor.com:8443
+      NTFY_UPSTREAM_BASE_URL: https://ntfy.sh
+      NTFY_LISTEN_HTTP: ":8080"
+      NTFY_CACHE_FILE: /var/lib/ntfy/cache.db
+      NTFY_CACHE_DURATION: 168h
+      NTFY_BEHIND_PROXY: "true"
+      NTFY_AUTH_DEFAULT_ACCESS: read-write
+      NTFY_LOG_LEVEL: warn
+    volumes:
+      - /mnt/Manifest/apps/vektor-desk/ntfy:/var/lib/ntfy
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --tries=1 -O - http://localhost:8080/v1/health | grep -q true"]
+      interval: 1m
+      timeout: 5s
+    mem_limit: 64m
 
   # The strategy lab (docs/statistics.md): runs queued experiment specs with no network, reading only the snapshots and price
   # data the engine leaves in data/lab/data. Uncomment when `python -m desk.lab` lands.
@@ -118,6 +149,7 @@ x-notes: |
   Private investing desk for Escape Vektor. Tailnet only.
 
   - **Open:** https://desk.escape-vektor.com from a device on your tailnet
+  - **Phone alerts:** ntfy app, server https://desk.escape-vektor.com:8443, topics desk-alerts, desk-research, desk-ops
   - **Status:** `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh status`
   - **Deploy now:** `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh now`
   - **Source:** https://github.com/inzodious/vektor-desk

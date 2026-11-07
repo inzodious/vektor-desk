@@ -6,7 +6,9 @@
 #                      otherwise, waits out a running job, and doesn't retry a commit that failed
 #   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
 #   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
-#   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS record against the tailnet address
+#   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS record against the tailnet address,
+#                      a test phone alert
+# Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
 set -Eeuo pipefail
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 export GIT_TERMINAL_PROMPT=0
@@ -33,8 +35,13 @@ IMAGES=("vektor-desk:local=." "vektor-desk/caddy:local=deploy/caddy")
 # ---- Helpers ----
 
 log() { printf '%s %s\n' "$(date '+%F %T')" "$*" | tee -a "$LOG"; }
+alert() {
+  [ -n "${ALERTS:-}" ] || return 0
+  timeout 20 docker exec vektor-desk-cron python -m desk.notify send ops "$1" "$2" --priority high --tags warning >/dev/null 2>&1 || true
+}
 die() {
   log "Stopped: $1"
+  [ "${2:-1}" = "$BUSY" ] || alert "${ALERTS:-}" "$1"
   exit "${2:-1}"
 }
 
@@ -222,6 +229,7 @@ auto() {
   rm -f "$AUTO_NOTE"
   log "Auto-deploy: main moved to ${target:0:7}"
   AUTO_TARGET=$target
+  ALERTS="Auto-deploy stopped"
   trap 'auto_stopped $?' EXIT
   deploy
   trap - EXIT
@@ -234,7 +242,7 @@ status() {
   repo fetch --quiet origin "$BRANCH" 2>/dev/null || echo "(couldn't reach GitHub)"
   printf 'Live:        %s\n' "$(live_build vektor-desk-api | cut -c1-7)"
   printf 'On GitHub:   %s\n' "$(repo log -1 --format='%h %s' "origin/$BRANCH")"
-  printf 'Containers:  api %s, cron %s, caddy %s, tailscale %s\n' "$(health vektor-desk-api)" "$(health vektor-desk-cron)" "$(health vektor-desk-caddy)" "$(health vektor-desk-tailscale)"
+  printf 'Containers:  api %s, cron %s, caddy %s, tailscale %s, ntfy %s\n' "$(health vektor-desk-api)" "$(health vektor-desk-cron)" "$(health vektor-desk-caddy)" "$(health vektor-desk-tailscale)" "$(health vektor-desk-ntfy)"
   printf 'Tailnet IP:  %s\n' "$(docker exec vektor-desk-tailscale tailscale ip -4 2>/dev/null || echo '?')"
   echo "Backups:     $(find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" 2>/dev/null | wc -l) in $BACKUPS"
   crons=$(midclt call cronjob.query 2>/dev/null | jq -r '[.[] | select(.enabled and (.command | test("vektor-desk-deploy/deploy\\.sh auto")))] | length' 2>/dev/null || true)
@@ -267,6 +275,9 @@ check() {
   dns=$(getent ahostsv4 desk.escape-vektor.com 2>/dev/null | awk 'NR == 1 { print $1 }')
   echo "  tailnet ${ip:-?}, desk.escape-vektor.com resolves to ${dns:-nothing}"
   if [ -n "$ip" ] && [ "$ip" = "$dns" ]; then echo "  match"; else echo "  set the Porkbun A record for desk to ${ip:-the tailnet address} (step 7)"; fi
+  echo "Phone alerts:"
+  docker exec vektor-desk-cron python -m desk.notify test ops 2>&1 | sed 's/^/  /' || true
+  echo "  subscribe in the ntfy app: server https://desk.escape-vektor.com:8443, topics desk-alerts, desk-research, desk-ops"
   echo "Certificate:"
   docker logs vektor-desk-caddy 2>&1 | grep -E 'certificate obtained|could not get certificate|obtain' | tail -n 2 | sed 's/^/  /' || true
 }
@@ -286,6 +297,7 @@ main() {
       if pinned_stale; then log "deploy.sh changed: copy it again for the cron jobs (step 8)"; fi
       ;;
     backup)
+      ALERTS="Nightly backup failed"
       files=$(backup) || die "the backup failed"
       log "Backed up: $files"
       ;;

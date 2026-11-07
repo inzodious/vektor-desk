@@ -5,7 +5,7 @@
 	}
 }
 
-{$DESK_DOMAIN:desk.escape-vektor.com} {
+(tailnet) {
 	tls {
 		dns porkbun {
 			api_key {env.PORKBUN_API_KEY}
@@ -17,8 +17,6 @@
 	@outside not remote_ip 100.64.0.0/10 fd7a:115c:a1e0::/48 127.0.0.0/8
 	abort @outside
 
-	encode zstd gzip
-
 	header {
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options nosniff
@@ -27,9 +25,22 @@
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
 		-Server
 	}
+}
+
+{$DESK_DOMAIN:desk.escape-vektor.com} {
+	import tailnet
+	encode zstd gzip
 
 	@api path /api/*
 	header @api Cache-Control no-store
 
 	reverse_proxy api:8000
+}
+
+{$DESK_DOMAIN:desk.escape-vektor.com}:8443 {
+	import tailnet
+
+	reverse_proxy ntfy:8080 {
+		flush_interval -1
+	}
 }
