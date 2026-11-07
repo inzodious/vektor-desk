@@ -118,3 +118,19 @@ def test_plan_endpoints(scheduled, app_client, mirror):
     assert any(e["title"] == "Review lots" for e in events)
     assert client.delete(f"/api/decisions/calendar/{r.json()['id']}").status_code == 200
     assert client.post("/api/decisions/calendar", json={"date": "x", "title": "y"}).status_code == 422
+
+
+def test_cash_in_counts_transfer_coded_money_in_and_drops_source_twins():
+    from desk.decisions.plan import cash_in
+
+    rows = [
+        ("a", {"date": "2026-11-03", "accountKey": "individual-1", "kind": "deposit", "action": "EFT RECEIVED", "amount": 3000}),
+        ("b", {"date": "2026-11-04", "accountKey": "individual-1", "kind": "deposit", "action": "EFT RECEIVED", "amount": 3000, "source": "sync"}),
+        ("c", {"date": "2026-11-10", "accountKey": "individual-1", "kind": "transfer", "action": "TRANSFER Electronic Funds", "amount": 500}),
+        ("d", {"date": "2026-11-11", "accountKey": "individual-1", "kind": "transfer", "action": "JOURNALED SPAXX", "amount": 900}),
+        ("e", {"date": "2026-11-12", "accountKey": "individual-1", "kind": "transfer", "action": "TRANSFER OF ASSETS", "amount": 800, "symbol": "AAAA"}),
+        ("f", {"date": "2026-11-13", "accountKey": "individual-1", "kind": "other", "action": "ELECTRONIC FUNDS TRANSFER PAID", "amount": 200}),
+        ("g", {"date": "2026-11-14", "accountKey": "individual-1", "kind": "withdrawal", "action": "EFT", "amount": 100}),
+        ("h", {"date": "not a date", "accountKey": "individual-1", "kind": "deposit", "amount": 50}),
+    ]
+    assert [x["activity_id"] for x in cash_in(rows)] == ["a", "c"]
