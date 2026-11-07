@@ -37,6 +37,8 @@ class Config:
     stale_hours: float = 14.0
     claude_token_expires: str = ""
     demo: bool = False
+    ntfy_url: str = ""
+    public_url: str = "https://desk.escape-vektor.com"
 
     @property
     def mirror_db(self) -> Path:
@@ -65,4 +67,6 @@ class Config:
             timezone=env.get("TZ", "America/New_York"),
             stale_hours=float(env.get("DESK_STALE_HOURS", "14")),
             claude_token_expires=env.get("DESK_CLAUDE_TOKEN_EXPIRES", "").strip(),
+            ntfy_url=env.get("DESK_NTFY_URL", "").strip().rstrip("/"),
+            public_url=env.get("DESK_PUBLIC_URL", "https://desk.escape-vektor.com").strip().rstrip("/"),
         )
