@@ -1,21 +1,21 @@
 # Vektor Desk
 
-A private investing desk for one person, self-hosted on TrueNAS at `desk.escape-vektor.com` and reachable only over Tailscale. It reads Escape Vektor's data, runs the statistics, tracks the portfolio live, and runs Claude Code agents on the Claude subscription that research, plan and propose decisions. It never places trades.
+A private investing desk for one person, self-hosted on TrueNAS at `desk.escape-vektor.com` and reachable only over Tailscale. It checks every investing decision against the plan before it happens, records why, and scores it afterwards against simply following the plan. Statistics, live tracking, research and Claude Code agents feed that loop. It never places trades.
 
 Escape Vektor is the everyday money app. Vektor Desk is the investing cockpit: one focus, more depth.
 
-## Modules
+## Areas
 
-| Module | What it does |
+| Area | Question it answers |
 |---|---|
-| **Track** | Live positions, prices and day moves, drill-down from portfolio to account to holding to lot in a click |
-| **Stats** | Returns, risk, drawdowns, correlation, attribution, scenarios |
-| **KPIs** | The few numbers that say whether the plan is working |
-| **Compare** | Portfolio against benchmarks, holding against holding, plan against actual, "what if I had followed the plan" |
-| **Plan** | Target mix, deposit routing, what-if, tax calendar |
-| **Decide** | Proposal queue from the agents, approve or dismiss, order tickets, decision journal, scorecard |
-| **Research** | Deep dives with sources, theses, bear cases, a searchable library |
-| **Boards** | Dashboards built from the pieces above |
+| **Bridge** | What changed, and does anything need me? KPIs, daily brief, decision queue, live holdings |
+| **Research** | What do I know about this? Dossiers, watchlist, source library |
+| **Decisions** | What am I doing and why? Preflight, order tickets, decision journal, Flight record |
+| **Plan** | What is the rulebook? Target mix, deposits, rules, tax calendar, FI path |
+| **Lab** | What does the evidence say? Compare, patterns, risk and statistics, saved boards |
+| **Settings** | How is the desk configured? Desk profile, agents, data freshness |
+
+Live tracking is one click from anywhere: every symbol opens the Symbol sheet with its live price, position, lots, plan target and open decisions. The full picture is in [docs/concept.md](docs/concept.md).
 
 ## Docs
 

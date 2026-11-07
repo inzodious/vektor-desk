@@ -2,17 +2,19 @@
 
 ## Goal
 
-A private investing cockpit that tells one investor, every day, whether the plan is on track and what the next sensible move is, backed by real statistics and sourced research, and honest about when doing nothing is the best move.
+A decision instrument for one investor: every buy, sell, rebalance or deliberate pass is checked against the plan before it happens, recorded with its reasoning, and scored afterwards against simply following the plan. Statistics, live tracking, research and agents feed that loop.
 
 ## What 1.0 means
 
-1.0 is done when the desk runs for a full month without hand-holding:
+The concept's success measures are the bar:
 
-1. The mirror and live prices stay current without manual fixes.
-2. Track, Stats, KPIs, Compare and Plan show numbers that match the brokerage on a spot check.
-3. The plan keeper and tax desk post proposals on schedule, each with sources, the rule it serves and an order ticket.
-4. Every proposal is scored, and the scorecard shows whether each desk beats following the plan.
-5. Every page works at 1920, 1440 and 390 wide, in light and dark.
+1. Every trade at Fidelity matches a decision record (at least 95 percent after three months).
+2. No rule break goes through without a logged override.
+3. The daily check takes under three minutes on a phone.
+4. December's loss-sale plan comes from the desk (Tier 1 by December 6; see `ROADMAP.md`).
+5. After six months the Flight record says which desks beat following the plan, and the rest are switched off.
+
+Plus the usual bar: numbers match the brokerage on a spot check, and every page works at 1920, 1440 and 390 wide in light and dark.
 
 ## Workstreams
 
@@ -21,7 +23,7 @@ Each workstream is its own project thread and owns its files. Nobody edits anoth
 | Workstream | Owns | Delivers first |
 |---|---|---|
 | Lead (roadmap and plan) | `README.md`, `ROADMAP.md`, `CHANGELOG.md`, `CLAUDE.md`, `.github/`, `docs/project-plan.md` | This plan and the roadmap |
-| Concept | `docs/concept.md` | Purpose, core loops, non-goals |
+| Concept | `docs/concept.md` | Purpose, areas, loops, tiers (PR #1) |
 | Infrastructure | `docs/architecture.md`, deploy files (`compose.yaml`, `Caddyfile`, Dockerfiles, `.env.example`) | Stack, network, mirror, secrets |
 | Statistics | `docs/statistics.md`, later the engine | Metric catalogue and the engine's output contract |
 | AI agents | `docs/agents.md`, later the agent runner and prompts | Desks, schedules, guardrails, usage budget |
@@ -38,7 +40,7 @@ Infrastructure ──► mirror tables ──► Statistics engine ──► out
 
 - **The output contract is the seam.** Statistics publishes metric ids, SQLite tables and the JSON shape. Agents and Dashboards build against it, not against each other's internals. Changes to it go through the Statistics thread.
 - **The mirror schema is the second seam.** Infrastructure publishes the mirrored table names and columns; Statistics builds on them.
-- **Proposals are the third.** AI agents define the proposal record (what, why, sources, confidence, rule, order ticket, settings snapshot); Dashboards design the Decide page around it.
+- **The decision record is the third.** Concept defines its fields; AI agents write proposals into it; Statistics scores it; Dashboards design Decisions and Bridge around it.
 - **Phase and dependency notes go to Lead**, who folds them into `ROADMAP.md`.
 
 ## Working rules
@@ -71,8 +73,8 @@ Infrastructure ──► mirror tables ──► Statistics engine ──► out
 | Agents sound confident and are wrong | Engine computes every number; proposals cite sources; the scorecard decides which desks stay on |
 | Prompt injection from web pages during research | Tight tool allow-lists, no shell, proposals checked by a second run that sees only the numbers |
 | Brokerage feed gives positions without tax lots | Lot export import in Track; tax desk refuses to pick lots without it |
-| Scope: eight modules is a lot | Phases ship usable slices; Track, Stats and Plan come before agents |
-| Year-end tax moves arrive before the desk is ready | Do not let the desk gate December decisions; the tax calendar is a phase 5 item |
+| Scope: five areas plus agents is a lot | Tier 1 ships first and is useful alone; Tiers 2 and 3 follow |
+| Tier 1 misses December 6 | Year-end tax moves do not wait on the desk; whatever has landed (lot import, wash-sale check) is used as a cross-check |
 
 ## Open questions
 
