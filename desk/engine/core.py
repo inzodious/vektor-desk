@@ -8,18 +8,21 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION
+from desk.engine import ENGINE_VERSION, lookthrough, risk
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
 from desk.engine.lots import current_lots
 from desk.engine.research import macro, research_symbols, signals
-from desk.engine.returns import WINDOWS, annualize, base_index, daily_returns, drawdowns, period_mwr, twr_index, volatility
+from desk.engine.returns import WINDOWS, annualize, base_index, daily_returns, drawdowns, period_mwr, twr_index, volatility, window_start
 from desk.engine.shadows import TotalReturn, deposit_split, shadow
 from desk.engine.source import closes, current_rows
 from desk.engine.tax import held_long, realized, wash_windows
 
 UNITS = {"usd": 2, "pct": 4, "pts": 2, "ratio": 4, "days": 0, "count": 0}
-SP500 = ("SPY", "FXAIX", "VOO", "IVV")
+SP500 = risk.SP500
+SHELTERED = ("hsa", "roth", "ira", "401k", "401(k)", "403b", "457")
+ADHERENCE_WINDOWS = ("MTD", "QTD", "YTD", "1Y", "ITD")
+AFTER_TAX_WINDOWS = ("YTD", "1Y", "ITD")
 FUND_KINDS = {"fund", "etf", "mutual_fund", "index", "money_market"}
 PROFILE_ERRORS = (sqlite3.Error, TypeError, KeyError, ValueError, OSError, AttributeError)
 DEFAULT_RULES = [
@@ -36,6 +39,7 @@ class Out:
     series: list[tuple] = field(default_factory=list)
     health: list[tuple] = field(default_factory=list)
     wash: list[tuple] | None = None
+    lookthrough: list[tuple] | None = None
 
     def m(
         self,
@@ -120,6 +124,23 @@ def symbol_kinds(mirror: sqlite3.Connection, targets: dict[str, float]) -> dict[
     return kinds
 
 
+def profile_facts(mirror: sqlite3.Connection) -> dict[str, dict]:
+    out = {}
+    for p in current_rows(mirror, "priceProfiles"):
+        s = str(p.get("symbol") or "").upper()
+        body = p.get("profile") if isinstance(p.get("profile"), dict) else p
+        if not s:
+            continue
+        y = body.get("dividendYield")
+        out[s] = {"sector": lookthrough.sector_of(body.get("industry")), "yield": float(y) if isinstance(y, int | float) else None}
+    return out
+
+
+def account_sheltered(account: str) -> bool:
+    low = account.lower()
+    return any(low.startswith(k) or f"-{k}" in low or f" {k}" in low for k in SHELTERED)
+
+
 def rules_in_force(cfg: Config, plan: dict) -> tuple[list[dict], str]:
     try:
         _, rules = active_rules(cfg)
@@ -194,6 +215,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     for d, v, ix in zip(days, values, index, strict=True):
         out.s("value", "portfolio", "all", d, v, quality_by_day[d])
         out.s("twr_index", "portfolio", "all", d, ix, quality_by_day[d])
+    accounts = []
     for acct in sorted({h["account"] for d in days for h in holdings[d]}):
         a_values = [sum(h["value"] for h in holdings[d] if h["account"] == acct) for d in days]
         a_flows = [_flows_between(days, aflow[acct], i) for i in range(len(days))]
@@ -201,9 +223,11 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
         if first is None:
             continue
         out.m("value.market", a_values[-1], "usd", scope="account", scope_id=acct, quality=q_now)
-        _return_metrics(out, days[first:], a_values[first:], a_flows[first:], "account", acct, q_now)
-        for d, v in zip(days[first:], a_values[first:], strict=True):
+        a_index = _return_metrics(out, days[first:], a_values[first:], a_flows[first:], "account", acct, q_now)
+        for d, v, ix in zip(days[first:], a_values[first:], a_index, strict=True):
             out.s("value", "account", acct, d, v, quality_by_day[d])
+            out.s("twr_index", "account", acct, d, ix, quality_by_day[d])
+        accounts.append((acct, days[first:], a_values[first:], a_index))
 
     price_series = closes(mirror)
     if desk.execute("SELECT 1 FROM sqlite_master WHERE name='price_bars'").fetchone():
@@ -211,6 +235,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
             price_series.setdefault(r["symbol"], {}).setdefault(r["date"], (r["close"], r["adj_close"]))
     tr = TotalReturn(price_series)
     _shadow_metrics(out, days, values, flows_on, targets, tr)
+    facts = profile_facts(mirror)
 
     now_rows = holdings[as_of]
     total = totals[as_of]
@@ -218,8 +243,15 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _plan_metrics(out, cfg, plan, targets, kinds, now_rows, total, holdings, days, activity, q_now, amount)
     _margin_metrics(out, now_rows, total)
     _risk_metrics(out, now_rows, total, index, days, values, flows_on, q_now)
+    risk.metrics(out, desk, tr, days=days, values=values, flows_on=flows_on, rows=now_rows, total=total, kinds=kinds, targets=targets, q=q_now)
+    lookthrough.metrics(out, desk, kinds, {s: f["sector"] for s, f in facts.items()})
     _cost_metrics(out, plan, now_rows, total)
+    for s, f in sorted(facts.items()):
+        if f["yield"] is not None:
+            out.m("income.yield", f["yield"], "pct", scope="holding", scope_id=s, window="TTM")
+    _adherence(out, days, activity, targets, q_now)
     _tax_metrics(out, cfg, mirror, desk, activity, now_rows, now)
+    _after_tax(out, cfg, mirror, desk, accounts, income(activity))
     _research_metrics(out, desk, kinds)
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:
@@ -294,8 +326,9 @@ def _shadow_metrics(out: Out, days, values, flows_on, targets, tr):
         if series[-1] is None:
             out.m(f"bm.{name}", None, "usd", scope="shadow", scope_id=name)
             continue
-        for d, v in zip(days, series, strict=True):
+        for d, v, ix in zip(days, series, twr_index(series, flows_on), strict=True):
             out.s("value", "shadow", name, d, v, quality)
+            out.s("twr_index", "shadow", name, d, ix, quality)
         out.m(f"bm.{name}", series[-1], "usd", scope="shadow", scope_id=name, quality=quality)
         for w in WINDOWS:
             i0 = base_index(days, w)
@@ -428,6 +461,8 @@ def _risk_metrics(out: Out, rows, total, index, days, values, flows_on, q):
 
 def _cost_metrics(out: Out, plan, rows, total):
     ratios = expense_ratios(plan)
+    for s, r in sorted(ratios.items()):
+        out.m("cost.expense", r, "pct", scope="holding", scope_id=s)
     invested = {h["symbol"]: 0.0 for h in rows if not h["is_cash"]}
     for h in rows:
         if not h["is_cash"]:
@@ -441,6 +476,51 @@ def _cost_metrics(out: Out, plan, rows, total):
     q = "ok" if len(known) == len(invested) else "pro_forma"
     out.m("cost.expense", usd / base * 100, "pct", quality=q)
     out.m("cost.expense_usd", usd, "usd", window="1Y", quality=q)
+
+
+def _adherence(out: Out, days, activity, targets, q):
+    if not targets:
+        return
+    buys = []
+    for r in activity:
+        d, amt = str(r.get("date") or "")[:10], r.get("amount")
+        sym = str(r.get("symbol") or "").upper()
+        if r.get("kind") == "buy" and not r.get("core") and sym and isinstance(amt, int | float) and amt < 0:
+            buys.append((d, sym, -float(amt)))
+    end, first = date.fromisoformat(days[-1]), date.fromisoformat(days[0])
+    for w in ADHERENCE_WINDOWS:
+        lo = window_start(w, end, first).isoformat()
+        picked = [(s, a) for d, s, a in buys if lo < d <= days[-1]]
+        spent = sum(a for _, a in picked)
+        value = sum(a for s, a in picked if s in targets) / spent * 100 if spent else None
+        out.m("plan.adherence", value, "pct", window=w, n_obs=len(picked), quality=q if value is not None else "insufficient_history")
+
+
+def _after_tax(out: Out, cfg, mirror, desk, accounts, income_rows):
+    federal, state, _ = marginal_rate(cfg, mirror)
+    rate = None if federal is None else (federal + state) / 100
+    ltcg = (env_float("DESK_LTCG_RATE_PCT") or 15.0) / 100
+    sold = [dict(r) for r in desk.execute("SELECT account, sold, gain, term FROM realized_lots")]
+    for acct, a_days, a_values, a_index in accounts:
+        sheltered = account_sheltered(acct)
+        end, first = date.fromisoformat(a_days[-1]), date.fromisoformat(a_days[0])
+        for w in AFTER_TAX_WINDOWS:
+            i0 = base_index(a_days, w)
+            if i0 is None or not a_values[i0]:
+                continue
+            twr = (a_index[-1] / a_index[i0] - 1) * 100
+            if sheltered:
+                out.m("ret.after_tax", twr, "pct", scope="account", scope_id=acct, window=w, quality="modelled")
+                continue
+            if rate is None:
+                out.m("ret.after_tax", None, "pct", scope="account", scope_id=acct, window=w, quality="modelled")
+                continue
+            lo = window_start(w, end, first).isoformat()
+            divs = sum(a for d, ac, _, a in income_rows if ac == acct and lo < d <= a_days[-1])
+            st = sum(r["gain"] or 0 for r in sold if r["account"] == acct and lo < (r["sold"] or "") <= a_days[-1] and r["term"] != "long")
+            lt = sum(r["gain"] or 0 for r in sold if r["account"] == acct and lo < (r["sold"] or "") <= a_days[-1] and r["term"] == "long")
+            drag = (divs * rate + max(st, 0.0) * rate + max(lt, 0.0) * ltcg) / a_values[i0] * 100
+            out.m("ret.after_tax", twr - drag, "pct", scope="account", scope_id=acct, window=w, quality="modelled")
 
 
 # ---- Tax ----
@@ -607,6 +687,9 @@ def store(desk: sqlite3.Connection, out: Out) -> dict:
         desk.executemany("INSERT OR REPLACE INTO series_daily VALUES (?, ?, ?, ?, ?, ?)", out.series)
         desk.execute("DELETE FROM data_health WHERE as_of=?", (out.as_of,))
         desk.executemany("INSERT INTO data_health VALUES (?, ?, ?, ?)", out.health)
+        if out.lookthrough is not None:
+            desk.execute("DELETE FROM lookthrough")
+            desk.executemany("INSERT OR REPLACE INTO lookthrough VALUES (?, ?, ?, ?, ?, ?)", out.lookthrough)
         if out.wash is not None:
             desk.execute("DELETE FROM wash_windows")
             desk.executemany("INSERT OR REPLACE INTO wash_windows VALUES (?, ?, ?, ?, ?, ?, ?)", out.wash)

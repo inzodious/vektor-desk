@@ -11,6 +11,7 @@ from desk.engine import ENGINE_VERSION, core, schema, triggers
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.live import refresh_quotes
+from desk.engine.lookthrough import run_all as run_lookthrough_all
 from desk.engine.lots import import_inbox
 from desk.engine.research import run_all as run_research_all
 from desk.engine.source import open_mirror
@@ -114,14 +115,24 @@ def run_quotes(cfg: Config, http=None, force: bool = False) -> dict:
     return result
 
 
-def run_research(cfg: Config, http=None) -> dict:
+def _kinds(cfg: Config) -> dict[str, str]:
     mirror = open_mirror(cfg)
+    if mirror is None:
+        return {}
     try:
-        kinds = core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror))) if mirror else {}
+        return core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror)))
     finally:
-        if mirror:
-            mirror.close()
+        mirror.close()
+
+
+def run_research(cfg: Config, http=None) -> dict:
+    kinds = _kinds(cfg)
     return _with_desk(cfg, "research", lambda desk: run_research_all(desk, http or http_session(), kinds))
+
+
+def run_lookthrough(cfg: Config, http=None) -> dict:
+    kinds = _kinds(cfg)
+    return _with_desk(cfg, "lookthrough", lambda desk: run_lookthrough_all(desk, http or http_session(), kinds))
 
 
 def run_market_backfill(cfg: Config, http=None) -> dict:
@@ -135,6 +146,7 @@ JOBS = {
     "lots": run_lots,
     "quotes": run_quotes,
     "backfill": run_market_backfill,
+    "lookthrough": run_lookthrough,
     "research": run_research,
 }
 

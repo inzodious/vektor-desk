@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from typing import Annotated
 
@@ -7,6 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
+from desk.engine.compare import CompareError, compare
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
 from desk.engine.preflight import PreflightError, check_trade
@@ -307,3 +309,46 @@ def macro_series(request: Request, start: str | None = None) -> JSONResponse:
     finally:
         conn.close()
     return _json({"series": out})
+
+
+@router.get("/api/compare")
+def compare_view(request: Request, ids: str, window: str = "1Y") -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None:
+        return JSONResponse({"detail": "The engine has not run yet."}, status_code=400)
+    try:
+        return _json(compare(conn, ids.split(","), window))
+    except CompareError as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
+    finally:
+        conn.close()
+
+
+@router.get("/api/engine/lookthrough")
+def lookthrough_view(request: Request, fund: str | None = None, limit: int = 50) -> JSONResponse:
+    empty = {"as_of": None, "rows": [], "sectors": [], "funds": [], "holdings": []}
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "lookthrough"):
+        return _json(empty)
+    try:
+        rows = [
+            {**dict(r), "via": json.loads(r["via"])} for r in conn.execute("SELECT * FROM lookthrough ORDER BY weight DESC LIMIT ?", (max(1, min(limit, 500)),))
+        ]
+        day = conn.execute("SELECT max(as_of) FROM metric_values").fetchone()[0]
+        sectors = [
+            {"sector": r["scope_id"], "weight": r["value"], "quality": r["quality"]}
+            for r in conn.execute("SELECT * FROM metric_values WHERE as_of=? AND metric_id='risk.sector' ORDER BY value DESC", (day,))
+        ]
+        funds = [dict(r) for r in conn.execute("SELECT fund, max(as_of) AS as_of, count(*) AS holdings FROM fund_holdings GROUP BY fund ORDER BY fund")]
+        holdings = []
+        if fund:
+            holdings = [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT holding, name, weight, asset_cat, country FROM fund_holdings WHERE fund=? ORDER BY weight DESC LIMIT ?",
+                    (fund.upper(), max(1, min(limit, 500))),
+                )
+            ]
+    finally:
+        conn.close()
+    return _json({"as_of": rows[0]["as_of"] if rows else day, "rows": rows, "sectors": sectors, "funds": funds, "holdings": holdings})
