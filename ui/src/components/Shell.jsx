@@ -1,4 +1,5 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
+import { HealthBanner } from './HealthBanner.jsx';
 import { Icon } from './Icon.jsx';
 import { AREAS } from '../lib/areas.js';
 import { clockState } from '../lib/clock.js';
@@ -70,6 +71,7 @@ export function Shell({ badges }) {
         </div>
       </header>
       <main className="content" id="main" tabIndex={-1}>
+        <HealthBanner />
         <Outlet />
       </main>
       <nav className="nav dock" aria-label="Areas, phone">

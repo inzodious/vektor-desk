@@ -57,6 +57,7 @@ const open = { ...closed, state: 'open', day: DAY, opens_at: `${DAY}T14:30:00+00
 save('live', open);
 save('live.stale', { ...open, quality: 'stale', as_of: `${DAY}T15:05:00+00:00` });
 save('live.closed', { ...closed, day: '2026-11-07' });
+save('live.long', { ...open, rows: [...openRows, { ...openRows.find((r) => r.source !== 'cash'), symbol: '0999999', source: 'holdings' }, { ...openRows.find((r) => r.source !== 'cash'), symbol: 'LONGSYMBOL' }] });
 save('live.empty', { state: 'closed', day: '2026-11-07', opens_at: null, closes_at: null, as_of: null, holdings_date: null, value: 0, day_change: 0, day_change_pct: null, quality: 'insufficient_history', rows: [], benchmarks: {} });
 
 const intraday = {};
@@ -180,3 +181,13 @@ save('engine.fi.history', { as_of: fiView.as_of, status: 'not_ready', fi_number:
 const factorView = await get('/api/engine/factors');
 save('engine.factors', factorView);
 save('engine.factors.empty', { as_of: factorView.as_of, holdings: {}, portfolio: {}, coverage_pct: 0, note: 'No French factors yet.' });
+
+// ---------- engine health ----------
+const engineHealth = await get('/api/engine/health');
+save('engine.health', { ...engineHealth, status: 'ok', checks: engineHealth.checks.map((c) => ({ ...c, status: 'ok' })) });
+save('engine.health.warn', engineHealth);
+save('engine.health.fail', {
+  ...engineHealth,
+  status: 'fail',
+  checks: [{ check_name: 'value', status: 'fail', detail: 'Desk value is 4.1% off the broker on 2026-11-06; re-run the mirror pull, then the daily engine.' }, ...engineHealth.checks.filter((c) => c.check_name !== 'value')],
+});

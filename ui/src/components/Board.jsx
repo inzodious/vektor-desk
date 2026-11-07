@@ -1,10 +1,10 @@
 import { Spark } from './Spark.jsx';
-import { pct, px, usd } from '../lib/format.js';
+import { flapText, pct, px, usd } from '../lib/format.js';
 
 export function Flap({ text, size = 5 }) {
-  const chars = String(text).toUpperCase().padEnd(size, ' ').split('');
+  const chars = flapText(text).padEnd(size, ' ').split('');
   return (
-    <span className="flap" aria-label={text}>
+    <span className="flap" aria-label={text} title={String(text)} data-n={chars.length}>
       {chars.map((c, i) => (
         <span key={`${i}-${c}`} className="flip" aria-hidden="true">
           {c === ' ' ? ' ' : c}

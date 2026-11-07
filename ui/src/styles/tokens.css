@@ -17,7 +17,7 @@
   --lilac: #b39ddb; --lilac-soft: #ebe3f7;
   --sky-a: #fff6e2; --sky-b: #fde6c2; --sky-c: #fbc9a0; --sky-d: #f6a688;
   --sun-disc: #ffe3a0; --hill-a: #8fd9be; --hill-b: #5bb8a3; --star-o: 0;
-  --board: #173a40; --board-2: #24535a; --flap: #ffe7bf; --flap-dim: #9fb9b6;
+  --board: #173a40; --board-2: #24535a; --flap: #ffe7bf; --flap-dim: #b6ccc9;
   --shadow: 0 1px 0 rgba(255, 255, 255, .8) inset, 0 2px 0 rgba(23, 58, 64, .05), 0 18px 34px -26px rgba(23, 58, 64, .45);
   --pill-bg: rgba(255, 250, 240, .9); --btn: #173a40; --btn-ink: #fff7e8; --focus: #0d6461;
   --dot: rgba(23, 58, 64, .07); --grain-o: .22; --grain-blend: multiply;
@@ -40,7 +40,7 @@ html.dark {
   --lilac: #c9b6f2; --lilac-soft: rgba(201, 182, 242, .16);
   --sky-a: #0b2130; --sky-b: #16304d; --sky-c: #3a3160; --sky-d: #6e3d62;
   --sun-disc: #ff9f6b; --hill-a: #164a4c; --hill-b: #0d3134; --star-o: .75;
-  --board: #17181b; --board-2: #2f3138; --flap: #ffd38a; --flap-dim: #7f9aa0;
+  --board: #17181b; --board-2: #2f3138; --flap: #ffd38a; --flap-dim: #93adb2;
   --shadow: 0 1px 0 rgba(247, 236, 214, .05) inset, 0 20px 40px -28px rgba(0, 0, 0, .8);
   --pill-bg: rgba(32, 33, 38, .92); --btn: #ffcb5c; --btn-ink: #0d0e10; --focus: #ffcb5c;
   --dot: rgba(255, 255, 255, .035); --grain-o: .1; --grain-blend: screen;

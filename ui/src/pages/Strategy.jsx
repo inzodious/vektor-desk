@@ -565,7 +565,7 @@ export default function Strategy() {
     <>
       <Subtabs label="Lab views" tabs={LAB_TABS} />
       <Link className="btn sm ghost" to="/lab/strategies">
-        <Icon name="right" className="flip" />
+        <Icon name="right" className="mirror" />
         All strategies
       </Link>
     </>
