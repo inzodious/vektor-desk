@@ -180,6 +180,14 @@ CREATE TABLE IF NOT EXISTS preflight (
   engine_version TEXT NOT NULL,
   PRIMARY KEY (ticket_id, metric_id)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS triggers (
+  as_of TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
+  detail TEXT,
+  fired_at TEXT NOT NULL,
+  PRIMARY KEY (as_of, kind, scope_id)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS wash_windows (
   as_of TEXT NOT NULL,
   symbol TEXT NOT NULL,

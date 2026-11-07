@@ -7,12 +7,13 @@ import requests
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, core, schema
+from desk.engine import ENGINE_VERSION, core, schema, triggers
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.live import refresh_quotes
 from desk.engine.lots import import_inbox
 from desk.engine.source import open_mirror
+from desk.notify import publish
 from desk.runlock import BUSY, Busy, job_lock
 
 
@@ -43,10 +44,16 @@ def run_core(cfg: Config) -> dict:
     if mirror is None:
         return {"ok": False, "error": "mirror.db does not exist yet; run python -m desk.mirror first."}
     try:
-        result = _with_desk(cfg, "core", lambda desk: {"ok": True, **core.store(desk, core.compute(cfg, mirror, desk))})
+        result = _with_desk(cfg, "core", lambda desk: _core(cfg, mirror, desk))
     finally:
         mirror.close()
     return result
+
+
+def _core(cfg: Config, mirror, desk) -> dict:
+    stored = core.store(desk, core.compute(cfg, mirror, desk))
+    fired = triggers.run(cfg, desk, stored["as_of"]) if stored["metrics"] else {"new": 0, "kinds": []}
+    return {"ok": True, **stored, "triggers": fired}
 
 
 def run_daily(cfg: Config) -> dict:
@@ -57,7 +64,14 @@ def run_daily(cfg: Config) -> dict:
 
 
 def run_lots(cfg: Config) -> dict:
-    return _with_desk(cfg, "lots", lambda desk: import_inbox(cfg, desk))
+    return _with_desk(cfg, "lots", lambda desk: _lots(cfg, desk))
+
+
+def _lots(cfg: Config, desk) -> dict:
+    result = import_inbox(cfg, desk)
+    if result["imported"]:
+        triggers.record(cfg, desk, triggers.lot_export(cfg, desk, result["imported"]))
+    return result
 
 
 def http_session() -> requests.Session:
@@ -83,7 +97,20 @@ def _with_desk(cfg: Config, job: str, fn) -> dict:
 
 
 def run_quotes(cfg: Config, http=None, force: bool = False) -> dict:
-    return _with_desk(cfg, "quotes", lambda desk: refresh_quotes(desk, http or http_session(), force=force))
+    result = _with_desk(cfg, "quotes", lambda desk: refresh_quotes(desk, http or http_session(), force=force))
+    if result.get("state") == "open" and not cfg.demo and (not result.get("key") or (result.get("errors") and not result.get("quotes"))):
+        why = "FINNHUB_API_KEY is not set" if not result.get("key") else "Finnhub is not answering"
+        publish(
+            "ops",
+            "Live quotes are stale",
+            f"{why}, so Live shows the last close. Check Settings.",
+            "default",
+            tags=["hourglass"],
+            click="/settings",
+            key=f"quotes-{datetime.now(UTC).date().isoformat()}",
+            cfg=cfg,
+        )
+    return result
 
 
 def run_market_backfill(cfg: Config, http=None) -> dict:
