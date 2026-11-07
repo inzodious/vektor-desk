@@ -37,8 +37,9 @@ dataset() {
 for d in Manifest/apps/vektor-desk Manifest/apps/vektor-desk-src Singularity/backups/vektor-desk; do
   dataset "$d"
 done
-mkdir -p "$ROOT"/data/{home,inbox/fidelity,run,lab/data,lab/queue,lab/runs} "$ROOT"/caddy/{data,config} "$ROOT"/tailscale "$ROOT"/ntfy
-chown -R 568:568 "$ROOT/data" "$ROOT/ntfy"
+mkdir -p "$ROOT"/data/{home,inbox/fidelity,run/logs,lab/data,lab/queue,lab/runs} "$ROOT"/caddy/{data,config} "$ROOT"/tailscale "$ROOT"/ntfy "$ROOT"/eval/{home,work}
+chown -R 568:568 "$ROOT/data" "$ROOT/ntfy" "$ROOT/eval"
+chmod 700 "$ROOT/eval/home"
 chmod 700 "$ROOT/tailscale" "$ROOT/caddy"
 echo "1. Datasets and folders ready under $ROOT"
 

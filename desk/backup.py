@@ -14,6 +14,17 @@ MIRROR_TABLES = ("rows", "row_history", "tables", "runs")
 TABLE = re.compile(r"CREATE TABLE IF NOT EXISTS\s+(\w+)", re.IGNORECASE)
 
 
+def _source(db: Path) -> sqlite3.Connection:
+    try:
+        conn = connect(db, readonly=True)
+        conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        return conn
+    except sqlite3.OperationalError:
+        conn = sqlite3.connect(f"file:{db}?immutable=1", uri=True)
+        conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
+        return conn
+
+
 def snapshot(data_dir: Path, out_dir: Path) -> list[dict]:
     if out_dir.exists():
         shutil.rmtree(out_dir)
@@ -21,7 +32,7 @@ def snapshot(data_dir: Path, out_dir: Path) -> list[dict]:
     done = []
     for db in sorted(data_dir.glob("*.db")):
         target = out_dir / db.name
-        src = connect(db, readonly=True)
+        src = _source(db)
         dst = sqlite3.connect(target)
         try:
             src.backup(dst)
