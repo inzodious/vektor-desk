@@ -17,7 +17,7 @@ Status: plan, November 7, 2026. Nothing built. Base decisions are in fin-dashboa
 ```
 scheduler ─▶ brief builder ─▶ claude -p (one desk) ─▶ Preflight ──────▶ decision records ─▶ decision queue (UI)
               (engine, SQLite)   structured JSON out    numbers, rules,      │
-                                                        sources, expiry      └─▶ scorecard at 30 and 90 days
+                                                        sources, expiry      └─▶ scorecard at 30, 90, 365 days
 ```
 
 1. The scheduler picks a desk whose time or trigger has come and checks the usage budget.
@@ -151,8 +151,8 @@ Agent runs share the subscription's 5-hour and weekly limits with Joshua's inter
 
 Logged from the first proposal in Phase 5, reported from Phase 10. The method (returns, significance, calibration) is owned by `docs/statistics.md`; this section defines what the agents side must record.
 
-- **Baseline:** the same dollars into the plan mix on the proposal's date, at that day's close.
-- **Scored at 30 and 90 days:** every proposal, whether approved or not, so a dismissed idea that would have worked still counts.
+- **Baseline:** the same dollars into the plan mix, priced at the next trading day's close for both sides (method in `docs/statistics.md`).
+- **Scored at 30, 90 and 365 days:** every proposal, whether approved or not, so a dismissed idea that would have worked still counts.
 - **Per desk:** excess dollars vs baseline, hit rate, calibration of `confidence` (Brier score), approval rate, usage per proposal.
 - **Saves:** blocks and `hold_off` proposals are scored by what they avoided, such as margin interest not paid or a wash sale not triggered. Harvests are scored as realized loss times the marginal rate from Escape Vektor's tax estimate.
 - **Overrides** are scored the same way, so the scorecard also shows how Joshua's own calls do against the plan.
@@ -178,7 +178,7 @@ desk/agents/
   adapter.py      run_agent(), Claude Code CLI implementation and the fake
   briefs.py       builds each desk's prompt from engine output
   scheduler.py    windows, priority, budget, deferrals, the run lock
-  score.py        30/90-day scoring
+  score.py        calls the engine's scoring for each decision record
 deploy/crontab    one line per scheduled desk (infra's cron service, America/New_York)
 desk.example.yaml
 ```
