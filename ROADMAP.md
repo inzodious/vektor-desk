@@ -69,7 +69,7 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run.
 - [ ] Shadow portfolios: plan mix and S&P 500
 - [ ] Drift and rules, margin (interest in dollars, price drop to a call), costs, basic concentration and drawdown
 - [ ] Output contract v1
-- [ ] Background price backfill for the Strategy lab starts here (Tiingo's free tier caps symbols, so the broad single-stock history fills over months)
+- [ ] Background backfill for the Strategy lab starts here: Tiingo prices at about 400 new symbols a month under the free cap shared with Escape Vektor (ETFs first, then large caps including delisted ones), SEC bulk financial statement and insider data in one import
 - [ ] Bridge KPI row complete
 - [ ] Plan: target mix and bands, drift, rules (versioned), deposit routing
 
