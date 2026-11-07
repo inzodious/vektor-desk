@@ -1,4 +1,4 @@
-# Vektor Desk on TrueNAS SCALE: Apps → Discover Apps → ⋮ → Install via YAML, name it "vektor-desk" (docs/architecture.md).
+# Vektor Desk on TrueNAS SCALE: Apps → Discover Apps → ⋮ → Install via YAML, name it "vektor-desk" (docs/setup.md, step 6).
 # Private: the only way in is the tailscale service's own tailnet address, where caddy answers https://desk.escape-vektor.com.
 # Nothing here publishes a port on the NAS or the home network.
 services:
