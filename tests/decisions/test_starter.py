@@ -54,6 +54,7 @@ def test_init_from_demo_mirror_writes_a_valid_draft_once(demo_cfg):
     assert data["tax"]["wash_sale_accounts"] == ["hsa-0002", "individual-0001"]
     assert data["tax"]["lot_method"] == "highest_cost"
     assert data["agents"]["enabled"] is False and data["agents"]["desks"]["plan_keeper"] is True
+    assert data["usage"]["weekly_runs"] == {"plan_keeper": 10} and data["usage"]["overnight_window"] == "01:00-05:00"
     assert "# risk_level: 3" in text
     with pytest.raises(StarterError, match="already exists"):
         init(demo_cfg, today=TODAY)
