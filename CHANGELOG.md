@@ -4,6 +4,15 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.5.0 - 2026-11-07
+
+Tier 1 is code complete: Bridge, Plan, Decisions with Preflight, and the Plan keeper and tax desk with their brief, crew tiles and tax calendar. It runs on demo data until the one-time box setup finishes phase 1. The Lab's compare and risk engine landed alongside.
+
+### Added
+
+- Today's brief on the Bridge; crew tiles with switches, kill switch, weekly usage and run log in Settings; tax calendar with wash-sale windows on the Plan page ([#44])
+- Lab compare and risk engine: VaR/CVaR, beta, correlations, Sharpe/Sortino, capture, active share, scenario shocks, N-PORT look-through and sectors, plan adherence, after-tax account returns, and `/api/compare` ([#43])
+
 ## 0.4.0 - 2026-11-07
 
 Decisions and Preflight are done: every proposal now shows its Preflight lights, an override needs a reason, and the Journal keeps score. The research data feeds for phase 6 landed alongside.
@@ -100,3 +109,5 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#38]: https://github.com/inzodious/vektor-desk/pull/38
 [#40]: https://github.com/inzodious/vektor-desk/pull/40
 [#41]: https://github.com/inzodious/vektor-desk/pull/41
+[#43]: https://github.com/inzodious/vektor-desk/pull/43
+[#44]: https://github.com/inzodious/vektor-desk/pull/44
