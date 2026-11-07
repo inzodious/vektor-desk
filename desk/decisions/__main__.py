@@ -4,11 +4,28 @@ import sys
 
 from desk.config import Config
 from desk.decisions.profile import active_profile
+from desk.decisions.records import confirm_fills, expire_due, rerun_preflight
+from desk.decisions.store import now_iso, session
 
 
 def sync(cfg: Config) -> dict:
     profile = active_profile(cfg)
-    return {"profile_version": profile.version, "rules_version": profile.rules_version, "source": profile.source, "error": profile.error}
+    with session(cfg) as conn:
+        expired = expire_due(conn, now_iso())
+        pending = [
+            r["id"] for r in conn.execute("SELECT id FROM decisions WHERE status IN ('proposed', 'snoozed') AND preflight_status IN ('pending', 'error')")
+        ]
+    checked = sum(rerun_preflight(cfg, d)["preflight_status"] not in ("pending", "error") for d in pending)
+    filled = confirm_fills(cfg)
+    return {
+        "profile_version": profile.version,
+        "rules_version": profile.rules_version,
+        "source": profile.source,
+        "error": profile.error,
+        "expired": expired,
+        "preflight_rerun": checked,
+        "filled": len(filled),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
