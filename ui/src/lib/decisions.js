@@ -100,11 +100,12 @@ export function expiresLabel(iso) {
   return `Expires ${dayLabel(iso.slice(0, 10))}`;
 }
 
-export function scoreOf(d, window = '30d') {
-  const s = d?.scores?.[window];
+export function scoreOf(d, window = '30D') {
+  const sc = d?.scores || {};
+  const s = sc[window] ?? sc[window.toUpperCase()] ?? sc[window.toLowerCase()];
   if (s == null) return null;
   if (typeof s === 'number') return s;
-  return typeof s.value === 'number' ? s.value : typeof s.vs_plan === 'number' ? s.vs_plan : null;
+  return typeof s.value === 'number' ? s.value : typeof s.usd === 'number' ? s.usd : typeof s.vs_plan === 'number' ? s.vs_plan : null;
 }
 
 export function scoresOn(d, days = 30) {

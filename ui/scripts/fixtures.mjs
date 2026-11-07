@@ -122,14 +122,7 @@ for (const d of dossiers) save(`agents.dossiers.${d.symbol}`, d);
 save('agents.console', await get('/api/agents/console?limit=50'));
 save('engine.macro', await get('/api/engine/macro?start=2025-11-07'));
 
-let watch;
-try {
-  watch = await get('/api/engine/watchlist');
-} catch {
-  const nova = (await get('/api/engine/prices?symbol=NOVA')).rows;
-  const [prev, last] = nova.slice(-2);
-  watch = { symbols: [{ symbol: 'NOVA', name: 'Nova Fission (synthetic)', source: 'desk', added_at: '2026-10-02T14:00:00+00:00', last_close: last.close, prev_close: prev.close, last_bar: last.date, has_research: true }] };
-}
+const watch = await get('/api/engine/watchlist');
 save('engine.watchlist', watch);
 save('engine.watchlist.empty', { symbols: [] });
 

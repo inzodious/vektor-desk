@@ -221,7 +221,7 @@ from datetime import date, timedelta  # noqa: E402
 
 EDGAR = "https://www.sec.gov/edgar/search/"
 FRED = "https://fred.stlouisfed.org/series/"
-rng = random.Random(6)
+rng = random.Random(6)  # noqa: S311
 
 FILINGS = [
     ("ACME", "8-K", "2026-11-03", "2026-11-03", "Launch schedule update, synthetic"),
@@ -269,12 +269,13 @@ with sqlite3.connect(cfg.desk_db) as conn:
     conn.executemany("INSERT INTO fundamentals VALUES (?,?,?,?,?,?,?,?,?,?)", FACTS)
     conn.executemany("INSERT OR REPLACE INTO earnings VALUES (?,?,?,?,?,?,?,?,?)", EARNINGS)
     conn.executemany("INSERT OR IGNORE INTO insider_trades VALUES (?,?,?,?,?,?,?,?)", INSIDERS)
-    conn.execute(
-        "INSERT OR REPLACE INTO market_symbols (symbol, role, priority, added_at) VALUES ('NOVA', 'watch', 5, '2026-10-02T14:00:00+00:00')"
-    )
+    conn.execute("INSERT OR REPLACE INTO market_symbols (symbol, role, priority, added_at) VALUES ('NOVA', 'watch', 5, '2026-10-02T14:00:00+00:00')")
     conn.executemany(
         "INSERT OR REPLACE INTO sym_profiles (symbol, name, industry, sector, fetched_at) VALUES (?,?,?,?,?)",
-        [("ACME", "Acme Orbital (synthetic)", "Aerospace", "Industrials", "2026-11-06"), ("NOVA", "Nova Fission (synthetic)", "Utilities", "Utilities", "2026-11-06")],
+        [
+            ("ACME", "Acme Orbital (synthetic)", "Aerospace", "Industrials", "2026-11-06"),
+            ("NOVA", "Nova Fission (synthetic)", "Utilities", "Utilities", "2026-11-06"),
+        ],
     )
     day, px, rows = date(2024, 11, 7), 14.0, []
     while day <= date(2026, 11, 6):
@@ -284,7 +285,13 @@ with sqlite3.connect(cfg.desk_db) as conn:
         day += timedelta(days=1)
     conn.executemany("INSERT OR REPLACE INTO prices_daily VALUES (?,?,?,?,?)", rows)
     macro = []
-    for series, start, drift, vol in (("DGS3MO", 4.6, -0.0012, 0.01), ("DGS2", 4.1, -0.0008, 0.03), ("DGS10", 4.3, -0.0002, 0.03), ("BAMLH0A0HYM2", 3.4, -0.0005, 0.04), ("VIXCLS", 17.0, 0, 0.6)):
+    for series, start, drift, vol in (
+        ("DGS3MO", 4.6, -0.0012, 0.01),
+        ("DGS2", 4.1, -0.0008, 0.03),
+        ("DGS10", 4.3, -0.0002, 0.03),
+        ("BAMLH0A0HYM2", 3.4, -0.0005, 0.04),
+        ("VIXCLS", 17.0, 0, 0.6),
+    ):
         day, v = date(2025, 11, 3), start
         while day <= date(2026, 11, 6):
             if day.weekday() < 5:
@@ -305,8 +312,14 @@ DOSSIERS = [
         {
             "symbol": "FTEC",
             "verdict": "hold",
-            "thesis": "FTEC is the plan's tech tilt at 20% of the mix. It tracks the broad US tech index for 0.084% a year, and the plan already caps it so one sector can't run the portfolio.",
-            "bear_case": "The top three holdings are 45% of the fund. A bad quarter for any one of them moves FTEC far more than the S&P 500, and it overlaps a third with the core fund.",
+            "thesis": (
+                "FTEC is the plan's tech tilt at 20% of the mix. It tracks the broad US tech index for 0.084% a year, "
+                "and the plan already caps it so one sector can't run the portfolio."
+            ),
+            "bear_case": (
+                "The top three holdings are 45% of the fund. A bad quarter for any one of them moves FTEC far more than the S&P 500, "
+                "and it overlaps a third with the core fund."
+            ),
             "valuation_range": {"low": 24, "high": 35, "basis": "forward P/E of the fund", "now": 32},
             "what_would_change": "Top three weights pass 50%.\nForward P/E above 35x.\nThe plan drops the tech tilt.",
             "changes_since_last": "Top three weight is up 2 points since the June holdings.",
@@ -325,7 +338,10 @@ DOSSIERS = [
             "symbol": "ACME",
             "verdict": "avoid",
             "thesis": "ACME grew revenue 24% a year for three years and turned an operating profit in 2025. The launch backlog is two years deep.",
-            "bear_case": "It is a single stock outside the plan, share count is up 5% in a year, and a director sold under a 10b5-1 plan last month. One launch scrub resets the story.",
+            "bear_case": (
+                "It is a single stock outside the plan, share count is up 5% in a year, and a director sold under a 10b5-1 plan last month. "
+                "One launch scrub resets the story."
+            ),
             "valuation_range": {"low": 2.4, "high": 4.2, "basis": "price per share, $", "now": None},
             "what_would_change": "Two clean launches in a row.\nShare count stops growing.\nThe plan makes room for a satellite sleeve.",
             "changes_since_last": None,
@@ -354,7 +370,7 @@ DOSSIERS = [
 
 with store.db(cfg) as conn:
     research_run = conn.execute("SELECT id FROM agent_runs WHERE desk='research' ORDER BY id DESC LIMIT 1").fetchone()[0]
-for sym, created, body in DOSSIERS:
+for sym, _created, body in DOSSIERS:
     store.save_dossier(cfg, sym, research_run, json.dumps(body, sort_keys=True))
 with store.db(cfg) as conn:
     for sym, created, _ in DOSSIERS:
