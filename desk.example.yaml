@@ -1,0 +1,66 @@
+# Vektor Desk profile: an example with made-up values.
+# The real file lives on the TrueNAS box at /data/desk.yaml (or $DESK_PROFILE) and never in the repo.
+# Every change is stored as a new profile version; a change to rules is logged as a decision.
+
+risk_level: 3
+
+industry_focus:
+  themes:
+    - name: broad market
+      weight: 70
+    - name: example theme
+      weight: 30
+  exclude: [tobacco]
+
+opportunity:
+  satellite_cap_pct: 10
+  ideas_per_month: 2
+  min_confidence: 0.55
+
+tax:
+  harvest_threshold_usd: 250
+  lot_method: highest_cost
+  year_end_start: "12-01"
+  wash_sale_accounts: [brokerage, hsa, retirement]
+
+growth:
+  horizon_years: 10
+  tilt: growth
+  fi_target_from_plan: true
+
+usage:
+  overnight_window: "01:00-05:00"
+  weekly_runs:
+    plan_keeper: 7
+    tax: 8
+    risk: 3
+    research: 4
+    skeptic: 10
+    scout: 1
+    strategy: 2
+
+agents:
+  enabled: false
+  desks:
+    plan_keeper: true
+    tax: true
+    risk: true
+    research: false
+    skeptic: true
+    scout: false
+    strategy: false
+
+rules:
+  - id: no-margin-buys
+    kind: no_margin_buys
+  - id: no-new-single-stocks
+    kind: no_new_single_stocks
+  - id: single-stock-band
+    kind: single_stock_band
+    params: {min_pct: 0, max_pct: 10}
+  - id: drift-max
+    kind: drift_max_pts
+    params: {pts: 5}
+  - id: cash-floor
+    kind: cash_floor_pct
+    params: {pct: 2}
