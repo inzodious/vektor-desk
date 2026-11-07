@@ -7,6 +7,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine import ENGINE_VERSION, schema
 from desk.engine.holdings import rebuild
+from desk.engine.lots import import_inbox
 from desk.engine.source import open_mirror
 from desk.runlock import BUSY, Busy, job_lock
 
@@ -33,7 +34,22 @@ def run_holdings(cfg: Config) -> dict:
         desk.close()
 
 
-JOBS = {"holdings": run_holdings}
+def run_lots(cfg: Config) -> dict:
+    desk = connect(cfg.desk_db)
+    try:
+        schema.apply(desk)
+        result = import_inbox(cfg, desk)
+        with desk:
+            desk.execute(
+                "INSERT INTO engine_runs (job, started_at, finished_at, ok, detail, engine_version) VALUES ('lots', ?, ?, ?, ?, ?)",
+                (now_iso(), now_iso(), int(result["ok"]), json.dumps(result), ENGINE_VERSION),
+            )
+        return result
+    finally:
+        desk.close()
+
+
+JOBS = {"holdings": run_holdings, "lots": run_lots}
 
 
 def main(argv: list[str] | None = None) -> int:

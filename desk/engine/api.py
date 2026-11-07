@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
+from desk.engine.lots import current_lots
 
 router = APIRouter(prefix="/api/engine", tags=["engine"])
 
@@ -77,3 +78,19 @@ def value(request: Request, start: str | None = None, end: str | None = None, ac
     finally:
         conn.close()
     return _json({"series": [{"date": r["date"], "value": r["value"], "source": r["source"], "quality": worst((r["q"] or "").split(","))} for r in rows]})
+
+
+@router.get("/lots")
+def lots(request: Request, symbol: str | None = None, account: str | None = None) -> JSONResponse:
+    cfg = get_cfg(request)
+    if not cfg.desk_db.exists():
+        return _json({"lots": [], "files": []})
+    conn = connect(cfg.desk_db, readonly=True)
+    try:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='lot_files'").fetchone() is None:
+            return _json({"lots": [], "files": []})
+        rows = [r for r in current_lots(conn) if (not symbol or r["symbol"] == symbol.upper()) and (not account or r["account"] == account)]
+        files = [dict(r) for r in conn.execute("SELECT id, name, kind, as_of, imported_at, rows, warnings FROM lot_files ORDER BY id DESC LIMIT 20")]
+    finally:
+        conn.close()
+    return _json({"lots": rows, "files": files})
