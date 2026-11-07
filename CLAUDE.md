@@ -9,4 +9,4 @@ Read `docs/project-plan.md` first. It names the workstreams and the files each o
 - Nothing may hold broker credentials or place trades. Nothing may write to Escape Vektor's Firestore.
 - Model calls go through the Claude Code CLI (`claude -p`) runner only.
 - Docs: short, plain, tables over paragraphs. Code: no inline comments except section labels.
-- App PRs add a line under `## Unreleased` in `CHANGELOG.md` and tick their items in `ROADMAP.md` (Lead folds roadmap changes in if you message them instead).
+- Don't edit `CHANGELOG.md` or `ROADMAP.md` (they conflict on every parallel PR). Put a `Changelog:` line in the PR body and list the roadmap items it delivers; Lead writes both in when the phase is cut.

@@ -1,0 +1,69 @@
+from dataclasses import asdict, dataclass
+
+from desk.agents import store
+from desk.agents.adapter import Adapter, AgentError, AgentResult, AgentTimeout, ClaudeCli, UsageLimitError
+from desk.agents.desks import Desk
+from desk.config import Config
+from desk.runlock import Busy, job_lock
+
+LOCK = "agents"
+
+
+@dataclass
+class Outcome:
+    status: str
+    run_id: int
+    result: AgentResult | None = None
+    note: str | None = None
+
+    @property
+    def ok(self) -> bool:
+        return self.status == "ok"
+
+
+def _usage(result: AgentResult) -> dict:
+    keep = ("turns", "input_tokens", "output_tokens", "cache_tokens", "duration_ms", "cost_estimate")
+    return {k: v for k, v in asdict(result).items() if k in keep}
+
+
+def run_desk(
+    desk: Desk,
+    system: str,
+    prompt: str,
+    *,
+    cfg: Config,
+    schema: dict | None = None,
+    adapter: Adapter | None = None,
+    trigger: str = "schedule",
+    wait: float = 0.0,
+) -> Outcome:
+    def skip(status: str, note: str) -> Outcome:
+        return Outcome(status, store.start_run(cfg, desk.name, trigger=trigger, model=desk.model, effort=desk.effort, status=status, note=note), note=note)
+
+    if not store.is_enabled(cfg, desk.name):
+        return skip("disabled", "Switched off in Settings.")
+    if trigger == "schedule" and store.week_usage(cfg, desk.name)["runs"] >= desk.weekly_runs:
+        return skip("over_budget", f"Weekly cap of {desk.weekly_runs} runs reached.")
+    adapter = adapter or ClaudeCli()
+    try:
+        with job_lock(LOCK, wait=wait, cfg=cfg):
+            run_id = store.start_run(cfg, desk.name, trigger=trigger, model=desk.model, effort=desk.effort)
+            try:
+                result = adapter.run(desk, system, prompt, schema)
+            except UsageLimitError as e:
+                store.finish_run(cfg, run_id, "deferred", note=str(e))
+                return Outcome("deferred", run_id, note=str(e))
+            except AgentTimeout as e:
+                store.finish_run(cfg, run_id, "timeout", note=str(e))
+                return Outcome("timeout", run_id, note=str(e))
+            except AgentError as e:
+                store.finish_run(cfg, run_id, "failed", note=str(e))
+                return Outcome("failed", run_id, note=str(e))
+            if schema is not None and result.structured is None:
+                note = "No structured answer came back."
+                store.finish_run(cfg, run_id, "failed", usage=_usage(result), note=note)
+                return Outcome("failed", run_id, result, note)
+            store.finish_run(cfg, run_id, "ok", usage=_usage(result))
+            return Outcome("ok", run_id, result)
+    except Busy:
+        return skip("busy", "Another desk or a heavy engine job was running.")
