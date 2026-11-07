@@ -13,9 +13,9 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 2 | Bridge and Symbol sheet | 1 | ✅ | 1 |
 | 3 | Engine core and Plan | 1 | ✅ | 2 |
 | 4 | Decisions and Preflight | 1 | ✅ | 3 |
-| 5 | Plan keeper and tax desk | 1 | 🚧 | 4 |
+| 5 | Plan keeper and tax desk | 1 | ✅ | 4 |
 | 6 | Research | 2 | 🚧 | 4 |
-| 7 | Lab: Compare and risk | 2 | 📋 | 3 |
+| 7 | Lab: Compare and risk | 2 | 🚧 | 3 |
 | 8 | Phone alerts | 2 | 📋 | 5 |
 | 9 | Strategy lab | 3 | 📋 | 3, 6 |
 | 10 | Flight record and Patterns | 3 | 📋 | 30 days of decision records |
@@ -84,16 +84,16 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run. **
 - [x] Order tickets, marked placed, confirmed by the mirror ([#20])
 - [x] Queue with proposal cards; Journal as a stamped ledger ([#20], [#41])
 
-### 5. Plan keeper and tax desk 🚧
+### 5. Plan keeper and tax desk ✅
 
 - [x] Agent proposal record, written into the queue ([#15], [#20])
 - [x] Engine: per-desk brief slices, triggers table, marginal tax rate ([#36])
 - [x] Plan keeper: daily brief, payday split, rule breach flags ([#15], [#36], [#38])
 - [x] Tax desk: harvest candidates, lot picks, wash-sale windows, tax calendar ([#15], [#22], [#35], [#36])
-- [ ] Brief card; crew tiles with agent status, run log and usage per run (data [#10], [#15]; page to come)
-- [ ] Tax calendar view
+- [x] Brief card; crew tiles with agent status, run log and usage per run ([#10], [#15], [#44])
+- [x] Tax calendar view ([#44])
 
-Tier 1 complete: 0.5.0.
+Tier 1 code complete: 0.5.0. It runs on demo data until the box setup in [docs/setup.md](docs/setup.md) finishes phase 1.
 
 ### 6. Research 🚧
 
@@ -104,11 +104,11 @@ Tier 1 complete: 0.5.0.
 - [ ] Source library: SEC EDGAR filings, insider trades, 13F, earnings dates, FRED series (data [#40]; 13F and views to come)
 - [x] Engine: EDGAR, FRED and Finnhub fetchers and holding signals ([#40])
 
-### 7. Lab: Compare and risk 📋
+### 7. Lab: Compare and risk 🚧
 
-- [ ] Compare two to five items over a period, with fund overlap (N-PORT look-through)
-- [ ] Risk and statistics: concentration, exposure, scenario shocks, margin stress; heatmap and scatter views
-- [ ] Saved boards shell (`/api/compare`)
+- [ ] Compare two to five items over a period, with fund overlap (N-PORT look-through) (engine [#43]; views to come)
+- [ ] Risk and statistics: concentration, exposure, scenario shocks, margin stress; heatmap and scatter views (engine [#43]; views to come)
+- [ ] Saved boards shell (`/api/compare`) (endpoint [#43]; shell to come)
 - [x] Risk desk weekly report ([#18])
 
 ### 8. Phone alerts 📋
@@ -191,3 +191,5 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#38]: https://github.com/inzodious/vektor-desk/pull/38
 [#40]: https://github.com/inzodious/vektor-desk/pull/40
 [#41]: https://github.com/inzodious/vektor-desk/pull/41
+[#43]: https://github.com/inzodious/vektor-desk/pull/43
+[#44]: https://github.com/inzodious/vektor-desk/pull/44
