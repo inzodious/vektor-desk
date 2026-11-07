@@ -14,6 +14,8 @@ class Engine(Protocol):
 
 
 class Lab(Protocol):
+    def grammar(self) -> dict: ...
+
     def features(self, cfg: Config) -> list[dict]: ...
 
     def desk_view(self, cfg: Config, strategy_id: str) -> dict: ...
@@ -102,6 +104,9 @@ class RealLab:
             return getattr(mod, fn)(*args)
         except not_ready as e:
             raise NotReady(str(e) or "lab not ready") from None
+
+    def grammar(self) -> dict:
+        return dict(self._call("grammar"))
 
     def features(self, cfg: Config) -> list[dict]:
         return list(self._call("features", cfg))

@@ -31,8 +31,14 @@ DOSSIER = {
             "type": "object",
             "additionalProperties": False,
             "required": ["low", "high", "basis"],
-            "properties": {"low": {"type": ["number", "null"]}, "high": {"type": ["number", "null"]}, "basis": {"type": "string"}},
+            "properties": {
+                "low": {"type": ["number", "null"]},
+                "high": {"type": ["number", "null"]},
+                "now": {"type": ["number", "null"]},
+                "basis": {"type": "string"},
+            },
         },
+        "verdict": {"enum": ["add", "hold", "trim", "avoid", "watch", None]},
         "what_would_change": {"type": "string", "maxLength": 800},
         "changes_since_last": {"type": ["string", "null"], "maxLength": 800},
         "sources": {

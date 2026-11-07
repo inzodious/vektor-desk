@@ -40,6 +40,10 @@ class FakeLab:
         if not self.ready:
             raise NotReady("lab not built")
 
+    def grammar(self):
+        self._check()
+        return {"sizing": "equal, inverse_vol or rank"}
+
     def features(self, cfg):
         self._check()
         return [{"metric_id": "ret", "window_options": ["21d", "126d"], "transforms": ["rank"], "description": "total return"}]
@@ -86,6 +90,7 @@ def test_experiment_is_queued_with_runner_provenance(cfg):
     assert not list(queue_dir(cfg).glob(".*.tmp"))
     prompt = json.loads(fake.calls[0]["prompt"].split("\n\n", 1)[1])
     assert prompt["features"][0]["metric_id"] == "ret" and prompt["lab_result"] is None
+    assert prompt["grammar"]["sizing"].startswith("equal")
 
 
 def test_finalize_only_for_the_strategy_under_review(cfg):
@@ -105,11 +110,17 @@ def test_strategy_not_ready_and_yaml_switch(cfg):
 
 
 def test_lab_reviews_queue_one_request_each(cfg):
-    lab = FakeLab(pending=[{"strategy_id": "value-momentum-etf", "version": 1, "result_at": "2026-11-08T06:00:00Z"}])
+    pending = [
+        {"strategy_id": "value-momentum-etf", "version": 1, "kind": "experiment", "result_at": "2026-11-08T06:00:00Z"},
+        {"strategy_id": "value-momentum-etf", "version": 1, "kind": "finalize", "result_at": "2026-11-08T06:00:00Z"},
+        {"strategy_id": "low-vol", "version": 1, "kind": "rejected", "result_at": "2026-11-08T06:00:00Z"},
+    ]
+    lab = FakeLab(pending=pending)
     made = queue_reviews(cfg, lab)
-    assert len(made) == 1 and queue_reviews(cfg, lab) == []
-    req = store.get_request(cfg, made[0])
+    assert len(made) == 3 and queue_reviews(cfg, lab) == []
+    req, fin, bounced = (store.get_request(cfg, r) for r in made)
     assert (req["desk"], req["symbol"], req["source"], req["run_now"]) == ("strategy", "value-momentum-etf", "lab", 0)
+    assert "finalized" in fin["question"] and "fix the spec" in bounced["question"]
     assert queue_reviews(cfg, FakeLab(ready=False)) == []
 
 
