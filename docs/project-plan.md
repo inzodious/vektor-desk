@@ -67,7 +67,7 @@ Parallel workstreams stay conflict-free by owning packages, not files scattered 
 
 Shared seams, so nobody edits another owner's code:
 
-- **Routes.** Each package exposes `router` in `desk/<package>/api.py`; `app.py` includes every package router it finds. Paths are `/api/<package>/...`.
+- **Routes.** Each package exposes `router` in `desk/<package>/api.py`; `app.py` includes every package router it finds. Path owners: Infrastructure `/api/health`, `/api/status`, `/api/positions`; Statistics `/api/live`, `/api/preflight`, `/api/compare`, `/api/engine/...`; Concept `/api/decisions/...`; AI agents `/api/agents/...`. A new prefix is claimed in the owner's doc first.
 - **Tables.** Each package declares its own tables in `desk/<package>/schema.py`; startup applies them in `desk.db`. Only the owner writes its tables; others read through the owner's functions or published views.
 - **Jobs.** Each package lists scheduled jobs in `desk/<package>/jobs.py`; the scheduler picks them up.
 - **Dependencies.** Add your own lines to `pyproject.toml` or `ui/package.json`; never reorder or remove others'. Re-merge `main` before review.
