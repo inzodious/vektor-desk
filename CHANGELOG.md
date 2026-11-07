@@ -4,6 +4,20 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.6.0 - 2026-11-07
+
+Research is done, and phone alerts are complete with trigger hits. The Strategy lab and Flight record engines landed alongside; their views come next.
+
+### Added
+
+- Research views (dossiers, sources, watchlist, calendar), the Console popup, symbol search and dossiers in the symbol sheet ([#52])
+- Research dossiers carry a verdict and today's value on the valuation strip ([#48])
+- Strategy lab: spec parsing, a point-in-time simulator with costs, taxes and delistings, walk-forward with a locked two-year holdout, trial ledger, deflated Sharpe and PBO, nightly paper portfolios eligible after 182 days, and `/api/lab/strategies` ([#45])
+- The lab runs on the box as its own no-network service, with overnight sweeps from 1 to 6 ET ([#47])
+- Ken French industry, size and momentum portfolios back to 1963, a six-factor alpha check on every strategy, and backtests of your own rules (rebalance bands, deposit steering, harvest thresholds, margin on dips) over every start month; watchlist API ([#49])
+- The Strategy desk works with the real lab, tests your plan rules and reads factor checks and French results plainly ([#48], [#50])
+- Flight record engine: every decision scored at 30, 90 and 365 days against the plan, desk records, calibration, saves and the cost of off-plan trades; Patterns with base rates, drawdown recovery history and your own buying habits ([#51])
+
 ## 0.5.0 - 2026-11-07
 
 Tier 1 is code complete: Bridge, Plan, Decisions with Preflight, and the Plan keeper and tax desk with their brief, crew tiles and tax calendar. It runs on demo data until the one-time box setup finishes phase 1. The Lab's compare and risk engine landed alongside.
@@ -111,3 +125,10 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#41]: https://github.com/inzodious/vektor-desk/pull/41
 [#43]: https://github.com/inzodious/vektor-desk/pull/43
 [#44]: https://github.com/inzodious/vektor-desk/pull/44
+[#45]: https://github.com/inzodious/vektor-desk/pull/45
+[#47]: https://github.com/inzodious/vektor-desk/pull/47
+[#48]: https://github.com/inzodious/vektor-desk/pull/48
+[#49]: https://github.com/inzodious/vektor-desk/pull/49
+[#50]: https://github.com/inzodious/vektor-desk/pull/50
+[#51]: https://github.com/inzodious/vektor-desk/pull/51
+[#52]: https://github.com/inzodious/vektor-desk/pull/52
