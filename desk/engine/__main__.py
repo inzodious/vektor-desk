@@ -10,6 +10,8 @@ from desk.db import connect
 from desk.engine import ENGINE_VERSION, core, schema, triggers
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
+from desk.engine.lab import data as lab_data
+from desk.engine.lab import paper
 from desk.engine.live import refresh_quotes
 from desk.engine.lookthrough import run_all as run_lookthrough_all
 from desk.engine.lots import import_inbox
@@ -135,6 +137,22 @@ def run_lookthrough(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "lookthrough", lambda desk: run_lookthrough_all(desk, http or http_session(), kinds))
 
 
+def run_lab_export(cfg: Config) -> dict:
+    mirror = open_mirror(cfg)
+    try:
+        kinds = core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror))) if mirror else {}
+        targets = core.plan_targets(core.latest_plan(mirror)) if mirror else {}
+    finally:
+        if mirror:
+            mirror.close()
+
+    def work(desk):
+        exported = lab_data.export(cfg, desk, kinds, targets)
+        return {**exported, **paper.run(cfg, desk)}
+
+    return _with_desk(cfg, "lab-export", work)
+
+
 def run_market_backfill(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "backfill", lambda desk: run_backfill(desk, http or http_session()))
 
@@ -147,6 +165,7 @@ JOBS = {
     "quotes": run_quotes,
     "backfill": run_market_backfill,
     "lookthrough": run_lookthrough,
+    "lab-export": run_lab_export,
     "research": run_research,
 }
 

@@ -299,6 +299,39 @@ CREATE TABLE IF NOT EXISTS lookthrough (
   via TEXT NOT NULL,
   PRIMARY KEY (holding)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS paper_portfolios (
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  title TEXT,
+  started TEXT NOT NULL,
+  as_of TEXT NOT NULL,
+  days INTEGER NOT NULL,
+  value REAL,
+  return_pct REAL,
+  excess_pts REAL,
+  status TEXT NOT NULL CHECK (status IN ('paper', 'eligible', 'retired')),
+  summary TEXT,
+  PRIMARY KEY (strategy_id, version)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS paper_positions (
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  shares REAL NOT NULL,
+  value REAL,
+  PRIMARY KEY (strategy_id, version, symbol)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS paper_trades (
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL,
+  shares REAL NOT NULL,
+  price REAL NOT NULL,
+  cost REAL NOT NULL
+);
 """
 
 
