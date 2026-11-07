@@ -64,6 +64,15 @@ Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deplo
 
 **Cash flows.** External flows are deposits, withdrawals, HSA contributions and 401(k) contributions. Internal moves (the margin and cash sub-account journals, transfers between your own accounts at the portfolio level, core fund sweeps, dividend reinvestment) are not flows. Getting this wrong is the most common way personal return math lies, so the classifier ships with fixtures for every Fidelity action text seen so far.
 
+| Activity row | External flow when |
+|---|---|
+| `deposit`, `withdrawal` | Always (not core, not a cash symbol) |
+| `transfer`, `other`, money in | `desk.decisions.plan.is_cash_in`: EFT, ACH, electronic, deposit, contribution, received or wire wording, and no out wording |
+| `transfer`, `other`, money out | EFT, ACH, electronic, transfer, withdraw or wire wording |
+| Any row with a non-core symbol | Never (share transfers are holdings moves) |
+
+Same-amount opposite moves between two of your accounts within 3 days are internal at the portfolio level.
+
 ## Reconciliation and data health
 
 Before metrics are published for a day, the engine checks:

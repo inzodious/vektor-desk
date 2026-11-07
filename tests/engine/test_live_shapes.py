@@ -266,3 +266,33 @@ def test_unpriced_plan_codes_never_fire_a_daily_move(cfg, mirror):
     _, found, _ = stored_run(cfg)
     moves = {f[2]: f[3]["ret_pct"] for f in found if f[1] == "daily_move"}
     assert moves.get("ROKT") == 20.0 and "Q20002" not in moves
+
+
+def test_eft_and_ach_transfers_are_external_flows():
+    from desk.engine.flows import classify
+
+    rows = [
+        {"date": FRI, "accountKey": IND, "kind": "transfer", "amount": 800.0, "action": "Electronic Funds Transfer Received"},
+        {"date": FRI, "accountKey": IND, "kind": "other", "amount": -300.0, "description": "ACH WITHDRAWAL TO BANK"},
+        {"date": FRI, "accountKey": IND, "kind": "transfer", "amount": 5.0, "symbol": "ROKT", "action": "TRANSFER OF ASSETS"},
+        {"date": FRI, "accountKey": IND, "kind": "other", "amount": 12.0, "action": "DIVIDEND RECEIVED", "core": True},
+        {"date": FRI, "accountKey": IND, "kind": "other", "amount": 40.0, "action": "FEE REBATE"},
+        {"date": THU, "accountKey": HSA, "kind": "transfer", "amount": -250.0, "action": "TRANSFER TO HSA INVESTMENTS"},
+        {"date": THU, "accountKey": IND, "kind": "transfer", "amount": 250.0, "action": "TRANSFER FROM CASH"},
+    ]
+    flows = {(f["account"], f["amount"]): f["external_portfolio"] for f in classify(rows)}
+    assert flows == {(IND, 800.0): 1, (IND, -300.0): 1, (HSA, -250.0): 0, (IND, 250.0): 0}
+
+
+def test_a_transfer_on_a_rolled_day_is_not_return(cfg, mirror):
+    rows = [(IND, "ROKT", 100.0, 3000.0, False), (IND, "SPAXX", 500.0, 500.0, True)]
+    mirror.put("snapshots", 1, snapshot(1, f"{THU}T21:30", 3500.0, 2))
+    for pid, (acct, sym, qty, value, cash) in enumerate(rows, start=1):
+        mirror.put("positions", pid, position(pid, 1, acct, sym, qty, value, value, cash=cash))
+    mirror.put("priceCloses", "ROKT_2026", closes_doc("ROKT", 2026, [[THU, 30.0, 30.0], [FRI, 30.3, 30.3]]))
+    mirror.put("activity", "eft", {"date": FRI, "accountKey": IND, "kind": "transfer", "amount": 1000.0, "action": "Electronic Funds Transfer Received"})
+    mirror.pull(f"{SAT}T14:00:00+00:00")
+    run_holdings(cfg)
+    assert rows_on(cfg, FRI)[(IND, "SPAXX")]["value"] == 1500.0
+    out, _, day = stored_run(cfg)
+    assert out.implied == {} and day == pytest.approx(30 / 3500 * 100, abs=1e-3)

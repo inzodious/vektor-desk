@@ -1,10 +1,14 @@
+import re
 import sqlite3
 from collections import defaultdict
 from datetime import date
 
+from desk.decisions.plan import is_cash_in
 from desk.engine.holdings import CASH_SYMBOLS
 
 EXTERNAL_KINDS = {"deposit", "withdrawal"}
+MOVE_KINDS = {"transfer", "other"}
+CASH_OUT_TRANSFER = re.compile(r"TRANSFER|\bEFT\b|\bACH\b|ELECTRONIC|WITHDRAW|WIRE", re.I)
 INCOME_KINDS = {"dividend", "interest"}
 PAIR_DAYS = 3
 
@@ -16,13 +20,25 @@ def _f(v) -> float:
         return 0.0
 
 
+def is_external(r: dict, amount: float) -> bool:
+    kind = r.get("kind")
+    if kind in EXTERNAL_KINDS:
+        return True
+    if kind not in MOVE_KINDS or r.get("symbol"):
+        return False
+    if amount > 0:
+        return is_cash_in(r)
+    text = f"{r.get('action') or ''} {r.get('description') or ''}"
+    return bool(CASH_OUT_TRANSFER.search(text))
+
+
 def classify(activity: list[dict]) -> list[dict]:
     flows = []
     for r in activity:
         kind = r.get("kind")
         symbol = str(r.get("symbol") or "").upper()
         amount = _f(r.get("amount"))
-        if kind not in EXTERNAL_KINDS or not amount or r.get("core") or symbol in CASH_SYMBOLS:
+        if not amount or r.get("core") or symbol in CASH_SYMBOLS or not is_external(r, amount):
             continue
         flows.append(
             {
