@@ -12,7 +12,7 @@ from desk.mirror import FirestoreReader, MirrorStore, run_mirror
 from desk.runlock import Busy, job_lock, running
 from desk.status import status
 from tests.fakes import FakeFirestore
-from tests.test_mirror import seed
+from tests.infra.test_mirror import seed
 
 
 def mirrored(cfg):

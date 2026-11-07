@@ -3,18 +3,18 @@ from pathlib import Path
 
 import pytest
 
-from desk.scheduler import parse, tick
+from desk.scheduler import package_jobs, parse, tick
 
 
 def at(s):
     return datetime.fromisoformat(s)
 
 
-def test_repo_crontab_parses():
-    jobs = parse(Path("deploy/crontab").read_text())
-    assert jobs and jobs[0].command == ["python", "-m", "desk.mirror"]
-    assert jobs[0].due(at("2026-11-09T08:00")) and jobs[0].due(at("2026-11-09T17:00"))
-    assert not jobs[0].due(at("2026-11-09T08:01"))
+def test_repo_crontab_parses_and_mirror_runs_twice_a_day():
+    assert parse(Path("deploy/crontab").read_text()) == []
+    (job,) = package_jobs(["mirror"])
+    assert job.due(at("2026-11-09T08:00")) and job.due(at("2026-11-09T17:00"))
+    assert not job.due(at("2026-11-09T08:01"))
 
 
 def test_fields_steps_ranges_and_weekdays():

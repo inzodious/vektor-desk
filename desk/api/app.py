@@ -2,6 +2,7 @@ import html
 import json
 import os
 import sqlite3
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -10,7 +11,8 @@ from fastapi.staticfiles import StaticFiles
 
 from desk import __version__
 from desk.config import Config
-from desk.db import connect
+from desk.db import apply_schemas, connect
+from desk.packages import seams
 from desk.status import status
 
 BUILD = os.environ.get("DESK_BUILD", "dev")
@@ -68,9 +70,17 @@ Holdings as of {html.escape(str(held["asOf"] or "no snapshot yet"))}. Build {htm
 </main></body></html>"""
 
 
-def create_app(cfg: Config | None = None) -> FastAPI:
+def create_app(cfg: Config | None = None, *, packages: list[str] | None = None, schemas: bool = True) -> FastAPI:
     cfg = cfg or Config.from_env()
-    app = FastAPI(title="Vektor Desk", version=__version__, docs_url=None, redoc_url=None, openapi_url="/api/openapi.json")
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):
+        if schemas:
+            app.state.schemas = apply_schemas(cfg, only=packages)
+        yield
+
+    app = FastAPI(title="Vektor Desk", version=__version__, docs_url=None, redoc_url=None, openapi_url="/api/openapi.json", lifespan=lifespan)
+    app.state.cfg = cfg
 
     @app.get("/api/health")
     def health() -> dict:
@@ -83,6 +93,14 @@ def create_app(cfg: Config | None = None) -> FastAPI:
     @app.get("/api/positions")
     def get_positions() -> JSONResponse:
         return JSONResponse(latest_positions(cfg), headers={"Cache-Control": "no-store"})
+
+    app.state.routers = []
+    for pkg, mod in seams("api", packages).items():
+        router = getattr(mod, "router", None)
+        if router is None:
+            raise RuntimeError(f"desk/{pkg}/api.py has no `router`")
+        app.include_router(router)
+        app.state.routers.append(pkg)
 
     ui = Path(os.environ.get("DESK_UI_DIR", "/app/ui/dist"))
     if (ui / "index.html").exists():
