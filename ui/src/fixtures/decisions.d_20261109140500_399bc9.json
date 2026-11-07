@@ -1,29 +1,29 @@
 {
- "id": "d_20261102130500_b28bda",
- "created_at": "2026-11-02T13:05:00+00:00",
- "updated_at": "2026-11-02T15:05:00+00:00",
- "origin": "plan_keeper",
- "run_id": "r-seed-0",
- "kind": "deposit_route",
- "title": "Route deposit to $300 FXAIX",
- "symbol": "FXAIX",
- "account": "individual-0001",
- "amount_usd": 300,
+ "id": "d_20261109140500_399bc9",
+ "created_at": "2026-11-09T14:05:00+00:00",
+ "updated_at": "2026-11-09T14:05:00+00:00",
+ "origin": "risk",
+ "run_id": "r-seed-3",
+ "kind": "hold_off",
+ "title": "Hold off on new BND until the rate decision",
+ "symbol": "BND",
+ "account": null,
+ "amount_usd": null,
  "shares": null,
- "funding": "deposit",
- "thesis": "Core fund gets its share of the monthly deposit.",
+ "funding": null,
+ "thesis": "BND is on target. Nothing to add before the synthetic rate decision on Nov 18.",
  "bear_case": null,
  "invalidation": null,
- "horizon": null,
- "rule_served": "drift-max",
- "confidence": 0.9,
+ "horizon": "2 weeks",
+ "rule_served": null,
+ "confidence": 0.7,
  "numbers_used": [],
  "sources": [],
  "order_ticket": null,
  "skeptic": null,
- "expires_at": "2026-11-09T21:00:00+00:00",
- "status": "placed",
- "status_reason": "Monthly routine",
+ "expires_at": "2026-11-16T21:00:00+00:00",
+ "status": "proposed",
+ "status_reason": null,
  "snoozed_until": null,
  "override": false,
  "override_reason": null,
@@ -33,25 +33,25 @@
   "engine_version": "0.1.0",
   "lights": [
    {
-    "after": 59.5899,
-    "before": 58.8504,
-    "detail": "FXAIX goes from 58.9% to 59.6%; the largest holding would be 59.6%.",
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
     "id": "concentration",
     "label": "Concentration",
     "status": "ok"
    },
    {
-    "after": 1.5676,
-    "before": 1.3218,
-    "detail": "Largest drift stays near 1.6 points.",
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
     "id": "drift_after",
     "label": "Drift after",
     "status": "ok"
    },
    {
-    "after": 0,
-    "before": 0,
-    "detail": "Waits for the 2026-12-01 deposit.",
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
     "id": "funding",
     "label": "Funding",
     "status": "ok"
@@ -59,8 +59,7 @@
    {
     "after": null,
     "before": null,
-    "clears": null,
-    "detail": "No loss sale of this symbol in the last 30 days.",
+    "detail": "Nothing to trade.",
     "id": "wash_sales",
     "label": "Wash sales",
     "status": "ok"
@@ -68,15 +67,15 @@
    {
     "after": null,
     "before": null,
-    "detail": "Opens a new lot at about $207.72.",
+    "detail": "Nothing to trade.",
     "id": "lots_tax",
     "label": "Lots and tax",
     "status": "ok"
    },
    {
-    "after": 3,
-    "before": 3,
-    "detail": "All 3 rules hold.",
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
     "id": "plan_rules",
     "label": "Plan rules",
     "status": "ok"
@@ -84,25 +83,25 @@
   ],
   "metrics": [
    {
-    "after": 16693.49,
+    "after": 16393.49,
     "before": 16393.49,
     "flag": "ok",
     "metric_id": "value.market"
    },
    {
-    "after": 59.5899,
+    "after": 58.8504,
     "before": 58.8504,
     "flag": "ok",
     "metric_id": "risk.top1"
    },
    {
-    "after": 0.4729,
+    "after": 0.4816,
     "before": 0.4816,
     "flag": "ok",
     "metric_id": "plan.single_stock"
    },
    {
-    "after": 1.5676,
+    "after": 1.3218,
     "before": 1.3218,
     "flag": "ok",
     "metric_id": "plan.drift_max"
@@ -126,7 +125,7 @@
     "metric_id": "margin.call_drop"
    },
    {
-    "after": 0.8506,
+    "after": 0.8662,
     "before": 0.8662,
     "flag": "ok",
     "metric_id": "cash.share"
@@ -135,69 +134,45 @@
   "quality": "ok",
   "status": "clear",
   "tax": {
-   "lot_method": "highest_cost",
-   "lots": [],
    "wash_clear_date": null
   },
   "trade": {
-   "account": "individual-0001",
-   "amount_usd": 300,
-   "funding": "deposit",
-   "kind": "deposit_route",
+   "account": null,
+   "amount_usd": null,
+   "funding": "cash",
+   "kind": "hold_off",
    "lot_method": "highest_cost",
-   "price": 207.72,
-   "shares": 1.444252,
-   "side": "buy",
-   "symbol": "FXAIX"
+   "price": 77.35,
+   "shares": null,
+   "side": null,
+   "symbol": "BND"
   }
  },
- "preflight_at": "2026-11-02T13:05:00+00:00",
+ "preflight_at": "2026-11-09T14:05:00+00:00",
  "tax_impact": {
-  "lot_method": "highest_cost",
-  "lots": [],
   "wash_clear_date": null
  },
  "profile_version": 1,
  "rules_version": 1,
- "decided_at": "2026-11-02T14:05:00+00:00",
- "placed_at": "2026-11-02T15:05:00+00:00",
+ "decided_at": null,
+ "placed_at": null,
  "filled_at": null,
- "fill": {
-  "placed": {
-   "price": 207.51,
-   "shares": 1.445713
-  }
- },
+ "fill": null,
  "activity_id": null,
- "decision": "approved",
+ "decision": null,
  "events": [
   {
-   "at": "2026-11-02T13:05:00+00:00",
+   "at": "2026-11-09T14:05:00+00:00",
    "event": "proposed",
    "reason": null,
    "detail": null
   },
   {
-   "at": "2026-11-02T13:05:00+00:00",
+   "at": "2026-11-09T14:05:00+00:00",
    "event": "preflight",
    "reason": null,
    "detail": {
     "status": "clear"
-   }
-  },
-  {
-   "at": "2026-11-02T14:05:00+00:00",
-   "event": "approved",
-   "reason": "Monthly routine",
-   "detail": null
-  },
-  {
-   "at": "2026-11-02T15:05:00+00:00",
-   "event": "placed",
-   "reason": null,
-   "detail": {
-    "price": 207.51,
-    "shares": 1.445713
    }
   }
  ]

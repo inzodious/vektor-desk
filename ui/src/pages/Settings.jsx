@@ -4,6 +4,7 @@ import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
 import { Panel } from '../components/Panel.jsx';
 import { useApi } from '../lib/api.js';
+import { Crew, Usage } from '../agents/Crew.jsx';
 import { useTheme } from '../lib/theme.js';
 import { ago, count, etStamp, etTime, plural } from '../lib/format.js';
 import { JOBS, MIRROR, THEMES, TOKEN, daysLabel, mirrorLine, summary, tokenLine } from '../lib/status.js';
@@ -233,6 +234,8 @@ function MirrorTables({ mirror, open, onClose }) {
 export default function Settings() {
   const status = useApi('/api/status', { every: 30000 });
   const health = useApi('/api/health');
+  const agents = useApi('/api/agents/status', { every: 60000 });
+  const runs = useApi('/api/agents/runs?limit=8', { every: 120000 });
   const [drawer, setDrawer] = useState(false);
   const [checkedAt, setCheckedAt] = useState(() => new Date());
   const s = status.data;
@@ -304,6 +307,14 @@ export default function Settings() {
         <Token token={s.claude_token} />
         <Running jobs={s.running || []} />
         <About status={s} health={health.data} checkedAt={checkedAt} onRefresh={refresh} refreshing={status.loading} />
+        <Crew
+          status={agents}
+          reload={() => {
+            agents.reload();
+            runs.reload();
+          }}
+        />
+        <Usage status={agents} runs={runs} />
       </section>
       <MirrorTables mirror={s.mirror} open={drawer} onClose={() => setDrawer(false)} />
     </>

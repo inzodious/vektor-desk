@@ -1,0 +1,77 @@
+{
+ "as_of": "2026-11-06",
+ "windows": [
+  {
+   "as_of": "2026-11-06",
+   "symbol": "BND",
+   "kind": "recent_buy",
+   "date": "2026-11-02",
+   "clears": "2026-12-03",
+   "account": "hsa-0002",
+   "amount": 5
+  },
+  {
+   "as_of": "2026-11-06",
+   "symbol": "BND",
+   "kind": "recent_buy",
+   "date": "2026-11-02",
+   "clears": "2026-12-03",
+   "account": "individual-0001",
+   "amount": 25
+  },
+  {
+   "as_of": "2026-11-06",
+   "symbol": "FTEC",
+   "kind": "recent_buy",
+   "date": "2026-11-02",
+   "clears": "2026-12-03",
+   "account": "hsa-0002",
+   "amount": 20
+  },
+  {
+   "as_of": "2026-11-06",
+   "symbol": "FTEC",
+   "kind": "recent_buy",
+   "date": "2026-11-02",
+   "clears": "2026-12-03",
+   "account": "individual-0001",
+   "amount": 100
+  },
+  {
+   "as_of": "2026-11-06",
+   "symbol": "FXAIX",
+   "kind": "recent_buy",
+   "date": "2026-11-02",
+   "clears": "2026-12-03",
+   "account": "hsa-0002",
+   "amount": 60
+  },
+  {
+   "as_of": "2026-11-06",
+   "symbol": "FXAIX",
+   "kind": "recent_buy",
+   "date": "2026-11-02",
+   "clears": "2026-12-03",
+   "account": "individual-0001",
+   "amount": 300
+  },
+  {
+   "as_of": "2026-11-06",
+   "symbol": "VXUS",
+   "kind": "recent_buy",
+   "date": "2026-11-02",
+   "clears": "2026-12-03",
+   "account": "hsa-0002",
+   "amount": 15
+  },
+  {
+   "as_of": "2026-11-06",
+   "symbol": "VXUS",
+   "kind": "recent_buy",
+   "date": "2026-11-02",
+   "clears": "2026-12-03",
+   "account": "individual-0001",
+   "amount": 75
+  }
+ ]
+}

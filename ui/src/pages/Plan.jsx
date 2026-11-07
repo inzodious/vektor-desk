@@ -3,6 +3,8 @@ import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Kpi } from '../components/Kpi.jsx';
 import { DriftRows } from '../components/DriftRows.jsx';
+import { TaxCalendar } from '../components/TaxCalendar.jsx';
+import { todayEt } from '../lib/tax.js';
 import { useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { fundsFromMetrics, useMetrics, val } from '../lib/metrics.js';
@@ -184,6 +186,40 @@ function Deposits({ funds, deposits, deskValue }) {
   );
 }
 
+function Taxes({ m, calendar, wash }) {
+  const cell = (id, window, label) => {
+    const row = m.get(id, { window });
+    const v = val(row);
+    return (
+      <div key={id}>
+        <small>{label}</small>
+        <b>{v == null ? '—' : usd(v, { sign: true })}</b>
+        <span className="muted">{v == null ? 'Needs a lot export' : window === 'YTD' ? 'This year' : 'If sold today'}</span>
+      </div>
+    );
+  };
+  const events = (calendar.data?.events || []).filter((e) => !e.kind || e.kind === 'tax');
+  return (
+    <div className="card c12" style={{ '--i': 11 }} data-testid="tax-calendar">
+      <div className="card-head">
+        <span className="tag mustard">Tax calendar</span>
+        <span className="acts">{wash.data?.as_of ? <span className="chip">Wash windows as of {dayLabel(wash.data.as_of)}</span> : null}</span>
+      </div>
+      <div className="mini-kpis four">
+        {cell('tax.realized_st', 'YTD', 'Realized short term')}
+        {cell('tax.realized_lt', 'YTD', 'Realized long term')}
+        {cell('tax.unrealized_st', 'now', 'Unrealized short term')}
+        {cell('tax.unrealized_lt', 'now', 'Unrealized long term')}
+      </div>
+      {calendar.error && wash.error ? (
+        <p className="empty-hint">The tax calendar didn&apos;t load. It comes back with the desk API.</p>
+      ) : (
+        <TaxCalendar events={events} windows={wash.data?.windows || []} today={todayEt()} />
+      )}
+    </div>
+  );
+}
+
 // ---------- page ----------
 export default function Plan() {
   const ctx = useLive();
@@ -191,6 +227,9 @@ export default function Plan() {
   const plan = useMetrics('plan.*', 'scope=holding');
   const profile = useApi('/api/decisions/profile');
   const rules = useApi('/api/decisions/rules');
+  const tax = useMetrics('tax.*');
+  const calendar = useApi('/api/decisions/calendar');
+  const wash = useApi('/api/engine/wash');
   const limits = planLimits(profile.data, rules.data);
   const funds = useMemo(() => fundsFromMetrics(plan.rows), [plan.rows]);
   const values = useMemo(() => Object.fromEntries(ctx.symbols.map((s) => [s.symbol, s.value])), [ctx.symbols]);
@@ -283,6 +322,7 @@ export default function Plan() {
         <Rules rules={ruleList} m={m} version={limits.rulesVersion} />
         <Funds funds={funds} live={ctx.symbols} names={ctx.names} />
         <Deposits funds={funds} deposits={p.deposits || []} deskValue={ctx.live?.value} />
+        <Taxes m={tax} calendar={calendar} wash={wash} />
       </section>
     </>
   );
