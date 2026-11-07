@@ -4,6 +4,28 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.0 - 2026-11-07
+
+Production-ready on the TrueNAS box with real data. Every roadmap phase is complete, every page passed a 480-shot sweep at three widths in both themes, and a backup restored cleanly.
+
+### Added
+
+- `python -m desk.decisions.profile init` drafts `desk.yaml` from the mirror (deposit cadence and amounts, accounts for wash-sale checks, plan sleeves and guardrails) and never overwrites; `/api/decisions/profile/status` shows which settings are still defaults ([#70])
+- Settings shows the desk profile (version, what's still default, desks on, and a starter command when there is no desk.yaml) ([#76])
+- Every page shows an engine health banner while checks fail or warn ([#75])
+- Eval container lets a Claude Remote Control session QA the box read-only, with redacted service logs in data/run/logs ([#72])
+- `python -m desk.engine daily --dry-run` and `python -m desk.agents dry-run <desk>` write nothing ([#71], [#73])
+
+### Changed
+
+- Agents refuse to run on failing engine health, start with only the Plan keeper and Tax desk, and hold their caps and queue under real cron timing ([#73])
+- The plan keeper gets 10 runs a week, so trigger runs fit under the cap ([#74])
+
+### Fixed
+
+- Engine prices held symbols from Tiingo when Escape Vektor's closes lag, values snapshot days at the broker's price, classifies funds without Escape Vektor profiles, and gives every health problem a fix line ([#71])
+- Departures board letters no longer render mirrored, long fund codes fit, and contrast passes across charts, tax badges and Preflight lamps ([#75])
+
 ## 0.11.0 - 2026-11-07
 
 Foundation is done: the desk is live on the TrueNAS box over Tailscale, reading Escape Vektor's data through the read-only mirror. Every roadmap phase is now complete; 1.0 hardening is what's left.
@@ -198,3 +220,10 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#65]: https://github.com/inzodious/vektor-desk/pull/65
 [#67]: https://github.com/inzodious/vektor-desk/pull/67
 [#68]: https://github.com/inzodious/vektor-desk/pull/68
+[#70]: https://github.com/inzodious/vektor-desk/pull/70
+[#71]: https://github.com/inzodious/vektor-desk/pull/71
+[#72]: https://github.com/inzodious/vektor-desk/pull/72
+[#73]: https://github.com/inzodious/vektor-desk/pull/73
+[#74]: https://github.com/inzodious/vektor-desk/pull/74
+[#75]: https://github.com/inzodious/vektor-desk/pull/75
+[#76]: https://github.com/inzodious/vektor-desk/pull/76

@@ -20,7 +20,7 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 9 | Strategy lab | 3 | ✅ | 3, 6 |
 | 10 | Flight record and Patterns | 3 | ✅ | 30 days of decision records |
 | 11 | Scout and FI scenarios | 3 | ✅ | 10 |
-| 1.0 | Hardening | | 📋 | 11 |
+| 1.0 | Hardening | | ✅ | 11 |
 
 Phases 6 and 7 can run in parallel with 5 once their dependencies land, and phase 9 can run beside 7, 8 and 10. Start the Strategy lab as early as its dependencies allow: six months of forward paper trading is its graduation bar. The agent runner and its fake adapter are built alongside phases 3 and 4, so phase 5 only wires them to real engine outputs.
 
@@ -141,11 +141,19 @@ Research hypotheses become strategies, tested on history without seeing the futu
 - [x] FI path card and scenarios (Monte Carlo percentiles) ([#54], [#65])
 - [x] Factor exposure ([#54], [#65])
 
-### 1.0 Hardening 📋
+### 1.0 Hardening ✅
 
-- [ ] Restore from backup tested (`deploy.sh restore-test` [#67]; runs after the first nightly backup)
-- [ ] Every page checked at 1920, 1440 and 390 in light and dark
-- [ ] Six months of Flight record reviewed; desks that do not beat following the plan are switched off
+- [x] Restore from backup tested (`deploy.sh restore-test`, [#67], [#72])
+- [x] Every page checked at 1920, 1440 and 390 in light and dark, with a contrast audit and first-day states ([#75], [#76])
+- [x] Real-data hardening: fresh held prices, health fix lines and banner, desks gated on health with a first-run guard, desk.yaml starter, sealed eval container ([#70]–[#74])
+
+## After 1.0
+
+| When | Check |
+|---|---|
+| After a week of green health | Lift the agents' first-run guard; turn on Research and Skeptic |
+| Early February 2027 (three months) | At least 95% of Fidelity trades match a decision record |
+| May 2027 (six months) | Flight record review: desks that don't beat following the plan are switched off |
 
 ## Key dates
 
@@ -213,3 +221,10 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#64]: https://github.com/inzodious/vektor-desk/pull/64
 [#67]: https://github.com/inzodious/vektor-desk/pull/67
 [#68]: https://github.com/inzodious/vektor-desk/pull/68
+[#70]: https://github.com/inzodious/vektor-desk/pull/70
+[#71]: https://github.com/inzodious/vektor-desk/pull/71
+[#72]: https://github.com/inzodious/vektor-desk/pull/72
+[#73]: https://github.com/inzodious/vektor-desk/pull/73
+[#74]: https://github.com/inzodious/vektor-desk/pull/74
+[#75]: https://github.com/inzodious/vektor-desk/pull/75
+[#76]: https://github.com/inzodious/vektor-desk/pull/76
