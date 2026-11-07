@@ -12,6 +12,7 @@ from desk.engine import ENGINE_VERSION
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
 from desk.engine.lots import current_lots
+from desk.engine.research import macro, research_symbols, signals
 from desk.engine.returns import WINDOWS, annualize, base_index, daily_returns, drawdowns, period_mwr, twr_index, volatility
 from desk.engine.shadows import TotalReturn, deposit_split, shadow
 from desk.engine.source import closes, current_rows
@@ -219,6 +220,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _risk_metrics(out, now_rows, total, index, days, values, flows_on, q_now)
     _cost_metrics(out, plan, now_rows, total)
     _tax_metrics(out, cfg, mirror, desk, activity, now_rows, now)
+    _research_metrics(out, desk, kinds)
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:
         out.m("cash.pending_days", (date.fromisoformat(when) - date.fromisoformat(as_of)).days, "days", quality="modelled")
@@ -522,6 +524,24 @@ def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datet
     out.m("tax.harvest_value", total * rate / 100 if lots and rate is not None else None, "usd", quality="modelled")
     if source != "none":
         out.h("marginal_rate", "ok", "Marginal rate from Escape Vektor's tax estimate." if source == "escape_vektor" else "Marginal rate from desk.yaml.")
+
+
+# ---- Research signals and macro ----
+
+
+def _research_metrics(out: Out, desk, kinds):
+    symbols = research_symbols(desk, kinds)
+    prev = desk.execute("SELECT max(as_of) FROM metric_values WHERE as_of < ?", (out.as_of,)).fetchone()[0]
+    for metric_id, sym, value, unit, window, n in signals(desk, symbols, out.as_of, prev):
+        out.m(metric_id, value, unit, scope="holding", scope_id=sym, window=window, n_obs=n)
+    for metric_id, name, value, unit in macro(desk, out.as_of):
+        out.m(metric_id, value, unit, scope="macro", scope_id=name)
+    covered = {r[0] for r in desk.execute("SELECT DISTINCT symbol FROM fundamentals")}
+    bare = [s for s in symbols if s not in covered]
+    if bare:
+        out.h("research", "warn", f"No SEC company facts yet for {', '.join(bare[:10])}; the nightly research job fills them.")
+    elif symbols:
+        out.h("research", "ok", f"SEC company facts for {len(symbols)} stocks.")
 
 
 # ---- Data health ----

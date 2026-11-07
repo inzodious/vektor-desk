@@ -12,6 +12,7 @@ from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.live import refresh_quotes
 from desk.engine.lots import import_inbox
+from desk.engine.research import run_all as run_research_all
 from desk.engine.source import open_mirror
 from desk.notify import publish
 from desk.runlock import BUSY, Busy, job_lock
@@ -113,11 +114,29 @@ def run_quotes(cfg: Config, http=None, force: bool = False) -> dict:
     return result
 
 
+def run_research(cfg: Config, http=None) -> dict:
+    mirror = open_mirror(cfg)
+    try:
+        kinds = core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror))) if mirror else {}
+    finally:
+        if mirror:
+            mirror.close()
+    return _with_desk(cfg, "research", lambda desk: run_research_all(desk, http or http_session(), kinds))
+
+
 def run_market_backfill(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "backfill", lambda desk: run_backfill(desk, http or http_session()))
 
 
-JOBS = {"holdings": run_holdings, "core": run_core, "daily": run_daily, "lots": run_lots, "quotes": run_quotes, "backfill": run_market_backfill}
+JOBS = {
+    "holdings": run_holdings,
+    "core": run_core,
+    "daily": run_daily,
+    "lots": run_lots,
+    "quotes": run_quotes,
+    "backfill": run_market_backfill,
+    "research": run_research,
+}
 
 
 def main(argv: list[str] | None = None) -> int:

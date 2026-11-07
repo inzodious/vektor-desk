@@ -167,6 +167,23 @@ The shadows answer the only question that matters for a personal portfolio: woul
 | `tax.lot_realized` | Realized gain or loss per lot sold | Short or long term, with the sale it came from |
 | `tax.div_drag` | Tax drag from taxable dividends | |
 
+### Research signals and macro (nightly fetchers)
+
+Single stocks only (held, `market_symbols` role `watch`, or `DESK_WATCHLIST`); funds are skipped. Scope `holding` unless noted.
+
+| Id | Metric | Source and notes |
+|---|---|---|
+| `sig.earnings_days` | Days to the next earnings date | Finnhub earnings calendar |
+| `sig.earnings_since` | Days since the last report | |
+| `sig.eps_surprise`, `sig.revenue_surprise` | Last report vs estimate, in percent | |
+| `sig.earnings_reported` | 1 when a report landed since the previous engine day | Fires the `earnings` trigger |
+| `sig.insider_net`, `sig.insider_buyers` | Open-market insider dollars (buys minus sells) and distinct buyers, window `90D` | Finnhub insider transactions (codes P and S only) |
+| `sig.dilution` | Share count change, window `1Y` | XBRL `dei:EntityCommonStockSharesOutstanding` |
+| `fund.revenue_growth`, `fund.gross_margin`, `fund.operating_margin`, `fund.net_margin` | Latest fiscal year, window `FY` | XBRL company facts, full-year periods only |
+| `macro.rf_3m`, `macro.y2`, `macro.y10`, `macro.curve_10y2y`, `macro.hy_spread`, `macro.vix`, `macro.cpi_yoy` | Latest values, scope `macro` | FRED |
+
+Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamentals` (one row per concept and period), `macro_daily`, `earnings`, `insider_trades`. The `research` job runs at 00:40, refreshes each symbol at most every 20 hours, keeps SEC at about 8 requests a second, and skips any source whose key is missing. `GET /api/engine/research?symbol=` serves filings, facts, earnings, insiders and signals; `GET /api/engine/macro?start=` serves the FRED series.
+
 ### Costs
 
 | Id | Metric | Notes |

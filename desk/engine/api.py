@@ -254,3 +254,56 @@ def wash(request: Request) -> JSONResponse:
     finally:
         conn.close()
     return _json({"as_of": rows[0]["as_of"] if rows else None, "windows": rows})
+
+
+@router.get("/api/engine/research")
+def research(request: Request, symbol: str) -> JSONResponse:
+    sym = symbol.upper()
+    empty = {"symbol": sym, "filings": [], "fundamentals": {}, "earnings": [], "insiders": [], "signals": []}
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "filings"):
+        return _json(empty)
+    try:
+        filings = [
+            dict(r) for r in conn.execute("SELECT form, filed, report_date, description, url FROM filings WHERE symbol=? ORDER BY filed DESC LIMIT 40", (sym,))
+        ]
+        facts: dict[str, list[dict]] = {}
+        for r in conn.execute(
+            "SELECT concept, start, period_end, fp, form, value, unit FROM fundamentals WHERE symbol=? ORDER BY concept, period_end DESC", (sym,)
+        ):
+            rows = facts.setdefault(r["concept"], [])
+            if len(rows) < 12:
+                rows.append({k: r[k] for k in ("start", "period_end", "fp", "form", "value", "unit")})
+        earnings = [dict(r) for r in conn.execute("SELECT * FROM earnings WHERE symbol=? ORDER BY date DESC LIMIT 12", (sym,))]
+        insiders = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT name, filing_date, txn_date, code, change, shares_after, price FROM insider_trades WHERE symbol=? ORDER BY txn_date DESC LIMIT 50",
+                (sym,),
+            )
+        ]
+        day = conn.execute("SELECT max(as_of) FROM metric_values").fetchone()[0] if _has(conn, "metric_values") else None
+        sigs = [
+            dict(r)
+            for r in conn.execute(
+                "SELECT * FROM metric_values WHERE as_of=? AND scope='holding' AND scope_id=? AND (metric_id LIKE 'sig.%' OR metric_id LIKE 'fund.%')",
+                (day, sym),
+            )
+        ]
+    finally:
+        conn.close()
+    return _json({"symbol": sym, "filings": filings, "fundamentals": facts, "earnings": earnings, "insiders": insiders, "signals": sigs})
+
+
+@router.get("/api/engine/macro")
+def macro_series(request: Request, start: str | None = None) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "macro_daily"):
+        return _json({"series": {}})
+    try:
+        out: dict[str, list[dict]] = {}
+        for r in conn.execute("SELECT series, date, value FROM macro_daily WHERE date >= ? ORDER BY series, date", (start or "0000",)):
+            out.setdefault(r["series"], []).append({"date": r["date"], "value": r["value"]})
+    finally:
+        conn.close()
+    return _json({"series": out})
