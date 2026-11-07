@@ -1,7 +1,8 @@
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { Icon } from './Icon.jsx';
 import { AREAS } from '../lib/areas.js';
-import { marketState } from '../lib/clock.js';
+import { clockState } from '../lib/clock.js';
+import { useLive } from '../live/context.js';
 import { etTime } from '../lib/format.js';
 import { useTheme } from '../lib/theme.js';
 import { useNow } from '../lib/useNow.js';
@@ -9,10 +10,11 @@ import { useNow } from '../lib/useNow.js';
 // ---------- clock ----------
 export function MarketClock() {
   const now = useNow();
-  const m = marketState(now);
+  const { live } = useLive();
+  const m = clockState(now, live);
   return (
-    <span className="clock" title={m.hint} data-state={m.state} data-testid="market-clock">
-      <i className={`pulse${m.state === 'open' ? '' : ' off'}`} />
+    <span className="clock" title={m.hint} data-state={m.state} data-feed={m.feed} data-testid="market-clock">
+      <i className={`pulse${m.feed === 'live' ? '' : m.feed === 'delayed' ? ' late' : ' off'}`} />
       <span className="lbl">{m.label}</span> <small>{etTime(now)} ET</small>
       <span className="sr">. {m.hint}</span>
     </span>

@@ -58,3 +58,16 @@ export function marketState(date = new Date()) {
   if (minutes < PRE) return { state: 'closed', label: 'Market closed', hint: 'Opens 9:30 AM ET' };
   return { state: 'closed', label: 'Market closed', hint: `Opens ${nextOpen(date)} ET` };
 }
+
+const LIVE = ['pre', 'open', 'after'];
+
+export function clockState(now, live) {
+  const m = marketState(now);
+  if (!live || !live.state || (live.day && live.day !== etParts(now).day)) return { ...m, feed: m.state === 'open' ? 'live' : 'off' };
+  const state = live.state;
+  const base = state === m.state ? m : { ...m, state, label: { open: 'Market open', pre: 'Pre-market', after: 'After hours', closed: 'Market closed' }[state] || m.label };
+  if (!LIVE.includes(state)) return { ...base, feed: 'off' };
+  const fresh = live.as_of && now - new Date(live.as_of) <= 10 * 60000;
+  if (fresh && live.quality !== 'stale') return { ...base, feed: 'live', hint: `${base.hint} · quotes refresh every 5 min` };
+  return { ...base, feed: 'delayed', label: state === 'open' ? 'Quotes delayed' : base.label, hint: live.as_of ? `Last quote ${new Intl.DateTimeFormat('en-US', { timeZone: ET, hour: 'numeric', minute: '2-digit' }).format(new Date(live.as_of))} ET` : 'Waiting on the first quote' };
+}

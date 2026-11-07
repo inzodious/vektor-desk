@@ -4,12 +4,15 @@ export function usd(v, o = {}) {
   if (v == null || Number.isNaN(v)) return '—';
   const d = o.cents ? 2 : 0;
   const s = Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
-  return `${v < 0 ? MINUS : o.sign && v > 0 ? '+' : ''}$${s}`;
+  const zero = !/[1-9]/.test(s);
+  return `${zero ? '' : v < 0 ? MINUS : o.sign && v > 0 ? '+' : ''}$${s}`;
 }
 
 export function pct(v, dg = 1, sign = false) {
   if (v == null || Number.isNaN(v)) return '—';
-  return `${v < 0 ? MINUS : sign && v > 0 ? '+' : ''}${Math.abs(v * 100).toFixed(dg)}%`;
+  const s = Math.abs(v * 100).toFixed(dg);
+  const zero = !/[1-9]/.test(s);
+  return `${zero ? '' : v < 0 ? MINUS : sign && v > 0 ? '+' : ''}${s}%`;
 }
 
 export function pts(v, sign = true) {

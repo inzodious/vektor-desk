@@ -1,0 +1,208 @@
+import { useMemo } from 'react';
+import { Panel } from '../components/Panel.jsx';
+import { Icon } from '../components/Icon.jsx';
+import { LineChart } from '../components/LineChart.jsx';
+import { accountLabel, priceStatus, useLive } from './context.js';
+import { useApi } from '../lib/api.js';
+import { count, etStamp, pct, px, usd } from '../lib/format.js';
+import { dayLabel, periodStart } from '../lib/charts.js';
+
+function PriceHistory({ symbol, row, lots }) {
+  const last = new Date().toISOString().slice(0, 10);
+  const start = periodStart('1Y', last);
+  const prices = useApi(`/api/engine/prices?symbol=${encodeURIComponent(symbol)}&start=${start}`);
+  const pts = useMemo(() => (Array.isArray(prices.data?.series) ? prices.data.series.filter((p) => p.close != null) : []), [prices.data]);
+  const avg = row && row.shares && row.cost ? row.cost / row.shares : null;
+  const markers = useMemo(() => {
+    if (!pts.length) return [];
+    return lots
+      .filter((l) => l.acquired)
+      .map((l) => {
+        const i = pts.findIndex((p) => p.date >= l.acquired.slice(0, 10));
+        return i < 0 ? null : { i, label: `Bought ${count(Math.round(l.shares * 1000) / 1000)} sh, ${accountLabel(l.account)}` };
+      })
+      .filter(Boolean);
+  }, [pts, lots]);
+
+  if (prices.loading) return <p className="empty-hint">Loading price history…</p>;
+  if (!pts.length) return <p className="empty-hint">No price history for {symbol} yet. It fills in after the nightly backfill.</p>;
+  return (
+    <LineChart
+      label={`${symbol} price, one year`}
+      height={200}
+      x={pts.map((p) => p.date)}
+      series={[{ name: symbol, color: 'var(--s1)', values: pts.map((p) => p.close) }]}
+      fmtY={(v) => (v >= 100 ? `$${Math.round(v)}` : `$${px(v)}`)}
+      fmtTip={(v) => `$${px(v)}`}
+      refs={avg ? [{ y: avg, label: `Your average $${px(avg)}` }] : []}
+      markers={markers}
+    />
+  );
+}
+
+function SheetBody({ symbol }) {
+  const ctx = useLive();
+  const row = ctx.symbols.find((s) => s.symbol === symbol);
+  const cost = ctx.cost[symbol];
+  const lotsApi = useApi(`/api/engine/lots?symbol=${encodeURIComponent(symbol)}`);
+  const lots = lotsApi.data?.lots || [];
+  const status = priceStatus(ctx.live, row);
+  const gain = row && cost ? row.value - cost : null;
+  const held = { ...row, cost };
+
+  if (!row) {
+    return (
+      <div className="note">
+        <Icon name="eye" />
+        <span>
+          <b style={{ color: 'var(--ink)' }}>Not held.</b> {symbol} isn&apos;t in the latest holdings. Watchlist and research for it land in phase 6.
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="sheet-price">
+        <b className="num" data-live={symbol}>
+          ${px(row.price)}
+        </b>
+        <span className={row.day_change >= 0 ? 'up' : 'dn'} style={{ fontWeight: 800 }}>
+          {usd(row.price - row.prev_close, { cents: true, sign: true })} · {pct(row.change_pct, 2, true)} today
+        </span>
+        {status ? (
+          <span className={`chip ${status.tone}`}>
+            {status.pulse ? <i className="pulse" style={{ width: 6, height: 6 }} /> : null}
+            {status.text}
+          </span>
+        ) : null}
+      </div>
+      <div>
+        <div className="card-head" style={{ marginBottom: 4 }}>
+          <span className="kicker">Price, 1 year</span>
+          <span className="muted" style={{ fontSize: 11.5 }}>
+            Dots are your buys · dashed line is your average cost
+          </span>
+        </div>
+        <PriceHistory symbol={symbol} row={held} lots={lots} />
+      </div>
+      <div className="mini-kpis">
+        <div>
+          <small>Position</small>
+          <b>{usd(row.value)}</b>
+        </div>
+        <div>
+          <small>Gain</small>
+          <b className={gain == null ? '' : gain >= 0 ? 'up' : 'dn'}>{gain == null ? '—' : usd(gain, { sign: true })}</b>
+        </div>
+        <div>
+          <small>Today</small>
+          <b className={row.day_change >= 0 ? 'up' : 'dn'}>{usd(row.day_change, { sign: true })}</b>
+        </div>
+      </div>
+      <div>
+        <span className="kicker">By account</span>
+        <div className="tscroll">
+          <table className="t">
+            <thead>
+              <tr>
+                <th scope="col">Account</th>
+                <th scope="col" className="r">
+                  Shares
+                </th>
+                <th scope="col" className="r">
+                  Value
+                </th>
+                <th scope="col" className="r">
+                  Today
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {row.accounts.map((a) => (
+                <tr key={a.account} className="still">
+                  <td>{accountLabel(a.account)}</td>
+                  <td className="r">{count(Math.round(a.shares * 1000) / 1000)}</td>
+                  <td className="r">{usd(a.value)}</td>
+                  <td className={`r ${a.day_change >= 0 ? 'up' : 'dn'}`}>{usd(a.day_change, { sign: true })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <div className="card-head" style={{ marginBottom: 2 }}>
+          <span className="kicker">Lots</span>
+          {lotsApi.data?.files?.[0]?.as_of ? <span className="muted" style={{ fontSize: 11.5 }}>From the {dayLabel(lotsApi.data.files[0].as_of.slice(0, 10))} export</span> : null}
+        </div>
+        {lots.length ? (
+          <div className="tscroll">
+            <table className="t">
+              <thead>
+                <tr>
+                  <th scope="col">Acquired</th>
+                  <th scope="col">Account</th>
+                  <th scope="col" className="r">
+                    Shares
+                  </th>
+                  <th scope="col" className="r">
+                    Cost
+                  </th>
+                  <th scope="col" className="r">
+                    Gain
+                  </th>
+                  <th scope="col">Term</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lots.map((l) => {
+                  const cps = l.cost_per_share ?? (l.cost && l.shares ? l.cost / l.shares : null);
+                  const g = cps != null ? l.shares * (row.price - cps) : null;
+                  return (
+                    <tr key={l.id} className="still">
+                      <td>{l.acquired ? dayLabel(l.acquired.slice(0, 10), true) : '—'}</td>
+                      <td>{accountLabel(l.account)}</td>
+                      <td className="r">{count(Math.round(l.shares * 1000) / 1000)}</td>
+                      <td className="r">{cps != null ? `$${px(cps)}` : '—'}</td>
+                      <td className={`r ${g == null ? '' : g >= 0 ? 'up' : 'dn'}`}>{g == null ? '—' : usd(g, { sign: true })}</td>
+                      <td>{l.term ? l.term.charAt(0).toUpperCase() + l.term.slice(1) : '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="empty-hint">No lot export yet. Drop one in the desk inbox and lots show here.</p>
+        )}
+      </div>
+      {ctx.live?.as_of ? <p className="muted" style={{ fontSize: 11.5 }}>Quotes as of {etStamp(ctx.live.as_of)}</p> : null}
+    </>
+  );
+}
+
+export function SymbolSheet({ symbol, onClose }) {
+  const ctx = useLive();
+  const row = ctx.symbols.find((s) => s.symbol === symbol);
+  const name = ctx.names[symbol];
+  const head = (
+    <span className="sym" style={{ fontSize: 20 }}>
+      <i style={{ '--c': 'var(--s1)' }} />
+      {symbol}
+    </span>
+  );
+  return (
+    <Panel
+      open={!!symbol}
+      onClose={onClose}
+      kind="sheet"
+      label={`${symbol} symbol sheet`}
+      title={head}
+      sub={name}
+      crumbs={[{ label: row ? 'Holding' : 'Symbol' }, ...(row ? [{ label: row.accounts.map((a) => accountLabel(a.account)).join(' + ') }] : [])]}
+    >
+      {symbol ? <SheetBody symbol={symbol} /> : null}
+    </Panel>
+  );
+}

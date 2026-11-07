@@ -11,8 +11,10 @@ function fixtureApi() {
     const url = new URL(req.url, 'http://desk');
     if (!url.pathname.startsWith('/api/')) return next();
     const scenario = req.headers['x-desk-scenario'] || url.searchParams.get('scenario') || '';
+    const symbol = (url.searchParams.get('symbol') || '').toUpperCase();
     const base = url.pathname.slice(5).replace(/\/+$/, '').replace(/\//g, '.') || 'index';
-    const file = [scenario && `${FIXTURES}${base}.${scenario}.json`, `${FIXTURES}${base}.json`].find((f) => f && existsSync(f));
+    const tries = [scenario && `${base}.${scenario}`, symbol && `${base}.${symbol}`, symbol && `${base}.any`, symbol ? null : base].filter(Boolean);
+    const file = tries.map((t) => `${FIXTURES}${t}.json`).find((f) => existsSync(f));
     res.setHeader('Cache-Control', 'no-store');
     if (!file) {
       res.statusCode = 404;

@@ -51,11 +51,12 @@ export function useApi(path, { every } = {}) {
     return () => ctl.abort();
   }, [path, nonce]);
 
+  const ms = typeof every === 'function' ? every(state.data) : every;
   useEffect(() => {
-    if (!every) return undefined;
-    const id = setInterval(reload, every);
+    if (!ms) return undefined;
+    const id = setInterval(reload, ms);
     return () => clearInterval(id);
-  }, [every, reload]);
+  }, [ms, reload]);
 
   return { ...state, reload };
 }

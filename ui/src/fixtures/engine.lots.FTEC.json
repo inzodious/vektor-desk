@@ -1,0 +1,54 @@
+{
+ "lots": [
+  {
+   "id": 1,
+   "file_id": 1,
+   "as_of": "2026-11-01",
+   "account": "individual-0001",
+   "symbol": "FTEC",
+   "acquired": "2025-12-15",
+   "shares": 4.0,
+   "cost": 884.0,
+   "cost_per_share": 221.0,
+   "value": 1002.12,
+   "term": "short"
+  },
+  {
+   "id": 2,
+   "file_id": 1,
+   "as_of": "2026-11-01",
+   "account": "individual-0001",
+   "symbol": "FTEC",
+   "acquired": "2026-03-02",
+   "shares": 3.551,
+   "cost": 841.59,
+   "cost_per_share": 237.0,
+   "value": 889.63,
+   "term": "short"
+  },
+  {
+   "id": 3,
+   "file_id": 1,
+   "as_of": "2026-11-01",
+   "account": "individual-0001",
+   "symbol": "FTEC",
+   "acquired": "2026-08-20",
+   "shares": 4.0,
+   "cost": 1040.0,
+   "cost_per_share": 260.0,
+   "value": 1002.12,
+   "term": "short"
+  }
+ ],
+ "files": [
+  {
+   "id": 1,
+   "name": "sample-lots.csv",
+   "kind": "fidelity",
+   "as_of": "2026-11-01",
+   "imported_at": "2026-11-01T12:00:00+00:00",
+   "rows": 3,
+   "warnings": 0
+  }
+ ]
+}

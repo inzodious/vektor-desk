@@ -1,0 +1,14 @@
+{
+ "state": "closed",
+ "day": "2026-11-07",
+ "opens_at": null,
+ "closes_at": null,
+ "as_of": null,
+ "holdings_date": null,
+ "value": 0.0,
+ "day_change": 0.0,
+ "day_change_pct": null,
+ "quality": "insufficient_history",
+ "rows": [],
+ "benchmarks": {}
+}

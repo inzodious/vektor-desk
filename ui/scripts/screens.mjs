@@ -7,8 +7,12 @@ const out = process.argv[2] || 'screens';
 const only = process.argv[3] ? process.argv[3].split(',') : null;
 const WIDTHS = [1920, 1440, 390];
 const THEMES = ['light', 'dark'];
+const MONDAY = new Date('2026-11-09T16:42:00Z');
 const SHOTS = [
-  { name: 'bridge', path: '/' },
+  { name: 'bridge', path: '/', fixtures: true, clock: MONDAY },
+  { name: 'bridge-sheet', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.locator('.board-row[data-sym="FTEC"]').click() },
+  { name: 'bridge-today', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.getByRole('button', { name: /^Today/ }).click() },
+  { name: 'bridge-demo', path: '/' },
   { name: 'research', path: '/research' },
   { name: 'decisions', path: '/decisions' },
   { name: 'plan', path: '/plan' },
@@ -30,7 +34,8 @@ for (const shot of SHOTS.filter((s) => !only || only.includes(s.name))) {
       const page = await ctx.newPage();
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
-      page.on('console', (m) => m.type() === 'error' && !shot.offline && errors.push(m.text()));
+      page.on('console', (m) => m.type() === 'error' && !shot.offline && !m.text().includes('status of 404') && errors.push(m.text()));
+      if (shot.clock) await page.clock.setFixedTime(shot.clock);
       if (shot.offline) await page.route('**/api/**', (r) => r.fulfill({ status: 503, body: '{}' }));
       const url = `${shot.fixtures ? process.env.SCREENS_FIXTURE_URL || base : base}${shot.path}${shot.path.includes('?') ? '&' : '?'}theme=${theme}`;
       await page.goto(url, { waitUntil: 'networkidle' });
