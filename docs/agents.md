@@ -114,23 +114,26 @@ The lab tests trading strategies over 3, 5 and 10 year windows as paper trading,
 4. **Every variant counts.** Specs record their parent, so the lab knows how many versions of an idea were tried and can discount the winner for it.
 5. **Criteria are set before the test.** The spec states what "works" means (excess return vs the plan mix, maximum drawdown, minimum trades, how many windows it must hold in). Criteria cannot change after a result.
 
-**Stages:** `draft` → `lab` → `paper` (forward, six months minimum) → `eligible`. An eligible strategy can generate proposals inside the satellite cap, and they go through Preflight and the scorecard like any other proposal. A strategy that fails its paper period goes back to `draft` or is retired.
+**Stages:** `draft` → `lab` → `paper` (forward, six months minimum) → `eligible`. An eligible strategy can back Scout proposals inside the satellite cap, and they go through Preflight and the scorecard like any other proposal. A strategy that fails its paper period goes back to `draft` or is retired.
 
-**Strategy spec** (`desk/agents/schemas/strategy.json`, agreed with the statistics thread):
+**Strategy spec.** The Strategy desk returns a `strategy` output (`desk/agents/schemas/strategy.json`) instead of a proposal. The lab's side of the contract is `docs/statistics.md`, "Strategy lab"; that doc wins where the two differ.
 
 | Field | Meaning |
 |---|---|
-| `id`, `version`, `parent_id` | Identity and lineage, for variant counting |
+| `id`, `version`, `parent_id` | Identity and lineage; every version is a new trial in the lab's ledger |
 | `title`, `hypothesis` | Plain-language idea and why the market might be missing it |
-| `universe` | Point-in-time rule, such as index members as of each date, a fixed fund list, or a screen; never "today's tickers" |
-| `signals` | List of `{metric_id, window, transform}` from the lab's feature list only |
-| `entry`, `exit`, `rebalance`, `sizing` | Rules over those signals |
-| `constraints` | Long only, no margin, maximum position %, maximum turnover |
-| `success_criteria` | Pre-registered thresholds, as above |
-| `horizons` | Any of 3, 5, 10 years; the lab picks rolling start dates |
+| `predicted_effect` | What should happen and by how much, stated before any run |
+| `universe` | A rule over point-in-time data, such as index members as of each date; never a ticker list |
+| `signals` | From the engine's feature library only, no free-form code |
+| `entry`, `exit`, `sizing`, `rebalance` | Rules over those signals |
+| `benchmark`, `account` | Plan mix by default; the account whose rules (margin, taxes) apply |
+| `params` | Each tunable value with its allowed search range |
+| `success_criteria`, `horizons` | Pre-registered bars; any of 3, 5, 10 years |
 | `written_at`, `desk`, `model`, `effort` | Provenance |
 
-Trading costs, taxes and the benchmark (plan mix) are set by the lab, not the spec. The lab answers with a result per horizon, the post-cutoff window, variants tried, caveats such as survivorship, and a verdict: `pass`, `fail` or `inconclusive`. The Strategy desk then writes a short memo on what the result does and does not show.
+**No peeking.** The lab freezes and hashes a spec when it is registered. The Strategy desk never sees simulated days or interim results, only the tear sheet once the run ends. Once it has seen a result, that spec is closed: any change is a new version, a new trial, and counted against the idea. A strategy that clears the backtest bars and six months of forward paper trading may then be cited only by Scout proposals inside the satellite cap, through Preflight.
+
+The lab's tear sheet reports each horizon, the post-cutoff window, trials tried, caveats such as survivorship, and a verdict. The Strategy desk then writes a short memo on what the result does and does not show.
 
 Expect most strategies to fail. That is the lab working: a cheap "no" in simulation beats an expensive one in the account.
 
