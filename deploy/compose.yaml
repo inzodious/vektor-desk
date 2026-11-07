@@ -1,6 +1,6 @@
 # Vektor Desk on TrueNAS SCALE: Apps → Discover Apps → ⋮ → Install via YAML, name it "vektor-desk" (docs/setup.md, step 6).
-# Private: the only way in is the tailscale service's own tailnet address, where caddy answers https://desk.escape-vektor.com.
-# Nothing here publishes a port on the NAS or the home network.
+# Private: caddy answers on the tailscale service's own tailnet address (https://desk.escape-vektor.com) and on the NAS's
+# LAN alias 192.168.0.116 (https://desk-lan.escape-vektor.com, docs/setup.md "Home network"). Your router forwards neither.
 services:
   tailscale:
     image: tailscale/tailscale:v1.102.4
@@ -20,6 +20,11 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     cap_add: [NET_ADMIN, NET_RAW]
+    # Caddy shares this service's network, so its LAN ports are published here, on the alias only. Change both lines if
+    # you pick another alias.
+    ports:
+      - "192.168.0.116:443:443"
+      - "192.168.0.116:8443:8443"
     mem_limit: 96m
 
   caddy:
@@ -27,11 +32,12 @@ services:
     pull_policy: never
     container_name: vektor-desk-caddy
     restart: unless-stopped
-    # Listens on the tailscale service's address only, so https://desk.escape-vektor.com answers on the tailnet and nowhere else.
+    # Lives in the tailscale service's network: its tailnet address, plus the LAN ports that service publishes on the alias.
     network_mode: service:tailscale
     depends_on: [tailscale, api, ntfy]
     environment:
       DESK_DOMAIN: desk.escape-vektor.com
+      DESK_LAN_DOMAIN: desk-lan.escape-vektor.com
     # PORKBUN_API_KEY and PORKBUN_API_SECRET_KEY, for the certificate's DNS check.
     env_file: /mnt/Manifest/apps/vektor-desk/caddy.env
     volumes:
@@ -194,7 +200,7 @@ x-notes: |
 
   Private investing desk for Escape Vektor. Tailnet only.
 
-  - **Open:** https://desk.escape-vektor.com from a device on your tailnet
+  - **Open:** https://desk.escape-vektor.com from a device on your tailnet, or https://desk-lan.escape-vektor.com at home
   - **Phone alerts:** ntfy app, server https://desk.escape-vektor.com:8443, topics desk-alerts, desk-research, desk-ops
   - **Status:** `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh status`
   - **Deploy now:** `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh now`

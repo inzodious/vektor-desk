@@ -27,9 +27,10 @@ The NAS publishes no port for the desk. The TrueNAS UI keeps 443 on the LAN; Cad
 - **Tailscale.** The `tailscale` service joins your tailnet as its own node, `desk`, separate from the existing `starlite` node. Your PC and phone reach it like any other tailnet device. It runs in kernel mode with `/dev/net/tun`, the same way your existing Tailscale app does.
 - **DNS.** A Porkbun A record, `desk` → the node's `100.x.y.z` address. It resolves publicly but leads nowhere off the tailnet, and your home IP is never published.
 - **Certificate.** Caddy is built with `caddy-dns/porkbun` and proves the domain with a DNS TXT record (Let's Encrypt DNS-01), so it needs no open port and works before the A record exists. Certificates renew on their own.
-- **Second fence.** Caddy drops any request whose source is not a tailnet address (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`).
+- **Home network.** The tailscale service also publishes 443 and 8443 on a NAS alias, `192.168.0.116`, where Caddy answers `desk-lan.escape-vektor.com` (Porkbun A record to that private address). The router forwards nothing, so it's reachable from the LAN only. Steps: [setup.md](setup.md#home-network).
+- **Second fence.** Caddy drops any request whose source is not a tailnet or private address (`100.64.0.0/10`, `fd7a:115c:a1e0::/48`, `192.168.0.0/16`, `10.0.0.0/8`, `172.16.0.0/12`).
 - **If the name doesn't resolve at home.** Some routers and DNS filters drop public answers that point at private ranges. Fix it in the Tailscale admin console, DNS, by adding `1.1.1.1` as a global nameserver with "Override local DNS".
-- **Not used:** Cloudflare Tunnel and Access, Tailscale Funnel. Moving `escape-vektor.com` to Cloudflare nameservers would only be needed for access from a device without Tailscale.
+- **Not used:** Cloudflare Tunnel and Access, Tailscale Funnel, and any port forward on the router.
 
 ## Data
 
