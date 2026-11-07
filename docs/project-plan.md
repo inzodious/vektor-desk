@@ -64,6 +64,7 @@ Parallel workstreams stay conflict-free by owning packages, not files scattered 
 | `desk/agents/` (runner, adapters, prompts, desks) | AI agents |
 | `ui/` (the whole web app) | Dashboards and design |
 | `tests/<package>/` | The package's owner |
+| `tests/integration/` (cross-package wiring) | Lead |
 
 Shared seams, so nobody edits another owner's code:
 

@@ -9,11 +9,11 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | # | Phase | Tier | Status | Depends on |
 |---|---|---|---|---|
 | 0 | Planning docs | | ✅ | |
-| 1 | Foundation | 1 | 🚧 | 0 |
-| 2 | Bridge and Symbol sheet | 1 | 📋 | 1 |
-| 3 | Engine core and Plan | 1 | 📋 | 2 |
-| 4 | Decisions and Preflight | 1 | 📋 | 3 |
-| 5 | Plan keeper and tax desk | 1 | 📋 | 4 |
+| 1 | Foundation | 1 | 🚧 (code done, box setup pending) | 0 |
+| 2 | Bridge and Symbol sheet | 1 | 🚧 | 1 |
+| 3 | Engine core and Plan | 1 | 🚧 | 2 |
+| 4 | Decisions and Preflight | 1 | 🚧 | 3 |
+| 5 | Plan keeper and tax desk | 1 | 🚧 | 4 |
 | 6 | Research | 2 | 📋 | 4 |
 | 7 | Lab: Compare and risk | 2 | 📋 | 3 |
 | 8 | Phone alerts | 2 | 📋 | 5 |
@@ -48,49 +48,49 @@ Done when all six are merged and agree with each other.
 - [x] Compose stack on TrueNAS: Tailscale sidecar, Caddy, api (serves the built UI), cron (scheduler, engine and agents) ([#5])
 - [ ] `desk.escape-vektor.com` resolves on the tailnet with a valid certificate (built in [#5]; needs Joshua's one-time setup steps in `docs/architecture.md`)
 - [x] Read-only mirror of every `lockIn/{uid}` collection into SQLite, incremental by change time with a weekly full pass, with change history ([#5])
-- [ ] `holdings_daily` built from the mirror history from day one (Statistics)
-- [ ] Claude Code CLI in the cron service (Hemline's pattern), token in a root-only env file, smoke run with `deploy.sh check` (no `--bare`) ([#5]); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout
+- [x] `holdings_daily` built from the mirror history from day one (Statistics) ([#11])
+- [x] Claude Code CLI in the cron service (Hemline's pattern), token in a root-only env file, smoke run with `deploy.sh check` (no `--bare`) ([#5]); desks get the brief on stdin and no file, shell or MCP tools, web tools only for Research and Scout ([#10])
 - [x] Backups of the desk database ([#5])
-- [ ] App shell in the Escape Vektor look: tokens in `ui/src/styles`, pill nav and phone dock, light and graphite dark
-- [ ] Settings: data freshness and token card (`/api/status` in [#5]; page by Design)
-- [ ] Local lint, test and build scripts; synthetic fixtures
+- [x] App shell in the Escape Vektor look: tokens in `ui/src/styles`, pill nav and phone dock, light and graphite dark ([#21])
+- [x] Settings: data freshness and token card (`/api/status` in [#5]; page by Design) ([#21])
+- [x] Local lint, test and build scripts; synthetic fixtures ([#14], [#17])
 
-Done when a phone on Tailscale opens the desk and sees the mirror's last run.
+Done when a phone on Tailscale opens the desk and sees the mirror's last run. **Code complete (0.1.0); waiting on Joshua's one-time setup** in `docs/architecture.md`, which also gives the first real `claude -p` smoke run.
 
-### 2. Bridge and Symbol sheet 📋
+### 2. Bridge and Symbol sheet 🚧
 
-- [ ] Live price feed during market hours, last close outside them (live quotes table, `/api/live`)
+- [x] Live price feed during market hours, last close outside them (live quotes table, `/api/live`) ([#19])
 - [ ] Bridge: departures-board holdings strip, KPI tiles, market clock states
 - [ ] Symbol sheet from any symbol chip: price, position across accounts, cost basis, lots
 - [ ] Line and spark charts (hand-rolled SVG, no chart library)
-- [ ] Fidelity lot export parser and lots table (Dec 6 risk)
+- [x] Fidelity lot export parser and lots table (Dec 6 risk) ([#16])
 
-### 3. Engine core and Plan 📋
+### 3. Engine core and Plan 🚧
 
 - [ ] Engine (Python): flow classifier, reconciliation and `data_health`, value and flows, TWR and XIRR
 - [ ] Shadow portfolios: plan mix and S&P 500
 - [ ] Drift and rules, margin (interest in dollars, price drop to a call), costs, basic concentration and drawdown
 - [ ] Output contract v1
-- [ ] Background backfill for the Strategy lab starts here: Tiingo prices at about 400 new symbols a month under the free cap shared with Escape Vektor (ETFs first, then large caps including delisted ones), SEC bulk financial statement and insider data in one import
+- [x] Background backfill for the Strategy lab starts here: Tiingo prices at about 400 new symbols a month under the free cap shared with Escape Vektor (ETFs first, then large caps including delisted ones), SEC bulk financial statement and insider data in one import ([#19])
 - [ ] Bridge KPI row complete, drift bullets, gauges
-- [ ] Plan page: target mix and bands, drift, rules (versioned), deposit routing
+- [ ] Plan page: target mix and bands, drift, rules (versioned), deposit routing (rules [#12] and deposit schedule [#22] done; page and drift math to come)
 
-### 4. Decisions and Preflight 📋
+### 4. Decisions and Preflight 🚧
 
-- [ ] Decision records for every action and deliberate pass; logging starts here so scoring has history later
+- [x] Decision records for every action and deliberate pass; logging starts here so scoring has history later ([#20])
 - [ ] Preflight lights (engine, `preflight(holdings, trade)`): concentration, drift, funding and margin interest, wash sales across all accounts, lots and realized gain or loss, rule breaks
-- [ ] Tax lots, wash-sale calendar, realized gain and loss (Dec 6 risk)
+- [ ] Tax lots, wash-sale calendar, realized gain and loss (Dec 6 risk; lots and realized imported in [#16], wash-sale calendar to come)
 - [ ] Preflight annunciator (`POST /api/preflight`) and override box with a one-line reason
-- [ ] Order tickets, marked placed, confirmed by the mirror
-- [ ] Queue with proposal cards; Journal as a stamped ledger
+- [x] Order tickets, marked placed, confirmed by the mirror ([#20])
+- [ ] Queue with proposal cards; Journal as a stamped ledger (data [#20]; pages to come)
 
-### 5. Plan keeper and tax desk 📋
+### 5. Plan keeper and tax desk 🚧
 
-- [ ] Agent proposal record, written into the queue
+- [x] Agent proposal record, written into the queue ([#15], [#20])
 - [ ] Engine: per-desk brief slices, triggers table, marginal tax rate
-- [ ] Plan keeper: daily brief, payday split, rule breach flags
-- [ ] Tax desk: harvest candidates, lot picks, wash-sale windows, tax calendar
-- [ ] Brief card; crew tiles with agent status, run log and usage per run
+- [ ] Plan keeper: daily brief, payday split, rule breach flags (desk built [#15]; runs once the engine's brief slices land)
+- [ ] Tax desk: harvest candidates, lot picks, wash-sale windows, tax calendar (desk built [#15]; tax calendar data [#22])
+- [ ] Brief card; crew tiles with agent status, run log and usage per run (data [#10], [#15]; page to come)
 - [ ] Tax calendar view
 
 Tier 1 complete: 0.5.0.
@@ -98,8 +98,8 @@ Tier 1 complete: 0.5.0.
 ### 6. Research 📋
 
 - [ ] Dossiers per symbol and theme, with sources and "what would change the call"
-- [ ] Research desk, on request (overnight by default) and on a weekly rotation, with a skeptic run checking each dossier
-- [ ] Dossier and sources views; Console to request research and talk to the desks
+- [x] Research desk, on request (overnight by default) and on a weekly rotation, with a skeptic run checking each dossier ([#18])
+- [ ] Dossier and sources views; Console to request research and talk to the desks (backend [#18]; views to come)
 - [ ] Watchlist and engine triggers into the queue: big daily move, band crossed, margin debit appears, earnings date, new lot export
 - [ ] Source library: SEC EDGAR filings, insider trades, 13F, earnings dates, FRED series
 - [ ] Engine: EDGAR, FRED and Finnhub fetchers and holding signals
@@ -109,7 +109,7 @@ Tier 1 complete: 0.5.0.
 - [ ] Compare two to five items over a period, with fund overlap (N-PORT look-through)
 - [ ] Risk and statistics: concentration, exposure, scenario shocks, margin stress; heatmap and scatter views
 - [ ] Saved boards shell (`/api/compare`)
-- [ ] Risk desk weekly report
+- [x] Risk desk weekly report ([#18])
 
 ### 8. Phone alerts 📋
 
@@ -123,7 +123,7 @@ Research hypotheses become strategies, tested on history without seeing the futu
 - [ ] Walk-forward runner over 3, 5 and 10 year windows, point-in-time data only; ETF and Ken French universes first
 - [ ] Trial ledger: every strategy tried is recorded, so overfitting tests count them all
 - [ ] Deflated Sharpe and overfitting tests
-- [ ] Strategy desk: turns research desk hypotheses into specs, reads results
+- [x] Strategy desk: turns research desk hypotheses into specs, reads results ([#23])
 - [ ] Forward paper portfolios; a strategy is eligible only after six months of forward results
 - [ ] Rule backtests for the plan's own rules
 - [ ] Strategy lab views (Design mocks them once the spec settles)
@@ -137,7 +137,7 @@ Research hypotheses become strategies, tested on history without seeing the futu
 
 ### 11. Scout and FI scenarios 📋
 
-- [ ] Scout desk: monthly ideas within the desk profile, each argued against first
+- [x] Scout desk: monthly ideas within the desk profile, each argued against first ([#23])
 - [ ] FI path card and scenarios (Monte Carlo percentiles)
 - [ ] Factor exposure
 
@@ -166,3 +166,17 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#4]: https://github.com/inzodious/vektor-desk/pull/4
 [#5]: https://github.com/inzodious/vektor-desk/pull/5
 [#6]: https://github.com/inzodious/vektor-desk/pull/6
+[#9]: https://github.com/inzodious/vektor-desk/pull/9
+[#10]: https://github.com/inzodious/vektor-desk/pull/10
+[#11]: https://github.com/inzodious/vektor-desk/pull/11
+[#12]: https://github.com/inzodious/vektor-desk/pull/12
+[#14]: https://github.com/inzodious/vektor-desk/pull/14
+[#15]: https://github.com/inzodious/vektor-desk/pull/15
+[#16]: https://github.com/inzodious/vektor-desk/pull/16
+[#17]: https://github.com/inzodious/vektor-desk/pull/17
+[#18]: https://github.com/inzodious/vektor-desk/pull/18
+[#19]: https://github.com/inzodious/vektor-desk/pull/19
+[#20]: https://github.com/inzodious/vektor-desk/pull/20
+[#21]: https://github.com/inzodious/vektor-desk/pull/21
+[#22]: https://github.com/inzodious/vektor-desk/pull/22
+[#23]: https://github.com/inzodious/vektor-desk/pull/23
