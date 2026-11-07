@@ -49,6 +49,45 @@ CREATE TABLE IF NOT EXISTS holdings_daily (
   PRIMARY KEY (date, account, symbol)
 ) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS holdings_daily_symbol ON holdings_daily (symbol, date);
+CREATE TABLE IF NOT EXISTS lot_files (
+  id INTEGER PRIMARY KEY,
+  sha256 TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('lots', 'realized')),
+  as_of TEXT,
+  imported_at TEXT NOT NULL,
+  rows INTEGER NOT NULL,
+  warnings TEXT
+);
+CREATE TABLE IF NOT EXISTS lots (
+  id INTEGER PRIMARY KEY,
+  file_id INTEGER NOT NULL REFERENCES lot_files (id),
+  as_of TEXT,
+  account TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  acquired TEXT,
+  shares REAL NOT NULL,
+  cost REAL,
+  cost_per_share REAL,
+  value REAL,
+  term TEXT
+);
+CREATE INDEX IF NOT EXISTS lots_symbol ON lots (symbol, account);
+CREATE TABLE IF NOT EXISTS realized_lots (
+  id INTEGER PRIMARY KEY,
+  file_id INTEGER NOT NULL REFERENCES lot_files (id),
+  account TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  acquired TEXT,
+  sold TEXT,
+  shares REAL NOT NULL,
+  proceeds REAL,
+  cost REAL,
+  gain REAL,
+  term TEXT,
+  wash_disallowed REAL NOT NULL DEFAULT 0,
+  UNIQUE (account, symbol, acquired, sold, shares, proceeds)
+);
 """
 
 
