@@ -27,7 +27,7 @@ def live_cfg(demo_cfg, tmp_path, monkeypatch):
 
 
 def test_plan_keeper_writes_real_decision_records(live_cfg):
-    bad = proposal(title="Wrong number", numbers_used=[{"field": "cash.ready:portfolio:now", "value": 9}])
+    bad = proposal(title="Wrong number", numbers_used=[{"field": "cash.ready:all:now", "value": 9}])
     report = run_proposal_desk(
         live_cfg, "plan_keeper", engine=FakeEngine(SLICE), decisions=RealDecisions(), adapter=FakeAdapter({"plan_keeper": answer(proposal(), bad)})
     )

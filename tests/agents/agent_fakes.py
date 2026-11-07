@@ -4,7 +4,17 @@ from desk.agents.sources import NotReady
 
 
 def m(metric_id, scope_id, window, value, unit="usd"):
-    return {"metric_id": metric_id, "scope_id": scope_id, "window": window, "value": value, "unit": unit, "as_of": "2026-11-06", "quality": "ok"}
+    scope = "portfolio" if scope_id == "all" else "holding"
+    return {
+        "metric_id": metric_id,
+        "scope": scope,
+        "scope_id": scope_id,
+        "window": window,
+        "value": value,
+        "unit": unit,
+        "as_of": "2026-11-06",
+        "quality": "ok",
+    }
 
 
 SLICE = {
@@ -12,8 +22,8 @@ SLICE = {
     "data_health": [{"check": "reconcile", "status": "ok"}],
     "sections": {
         "drift": [m("plan.drift", "FUNDA", "now", -4.2, "pts"), m("plan.drift", "FUNDB", "now", 3.1, "pts")],
-        "cash": [m("cash.ready", "portfolio", "now", 1500.0)],
-        "margin": [m("margin.debit", "portfolio", "now", 0.0)],
+        "cash": [m("cash.ready", "all", "now", 1500.0)],
+        "margin": [m("margin.debit", "all", "now", 0.0)],
         "triggers": [{"as_of": "2026-11-06", "kind": "earnings", "scope_id": "TICKA", "detail": "{}"}],
     },
 }
@@ -32,7 +42,7 @@ def proposal(**over):
         "rule_served": "drift band",
         "invalidation": "Drift on FUNDA back inside 1 point",
         "horizon": "30d",
-        "numbers_used": [{"field": "plan.drift:FUNDA:now", "value": -4.2}, {"field": "cash.ready:portfolio:now", "value": "$1,500"}],
+        "numbers_used": [{"field": "plan.drift:FUNDA:now", "value": -4.2}, {"field": "cash.ready:all:now", "value": "$1,500"}],
         "sources": [],
         "confidence": 0.6,
         "order_ticket": {"action": "buy", "symbol": "FUNDA", "amount_usd": 1500, "order_type": "market", "account": "taxable"},
