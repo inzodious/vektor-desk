@@ -24,7 +24,16 @@ Siblings: [architecture.md](architecture.md) (mirror, compose app), [agents.md](
 | **FRED** (free key, `FRED_API_KEY`) | Risk-free rate (3-month T-bill), 10y and 2y yields, CPI, high-yield spread, VIX close | Free key, generous rate limit | Nightly |
 | **Ken French data library** | Daily and monthly Fama-French 5 factors plus momentum, US market back to 1926 | Free CSV ([library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.French/data_library.html)) | Monthly |
 
-Held symbols already have closes in Escape Vektor's `priceCloses` (with `adjClose`), so the desk reads those from the mirror and only calls Tiingo for symbols Escape Vektor does not price. That keeps the two apps well inside one free key.
+Escape Vektor's `priceCloses` only refresh when Joshua opens it, so they can lag. Price sources, in order:
+
+| Day | Close used |
+|---|---|
+| Any day with a Tiingo bar | Tiingo's official close (it wins over the mirror) |
+| Any other day | The mirror's close, else the last close before it |
+| A snapshot day whose newest close predates its last trading day | The broker's own price (value ÷ shares) |
+| A symbol nothing prices (Empower plan codes) | The broker's snapshot price; backfill lists it under `unpriced`, not `errors` |
+
+A held symbol is fetched from Tiingo unless the mirror already has a close for the last trading day. Weekends and holidays resolve to the last trading day.
 
 **Gaps, stated plainly.**
 
@@ -61,10 +70,17 @@ Before metrics are published for a day, the engine checks:
 
 | Check | Pass when |
 |---|---|
-| Value | Shares × close per account is within $1 or 0.05% of SimpleFIN's account value |
+| Value | Shares × close per account is within $1 or 0.05% of SimpleFIN's account value. A price-only gap is `warn` and names the biggest gaps; positions that don't add up are `fail` |
 | Shares | The lot export's shares per symbol equal the positions' shares exactly |
 | Cash | Change in cash equals flows plus trades plus income, within $0.01 |
-| Freshness | Mirror pull under 14 hours old, closes present for every held symbol |
+| Freshness | Mirror pull under 14 hours old |
+| Closes | Every held symbol has a close for the last trading day, or is a code nothing prices |
+| Market keys | `TIINGO_API_KEY` is set (Finnhub, FRED and the SEC contact are listed but don't warn) |
+| Symbol kinds | Every holding is known as a fund or a stock: Escape Vektor's profiles, then SEC's fund list, the benchmark ETFs, ticker shape (5 letters ending in X, plan codes with digits) and SEC titles |
+
+Every non-ok detail ends with `Fix:` and the one step that clears it.
+
+**Dry run.** `python -m desk.engine daily --dry-run` (also `holdings`, `core`) runs on a throwaway copy of the data, sends no alerts, and prints the result plus `health_detail` for every check. Nothing in `/data` changes.
 
 A failed check marks the day `stale`, keeps the last good values on screen with their date, and writes the reason to `data_health`. Agents read `data_health` first and stop if it is not green. The Phase 1 exit test ("numbers match Fidelity to the cent on a test day") is this table passing.
 
