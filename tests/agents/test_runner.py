@@ -187,4 +187,4 @@ def test_cli_entrypoint(cfg, monkeypatch, capsys):
     assert main(["status"]) == 0
     assert '"plan_keeper"' in capsys.readouterr().out
     assert main(["run", "scout"]) == 2
-    assert "isn't built yet" in capsys.readouterr().out
+    assert "doesn't run on its own" in capsys.readouterr().out

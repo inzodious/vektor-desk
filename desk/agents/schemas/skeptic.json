@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Skeptic verdict",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "counter_case"],
+  "properties": {
+    "verdict": {"enum": ["pass", "flag"]},
+    "counter_case": {"type": "string", "maxLength": 800}
+  }
+}

@@ -118,3 +118,82 @@ def runs(cfg: Config, desk: str | None = None, limit: int = 50) -> list[dict]:
         else:
             rows = conn.execute("SELECT * FROM agent_runs ORDER BY id DESC LIMIT ?", (limit,))
         return [dict(r) for r in rows]
+
+
+def save_dossier(cfg: Config, symbol: str, run_id: int, dossier: str) -> None:
+    with db(cfg) as conn:
+        conn.execute("INSERT INTO agent_dossiers (symbol, run_id, dossier, created_at) VALUES (?,?,?,?)", (symbol, run_id, dossier, now_iso()))
+
+
+def latest_dossier(cfg: Config, symbol: str) -> dict | None:
+    with db(cfg) as conn:
+        row = conn.execute("SELECT * FROM agent_dossiers WHERE symbol=? ORDER BY id DESC LIMIT 1", (symbol,)).fetchone()
+    return dict(row) if row else None
+
+
+def dossier_ages(cfg: Config) -> dict[str, str]:
+    with db(cfg) as conn:
+        return {r["symbol"]: r["at"] for r in conn.execute("SELECT symbol, max(created_at) AS at FROM agent_dossiers GROUP BY symbol")}
+
+
+def dossier_list(cfg: Config) -> list[dict]:
+    with db(cfg) as conn:
+        rows = conn.execute(
+            "SELECT d.symbol, d.run_id, d.created_at, d.dossier FROM agent_dossiers d "
+            "JOIN (SELECT symbol, max(id) AS id FROM agent_dossiers GROUP BY symbol) m ON m.id = d.id ORDER BY d.symbol"
+        )
+        return [dict(r) for r in rows]
+
+
+def add_request(cfg: Config, desk: str, question: str, *, symbol: str | None = None, run_now: bool = False, source: str = "console") -> int:
+    with db(cfg) as conn:
+        cur = conn.execute(
+            "INSERT INTO agent_requests (desk, question, symbol, run_now, source, created_at) VALUES (?,?,?,?,?,?)",
+            (desk, question, symbol, int(run_now), source, now_iso()),
+        )
+        return int(cur.lastrowid)
+
+
+def next_request(cfg: Config, *, now_only: bool) -> dict | None:
+    where = "status='queued'" + (" AND run_now=1" if now_only else "")
+    with db(cfg) as conn:
+        row = conn.execute(f"SELECT * FROM agent_requests WHERE {where} ORDER BY run_now DESC, id LIMIT 1").fetchone()
+        if row is None:
+            return None
+        conn.execute("UPDATE agent_requests SET status='running', started_at=? WHERE id=?", (now_iso(), row["id"]))
+    return dict(row)
+
+
+def finish_request(cfg: Config, request_id: int, status: str, *, run_id: int | None = None, answer: str | None = None, note: str | None = None) -> None:
+    with db(cfg) as conn:
+        conn.execute(
+            "UPDATE agent_requests SET status=?, finished_at=?, run_id=?, answer=?, note=? WHERE id=?",
+            (status, now_iso(), run_id, answer, note, request_id),
+        )
+
+
+def requeue(cfg: Config, request_id: int, note: str) -> None:
+    with db(cfg) as conn:
+        conn.execute("UPDATE agent_requests SET status='queued', run_now=0, started_at=NULL, note=? WHERE id=?", (note, request_id))
+
+
+def get_request(cfg: Config, request_id: int) -> dict | None:
+    with db(cfg) as conn:
+        row = conn.execute("SELECT * FROM agent_requests WHERE id=?", (request_id,)).fetchone()
+    return dict(row) if row else None
+
+
+def requests(cfg: Config, limit: int = 50) -> list[dict]:
+    with db(cfg) as conn:
+        return [dict(r) for r in conn.execute("SELECT * FROM agent_requests ORDER BY id DESC LIMIT ?", (limit,))]
+
+
+def mark_trigger(cfg: Config, as_of: str, kind: str, scope_id: str) -> bool:
+    with db(cfg) as conn:
+        cur = conn.execute("INSERT OR IGNORE INTO agent_triggers_seen (as_of, kind, scope_id) VALUES (?,?,?)", (as_of, kind, scope_id))
+        return cur.rowcount == 1
+
+
+def link_trigger(cfg: Config, as_of: str, kind: str, scope_id: str, request_id: int) -> None:
+    with db(cfg) as conn:
+        conn.execute("UPDATE agent_triggers_seen SET request_id=? WHERE as_of=? AND kind=? AND scope_id=?", (request_id, as_of, kind, scope_id))

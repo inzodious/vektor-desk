@@ -33,4 +33,35 @@ CREATE TABLE IF NOT EXISTS agent_briefs (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS agent_briefs_desk ON agent_briefs (desk, run_id);
+CREATE TABLE IF NOT EXISTS agent_dossiers (
+  id INTEGER PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  run_id INTEGER NOT NULL REFERENCES agent_runs (id),
+  dossier TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS agent_dossiers_symbol ON agent_dossiers (symbol, id);
+CREATE TABLE IF NOT EXISTS agent_requests (
+  id INTEGER PRIMARY KEY,
+  desk TEXT NOT NULL,
+  question TEXT NOT NULL,
+  symbol TEXT,
+  run_now INTEGER NOT NULL DEFAULT 0,
+  source TEXT NOT NULL DEFAULT 'console',
+  status TEXT NOT NULL DEFAULT 'queued',
+  created_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT,
+  run_id INTEGER REFERENCES agent_runs (id),
+  answer TEXT,
+  note TEXT
+);
+CREATE INDEX IF NOT EXISTS agent_requests_status ON agent_requests (status, run_now, id);
+CREATE TABLE IF NOT EXISTS agent_triggers_seen (
+  as_of TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
+  request_id INTEGER REFERENCES agent_requests (id),
+  PRIMARY KEY (as_of, kind, scope_id)
+);
 """
