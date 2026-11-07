@@ -129,6 +129,47 @@ CREATE TABLE IF NOT EXISTS api_calls (
   ok INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS api_calls_provider ON api_calls (provider, at);
+CREATE TABLE IF NOT EXISTS cash_flows (
+  id INTEGER PRIMARY KEY,
+  date TEXT NOT NULL,
+  account TEXT NOT NULL,
+  amount REAL NOT NULL,
+  kind TEXT NOT NULL,
+  external_account INTEGER NOT NULL,
+  external_portfolio INTEGER NOT NULL,
+  ref TEXT
+);
+CREATE INDEX IF NOT EXISTS cash_flows_date ON cash_flows (date);
+CREATE TABLE IF NOT EXISTS metric_values (
+  metric_id TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
+  window TEXT NOT NULL,
+  as_of TEXT NOT NULL,
+  value REAL,
+  unit TEXT NOT NULL,
+  n_obs INTEGER,
+  quality TEXT NOT NULL,
+  engine_version TEXT NOT NULL,
+  PRIMARY KEY (metric_id, scope, scope_id, window, as_of)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS metric_values_as_of ON metric_values (as_of);
+CREATE TABLE IF NOT EXISTS series_daily (
+  series_id TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
+  date TEXT NOT NULL,
+  value REAL NOT NULL,
+  quality TEXT NOT NULL,
+  PRIMARY KEY (series_id, scope, scope_id, date)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS data_health (
+  as_of TEXT NOT NULL,
+  check_name TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('ok', 'warn', 'fail')),
+  detail TEXT,
+  PRIMARY KEY (as_of, check_name)
+) WITHOUT ROWID;
 """
 
 
