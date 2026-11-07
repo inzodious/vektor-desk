@@ -13,6 +13,7 @@ Production-ready on the TrueNAS box with real data. Every roadmap phase is compl
 - `python -m desk.decisions.profile init` drafts `desk.yaml` from the mirror (deposit cadence and amounts, accounts for wash-sale checks, plan sleeves and guardrails) and never overwrites; `/api/decisions/profile/status` shows which settings are still defaults ([#70])
 - Settings shows the desk profile (version, what's still default, desks on, and a starter command when there is no desk.yaml) ([#76])
 - Every page shows an engine health banner while checks fail or warn ([#75])
+- The desk also answers at home at https://desk-lan.escape-vektor.com on a NAS LAN alias, with no router forward ([#79])
 - Eval container lets a Claude Remote Control session QA the box read-only, with redacted service logs in data/run/logs ([#72])
 - `python -m desk.engine daily --dry-run` and `python -m desk.agents dry-run <desk>` write nothing ([#71], [#73])
 
@@ -229,3 +230,4 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#75]: https://github.com/inzodious/vektor-desk/pull/75
 [#76]: https://github.com/inzodious/vektor-desk/pull/76
 [#78]: https://github.com/inzodious/vektor-desk/pull/78
+[#79]: https://github.com/inzodious/vektor-desk/pull/79
