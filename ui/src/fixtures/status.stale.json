@@ -1,0 +1,39 @@
+{
+  "version": "0.1.0",
+  "demo": false,
+  "mirror": {
+    "state": "stale",
+    "last_ok": "2026-11-08T13:00:04+00:00",
+    "age_hours": 27.7,
+    "last_error": null,
+    "tables": {
+      "activity": 412,
+      "checkins": 38,
+      "medals": 21,
+      "merchantRules": 64,
+      "paystubs": 0,
+      "plans": 3,
+      "positions": 96,
+      "prefs": 1,
+      "priceCloses": 1830,
+      "prices": 24,
+      "quests": 17,
+      "snapshots": 12,
+      "statements": 9,
+      "transactions": 1288,
+      "xpEvents": 540
+    }
+  },
+  "claude_token": {
+    "state": "renew",
+    "expires": "2026-12-01",
+    "days_left": 22
+  },
+  "running": [
+    {
+      "job": "mirror",
+      "pid": 4122,
+      "since": "2026-11-09T16:40:12+00:00"
+    }
+  ]
+}
