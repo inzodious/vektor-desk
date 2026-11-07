@@ -4,6 +4,17 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.3.0 - 2026-11-07
+
+Engine core and Plan are done. Preflight, desk brief slices and triggers from phases 4 and 5 landed alongside, so the Plan keeper and tax desk now run on real engine numbers.
+
+### Added
+
+- Bridge gets a 7-tile KPI row with drawers, value versus the plan and S&P 500 shadows, cockpit gauges and drift bullets; new Plan page with rules, funds and a modelled deposit split ([#37])
+- Preflight for every trade idea (six lamps with before and after, margin cost in dollars, lot picks and short/long-term gain, wash-sale checks across accounts), plus realized and unrealized gains, harvestable losses and a wash-sale calendar (`POST /api/preflight`, `/api/engine/preflight`, `/api/engine/wash`) ([#35])
+- Engine brief slices for each agent desk, daily triggers (margin debit, big moves, concentration, rule breaches, lot exports, landed deposits) with phone alerts the first day they appear, marginal tax rate from Escape Vektor's tax estimate, and harvest value ([#36])
+- Rule breaches and landed deposits wake the Plan keeper, and the agents read the real engine brief ([#38])
+
 ## 0.2.0 - 2026-11-07
 
 Bridge and Symbol sheet are live on demo data, the engine core behind phase 3 is in, and phone alerts are wired through every package.
@@ -74,3 +85,7 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#30]: https://github.com/inzodious/vektor-desk/pull/30
 [#32]: https://github.com/inzodious/vektor-desk/pull/32
 [#33]: https://github.com/inzodious/vektor-desk/pull/33
+[#35]: https://github.com/inzodious/vektor-desk/pull/35
+[#36]: https://github.com/inzodious/vektor-desk/pull/36
+[#37]: https://github.com/inzodious/vektor-desk/pull/37
+[#38]: https://github.com/inzodious/vektor-desk/pull/38

@@ -11,7 +11,7 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 0 | Planning docs | | ✅ | |
 | 1 | Foundation | 1 | 🚧 (code done, box setup pending) | 0 |
 | 2 | Bridge and Symbol sheet | 1 | ✅ | 1 |
-| 3 | Engine core and Plan | 1 | 🚧 | 2 |
+| 3 | Engine core and Plan | 1 | ✅ | 2 |
 | 4 | Decisions and Preflight | 1 | 🚧 | 3 |
 | 5 | Plan keeper and tax desk | 1 | 🚧 | 4 |
 | 6 | Research | 2 | 📋 | 4 |
@@ -65,31 +65,31 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run. **
 - [x] Line and spark charts (hand-rolled SVG, no chart library) ([#33])
 - [x] Fidelity lot export parser and lots table (Dec 6 risk) ([#16])
 
-### 3. Engine core and Plan 🚧
+### 3. Engine core and Plan ✅
 
 - [x] Engine (Python): flow classifier, reconciliation and `data_health`, value and flows, TWR and XIRR ([#30])
 - [x] Shadow portfolios: plan mix and S&P 500 ([#30])
 - [x] Drift and rules, margin (interest in dollars, price drop to a call), costs, basic concentration and drawdown ([#30])
 - [x] Output contract v1 ([#30])
 - [x] Background backfill for the Strategy lab starts here: Tiingo prices at about 400 new symbols a month under the free cap shared with Escape Vektor (ETFs first, then large caps including delisted ones), SEC bulk financial statement and insider data in one import ([#19])
-- [ ] Bridge KPI row complete, drift bullets, gauges
-- [ ] Plan page: target mix and bands, drift, rules (versioned), deposit routing (rules [#12], deposit schedule [#22] and drift math [#30] done; page to come)
+- [x] Bridge KPI row complete, drift bullets, gauges ([#37])
+- [x] Plan page: target mix and bands, drift, rules (versioned), deposit routing ([#12], [#22], [#30], [#37])
 
 ### 4. Decisions and Preflight 🚧
 
 - [x] Decision records for every action and deliberate pass; logging starts here so scoring has history later ([#20])
-- [ ] Preflight lights (engine, `preflight(holdings, trade)`): concentration, drift, funding and margin interest, wash sales across all accounts, lots and realized gain or loss, rule breaks
-- [ ] Tax lots, wash-sale calendar, realized gain and loss (Dec 6 risk; lots and realized imported in [#16], wash-sale calendar to come)
-- [ ] Preflight annunciator (`POST /api/preflight`) and override box with a one-line reason
+- [x] Preflight lights (engine, `preflight(holdings, trade)`): concentration, drift, funding and margin interest, wash sales across all accounts, lots and realized gain or loss, rule breaks ([#35])
+- [x] Tax lots, wash-sale calendar, realized gain and loss ([#16], [#35])
+- [ ] Preflight annunciator (`POST /api/preflight`) and override box with a one-line reason (endpoint [#35]; UI to come)
 - [x] Order tickets, marked placed, confirmed by the mirror ([#20])
 - [ ] Queue with proposal cards; Journal as a stamped ledger (data [#20]; pages to come)
 
 ### 5. Plan keeper and tax desk 🚧
 
 - [x] Agent proposal record, written into the queue ([#15], [#20])
-- [ ] Engine: per-desk brief slices, triggers table, marginal tax rate
-- [ ] Plan keeper: daily brief, payday split, rule breach flags (desk built [#15]; runs once the engine's brief slices land)
-- [ ] Tax desk: harvest candidates, lot picks, wash-sale windows, tax calendar (desk built [#15]; tax calendar data [#22])
+- [x] Engine: per-desk brief slices, triggers table, marginal tax rate ([#36])
+- [x] Plan keeper: daily brief, payday split, rule breach flags ([#15], [#36], [#38])
+- [x] Tax desk: harvest candidates, lot picks, wash-sale windows, tax calendar ([#15], [#22], [#35], [#36])
 - [ ] Brief card; crew tiles with agent status, run log and usage per run (data [#10], [#15]; page to come)
 - [ ] Tax calendar view
 
@@ -185,3 +185,7 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#28]: https://github.com/inzodious/vektor-desk/pull/28
 [#30]: https://github.com/inzodious/vektor-desk/pull/30
 [#33]: https://github.com/inzodious/vektor-desk/pull/33
+[#35]: https://github.com/inzodious/vektor-desk/pull/35
+[#36]: https://github.com/inzodious/vektor-desk/pull/36
+[#37]: https://github.com/inzodious/vektor-desk/pull/37
+[#38]: https://github.com/inzodious/vektor-desk/pull/38
