@@ -16,7 +16,8 @@ TrueNAS SCALE 24.10 ─ custom app "vektor-desk" (deploy/compose.yaml)
   ├─ api        FastAPI on :8000, compose network only; serves the UI once it lands
   ├─ cron       python -m desk.scheduler running deploy/crontab: mirror, engine, agents (claude -p)
   ├─ ntfy       phone alerts at https://desk.escape-vektor.com:8443, through the same caddy
-  └─ lab        python -m desk.engine.lab: overnight strategy sweeps, no network at all
+  ├─ lab        python -m desk.engine.lab: overnight strategy sweeps, no network at all
+  └─ eval       claude remote-control for QA: data and source read-only, own network, no keys (eval-access.md)
 ```
 
 The NAS publishes no port for the desk. The TrueNAS UI keeps 443 on the LAN; Caddy listens inside the tailscale container's network namespace, so `desk.escape-vektor.com` answers only on the tailnet.
@@ -158,7 +159,8 @@ The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free.
 | Deploy | Nothing: within 5 minutes of a push to `main`. Right away: `deploy.sh now` |
 | Status | `deploy.sh status`, or `https://desk.escape-vektor.com/api/status` |
 | Pull Escape Vektor now | `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
-| Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log` |
+| Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log`; redacted copies in `data/run/logs` every 5 minutes (`deploy.sh logs` now) |
+| Let Claude QA the box | [eval-access.md](eval-access.md): a Remote Control session in the sealed `eval` container |
 | Add a schedule | A line in `deploy/crontab` (minute hour day month weekday command, Eastern time) |
 | Test phone alerts | `docker exec vektor-desk-cron python -m desk.notify test`; recent ones with `... desk.notify recent` |
 

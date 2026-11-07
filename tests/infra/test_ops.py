@@ -72,6 +72,25 @@ def test_backup_copies_every_db_and_inbox(cfg, tmp_path):
     assert (out / "inbox" / "fidelity" / "lots.txt").exists()
 
 
+def test_backup_reads_idle_databases_on_a_read_only_mount(cfg, tmp_path, monkeypatch):
+    import sqlite3
+
+    import desk.backup as backup
+
+    mirrored(cfg)
+
+    def no_lock_file(path, *, readonly=False):
+        if readonly:
+            raise sqlite3.OperationalError("unable to open database file")
+        return connect(path)
+
+    monkeypatch.setattr(backup, "connect", no_lock_file)
+    out = tmp_path / "copies"
+    files = snapshot(cfg.data_dir, out)
+    assert [f["db"] for f in files] == ["mirror.db"]
+    assert sqlite3.connect(out / "mirror.db").execute("SELECT count(*) FROM rows").fetchone()[0] == 7
+
+
 def test_api_health_status_positions_and_smoke_page(cfg):
     mirrored(cfg)
     client = TestClient(create_app(cfg))

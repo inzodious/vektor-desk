@@ -146,6 +146,46 @@ services:
     cpus: 3
     mem_limit: 1536m
 
+  # Claude evaluation access (docs/eval-access.md): a Remote Control session this project can drive. Reads the desk's data,
+  # source and redacted logs read-only, and works on copies in eval/work. No keys, no Docker socket, and on its own network,
+  # so it can't reach the API, ntfy or the tailnet.
+  eval:
+    image: vektor-desk:local
+    pull_policy: never
+    container_name: vektor-desk-eval
+    hostname: vektor-desk-eval
+    restart: unless-stopped
+    init: true
+    user: "568:568"
+    working_dir: /work
+    command:
+      - sh
+      - -c
+      - >-
+        cp /src/deploy/eval/CLAUDE.md /work/CLAUDE.md;
+        until [ -s "$$HOME/.claude/.credentials.json" ]; do sleep 30; done;
+        exec claude remote-control --name vektor-desk-eval
+    networks: [eval]
+    healthcheck:
+      disable: true
+    environment:
+      HOME: /home/eval
+      DESK_DATA_DIR: /work/data
+    volumes:
+      - /mnt/Manifest/apps/vektor-desk/data:/data:ro
+      - /mnt/Manifest/apps/vektor-desk-src:/src:ro
+      - /mnt/Manifest/apps/vektor-desk/eval/home:/home/eval
+      - /mnt/Manifest/apps/vektor-desk/eval/work:/work
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 2
+    mem_limit: 1g
+
+networks:
+  eval: {}
+
 x-notes: |
   ## Vektor Desk
 
