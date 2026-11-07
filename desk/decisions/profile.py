@@ -23,6 +23,7 @@ DEFAULTS: dict = {
     "growth": {"horizon_years": 10, "tilt": "growth", "fi_target_from_plan": True},
     "usage": {"overnight_window": "01:00-05:00", "weekly_runs": {}},
     "agents": {"enabled": False, "desks": {d: False for d in DESKS}},
+    "deposits": [],
     "rules": [
         {"id": "no-margin-buys", "kind": "no_margin_buys"},
         {"id": "no-new-single-stocks", "kind": "no_new_single_stocks"},
@@ -170,6 +171,12 @@ def validate(data) -> list[str]:
                 warnings.append(f"agents.desks.{desk} is not a known desk")
             if not isinstance(on, bool):
                 errors.append(f"agents.desks.{desk} must be true or false")
+    if "deposits" in data:
+        from desk.decisions.plan import validate_deposits
+
+        dep_errors, dep_warnings = validate_deposits(data["deposits"])
+        errors += dep_errors
+        warnings += dep_warnings
     if "rules" in data:
         rule_errors, rule_warnings = validate_rules(data["rules"])
         errors += rule_errors
