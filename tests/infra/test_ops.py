@@ -82,3 +82,22 @@ def test_api_health_status_positions_and_smoke_page(cfg):
     assert [p["symbol"] for p in held["positions"]][:2] == ["S5", "S4"]
     page = client.get("/")
     assert page.status_code == 200 and "Vektor Desk is up" in page.text and "S5" in page.text
+
+
+def test_serves_the_built_ui_with_spa_fallback(cfg, tmp_path, monkeypatch):
+    dist = tmp_path / "dist"
+    (dist / "assets").mkdir(parents=True)
+    (dist / "index.html").write_text("<!doctype html><title>Vektor Desk</title><div id=root></div>")
+    (dist / "assets" / "app.js").write_text("console.log('hi')")
+    (dist / "favicon.svg").write_text("<svg/>")
+    (tmp_path / "secret.txt").write_text("nope")
+    monkeypatch.setenv("DESK_UI_DIR", str(dist))
+    with TestClient(create_app(cfg, packages=[])) as client:
+        assert "id=root" in client.get("/").text
+        assert "id=root" in client.get("/bridge/holdings").text
+        assert client.get("/assets/app.js").text == "console.log('hi')"
+        assert client.get("/favicon.svg").text == "<svg/>"
+        assert "id=root" in client.get("/../secret.txt").text
+        assert client.get("/api/health").json()["ok"] is True
+        missing = client.get("/api/nope")
+        assert missing.status_code == 404 and missing.json()["ok"] is False

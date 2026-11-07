@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from desk import __version__
@@ -106,9 +106,23 @@ def create_app(cfg: Config | None = None, *, packages: list[str] | None = None, 
         app.include_router(router)
         app.state.routers.append(pkg)
 
-    ui = Path(os.environ.get("DESK_UI_DIR", "/app/ui/dist"))
+    ui = Path(os.environ.get("DESK_UI_DIR", "/app/ui/dist")).resolve()
     if (ui / "index.html").exists():
-        app.mount("/", StaticFiles(directory=ui, html=True), name="ui")
+        index = ui / "index.html"
+        if (ui / "assets").is_dir():
+            app.mount("/assets", StaticFiles(directory=ui / "assets"), name="assets")
+
+        @app.get("/api/{rest:path}", include_in_schema=False)
+        def api_missing(rest: str) -> JSONResponse:
+            return JSONResponse({"ok": False, "error": f"No such API path: /api/{rest}"}, status_code=404)
+
+        @app.get("/{rest:path}", include_in_schema=False)
+        def spa(rest: str) -> FileResponse:
+            target = (ui / rest).resolve()
+            if rest and target.is_file() and target.is_relative_to(ui):
+                return FileResponse(target)
+            return FileResponse(index, headers={"Cache-Control": "no-cache"})
+
     else:
 
         @app.get("/", response_class=HTMLResponse)

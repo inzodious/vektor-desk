@@ -1,6 +1,16 @@
 # ---- Node, for the Claude Code CLI ----
 FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS node
 
+# ---- Web app: built when ui/package.json exists ----
+FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS ui
+WORKDIR /src
+COPY . .
+RUN if [ -f ui/package.json ]; then \
+        cd ui && (if [ -f package-lock.json ]; then npm ci; else npm install; fi) && npm run build && test -f dist/index.html; \
+    else \
+        mkdir -p ui/dist; \
+    fi
+
 # ---- Python dependencies ----
 FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS deps
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -33,6 +43,7 @@ ENV PATH=/opt/venv/bin:$PATH \
     TZ=America/New_York
 WORKDIR /app
 COPY desk ./desk
+COPY --from=ui /src/ui/dist ./ui/dist
 COPY deploy/crontab ./deploy/crontab
 COPY pyproject.toml ./
 RUN /opt/venv/bin/pip install --no-deps --no-cache-dir . && python -m compileall -q desk

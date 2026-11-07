@@ -169,6 +169,10 @@ Each package under `desk/` plugs in through three optional modules, found on the
 
 Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
+## Web app
+
+The image's `ui` stage builds `ui/` with `npm ci` and `npm run build` (or `npm install` until a lockfile exists) whenever `ui/package.json` is present, and the build has to produce `ui/dist/index.html`. The API serves `ui/dist` at `/`. Files under `/assets` are served as they are, any other path that isn't under `/api/` gets `index.html` so client-side routes work, and an unknown `/api/...` path answers JSON 404. Until `ui/` exists, `/` shows the plain status page. `DESK_UI_DIR` points the API at another build when testing locally.
+
 ## Demo data
 
 `desk/demo.py` builds one synthetic `mirror.db`. It covers two years of a made-up investor with an Individual and an HSA account, a four-fund plan mix and one losing single stock (ACME, half sold). It has monthly deposits and buys, quarterly dividends reinvested, weekly snapshots, pay stubs, card spending, a price board, yearly closes and profiles. Every table has the same shapes Escape Vektor writes, and `row_history` holds about 100 weekly pulls. The same seed always gives the same world.

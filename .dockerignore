@@ -11,3 +11,6 @@ inbox
 *.csv
 service-account*.json
 firestore-reader*.json
+**/node_modules
+ui/dist
+mockups
