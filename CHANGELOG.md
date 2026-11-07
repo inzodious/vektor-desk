@@ -4,6 +4,12 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.2 - 2026-11-07
+
+### Changed
+
+- The desk uses Escape Vektor's logo for its app icon, browser tab, phone home-screen icon and header mark ([#83])
+
 ## 1.0.1 - 2026-11-07
 
 ### Added
@@ -240,3 +246,4 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#79]: https://github.com/inzodious/vektor-desk/pull/79
 [#80]: https://github.com/inzodious/vektor-desk/pull/80
 [#81]: https://github.com/inzodious/vektor-desk/pull/81
+[#83]: https://github.com/inzodious/vektor-desk/pull/83
