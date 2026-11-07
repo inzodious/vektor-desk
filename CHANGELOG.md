@@ -4,6 +4,18 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 0.11.0 - 2026-11-07
+
+Foundation is done: the desk is live on the TrueNAS box over Tailscale, reading Escape Vektor's data through the read-only mirror. Every roadmap phase is now complete; 1.0 hardening is what's left.
+
+### Added
+
+- `deploy.sh restore-test` restore drill; Firestore errors now say why ([#67])
+
+### Fixed
+
+- The setup doc puts the reader account in the right project ([#67]) and says to open the desk in any browser with Tailscale connected ([#68])
+
 ## 0.10.0 - 2026-11-07
 
 Scout and FI scenarios are done, so every planned phase is built. What remains for 1.0 is hardening on the box.
@@ -184,3 +196,5 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#63]: https://github.com/inzodious/vektor-desk/pull/63
 [#64]: https://github.com/inzodious/vektor-desk/pull/64
 [#65]: https://github.com/inzodious/vektor-desk/pull/65
+[#67]: https://github.com/inzodious/vektor-desk/pull/67
+[#68]: https://github.com/inzodious/vektor-desk/pull/68
