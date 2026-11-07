@@ -332,6 +332,23 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   price REAL NOT NULL,
   cost REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS signals (
+  signal_id TEXT NOT NULL,
+  scope_id TEXT NOT NULL,
+  as_of TEXT NOT NULL,
+  value REAL,
+  base_rate REAL,
+  ci_low REAL,
+  ci_high REAL,
+  n_obs INTEGER,
+  note TEXT,
+  PRIMARY KEY (signal_id, scope_id, as_of)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS engine_views (
+  name TEXT PRIMARY KEY,
+  as_of TEXT NOT NULL,
+  body TEXT NOT NULL
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS factors_daily (
   series TEXT NOT NULL,
   date TEXT NOT NULL,
