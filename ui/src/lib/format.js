@@ -67,3 +67,8 @@ export function ago(hours) {
 export function plural(n, word, many = `${word}s`) {
   return `${count(n)} ${n === 1 ? word : many}`;
 }
+
+export function flapText(text, max = 7) {
+  const s = String(text ?? '').toUpperCase();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}

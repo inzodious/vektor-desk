@@ -154,3 +154,22 @@ test('bridge shows the top three proposals and acts on them', async ({ page }) =
   await expect(page).toHaveURL(/\/decisions\?d=/);
   await expect(page.getByTestId('detail').getByRole('heading', { level: 2 })).toHaveText('Buy $400 ACME');
 });
+
+test('board symbols read the right way round and long codes fit their tiles', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.goto('/?scenario=long');
+  const board = page.locator('.board');
+  await expect(board.locator('.board-row[data-sym="0999999"] .flap')).toHaveAttribute('aria-label', '0999999');
+  await expect(board.locator('.board-row[data-sym="LONGSYMBOL"] .flap span')).toHaveCount(7);
+  await expect(board.locator('.board-row[data-sym="LONGSYMBOL"] .flap span').last()).toHaveText('…');
+  const report = await board.evaluate((el) =>
+    [...el.querySelectorAll('.board-row[data-sym]')].map((row) => {
+      const flap = row.querySelector('.flap');
+      const cell = flap.parentElement.getBoundingClientRect();
+      const box = flap.getBoundingClientRect();
+      const turned = [...flap.querySelectorAll('span')].filter((s) => getComputedStyle(s).transform !== 'none').length;
+      return { sym: row.dataset.sym, fits: box.right <= cell.right + 0.5, turned };
+    }),
+  );
+  expect(report.filter((r) => !r.fits || r.turned)).toEqual([]);
+});

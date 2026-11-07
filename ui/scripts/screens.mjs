@@ -75,7 +75,69 @@ const SHOTS = [
   { name: 'settings-theme', path: '/settings', act: async (p) => p.getByRole('button', { name: /^Theme/ }).click() },
   { name: 'settings-failing', path: '/settings?scenario=failing', fixtures: true },
   { name: 'settings-offline', path: '/settings', offline: true },
+  { name: 'not-found', path: '/nowhere' },
 ];
+
+// ---------- contrast ----------
+function lowContrast() {
+  const cv = document.createElement('canvas');
+  cv.width = 1;
+  cv.height = 1;
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  const rgba = (c) => {
+    ctx.clearRect(0, 0, 1, 1);
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = c;
+    ctx.fillRect(0, 0, 1, 1);
+    const d = ctx.getImageData(0, 0, 1, 1).data;
+    return [d[0], d[1], d[2], d[3] / 255];
+  };
+  const over = (top, bottom) => [0, 1, 2].map((i) => top[i] * top[3] + bottom[i] * (1 - top[3])).concat(1);
+  const lum = (c) => {
+    const [r, g, b] = c.slice(0, 3).map((v) => {
+      const x = v / 255;
+      return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const backdrop = (el) => {
+    const layers = [];
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (cs.backgroundImage && cs.backgroundImage !== 'none' && !cs.backgroundImage.startsWith('radial-gradient')) return null;
+      const c = rgba(cs.backgroundColor);
+      if (c[3] > 0) layers.push(c);
+      if (c[3] >= 1) break;
+    }
+    let bg = [255, 255, 255, 1];
+    for (let k = layers.length - 1; k >= 0; k -= 1) bg = over(layers[k], bg);
+    return bg;
+  };
+  const out = [];
+  document.querySelectorAll('body *').forEach((el) => {
+    const own = [...el.childNodes].some((t) => t.nodeType === 3 && t.textContent.trim());
+    if (!own) return;
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const cs = getComputedStyle(el);
+    if (cs.visibility === 'hidden' || Number(cs.opacity) === 0 || el.closest('[aria-hidden="true"], .sr-only, button[disabled], .hm-cell, .hm')) return;
+    const svg = el instanceof SVGElement;
+    const bg = backdrop(svg ? el.closest('svg').parentElement : el);
+    if (!bg) return;
+    let fg = rgba(svg ? cs.fill : cs.color);
+    let op = 1;
+    for (let n = el; n && n.nodeType === 1; n = n.parentElement) op *= Number(getComputedStyle(n).opacity);
+    fg = over([...fg.slice(0, 3), fg[3] * op], bg);
+    const [a, b] = [lum(fg), lum(bg)].sort((x, y) => y - x);
+    const ratio = (a + 0.05) / (b + 0.05);
+    const size = parseFloat(cs.fontSize);
+    const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
+    if (svg && ratio < 1.3) return;
+    if (ratio < (large ? 3 : 4.5)) out.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? `.${el.className.split(' ')[0]}` : ''} "${el.textContent.trim().slice(0, 24)}" ${ratio.toFixed(2)}`);
+  });
+  return [...new Set(out)];
+}
+
 
 mkdirSync(out, { recursive: true });
 const browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined });
@@ -98,16 +160,17 @@ for (const shot of SHOTS.filter((s) => !only || only.includes(s.name))) {
         await page.waitForTimeout(400);
       }
       const o = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, view: window.innerWidth }));
+      const low = process.env.CONTRAST ? await page.evaluate(lowContrast) : [];
       const file = join(out, `${shot.name}-${width}-${theme}.png`);
       if (shot.el) await page.getByTestId(shot.el).screenshot({ path: file });
       else await page.screenshot({ path: file, fullPage: shot.full ?? !shot.act });
-      report.push({ file, overflow: o.scroll > o.view, errors });
+      report.push({ file, overflow: o.scroll > o.view, errors, low });
       await ctx.close();
     }
   }
 }
 await browser.close();
-const bad = report.filter((r) => r.overflow || r.errors.length);
+const bad = report.filter((r) => r.overflow || r.errors.length || r.low.length);
 console.log(`${report.length} screens, ${bad.length} with problems`);
-bad.forEach((b) => console.log(b.file, b.overflow ? 'OVERFLOW' : '', b.errors.join(' | ')));
+bad.forEach((b) => console.log(b.file, b.overflow ? 'OVERFLOW' : '', b.errors.join(' | '), b.low.length ? `LOW CONTRAST ${b.low.join(' ; ')}` : ''));
 process.exit(bad.length ? 1 : 0);

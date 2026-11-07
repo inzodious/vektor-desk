@@ -57,6 +57,7 @@ const open = { ...closed, state: 'open', day: DAY, opens_at: `${DAY}T14:30:00+00
 save('live', open);
 save('live.stale', { ...open, quality: 'stale', as_of: `${DAY}T15:05:00+00:00` });
 save('live.closed', { ...closed, day: '2026-11-07' });
+save('live.long', { ...open, rows: [...openRows, { ...openRows.find((r) => r.source !== 'cash'), symbol: '0999999', source: 'holdings' }, { ...openRows.find((r) => r.source !== 'cash'), symbol: 'LONGSYMBOL' }] });
 save('live.empty', { state: 'closed', day: '2026-11-07', opens_at: null, closes_at: null, as_of: null, holdings_date: null, value: 0, day_change: 0, day_change_pct: null, quality: 'insufficient_history', rows: [], benchmarks: {} });
 
 const intraday = {};

@@ -150,7 +150,7 @@ export function LineChart({ series, x, height = 240, fmtY = (v) => v, fmtTip, re
             series[0].values[m.i] == null ? null : <circle key={`${m.i}-${m.label}`} cx={X(m.i)} cy={Y(series[0].values[m.i])} r="5" fill={m.color || 'var(--card)'} stroke={series[0].color} strokeWidth="2" />,
           )}
           {ends.map((e) => (
-            <text key={e.name} x={W - R + 8} y={e.y} className="lbl" style={{ fill: e.color }}>
+            <text key={e.name} x={W - R + 8} y={e.y} className="lbl" style={{ fill: `color-mix(in oklab, ${e.color} 55%, var(--ink))` }}>
               {e.name}
             </text>
           ))}
