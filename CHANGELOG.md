@@ -4,6 +4,13 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.1 - 2026-11-07
+
+### Added
+
+- Vektor Desk has its own logo: TrueNAS app icon, browser tab icon, phone home-screen icon and header mark ([#81])
+- TrueNAS Apps shows the desk's icon and a Web UI button to the home-network address; `deploy.sh card` puts them back after YAML edits ([#80])
+
 ## 1.0.0 - 2026-11-07
 
 Production-ready on the TrueNAS box with real data. Every roadmap phase is complete, every page passed a 480-shot sweep at three widths in both themes, and a backup restored cleanly.
@@ -231,3 +238,5 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#76]: https://github.com/inzodious/vektor-desk/pull/76
 [#78]: https://github.com/inzodious/vektor-desk/pull/78
 [#79]: https://github.com/inzodious/vektor-desk/pull/79
+[#80]: https://github.com/inzodious/vektor-desk/pull/80
+[#81]: https://github.com/inzodious/vektor-desk/pull/81
