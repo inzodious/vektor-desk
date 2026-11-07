@@ -191,3 +191,8 @@ save('engine.health.fail', {
   status: 'fail',
   checks: [{ check_name: 'value', status: 'fail', detail: 'Desk value is 4.1% off the broker on 2026-11-06; re-run the mirror pull, then the daily engine.' }, ...engineHealth.checks.filter((c) => c.check_name !== 'value')],
 });
+
+// ---------- desk profile status ----------
+const profileStatus = await get('/api/decisions/profile/status');
+save('decisions.profile.status.empty', { ...profileStatus, path: '/data/desk.yaml' });
+await import('./fresh.mjs');

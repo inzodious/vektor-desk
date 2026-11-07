@@ -1,0 +1,19 @@
+{
+ "as_of": "2026-11-06",
+ "groups": [],
+ "desks": [],
+ "saves": {
+  "n": 0,
+  "usd": 0
+ },
+ "offplan_gap": {
+  "n": 0,
+  "total_usd": 0,
+  "mean_usd": null,
+  "hit_rate": null,
+  "ci_low": null,
+  "ci_high": null
+ },
+ "decisions": [],
+ "method": "Same dollars into the plan mix from the next trading day's close; 90% bootstrap interval for the mean"
+}

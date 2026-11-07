@@ -8,6 +8,8 @@ import { Crew, Usage } from '../agents/Crew.jsx';
 import { useTheme } from '../lib/theme.js';
 import { ago, count, etStamp, etTime, plural } from '../lib/format.js';
 import { JOBS, MIRROR, THEMES, TOKEN, daysLabel, mirrorLine, summary, tokenLine } from '../lib/status.js';
+import { originName } from '../lib/decisions.js';
+import { defaultsText, keyWord, profileSource } from '../lib/profile.js';
 
 // ---------- cards ----------
 function Freshness({ mirror, onOpen }) {
@@ -230,12 +232,106 @@ function MirrorTables({ mirror, open, onClose }) {
   );
 }
 
+function Profile({ api }) {
+  const p = api.data;
+  const [copied, setCopied] = useState(null);
+  if (!p) {
+    return (
+      <div className="card c12" data-testid="profile">
+        <div className="card-head">
+          <span className="tag mint">Desk profile</span>
+        </div>
+        <p className="empty-hint">{api.loading ? 'Reading desk.yaml…' : 'The profile status did not answer.'}</p>
+      </div>
+    );
+  }
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(p.starter);
+      setCopied('ok');
+    } catch {
+      setCopied('fail');
+    }
+    setTimeout(() => setCopied(null), 1600);
+  };
+  const all = defaultsText(p);
+  return (
+    <div className="card c12" style={{ '--i': 5 }} data-testid="profile" data-source={p.exists ? 'file' : 'defaults'}>
+      <div className="card-head">
+        <span className="tag mint">Desk profile</span>
+        <span className="acts">
+          <span className="chip">v{p.version ?? '—'}</span>
+          <span className={`chip${p.exists ? '' : ' lilac'}`}>{profileSource(p)}</span>
+        </span>
+      </div>
+      {p.error ? (
+        <p className="prof-error" role="status">
+          <span className="chip watch">Heads up</span> {p.error}
+        </p>
+      ) : null}
+      {p.starter ? (
+        <div className="prof-starter" data-testid="starter">
+          <p>
+            <b>No desk.yaml yet.</b> Draft one from your data on the NAS, then edit what you like:
+          </p>
+          <div className="prof-cmd">
+            <code>{p.starter}</code>
+            <button className="btn sm" type="button" onClick={copy}>
+              <Icon name={copied === 'ok' ? 'check' : 'copy'} />
+              {copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Copy failed' : 'Draft desk.yaml from your data'}
+            </button>
+          </div>
+        </div>
+      ) : null}
+      <div className="mini-kpis prof-kpis">
+        <div>
+          <small>Desks</small>
+          <b>{p.agents_enabled ? `${p.desks_on.length} on` : 'Off'}</b>
+          <span>{p.agents_enabled ? p.desks_on.map(originName).join(', ') || 'None picked' : 'They advise only once turned on'}</span>
+        </div>
+        <div>
+          <small>Rules</small>
+          <b>{p.rules}</b>
+          <span>{p.deposits ? plural(p.deposits, 'deposit') + ' scheduled' : 'No deposit schedule'}</span>
+        </div>
+        <div>
+          <small>Loaded</small>
+          <b>{p.loaded_at ? etStamp(p.loaded_at) : '—'}</b>
+          <span>{p.set?.length ? `${plural(p.set.length, 'setting')} of yours` : 'Nothing of yours yet'}</span>
+        </div>
+      </div>
+      <div className="prof-defaults" data-testid="still-default">
+        <span className="kicker">Still default</span>
+        {all ? (
+          <p className="muted">{all}</p>
+        ) : (
+          <div className="chips-row">
+            {p.defaults.map((k) => (
+              <span className="chip" key={k} title={k}>
+                {keyWord(k)}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      {p.warnings?.length ? (
+        <ul className="lamp-notes">
+          {p.warnings.map((w) => (
+            <li key={w}>{w}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 // ---------- page ----------
 export default function Settings() {
   const status = useApi('/api/status', { every: 30000 });
   const health = useApi('/api/health');
   const agents = useApi('/api/agents/status', { every: 60000 });
   const runs = useApi('/api/agents/runs?limit=8', { every: 120000 });
+  const profile = useApi('/api/decisions/profile/status');
   const [drawer, setDrawer] = useState(false);
   const [checkedAt, setCheckedAt] = useState(() => new Date());
   const s = status.data;
@@ -307,6 +403,7 @@ export default function Settings() {
         <Token token={s.claude_token} />
         <Running jobs={s.running || []} />
         <About status={s} health={health.data} checkedAt={checkedAt} onRefresh={refresh} refreshing={status.loading} />
+        <Profile api={profile} />
         <Crew
           status={agents}
           reload={() => {

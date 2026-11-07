@@ -24,6 +24,15 @@ export const ROUTES = [
   { path: '/lab/patterns', h1: 'Patterns' },
   { path: '/lab/boards', h1: 'Saved boards' },
   { path: '/settings', h1: 'Settings' },
+  { path: '/?scenario=fresh', h1: 'Bridge' },
+  { path: '/research?scenario=fresh', h1: 'Research' },
+  { path: '/decisions?scenario=fresh', h1: 'Decisions' },
+  { path: '/decisions/journal?scenario=fresh', h1: 'Journal' },
+  { path: '/decisions/flight?scenario=fresh', h1: 'Flight record' },
+  { path: '/plan?scenario=fresh', h1: 'Plan' },
+  { path: '/lab/risk?scenario=fresh', h1: 'Risk' },
+  { path: '/lab/strategies?scenario=fresh', h1: 'Strategy lab' },
+  { path: '/settings?scenario=fresh', h1: 'Settings' },
   { path: '/nowhere', h1: 'Lost in orbit' },
 ];
 
