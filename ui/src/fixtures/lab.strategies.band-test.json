@@ -1,0 +1,310 @@
+{
+ "strategy_id": "band-test",
+ "version": 1,
+ "kind": "rule",
+ "status": "helps",
+ "rule": {
+  "result_at": "2026-01-05T07:00:00+00:00",
+  "request": {
+   "id": "band-test",
+   "rule": "rebalance_band",
+   "params": {
+    "band_pts": [
+     3,
+     5,
+     10
+    ]
+   },
+   "horizons": [
+    5,
+    10
+   ],
+   "model": "opus"
+  },
+  "rule": "rebalance_band",
+  "windows": {
+   "start": "2010-01-04",
+   "end": "2023-12-30",
+   "holdout_start": "2023-12-31",
+   "last": "2025-12-31"
+  },
+  "mix": {
+   "BND": 0.2,
+   "FXAIX": 0.8
+  },
+  "deposit_monthly": 1000,
+  "start_value": 10000,
+  "taxable": true,
+  "baseline": {
+   "description": "Deposits split pro rata to the mix, never selling",
+   "full": {
+    "start": "2010-01-04",
+    "end": "2023-12-29",
+    "contributed": 177000,
+    "end_value": 221890.27,
+    "after_liquidation": 214951.12,
+    "taxes": 6828.21,
+    "loss_offset_benefit": 0,
+    "interest": 0,
+    "costs": 199.45,
+    "trades": 338,
+    "turnover_per_year": 0.2261,
+    "twr_ann_pct": 4.5122,
+    "mdd_pct": -35.0357,
+    "harvested_losses": 0,
+    "margin_calls": 0
+   },
+   "holdout": {
+    "start": "2024-01-01",
+    "end": "2025-12-31",
+    "contributed": 33000,
+    "end_value": 32741.22,
+    "after_liquidation": 32724.85,
+    "taxes": 0,
+    "loss_offset_benefit": 0,
+    "interest": 0,
+    "costs": 32.87,
+    "trades": 50,
+    "turnover_per_year": 1.539,
+    "twr_ann_pct": -0.1468,
+    "mdd_pct": -20.7454,
+    "harvested_losses": 0,
+    "margin_calls": 0
+   }
+  },
+  "variants": [
+   {
+    "params": {
+     "band_pts": 3
+    },
+    "horizons": [
+     {
+      "years": 5,
+      "starts": 108,
+      "mean_pts": 0.0018,
+      "p5_pts": -1.7765,
+      "p50_pts": 0.2646,
+      "p95_pts": 0.7724,
+      "share_better": 0.5926
+     },
+     {
+      "years": 10,
+      "starts": 48,
+      "mean_pts": 0.6453,
+      "p5_pts": 0.1442,
+      "p50_pts": 0.7003,
+      "p95_pts": 0.9886,
+      "share_better": 0.9583
+     }
+    ],
+    "full": {
+     "start": "2010-01-04",
+     "end": "2023-12-29",
+     "contributed": 177000,
+     "end_value": 221979.19,
+     "after_liquidation": 215908.05,
+     "taxes": 7002.04,
+     "loss_offset_benefit": 0,
+     "interest": 0,
+     "costs": 219.51,
+     "trades": 338,
+     "turnover_per_year": 0.2496,
+     "twr_ann_pct": 4.4885,
+     "mdd_pct": -34.3083,
+     "harvested_losses": 0,
+     "margin_calls": 0
+    },
+    "full_diff_pts": 0.5406,
+    "holdout": {
+     "start": "2024-01-01",
+     "end": "2025-12-31",
+     "contributed": 33000,
+     "end_value": 32741.22,
+     "after_liquidation": 32724.85,
+     "taxes": 0,
+     "loss_offset_benefit": 0,
+     "interest": 0,
+     "costs": 32.87,
+     "trades": 50,
+     "turnover_per_year": 1.539,
+     "twr_ann_pct": -0.1468,
+     "mdd_pct": -20.7454,
+     "harvested_losses": 0,
+     "margin_calls": 0
+    },
+    "holdout_diff_pts": 0,
+    "verdict": "helps"
+   },
+   {
+    "params": {
+     "band_pts": 5
+    },
+    "horizons": [
+     {
+      "years": 5,
+      "starts": 108,
+      "mean_pts": -0.189,
+      "p5_pts": -1.2588,
+      "p50_pts": 0,
+      "p95_pts": 0.0491,
+      "share_better": 0.0833
+     },
+     {
+      "years": 10,
+      "starts": 48,
+      "mean_pts": -0.0127,
+      "p5_pts": -0.6531,
+      "p50_pts": 0,
+      "p95_pts": 0.5951,
+      "share_better": 0.375
+     }
+    ],
+    "full": {
+     "start": "2010-01-04",
+     "end": "2023-12-29",
+     "contributed": 177000,
+     "end_value": 220892.47,
+     "after_liquidation": 214240.77,
+     "taxes": 6703.29,
+     "loss_offset_benefit": 0,
+     "interest": 0,
+     "costs": 201.93,
+     "trades": 338,
+     "turnover_per_year": 0.2302,
+     "twr_ann_pct": 4.4369,
+     "mdd_pct": -34.4054,
+     "harvested_losses": 0,
+     "margin_calls": 0
+    },
+    "full_diff_pts": -0.4013,
+    "holdout": {
+     "start": "2024-01-01",
+     "end": "2025-12-31",
+     "contributed": 33000,
+     "end_value": 32741.22,
+     "after_liquidation": 32724.85,
+     "taxes": 0,
+     "loss_offset_benefit": 0,
+     "interest": 0,
+     "costs": 32.87,
+     "trades": 50,
+     "turnover_per_year": 1.539,
+     "twr_ann_pct": -0.1468,
+     "mdd_pct": -20.7454,
+     "harvested_losses": 0,
+     "margin_calls": 0
+    },
+    "holdout_diff_pts": 0,
+    "verdict": "no_clear_edge"
+   },
+   {
+    "params": {
+     "band_pts": 10
+    },
+    "horizons": [
+     {
+      "years": 5,
+      "starts": 108,
+      "mean_pts": 0,
+      "p5_pts": 0,
+      "p50_pts": 0,
+      "p95_pts": 0,
+      "share_better": 0
+     },
+     {
+      "years": 10,
+      "starts": 48,
+      "mean_pts": 0,
+      "p5_pts": 0,
+      "p50_pts": 0,
+      "p95_pts": 0,
+      "share_better": 0
+     }
+    ],
+    "full": {
+     "start": "2010-01-04",
+     "end": "2023-12-29",
+     "contributed": 177000,
+     "end_value": 221890.27,
+     "after_liquidation": 214951.12,
+     "taxes": 6828.21,
+     "loss_offset_benefit": 0,
+     "interest": 0,
+     "costs": 199.45,
+     "trades": 338,
+     "turnover_per_year": 0.2261,
+     "twr_ann_pct": 4.5122,
+     "mdd_pct": -35.0357,
+     "harvested_losses": 0,
+     "margin_calls": 0
+    },
+    "full_diff_pts": 0,
+    "holdout": {
+     "start": "2024-01-01",
+     "end": "2025-12-31",
+     "contributed": 33000,
+     "end_value": 32741.22,
+     "after_liquidation": 32724.85,
+     "taxes": 0,
+     "loss_offset_benefit": 0,
+     "interest": 0,
+     "costs": 32.87,
+     "trades": 50,
+     "turnover_per_year": 1.539,
+     "twr_ann_pct": -0.1468,
+     "mdd_pct": -20.7454,
+     "harvested_losses": 0,
+     "margin_calls": 0
+    },
+    "holdout_diff_pts": 0,
+    "verdict": "no_clear_edge"
+   }
+  ],
+  "best": {
+   "band_pts": 3
+  },
+  "verdict": "helps",
+  "trials": 3,
+  "caveats": [
+   "Dividends sit inside adjusted prices, so dividend tax is not charged, the same for both sides.",
+   "Both sides are sold at the end and taxed, so a deferred gain is not counted as a win.",
+   "Differences are after-liquidation dollars over the baseline, in points of money put in, for every start month in the horizon."
+  ]
+ },
+ "rejected": null,
+ "grammar": {
+  "universe": {
+   "fund_list": "symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks. {\"type\": \"fund_list\", \"set\": \"sector_etfs\"}",
+   "screen": "single stocks in the backfill universe; min_history_days, min_price. Carries a survivorship caveat",
+   "french": "Ken French research portfolios, no survivorship bias, daily from 1963 on the factor calendar. set: industry_12 | industry_49 | size_deciles | momentum_deciles. {\"type\": \"french\", \"set\": \"industry_12\"}. Benchmark defaults to FF.MKT; a pass is research only, never paper"
+  },
+  "signals": "metric_id from features, window like 63d, 6m or 1y (or {param}d), transform: raw, rank, inverse_rank, zscore, inverse",
+  "entry": "{\"top_n\": 3 or \"param:top_n\", \"min_signal\": 0} (min_signal applies to the first signal's raw value), or \"top 3 by rank\"",
+  "exit": "\"rebalance\", or {\"hold_rank\": 5} to keep a holding while it ranks in the top 5",
+  "rebalance": "weekly, monthly or quarterly; signals at the close, trades at the next open",
+  "sizing": "equal, inverse_vol (63-day) or rank",
+  "params": "{\"top_n\": {\"min\": 2, \"max\": 5, \"default\": 3}} or a list of allowed values; grid values must sit inside",
+  "costs": "set by the lab: 5 bps funds and French portfolios, 15 bps stocks, 25 bps thin stocks",
+  "factor_check": "automatic: alpha after the six French factors on the walk-forward record; alpha t of 2 or more passes",
+  "rule": {
+   "request": "{\"request\": \"rule\", \"id\": \"band-test\", \"rule\": \"rebalance_band\", \"params\": {\"band_pts\": [3, 5, 10]}, \"horizons\": [5, 10]}",
+   "rules": {
+    "rebalance_band": [
+     "band_pts"
+    ],
+    "deposit_steering": [],
+    "harvest": [
+     "threshold_usd"
+    ],
+    "margin": [
+     "dip_pct",
+     "borrow_pct",
+     "rate_pct"
+    ]
+   },
+   "optional": "mix (funds, defaults to the plan), deposit_monthly (default 1000), start_value (default 10000), account, date_range",
+   "notes": "margin needs rate_pct as one number; every rule runs against deposits split pro rata with no selling; grid cap 12"
+  }
+ },
+ "paper_trades": []
+}

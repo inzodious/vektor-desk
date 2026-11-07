@@ -12,6 +12,7 @@ Vite + React. Hand-rolled SVG charts, no chart library. Tokens are copied from E
 | `npm run test:e2e` | Playwright on a fixtures preview, desktop 1440 and phone 390 |
 | `npm run fixtures` | Rebuilds the fixtures from a demo API (`DESK_DEMO=1`) with seeded intraday moves |
 | `python scripts/demo_seed.py` | Seeds synthetic proposals, agent runs, a brief, research rows (filings, earnings, insiders, FRED), a watched symbol, dossiers and Console questions into a demo data dir (run with `DESK_DEMO=1 DESK_DATA_DIR=…` before `npm run fixtures`) |
+| `python scripts/demo_lab.py` | Writes a synthetic lab market, queues three strategies, a finalize and three rule tests, runs the lab and steps one paper portfolio (same env, after `demo_seed.py`) |
 | `npm run screens -- <dir>` | Screens at 1920, 1440, 390 in light and dark (needs a preview on 4318, fixtures on 4319) |
 
 ## Fixtures
@@ -21,6 +22,7 @@ Vite + React. Hand-rolled SVG charts, no chart library. Tokens are copied from E
 | Lookup order | Example |
 |---|---|
 | `?scenario=name` on the page URL | `live.stale.json` |
+| `?ids=` (non-alphanumerics become `_`) | `compare.FXAIX_FTEC_VXUS.json` |
 | `?symbol=` | `engine.lots.FTEC.json` |
 | `?scope_id=` | `engine.series.plan_shadow.json` |
 | any symbol | `engine.prices.any.json` |
@@ -42,5 +44,7 @@ For real shapes, run the API in demo mode (`DESK_DEMO=1`) and use `npm run dev`.
 | Console, symbol search | 6 | Robot button or `?open=console`: history, suggested questions, Tonight and Run now. `/` or the search button finds a symbol and opens its sheet, now with the dossier |
 | `/lab` Compare | 7 | Two to five slots (ticker, portfolio, account, shadow) in `?ids=`, window combo `?w=`; growth of 100, fund overlap, six small multiples, side-by-side table |
 | `/lab/risk` | 7 | Drop from the high, six risk KPIs with drawers, return against risk, correlation heatmap, drawdowns, scenario shocks, look-through and sectors, month-by-month heatmap |
+| `/lab/strategies` | 9 | Stage rail (draft, lab, paper, eligible), strategies with paper progress, rule tests with verdicts |
+| `/lab/strategies/:id` | 9 | Strategy: verdict lamps, holdout, paper portfolio and trades, walk-forward tiles, test years, horizons, setting, market and cost analyses, factor check. Rule test: setup, against never selling, every setting, horizons |
 | `/lab/boards` | 7 | Saved Compare and Risk views with their slicers, kept in this browser |
 | `/decisions/flight`, `/lab/patterns` | 10 | Hero and a "lands in phase" card |

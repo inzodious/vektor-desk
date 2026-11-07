@@ -158,3 +158,10 @@ for (const ids of compareSets) {
 save('compare', await get(`/api/compare?ids=${encodeURIComponent(compareSets[0].join(','))}&window=1Y`));
 save('engine.lookthrough', await get('/api/engine/lookthrough?limit=8'));
 save('engine.series.all', await get('/api/engine/series?id=value&scope=portfolio&scope_id=all'));
+
+// ---------- strategy lab ----------
+const labList = await get('/api/lab/strategies');
+save('lab.strategies', labList);
+save('lab.strategies.empty', { ...labList, strategies: [], rules: [] });
+for (const s of [...labList.strategies, ...labList.rules]) save(`lab.strategies.${s.id}`, await get(`/api/lab/strategies/${encodeURIComponent(s.id)}`));
+save('lab.strategies.pick-one', await get('/api/lab/strategies/pick-one'));
