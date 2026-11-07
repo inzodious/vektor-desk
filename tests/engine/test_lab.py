@@ -228,7 +228,14 @@ def test_experiment_finalize_paper_and_views(cfg, app_client):
     client = app_client(packages=["engine"])
     listed = client.get("/api/lab/strategies").json()
     assert [s["id"] for s in listed["strategies"]] == ["sector-momentum"] and listed["grammar"]["entry"]
-    assert client.get("/api/lab/strategies/sector-momentum").json()["final"]["verdict"] == final["verdict"]
+    assert listed["strategies"][0]["hypothesis"] == SPEC["hypothesis"] and "spec" not in listed["strategies"][0]
+    detail = client.get("/api/lab/strategies/sector-momentum").json()
+    assert detail["final"]["verdict"] == final["verdict"] and set(detail["spec"]) == {*lab.SPEC_FIELDS, "written_at", "model"}
+    assert (
+        detail["spec"]["title"] == SPEC["title"] and detail["spec"]["predicted_effect"] == SPEC["predicted_effect"] and detail["spec"]["entry"] == SPEC["entry"]
+    )
+    assert detail["spec"]["model"] and detail["spec"]["written_at"]
+    assert lab.desk_view(cfg, "pick-nvda")["spec"] is None
     assert client.get("/api/lab/strategies/nobody").status_code == 404
 
 
