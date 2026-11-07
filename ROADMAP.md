@@ -14,11 +14,11 @@ Planning merged November 7, 2026. Building now; several workstreams build their 
 | 3 | Engine core and Plan | 1 | ✅ | 2 |
 | 4 | Decisions and Preflight | 1 | ✅ | 3 |
 | 5 | Plan keeper and tax desk | 1 | ✅ | 4 |
-| 6 | Research | 2 | 🚧 | 4 |
+| 6 | Research | 2 | ✅ | 4 |
 | 7 | Lab: Compare and risk | 2 | 🚧 | 3 |
-| 8 | Phone alerts | 2 | 📋 | 5 |
-| 9 | Strategy lab | 3 | 📋 | 3, 6 |
-| 10 | Flight record and Patterns | 3 | 📋 | 30 days of decision records |
+| 8 | Phone alerts | 2 | ✅ | 5 |
+| 9 | Strategy lab | 3 | 🚧 | 3, 6 |
+| 10 | Flight record and Patterns | 3 | 🚧 | 30 days of decision records |
 | 11 | Scout and FI scenarios | 3 | 📋 | 10 |
 | 1.0 | Hardening | | 📋 | 11 |
 
@@ -95,13 +95,13 @@ Done when a phone on Tailscale opens the desk and sees the mirror's last run. **
 
 Tier 1 code complete: 0.5.0. It runs on demo data until the box setup in [docs/setup.md](docs/setup.md) finishes phase 1.
 
-### 6. Research 🚧
+### 6. Research ✅
 
-- [ ] Dossiers per symbol and theme, with sources and "what would change the call"
+- [x] Dossiers per symbol and theme, with sources and "what would change the call" ([#18], [#48], [#52])
 - [x] Research desk, on request (overnight by default) and on a weekly rotation, with a skeptic run checking each dossier ([#18])
-- [ ] Dossier and sources views; Console to request research and talk to the desks (backend [#18]; views to come)
-- [ ] Watchlist and engine triggers into the queue: big daily move, band crossed, margin debit appears, earnings date, new lot export (triggers [#36], [#38], [#40]; watchlist to come)
-- [ ] Source library: SEC EDGAR filings, insider trades, 13F, earnings dates, FRED series (data [#40]; 13F and views to come)
+- [x] Dossier and sources views; Console to request research and talk to the desks ([#18], [#52])
+- [x] Watchlist and engine triggers into the queue: big daily move, band crossed, margin debit appears, earnings date, new lot export ([#36], [#38], [#40], [#49], [#52])
+- [x] Source library: SEC EDGAR filings, insider trades, earnings dates, FRED series ([#40], [#52]); 13F moved to the backlog
 - [x] Engine: EDGAR, FRED and Finnhub fetchers and holding signals ([#40])
 
 ### 7. Lab: Compare and risk 🚧
@@ -111,28 +111,28 @@ Tier 1 code complete: 0.5.0. It runs on demo data until the box setup in [docs/s
 - [ ] Saved boards shell (`/api/compare`) (endpoint [#43]; shell to come)
 - [x] Risk desk weekly report ([#18])
 
-### 8. Phone alerts 📋
+### 8. Phone alerts ✅
 
-- [ ] Self-hosted ntfy on the box, relaying through ntfy.sh for phone delivery: rule breach, trigger hit, wash-sale window, stale mirror, research ready (server, stale mirror, proposals, wash-sale and research alerts [#26], [#27], [#28]; trigger-hit alerts to come)
+- [x] Self-hosted ntfy on the box, relaying through ntfy.sh for phone delivery: rule breach, trigger hit, wash-sale window, stale mirror, research ready ([#26], [#27], [#28], [#36])
 
-### 9. Strategy lab 📋
+### 9. Strategy lab 🚧
 
 Research hypotheses become strategies, tested on history without seeing the future, then paper-traded forward before any of them can inform a proposal.
 
-- [ ] Feature library and strategy spec validation
-- [ ] Walk-forward runner over 3, 5 and 10 year windows, point-in-time data only; ETF and Ken French universes first
-- [ ] Trial ledger: every strategy tried is recorded, so overfitting tests count them all
-- [ ] Deflated Sharpe and overfitting tests
-- [x] Strategy desk: turns research desk hypotheses into specs, reads results ([#23])
-- [ ] Forward paper portfolios; a strategy is eligible only after six months of forward results
-- [ ] Rule backtests for the plan's own rules
+- [x] Feature library and strategy spec validation ([#45])
+- [x] Walk-forward runner over 3, 5 and 10 year windows, point-in-time data only; ETF and Ken French universes first ([#45], [#49])
+- [x] Trial ledger: every strategy tried is recorded, so overfitting tests count them all ([#45])
+- [x] Deflated Sharpe and overfitting tests ([#45], [#49])
+- [x] Strategy desk: turns research desk hypotheses into specs, reads results ([#23], [#48], [#50])
+- [x] Forward paper portfolios; a strategy is eligible only after six months of forward results ([#45], [#47])
+- [x] Rule backtests for the plan's own rules ([#49], [#50])
 - [ ] Strategy lab views (Design mocks them once the spec settles)
 
-### 10. Flight record and Patterns 📋
+### 10. Flight record and Patterns 🚧
 
-- [ ] Every decision scored at 30, 90 and 365 days against following the plan (next-close baseline, bootstrap intervals, Brier score)
-- [ ] Summaries by origin, type, and overrides versus clean Preflights
-- [ ] Patterns: market and his own behavior
+- [x] Every decision scored at 30, 90 and 365 days against following the plan (next-close baseline, bootstrap intervals, Brier score) ([#51]; views to come)
+- [x] Summaries by origin, type, and overrides versus clean Preflights ([#51]; views to come)
+- [x] Patterns: market and his own behavior ([#51]; views to come)
 - [ ] Saved boards complete
 
 ### 11. Scout and FI scenarios 📋
@@ -159,6 +159,7 @@ Research hypotheses become strategies, tested on history without seeing the futu
 ## Backlog
 
 - Options and crypto, if he starts holding them
+- 13F institutional holders per holding: quarterly SEC data sets keyed by CUSIP with no free ticker map, 45 to 135 days stale, little decision value for an index-heavy desk (Statistics, 2026-11-07)
 
 [#1]: https://github.com/inzodious/vektor-desk/pull/1
 [#2]: https://github.com/inzodious/vektor-desk/pull/2
@@ -193,3 +194,10 @@ Research hypotheses become strategies, tested on history without seeing the futu
 [#41]: https://github.com/inzodious/vektor-desk/pull/41
 [#43]: https://github.com/inzodious/vektor-desk/pull/43
 [#44]: https://github.com/inzodious/vektor-desk/pull/44
+[#45]: https://github.com/inzodious/vektor-desk/pull/45
+[#47]: https://github.com/inzodious/vektor-desk/pull/47
+[#48]: https://github.com/inzodious/vektor-desk/pull/48
+[#49]: https://github.com/inzodious/vektor-desk/pull/49
+[#50]: https://github.com/inzodious/vektor-desk/pull/50
+[#51]: https://github.com/inzodious/vektor-desk/pull/51
+[#52]: https://github.com/inzodious/vektor-desk/pull/52
