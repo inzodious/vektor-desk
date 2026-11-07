@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
 from desk.agents.sources import NotReady
 
@@ -18,7 +19,7 @@ def m(metric_id, scope_id, window, value, unit="usd"):
 
 
 SLICE = {
-    "as_of": "2026-11-06T22:00:00Z",
+    "as_of": datetime.now(UTC).isoformat(timespec="seconds"),
     "data_health": [{"check": "reconcile", "status": "ok"}],
     "sections": {
         "drift": [m("plan.drift", "FUNDA", "now", -4.2, "pts"), m("plan.drift", "FUNDB", "now", 3.1, "pts")],

@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 from desk.agents import store
 from desk.agents.desks import DESKS, Desk
+from desk.agents.runner import FIRST_RUN
 from desk.config import Config
 from desk.runlock import running
 from desk.scheduler import parse
@@ -34,10 +35,12 @@ def crew(cfg: Config, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     zone = ZoneInfo(cfg.timezone)
     on = store.is_enabled(cfg, store.ALL)
+    guard = store.guard_on(cfg)
     busy = any(j["job"] == "agents" for j in running(cfg))
     desks = []
     for d in sorted(DESKS.values(), key=lambda d: (d.priority, d.name)):
         enabled = store.is_enabled(cfg, d.name)
+        guarded = guard and d.name not in FIRST_RUN
         week = store.week_usage(cfg, d.name, now)
         desks.append(
             {
@@ -47,9 +50,10 @@ def crew(cfg: Config, now: datetime | None = None) -> dict:
                 "effort": d.effort,
                 "live": d.live,
                 "enabled": enabled,
+                "guarded": guarded,
                 "last_run": _last(store.last_run(cfg, d.name)),
-                "next_run": next_run(d, now, zone) if d.live and enabled and on else None,
+                "next_run": next_run(d, now, zone) if d.live and enabled and on and not guarded else None,
                 "week": week | {"cap": d.weekly_runs},
             }
         )
-    return {"enabled": on, "busy": busy, "desks": desks}
+    return {"enabled": on, "busy": busy, "guard": {"on": guard, "allowed": list(FIRST_RUN)}, "desks": desks}

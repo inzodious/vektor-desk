@@ -8,7 +8,10 @@ from desk.config import Config
 from desk.db import desk_conn
 
 ALL = "*"
+GUARD = "~first_run_guard"
 COUNTED = ("ok", "failed", "timeout", "running")
+STALE_RUN_MINUTES = 2
+STALE_REQUEST_MINUTES = 10
 
 
 def now_iso() -> str:
@@ -78,6 +81,41 @@ def is_enabled(cfg: Config, desk: str) -> bool:
     with db(cfg) as conn:
         rows = {r["desk"]: bool(r["enabled"]) for r in conn.execute("SELECT desk, enabled FROM agent_settings WHERE desk IN (?,?)", (ALL, desk))}
     return rows.get(ALL, True) and rows.get(desk, True)
+
+
+def guard_on(cfg: Config) -> bool:
+    with db(cfg) as conn:
+        row = conn.execute("SELECT enabled FROM agent_settings WHERE desk=?", (GUARD,)).fetchone()
+    return True if row is None else bool(row["enabled"])
+
+
+def set_guard(cfg: Config, on: bool) -> None:
+    set_enabled(cfg, GUARD, on)
+
+
+def recover(cfg: Config, lock_free: bool, now: datetime | None = None) -> dict:
+    if not lock_free:
+        return {"runs": 0, "requests": 0}
+    now = now or datetime.now(UTC)
+    runs_before = (now - timedelta(minutes=STALE_RUN_MINUTES)).isoformat(timespec="seconds")
+    reqs_before = (now - timedelta(minutes=STALE_REQUEST_MINUTES)).isoformat(timespec="seconds")
+    stamp = now.isoformat(timespec="seconds")
+    with db(cfg) as conn:
+        runs = conn.execute(
+            "UPDATE agent_runs SET status='failed', finished_at=?, note='Interrupted: the process stopped before the run finished.' "
+            "WHERE status='running' AND started_at < ?",
+            (stamp, runs_before),
+        ).rowcount
+        requests = conn.execute(
+            "UPDATE agent_requests SET status='queued', run_now=0, started_at=NULL, note='Interrupted; queued again for tonight.' "
+            "WHERE status='running' AND started_at < ? AND coalesce(note, '') NOT LIKE 'Interrupted%'",
+            (reqs_before,),
+        ).rowcount
+        requests += conn.execute(
+            "UPDATE agent_requests SET status='failed', finished_at=?, note='Interrupted twice; not retried.' WHERE status='running' AND started_at < ?",
+            (stamp, reqs_before),
+        ).rowcount
+    return {"runs": runs, "requests": requests}
 
 
 def set_enabled(cfg: Config, desk: str, enabled: bool) -> None:
@@ -157,11 +195,12 @@ def add_request(cfg: Config, desk: str, question: str, *, symbol: str | None = N
 def next_request(cfg: Config, *, now_only: bool) -> dict | None:
     where = "status='queued'" + (" AND run_now=1" if now_only else "")
     with db(cfg) as conn:
-        row = conn.execute(f"SELECT * FROM agent_requests WHERE {where} ORDER BY run_now DESC, id LIMIT 1").fetchone()
-        if row is None:
-            return None
-        conn.execute("UPDATE agent_requests SET status='running', started_at=? WHERE id=?", (now_iso(), row["id"]))
-    return dict(row)
+        for row in conn.execute(f"SELECT * FROM agent_requests WHERE {where} ORDER BY run_now DESC, id LIMIT 5").fetchall():
+            claimed = conn.execute("UPDATE agent_requests SET status='running', started_at=? WHERE id=? AND status='queued'", (now_iso(), row["id"]))
+            if claimed.rowcount == 1:
+                conn.commit()
+                return dict(row)
+    return None
 
 
 def finish_request(cfg: Config, request_id: int, status: str, *, run_id: int | None = None, answer: str | None = None, note: str | None = None) -> None:
@@ -175,6 +214,11 @@ def finish_request(cfg: Config, request_id: int, status: str, *, run_id: int | N
 def requeue(cfg: Config, request_id: int, note: str) -> None:
     with db(cfg) as conn:
         conn.execute("UPDATE agent_requests SET status='queued', run_now=0, started_at=NULL, note=? WHERE id=?", (note, request_id))
+
+
+def release(cfg: Config, request_id: int) -> None:
+    with db(cfg) as conn:
+        conn.execute("UPDATE agent_requests SET status='queued', started_at=NULL WHERE id=? AND status='running'", (request_id,))
 
 
 def get_request(cfg: Config, request_id: int) -> dict | None:
