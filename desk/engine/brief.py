@@ -26,9 +26,13 @@ SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
         "margin": ("margin.*",),
         "concentration": ("value.weight@holding", "plan.single_stock", "plan.rules"),
         "returns": ("ret.twr@portfolio", "value.day_change", "bm.excess"),
+        "signals": ("sig.dilution", "sig.earnings_days", "sig.insider_net"),
+        "macro": ("macro.*",),
     },
     "research": {
         "holdings": ("value.market@holding", "value.weight@holding"),
+        "signals": ("sig.*",),
+        "fundamentals": ("fund.*",),
         "returns": ("ret.twr@portfolio",),
         "room": ("plan.single_stock", "plan.rules"),
     },
@@ -42,13 +46,18 @@ SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
         "margin": ("margin.debit", "margin.cost_month", "margin.call_drop"),
         "risk": ("risk.top1", "risk.eff_n", "plan.single_stock", "value.weight@holding"),
         "tax": ("tax.wash_window", "tax.marginal_rate"),
+        "signals": ("sig.*", "fund.*"),
     },
     "strategy": {
         "returns": ("ret.*",),
         "benchmarks": ("bm.*",),
         "risk": ("risk.vol", "risk.mdd", "risk.dd_now"),
+        "macro": ("macro.*",),
     },
 }
+FILING_DESKS = ("research",)
+FILING_FORMS = ("10-K", "10-Q", "8-K", "4", "S-1", "S-3", "DEF 14A", "SC 13D", "SC 13G", "424B5")
+FILINGS_PER_SYMBOL = 8
 LOT_DESKS = ("tax",)
 WASH_DESKS = ("tax", "skeptic")
 
@@ -105,6 +114,18 @@ def _lots(conn: sqlite3.Connection, as_of: str) -> list[dict]:
     return out
 
 
+def _filings(conn: sqlite3.Connection) -> list[dict]:
+    out, seen = [], {}
+    marks = ",".join("?" * len(FILING_FORMS))
+    for r in conn.execute(
+        f"SELECT symbol, form, filed, report_date, description, url FROM filings WHERE form IN ({marks}) ORDER BY symbol, filed DESC", FILING_FORMS
+    ):
+        seen[r["symbol"]] = seen.get(r["symbol"], 0) + 1
+        if seen[r["symbol"]] <= FILINGS_PER_SYMBOL:
+            out.append(dict(r))
+    return out
+
+
 def desk_slice(cfg: Config, desk: str) -> dict:
     if desk not in SECTIONS:
         raise ValueError(f"unknown desk {desk!r}")
@@ -123,6 +144,8 @@ def desk_slice(cfg: Config, desk: str) -> dict:
             sections[name] = [_item(r) for r in rows if any(_matches(p, r["metric_id"], r["scope"]) for p in patterns)]
         if desk in LOT_DESKS:
             sections["lots"] = _lots(conn, as_of)
+        if desk in FILING_DESKS and _has(conn, "filings"):
+            sections["filings"] = _filings(conn)
         if desk in WASH_DESKS and _has(conn, "wash_windows"):
             sections["wash_windows"] = [dict(r) for r in conn.execute("SELECT symbol, kind, date, clears, account FROM wash_windows ORDER BY clears, symbol")]
         sections["triggers"] = (
