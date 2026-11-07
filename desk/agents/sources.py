@@ -22,6 +22,8 @@ class Decisions(Protocol):
 
     def reject(self, cfg: Config, proposal: dict, desk: str, reason: str, run_id: str) -> dict: ...
 
+    def attach_skeptic(self, cfg: Config, decision_id: object, verdict: str | None, counter_case: str | None) -> object: ...
+
 
 def _module(name: str):
     try:
@@ -56,3 +58,12 @@ class RealDecisions:
 
     def reject(self, cfg: Config, proposal: dict, desk: str, reason: str, run_id: str) -> dict:
         return _module("desk.decisions").reject_proposal(cfg, proposal, desk, reason, run_id=run_id)
+
+    def attach_skeptic(self, cfg: Config, decision_id: object, verdict: str | None, counter_case: str | None) -> object:
+        return _module("desk.decisions").attach_skeptic(cfg, decision_id, verdict, counter_case)
+
+
+@dataclass
+class RealTriggers:
+    def today(self, cfg: Config) -> list[dict]:
+        return list(_module("desk.engine.triggers").today(cfg))

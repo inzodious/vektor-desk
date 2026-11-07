@@ -87,6 +87,10 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 
 **Engine triggers** come from the engine's triggers table and fire a desk at most once a day: a margin debit appears; a position moves more than the risk dial's daily threshold; a single holding passes its concentration band; a holding reports earnings; a new lot export arrives. Live tracking itself is engine work and needs no agent.
 
+Trigger kinds and where they go: `margin_debit`, `daily_move` and `concentration` run the Risk desk right away; `lot_export` runs the Tax desk right away; `earnings` queues the Research desk for that symbol tonight. `python -m desk.agents triggers` turns them into requests at 17:45, each once.
+
+**Requests.** Console questions and triggers are rows in `agent_requests`. "Run now" rows are picked up within a minute (`queue --now-only`); the rest run at 01:30. A request that hits the usage limit or finds another desk running moves to tonight once, then fails rather than looping. A scheduled run that hits the limit queues one retry the same way.
+
 **Console.** The Console (Escape Vektor's Ask terminal look) is where Joshua talks to the desks. A question or research request is queued to the right desk and runs in the next overnight window unless he presses "Run now". It answers with a memo or dossier update plus any proposals. Settings shows each desk's last and next run, turns used, and an on/off toggle.
 
 ### Dials

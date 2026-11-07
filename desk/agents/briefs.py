@@ -19,6 +19,43 @@ def schema_file(name: str) -> dict:
     return json.loads((HERE / "schemas" / f"{name}.json").read_text())
 
 
+DOSSIER = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["symbol", "thesis", "bear_case", "valuation_range", "what_would_change", "sources"],
+    "properties": {
+        "symbol": {"type": "string"},
+        "thesis": {"type": "string", "maxLength": 1500},
+        "bear_case": {"type": "string", "maxLength": 1500},
+        "valuation_range": {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["low", "high", "basis"],
+            "properties": {"low": {"type": ["number", "null"]}, "high": {"type": ["number", "null"]}, "basis": {"type": "string"}},
+        },
+        "what_would_change": {"type": "string", "maxLength": 800},
+        "changes_since_last": {"type": ["string", "null"], "maxLength": 800},
+        "sources": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["url", "title", "date"],
+                "properties": {"url": {"type": "string"}, "title": {"type": "string"}, "date": {"type": "string"}},
+            },
+        },
+    },
+}
+
+
+def schema_for(desk: str) -> dict:
+    base = json.loads(json.dumps(schema_file("proposal")))
+    if desk == "research":
+        base["properties"]["dossier"] = DOSSIER
+        base["required"] = [*base["required"], "dossier"]
+    return base
+
+
 def system_prompt(desk: str) -> str:
     return prompt_file("common") + "\n" + prompt_file(desk)
 
