@@ -25,6 +25,7 @@ Production-ready on the TrueNAS box with real data. Every roadmap phase is compl
 
 - Engine prices held symbols from Tiingo when Escape Vektor's closes lag, values snapshot days at the broker's price, classifies funds without Escape Vektor profiles, and gives every health problem a fix line ([#71])
 - Departures board letters no longer render mirrored, long fund codes fit, and contrast passes across charts, tax badges and Preflight lamps ([#75])
+- Deploys no longer refuse to run while the desk is idle ([#78])
 
 ## 0.11.0 - 2026-11-07
 
@@ -227,3 +228,4 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#74]: https://github.com/inzodious/vektor-desk/pull/74
 [#75]: https://github.com/inzodious/vektor-desk/pull/75
 [#76]: https://github.com/inzodious/vektor-desk/pull/76
+[#78]: https://github.com/inzodious/vektor-desk/pull/78
