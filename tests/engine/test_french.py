@@ -33,6 +33,16 @@ MOM_CSV = """This file was created using the 202509 CRSP database.
 19630702,    0.44
 19630703,  -99.99
 """
+MONTHLY_CSV = """This file was created by CMPT_ME_BEME_RETS using the 202509 CRSP database.
+
+,Mkt-RF,SMB,HML,RF
+192607,    2.89,   -2.55,   -2.39,    0.22
+192608,    2.64,   -1.14,    3.81,    0.25
+
+ Annual Factors: January-December
+,Mkt-RF,SMB,HML,RF
+  1927,   29.47,   -2.04,   -4.30,    3.12
+"""
 SIZE_CSV = """This file was created by CMPT_ME_RETS_DAILY.
 
   Value Weight Returns -- Daily
@@ -91,6 +101,7 @@ class Http:
             "F-F_Momentum_Factor_daily_CSV.zip": MOM_CSV,
             "12_Industry_Portfolios_daily_CSV.zip": INDUSTRY_CSV,
             "Portfolios_Formed_on_ME_daily_CSV.zip": SIZE_CSV,
+            "F-F_Research_Data_Factors_CSV.zip": MONTHLY_CSV,
         }
         name = url.rsplit("/", 1)[-1]
         if name in files:
@@ -117,7 +128,8 @@ def test_french_job_fills_factors_and_portfolios_and_waits_a_month(desk_db):
     result = french.run(desk_db, http, now=now)
     assert not result["ok"] and any("49_Industry" in e for e in result["errors"])
     factors_ = {r[0]: r[1] for r in desk_db.execute("SELECT series, count(*) FROM factors_daily GROUP BY series")}
-    assert factors_ == {"mkt_rf": 3, "smb": 3, "hml": 3, "rmw": 3, "cma": 3, "rf": 3, "mom": 2}
+    assert factors_ == {"mkt_rf": 3, "smb": 3, "hml": 3, "rmw": 3, "cma": 3, "rf": 3, "mom": 2, "mkt_rf_m": 2, "rf_m": 2}
+    assert desk_db.execute("SELECT date, value FROM factors_daily WHERE series='rf_m' ORDER BY date").fetchall()[0][:] == ("1926-07-01", 0.22)
     size = desk_db.execute("SELECT name, ret FROM french_returns WHERE set_name='size_deciles' AND date='1963-07-02' ORDER BY ret").fetchall()
     assert [r[0] for r in size] == list(french.DECILES) and size[0][1] == 1.5
     assert desk_db.execute("SELECT count(*) FROM french_returns WHERE set_name='industry_12'").fetchone()[0] == 24
