@@ -28,7 +28,7 @@ def weekdays(start: str, end: str) -> list[str]:
 
 
 def write_data(cfg: Config, end: str) -> None:
-    rng = random.Random(23)
+    rng = random.Random(23)  # noqa: S311
     days = weekdays("2010-01-04", end)
     path = data_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -128,9 +128,24 @@ def main() -> None:
     queue(cfg, experiment(DIP | {"id": "pick-one", "title": "One hot stock", "universe": {"type": "fund_list", "symbols": ["NVDA"]}}, {}), "004-bad.json")
     queue(cfg, {"request": "finalize", "strategy_id": "sector-momentum", "version": 1}, "005-final.json")
     queue(cfg, {"request": "finalize", "strategy_id": "dip-buyer", "version": 1}, "006-final.json")
-    queue(cfg, {"request": "rule", "id": "band-test", "rule": "rebalance_band", "params": {"band_pts": [3, 5, 10]}, "horizons": [5, 10], "model": "opus"}, "007-rule.json")
+    queue(
+        cfg,
+        {"request": "rule", "id": "band-test", "rule": "rebalance_band", "params": {"band_pts": [3, 5, 10]}, "horizons": [5, 10], "model": "opus"},
+        "007-rule.json",
+    )
     queue(cfg, {"request": "rule", "id": "steer-deposits", "rule": "deposit_steering", "horizons": [5, 10], "model": "opus"}, "008-rule.json")
-    queue(cfg, {"request": "rule", "id": "dip-margin", "rule": "margin", "params": {"dip_pct": 20, "borrow_pct": [5, 10], "rate_pct": 12}, "horizons": [5, 10], "model": "opus"}, "009-rule.json")
+    queue(
+        cfg,
+        {
+            "request": "rule",
+            "id": "dip-margin",
+            "rule": "margin",
+            "params": {"dip_pct": 20, "borrow_pct": [5, 10], "rate_pct": 12},
+            "horizons": [5, 10],
+            "model": "opus",
+        },
+        "009-rule.json",
+    )
     done = process_queue(cfg, now=NOW)["done"]
     print([(d.get("strategy_id") or d.get("id"), d["status"]) for d in done])
 
