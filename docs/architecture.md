@@ -16,7 +16,7 @@ TrueNAS SCALE 24.10 ─ custom app "vektor-desk" (deploy/compose.yaml)
   ├─ api        FastAPI on :8000, compose network only; serves the UI once it lands
   ├─ cron       python -m desk.scheduler running deploy/crontab: mirror, engine, agents (claude -p)
   ├─ ntfy       phone alerts at https://desk.escape-vektor.com:8443, through the same caddy
-  └─ lab        strategy sweeps, no network at all (commented out until desk.lab lands)
+  └─ lab        python -m desk.engine.lab: overnight strategy sweeps, no network at all
 ```
 
 The NAS publishes no port for the desk. The TrueNAS UI keeps 443 on the LAN; Caddy listens inside the tailscale container's network namespace, so `desk.escape-vektor.com` answers only on the tailnet.

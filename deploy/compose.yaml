@@ -117,31 +117,31 @@ services:
       timeout: 5s
     mem_limit: 64m
 
-  # The strategy lab (docs/statistics.md): runs queued experiment specs with no network, reading only the snapshots and price
-  # data the engine leaves in data/lab/data. Uncomment when `python -m desk.lab` lands.
-  # lab:
-  #   image: vektor-desk:local
-  #   pull_policy: never
-  #   container_name: vektor-desk-lab
-  #   restart: unless-stopped
-  #   init: true
-  #   user: "568:568"
-  #   command: ["python", "-m", "desk.lab"]
-  #   network_mode: none
-  #   environment:
-  #     DESK_LAB_WORKERS: "3"
-  #   volumes:
-  #     - /mnt/Manifest/apps/vektor-desk/data/lab/data:/data/lab/data:ro
-  #     - /mnt/Manifest/apps/vektor-desk/data/lab/queue:/data/lab/queue
-  #     - /mnt/Manifest/apps/vektor-desk/data/lab/runs:/data/lab/runs
-  #     - /mnt/Manifest/apps/vektor-desk/data/run:/data/run
-  #   read_only: true
-  #   tmpfs: [/tmp]
-  #   cap_drop: [ALL]
-  #   security_opt: [no-new-privileges:true]
-  #   # 3 CPUs and 1.5g on 16 GB of RAM; 8 CPUs, 8g and DESK_LAB_WORKERS 8 after the upgrade.
-  #   cpus: 3
-  #   mem_limit: 1536m
+  # The strategy lab (docs/statistics.md): runs queued experiment specs overnight (DESK_LAB_HOURS, 1-6 ET) with no network,
+  # reading only data/lab/data/lab.db, which the engine's lab-export job writes at 00:55, and writing data/lab/runs/ledger.db.
+  lab:
+    image: vektor-desk:local
+    pull_policy: never
+    container_name: vektor-desk-lab
+    restart: unless-stopped
+    init: true
+    user: "568:568"
+    command: ["python", "-m", "desk.engine.lab"]
+    network_mode: none
+    environment:
+      DESK_LAB_WORKERS: "3"
+    volumes:
+      - /mnt/Manifest/apps/vektor-desk/data/lab/data:/data/lab/data:ro
+      - /mnt/Manifest/apps/vektor-desk/data/lab/queue:/data/lab/queue
+      - /mnt/Manifest/apps/vektor-desk/data/lab/runs:/data/lab/runs
+      - /mnt/Manifest/apps/vektor-desk/data/run:/data/run
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    # 3 CPUs and 1.5g on 16 GB of RAM; 8 CPUs, 8g and DESK_LAB_WORKERS 8 after the upgrade.
+    cpus: 3
+    mem_limit: 1536m
 
 x-notes: |
   ## Vektor Desk

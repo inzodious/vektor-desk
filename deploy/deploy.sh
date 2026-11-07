@@ -245,7 +245,7 @@ status() {
   repo fetch --quiet origin "$BRANCH" 2>/dev/null || echo "(couldn't reach GitHub)"
   printf 'Live:        %s\n' "$(live_build vektor-desk-api | cut -c1-7)"
   printf 'On GitHub:   %s\n' "$(repo log -1 --format='%h %s' "origin/$BRANCH")"
-  printf 'Containers:  api %s, cron %s, caddy %s, tailscale %s, ntfy %s\n' "$(health vektor-desk-api)" "$(health vektor-desk-cron)" "$(health vektor-desk-caddy)" "$(health vektor-desk-tailscale)" "$(health vektor-desk-ntfy)"
+  printf 'Containers:  api %s, cron %s, caddy %s, tailscale %s, ntfy %s, lab %s\n' "$(health vektor-desk-api)" "$(health vektor-desk-cron)" "$(health vektor-desk-caddy)" "$(health vektor-desk-tailscale)" "$(health vektor-desk-ntfy)" "$(health vektor-desk-lab)"
   printf 'Tailnet IP:  %s\n' "$(docker exec vektor-desk-tailscale tailscale ip -4 2>/dev/null || echo '?')"
   echo "Backups:     $(find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" 2>/dev/null | wc -l) in $BACKUPS"
   crons=$(midclt call cronjob.query 2>/dev/null | jq -r '[.[] | select(.enabled and (.command | test("vektor-desk-deploy/deploy\\.sh auto")))] | length' 2>/dev/null || true)
