@@ -238,9 +238,82 @@ The method behind `dec.score_*` and the agents' scorecard.
 - **Per desk:** total excess dollars, hit rate, and a bootstrap 90% interval for the mean excess. With a few dozen proposals the interval will usually include zero, and the scorecard says that rather than ranking noise.
 - **Calibration:** Brier score of `confidence` against "beat the baseline at 90 days", plus a calibration table once a desk has 30 scored proposals.
 
-## Backtests and honest limits
+## Strategy lab
 
-Backtests are for **rules**, not picks: rebalance bands, deposit steering, harvest thresholds, margin rules. They run point-in-time (only data published by that date, using EDGAR acceptance times), include trading costs and taxes, and report every variant tried, not just the best one.
+Where a strategy from deep research gets tested: a backtest over 3, 5 and 10 years that only sees data as it was known on each day, then forward paper trading with fake money. The research desk proposes; the engine runs the rules; nothing in the lab touches real money.
+
+### The catch: the model has already seen the future
+
+Any model writing a strategy in 2026 knows how 2016 to 2025 turned out. A strategy it writes for a 2016 start can be fitted to that knowledge without anyone meaning to ("favor AI chip makers" looks brilliant from 2016). Hiding the dates from it does not fix this. So:
+
+1. **The model writes rules, never trades.** A strategy is a spec (below). The engine executes it day by day; the model never sees a simulated day's data or results while the run is going.
+2. **Universes are rules, not ticker lists.** "Top 500 US stocks by market cap on each rebalance date" is allowed; "NVDA, AMD, AVGO" is not. A hand-picked list is the leak.
+3. **Backtests screen; forward paper trading decides.** Only trading after the spec is registered is truly out of sample, for the model and for us. A strategy needs both a passing backtest and six months of forward paper trading before any proposal may cite it.
+
+### Strategy spec
+
+The research desk (see [agents.md](agents.md)) hands the lab a `strategy.json`, frozen and hashed when registered:
+
+| Field | Meaning |
+|---|---|
+| `hypothesis` | The claimed edge and why the market might miss it, in two sentences |
+| `predicted_effect` | Expected excess return over the benchmark and the horizon, stated before the run |
+| `universe` | A rule over point-in-time data (index membership, market cap rank, sector, ETF list) |
+| `signals` | Built from the engine's feature library: returns over N days, volatility, distance from an average, 52-week range, valuation and growth from XBRL facts, insider buys, earnings surprise vs prior year. No free-form code |
+| `entry`, `exit`, `sizing` | Rules on signals; sizing by equal weight, volatility, or signal rank, with a position cap |
+| `rebalance` | Daily, weekly or monthly |
+| `benchmark` | Plan mix, S&P 500, or the universe's equal-weight average |
+| `account` | Taxable or tax-deferred, which sets the tax drag |
+| `params` | Any tunable numbers, with the range the desk is allowed to search |
+
+The feature library grows by pull request, with tests, so a new signal is reviewed code, not something a model writes on the fly.
+
+### Data, point in time
+
+| Need | Free source | Limit |
+|---|---|---|
+| Prices, splits, dividends | Tiingo EOD, including delisted symbols where it carries them | The free tier caps unique symbols a month, so a broad stock universe is backfilled over several months and cached forever. ETF, sector and factor universes (about 100 symbols) fit at once |
+| Long, survivorship-free test bed | Ken French portfolios (industry, size, value, momentum, profitability sorts) back to 1926 | Portfolio returns, not single stocks. The honest place to test factor-style ideas over many decades |
+| Fundamentals as known that day | SEC XBRL company facts, each fact dated by its filing | Reliable from about 2010; earlier years need filing text |
+| Insider trades | SEC Form 4, by acceptance time | |
+| Macro | FRED, using first-release values where ALFRED vintages exist | |
+| Index membership history | No clean free source | Rebuilt from published change lists and flagged `reconstructed` |
+| Analyst estimates, options, intraday | None free | Strategies that need them are out of scope |
+
+**Delisted stocks.** A stock that vanishes from the data without a merger price is booked at −30% on its last day, a common conservative assumption, rather than quietly dropped. Survivorship is the cheapest way to make a backtest look good.
+
+### How a run works
+
+- **Execution:** signals use data up to the close; trades fill at the next day's open plus a cost of 5 to 25 basis points by liquidity. No margin unless the spec says so, and then at the real rate.
+- **Taxes:** taxable runs pay short- and long-term rates on realized gains at each year end, using `tax.marginal_rate`.
+- **Walk-forward:** parameters are chosen on a training window and tested on the next window, rolling forward. Every start month in the horizon is run, not one lucky start date.
+- **Locked holdout:** the most recent two years are opened once per spec, after the walk-forward is final.
+- **Trial ledger:** every variant run is logged in `strategy_trials`. The count feeds the overfitting statistics; nothing gets deleted.
+
+### What a strategy must show
+
+| Test | Bar |
+|---|---|
+| Excess return vs benchmark after costs and taxes | Positive with a 90% interval above zero across start dates |
+| Deflated Sharpe ratio (Bailey and López de Prado) | Above 0.95, which accounts for every trial in the ledger |
+| Probability of backtest overfitting (combinatorial cross-validation) | Below 0.2 |
+| Factor check | Alpha after market, size, value, profitability, investment and momentum. A strategy that is just momentum in disguise is labelled that; buying a cheap momentum fund does the same job |
+| Holdout | Same sign and at least half the walk-forward excess |
+| Forward paper trading | Six months, scored like decisions (`dec.score_*`), with no edits to the spec |
+
+A strategy that passes graduates to a paper portfolio that keeps running, and the scout may cite it in proposals inside the satellite cap, still through Preflight. Edit a spec and it starts over as a new trial.
+
+### Plainly
+
+Daily prices and public filings are the most-mined data in the world. Strategies that "the market has not caught onto" in them are rare, small, and often gone after costs and taxes. Expect most ideas to fail the bars above, and count that as the lab working. The likely wins are rules about your own behavior (deposit timing, rebalance bands, harvest thresholds, margin) and plain factor exposure, cheaply held. Horizons: 10 years is about one market cycle, 5 is short, and 3 is mostly noise; the tear sheet says so next to each one.
+
+### Lab outputs
+
+`strategies(id, spec_hash, registered_at, status)`, `strategy_trials(strategy_id, params, window, metrics, run_at)`, `paper_positions(strategy_id, date, symbol, shares, value)`, `paper_trades(strategy_id, date, symbol, side, shares, price, cost)`, plus a tear sheet per run: equity curve vs benchmark (lines, no fill), drawdowns, yearly returns, turnover, after-tax return, factor loadings, deflated Sharpe, overfitting probability, and the trial count.
+
+## Honest limits
+
+Rule backtests (rebalance bands, deposit steering, harvest thresholds, margin rules) use the same lab machinery and the same bars.
 
 What the desk will say out loud:
 
@@ -264,6 +337,7 @@ signals(signal_id, scope_id, as_of, value, base_rate, ci_low, ci_high, n_obs, no
 data_health(as_of, check, status, detail)
 preflight(ticket_id, metric_id, before, after, flag)
 triggers(as_of, kind, scope_id, detail)
+strategies, strategy_trials, paper_positions, paper_trades   (see Strategy lab)
 ```
 
 - `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`.
@@ -284,6 +358,7 @@ triggers(as_of, kind, scope_id, detail)
 | `GET /api/compare?ids=&window=` | Aligned, rebased series plus the comparison table |
 | `GET /api/live` | Latest quotes, live value, day change (market hours) |
 | `POST /api/preflight` | Before and after metrics for a hypothetical trade |
+| `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status and tear sheet |
 
 **Display rules for design.** Show `as_of` on every KPI; show any non-`ok` quality as a small, friendly tag, not a red error; never annualize under a year; Monte Carlo as percentile lines or markers, not a filled band.
 
@@ -294,6 +369,7 @@ triggers(as_of, kind, scope_id, detail)
 | Every 5 min, 9:30 to 16:00 ET weekdays | Quotes, live value, day change, intraday drawdown, margin call distance |
 | After each mirror (8:00, 17:00 ET) | Reconciliation, holdings, flows, returns, drift, rules, margin, tax (if lots are fresh), brief for the agents |
 | Nightly | Tiingo, EDGAR, FRED pulls; risk, correlations, comparisons, signals, scorecard |
+| Nightly, after the 17:00 run | Forward paper portfolios step one day; queued lab backtests run overnight under `job_lock("lab")` |
 | Monthly | French factors, N-PORT look-through, Monte Carlo refresh, factor regression on holdings with three years or more of history |
 
 ## Stack and tests
@@ -323,5 +399,6 @@ Mapped to the [roadmap](../ROADMAP.md) phases; the lead thread owns the final or
 | 7. Lab: Compare and risk | Comparison engine, full risk table, look-through and sectors, scenarios, correlation shifts |
 | 9. Flight record and Patterns | Decision scoring and calibration, pattern tables |
 | 10. Scout and FI scenarios | Monte Carlo, factor exposure, rule backtests |
+| Strategy lab (new; after 7, beside 9) | Feature library, spec validation, walk-forward runner on ETF and French universes first, trial ledger, deflated Sharpe and overfitting tests, forward paper portfolios; broad stock backfill runs in the background over months |
 
 Tier 1 metrics are everything through phase 5. The December 6 target depends on the lot export (phase 2) and the wash-sale calendar (phase 4); if those slip, the December loss sale is planned at Fidelity as before.
