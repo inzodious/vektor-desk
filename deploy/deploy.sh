@@ -97,7 +97,12 @@ healthy() {
   return 1
 }
 
-busy() { docker exec vektor-desk-cron python -m desk.runlock 2>/dev/null; }
+busy() {
+  local out rc=0
+  out=$(docker exec vektor-desk-cron python -m desk.runlock 2>/dev/null) || rc=$?
+  [ "$rc" -eq "$BUSY" ] || return 1
+  printf '%s\n' "$out"
+}
 
 tarball() {
   local file

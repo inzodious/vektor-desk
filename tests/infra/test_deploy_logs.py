@@ -47,3 +47,18 @@ def test_sourcing_deploy_sh_runs_nothing(tmp_path):
     )
     assert res.returncode == 0 and res.stdout.strip() == "sourced"
     assert not any(tmp_path.iterdir())
+
+
+def busy(tmp_path: Path, rc: int, out: str) -> subprocess.CompletedProcess:
+    stub = tmp_path / "bin"
+    stub.mkdir(exist_ok=True)
+    (stub / "docker").write_text(f"#!/bin/sh\nprintf '%s' '{out}'\nexit {rc}\n")
+    (stub / "docker").chmod(0o755)
+    script = f'source "{DEPLOY}"; PATH="{stub}:$PATH"; if why=$(busy); then echo "busy:$why"; else echo idle; fi'
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={"DESK_ROOT": str(tmp_path), "PATH": "/usr/bin:/bin"})
+
+
+def test_busy_only_when_runlock_says_so(tmp_path):
+    assert busy(tmp_path, 0, "").stdout.strip() == "idle"
+    assert busy(tmp_path, 75, "mirror (since 09:00)").stdout.strip() == "busy:mirror (since 09:00)"
+    assert busy(tmp_path, 1, "Error: No such container").stdout.strip() == "idle"
