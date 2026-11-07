@@ -67,6 +67,8 @@ def parse_output(stdout: str, *, model: str = "") -> AgentResult:
             raise UsageLimitError(detail[:300])
         raise AgentError(detail[:300])
     usage = body.get("usage") or {}
+    by_model = body.get("modelUsage") if isinstance(body.get("modelUsage"), dict) else {}
+    served = max(by_model, key=lambda k: int((by_model[k] or {}).get("outputTokens") or 0), default="") if by_model else ""
     return AgentResult(
         text=text,
         structured=body.get("structured_output"),
@@ -77,7 +79,7 @@ def parse_output(stdout: str, *, model: str = "") -> AgentResult:
         duration_ms=int(body.get("duration_ms") or 0),
         cost_estimate=float(body.get("total_cost_usd") or 0.0),
         session_id=str(body.get("session_id") or ""),
-        model=model,
+        model=str(served or model),
     )
 
 

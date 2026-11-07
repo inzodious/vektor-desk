@@ -18,7 +18,15 @@ CREATE TABLE symbols (symbol TEXT PRIMARY KEY, kind TEXT NOT NULL, role TEXT, fi
 CREATE TABLE macro (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
 CREATE TABLE plan_mix (symbol TEXT PRIMARY KEY, weight REAL NOT NULL) WITHOUT ROWID;
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
+CREATE TABLE factors (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
+CREATE TABLE french (set_name TEXT NOT NULL, name TEXT NOT NULL, date TEXT NOT NULL, ret REAL NOT NULL, PRIMARY KEY (set_name, name, date)) WITHOUT ROWID;
 """
+FRENCH_KIND = "french"
+FRENCH_MARKET = "FF.MKT"
+
+
+def french_symbol(set_name: str, name: str) -> str:
+    return f"FF.{set_name}.{name}"
 
 
 class NotReady(RuntimeError):
@@ -62,6 +70,11 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
             kind = kinds.get(sym) or ("fund" if sym in BENCHMARKS or sym in targets else "unknown")
             rows.append((sym, kind, roles.get(sym), first, last))
         out.executemany("INSERT INTO symbols VALUES (?, ?, ?, ?, ?)", rows)
+        french_rows = 0
+        if desk.execute("SELECT 1 FROM sqlite_master WHERE name='factors_daily'").fetchone():
+            out.executemany("INSERT INTO factors VALUES (?, ?, ?)", (tuple(r) for r in desk.execute("SELECT series, date, value FROM factors_daily")))
+            out.executemany("INSERT INTO french VALUES (?, ?, ?, ?)", (tuple(r) for r in desk.execute("SELECT set_name, name, date, ret FROM french_returns")))
+            french_rows = out.execute("SELECT count(*) FROM french").fetchone()[0]
         if desk.execute("SELECT 1 FROM sqlite_master WHERE name='macro_daily'").fetchone():
             out.executemany("INSERT INTO macro VALUES (?, ?, ?)", [tuple(r) for r in desk.execute("SELECT series, date, value FROM macro_daily")])
         out.executemany("INSERT INTO plan_mix VALUES (?, ?)", list(targets.items()))
@@ -74,7 +87,7 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
     finally:
         out.close()
     os.replace(tmp, final)
-    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": len(bars)}
+    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": len(bars), "french_rows": french_rows}
 
 
 # ---- Load (lab side) ----
@@ -103,15 +116,76 @@ class LabData:
     plan_mix: dict[str, float]
     settings: dict[str, str | None]
     calendar: list[str]
+    factors: dict[str, dict[str, float]] = field(default_factory=dict)
+    path: Path | None = None
+    french_sets: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def end(self) -> str:
         return self.calendar[-1]
 
+    def calendar_for(self, kind: str) -> list[str]:
+        if kind == FRENCH_KIND:
+            s = self.series.get(FRENCH_MARKET)
+            return s.dates if s else []
+        return self.calendar
+
+    def end_for(self, kind: str) -> str:
+        cal = self.calendar_for(kind)
+        return cal[-1] if cal else self.end
+
+    def french(self, set_name: str) -> list[str]:
+        if set_name in self.french_sets:
+            return self.french_sets[set_name]
+        symbols: list[str] = []
+        if self.path is not None and self.path.exists():
+            conn = connect(self.path, readonly=True)
+            try:
+                if conn.execute("SELECT 1 FROM sqlite_master WHERE name='french'").fetchone():
+                    rows = conn.execute("SELECT name, date, ret FROM french WHERE set_name=? ORDER BY name, date", (set_name,)).fetchall()
+                else:
+                    rows = []
+            finally:
+                conn.close()
+            shared: dict[tuple[str, str, int], tuple[list[str], dict[str, int], list[None]]] = {}
+            by_name: dict[str, list[tuple[str, float]]] = {}
+            for r in rows:
+                by_name.setdefault(r[0], []).append((r[1], r[2]))
+            for name, pts in by_name.items():
+                sym = french_symbol(set_name, name)
+                key = (pts[0][0], pts[-1][0], len(pts))
+                if key not in shared:
+                    dates = [d for d, _ in pts]
+                    shared[key] = (dates, {d: i for i, d in enumerate(dates)}, [None] * len(dates))
+                dates, index, nones = shared[key]
+                self.series[sym] = _levels(dates, [x for _, x in pts], index, nones)
+                self.kinds[sym] = FRENCH_KIND
+                self.roles[sym] = None
+                self.last[sym] = dates[-1]
+                symbols.append(sym)
+        self.french_sets[set_name] = sorted(symbols)
+        return self.french_sets[set_name]
+
     def macro_at(self, series: str, day: str) -> float | None:
         dates, values = self.macro.get(series, ([], []))
         i = bisect_right(dates, day)
         return values[i - 1] if i else None
+
+
+def _levels(dates: list[str], pcts: list[float], index: dict[str, int], volume: list) -> Series:
+    level, adj = 100.0, []
+    for x in pcts:
+        level *= 1 + x / 100
+        adj.append(level)
+    return Series(dates, adj, adj, volume, index)
+
+
+def _french_market(factors: dict[str, dict[str, float]]) -> Series | None:
+    mkt, rf = factors.get("mkt_rf") or {}, factors.get("rf") or {}
+    dates = sorted(mkt)
+    if not dates:
+        return None
+    return _levels(dates, [mkt[d] + rf.get(d, 0.0) for d in dates], {d: i for i, d in enumerate(dates)}, [None] * len(dates))
 
 
 def load(path: Path) -> LabData:
@@ -147,9 +221,18 @@ def load(path: Path) -> LabData:
             v.append(r[2])
         plan = {r[0]: r[1] for r in conn.execute("SELECT symbol, weight FROM plan_mix")}
         settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings")}
+        factors: dict[str, dict[str, float]] = {}
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factors'").fetchone():
+            for r in conn.execute("SELECT series, date, value FROM factors"):
+                factors.setdefault(r[0], {})[r[1]] = r[2]
     finally:
         conn.close()
     ref = next((s for s in ("SPY", "VTI", "FXAIX") if s in series), None) or max(series, key=lambda s: len(series[s].dates), default=None)
+    market = _french_market(factors)
+    if market is not None:
+        series[FRENCH_MARKET], kinds[FRENCH_MARKET], roles[FRENCH_MARKET], last[FRENCH_MARKET] = market, FRENCH_KIND, None, market.dates[-1]
+    if not ref:
+        ref = FRENCH_MARKET if market is not None else None
     if not ref:
         raise NotReady("The lab data has no prices yet.")
-    return LabData(series, kinds, roles, last, macro, plan, settings, list(series[ref].dates))
+    return LabData(series, kinds, roles, last, macro, plan, settings, list(series[ref].dates), factors, path)

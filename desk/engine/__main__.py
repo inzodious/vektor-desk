@@ -7,7 +7,7 @@ import requests
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, core, schema, triggers
+from desk.engine import ENGINE_VERSION, core, french, schema, triggers
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.lab import data as lab_data
@@ -153,6 +153,10 @@ def run_lab_export(cfg: Config) -> dict:
     return _with_desk(cfg, "lab-export", work)
 
 
+def run_french(cfg: Config, http=None) -> dict:
+    return _with_desk(cfg, "french", lambda desk: french.run(desk, http or http_session()))
+
+
 def run_market_backfill(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "backfill", lambda desk: run_backfill(desk, http or http_session()))
 
@@ -166,6 +170,7 @@ JOBS = {
     "backfill": run_market_backfill,
     "lookthrough": run_lookthrough,
     "lab-export": run_lab_export,
+    "french": run_french,
     "research": run_research,
 }
 
