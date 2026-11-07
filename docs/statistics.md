@@ -83,7 +83,7 @@ Each metric has an id, a formula, a minimum sample, and scopes (portfolio, accou
 | `income.dividends` | Dividend and interest income | Trailing 12 months and by window |
 | `cash.share` | Cash share | Core fund and settled cash as a share of value |
 | `cash.ready` | Cash ready to invest | Settled core cash minus any margin debit |
-| `cash.pending` | Pending deposits | Deposits in flight plus the next scheduled deposit and its date, from the plan |
+| `cash.pending`, `cash.pending_days` | Next deposit and days until it | From the profile's deposit schedule, else the plan; `modelled` |
 | `flow.invest_rate` | Investing rate | External investment flows divided by take-home pay (from `paystubs`) |
 
 ### Returns
@@ -92,6 +92,7 @@ Each metric has an id, a formula, a minimum sample, and scopes (portfolio, accou
 |---|---|---|
 | `ret.twr` | Time-weighted return | Daily linked; flows at end of day. Judges the investments, ignores deposit timing |
 | `ret.mwr` | Money-weighted return (XIRR) | Judges your actual dollars, including timing |
+| `ret.twr_ann` | Annualized TWR | 3Y and since start, only at 365 days or more |
 | `ret.contrib` | Contribution to return | Weight × return per holding; sums to the portfolio return |
 
 Windows: 1D, 1W, MTD, QTD, YTD, 1Y, 3Y, since start. **Returns under a year are never annualized.** A 9% month shown as 180% a year is noise in a costume.
@@ -115,7 +116,7 @@ The shadows answer the only question that matters for a personal portfolio: woul
 |---|---|---|---|
 | `risk.vol` | Annualized volatility | 63 days | 63-day and 252-day windows |
 | `risk.downside_dev` | Downside deviation | 63 days | |
-| `risk.mdd` | Max drawdown, duration, recovery | none | Plus `risk.dd_now`, the current drawdown from the high |
+| `risk.mdd` | Max drawdown, duration, recovery | none | Plus `risk.dd_now` (current drawdown from the high) and `risk.mdd_days` (longest days under water) |
 | `risk.var95`, `risk.cvar95` | Historical 1-day and 1-month VaR and expected shortfall | 250 days | On short history, uses current weights over five years of holding prices, flagged `pro_forma` |
 | `risk.beta` | Beta to the S&P 500 | 252 days | |
 | `risk.corr` | Correlation matrix of holdings | 252 days | Feeds the comparison view |
@@ -133,9 +134,9 @@ The shadows answer the only question that matters for a personal portfolio: woul
 | Id | Metric | Notes |
 |---|---|---|
 | `margin.debit` | Margin debit | From the margin sub-account balance |
-| `margin.cost_day`, `margin.cost_month` | Interest cost in dollars | Daily accrual at the rate in `desk.yaml`, assuming a 360-day year until the first margin statement confirms the broker's day count |
+| `margin.cost_day`, `margin.cost_month` | Interest cost in dollars | Daily accrual at `DESK_MARGIN_RATE_PCT`, assuming a 360-day year until the first margin statement confirms the broker's day count |
 | `margin.funded_share` | Margin-funded share of positions | |
-| `margin.call_drop` | Price drop to a maintenance call | `1 − debit / ((1 − m) × value)`, with `m` the maintenance requirement (per security where the export gives it, otherwise the setting) |
+| `margin.call_drop` | Price drop to a maintenance call | `1 − debit / ((1 − m) × value)`, with `m` the maintenance requirement (per security where the export gives it, otherwise `DESK_MARGIN_MAINT_PCT`, default 30) |
 | `margin.call_price` | Call price for the largest single stock | The price at which that holding alone, with everything else flat, triggers a call |
 | `margin.breakeven` | Return a margin-funded position needs to beat its interest | Annual rate × days held / 360 |
 
@@ -143,7 +144,8 @@ The shadows answer the only question that matters for a personal portfolio: woul
 
 | Id | Metric | Notes |
 |---|---|---|
-| `plan.weight`, `plan.drift` | Actual weight and drift in points per fund | Against the active plan version from the mirror |
+| `plan.weight`, `plan.target`, `plan.drift` | Actual weight, target and drift in points per fund | Against the active plan version from the mirror |
+| `plan.in_mix` | Share of value in plan funds | |
 | `plan.drift_max` | Largest drift, in points, and which fund | The Bridge headline |
 | `plan.single_stock` | Single-stock share vs its band | |
 | `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling |
@@ -168,7 +170,7 @@ The shadows answer the only question that matters for a personal portfolio: woul
 
 | Id | Metric | Notes |
 |---|---|---|
-| `cost.expense` | Weighted expense ratio and dollars a year | Expense ratios from fund profiles |
+| `cost.expense`, `cost.expense_usd` | Weighted expense ratio and dollars a year | Expense ratios from the plan's funds |
 | `cost.total` | All-in yearly cost | Expenses plus margin interest plus estimated dividend tax drag |
 
 ### FI progress
@@ -395,11 +397,16 @@ strategies, strategy_trials, paper_positions, paper_trades   (see Strategy lab)
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/health` | `data_health` for the latest run |
-| `GET /api/metrics?ids=&scope=&scope_id=&window=` | Latest values with quality |
-| `GET /api/series?id=&scope_id=&from=&to=` | Daily series for charts and drill-down |
+| `GET /api/engine/health` | `data_health` for the latest run, plus the last engine run |
+| `GET /api/engine/metrics?ids=&scope=&scope_id=&window=&as_of=` | Latest values with quality; `ids` takes a comma list and `ret.*` prefixes |
+| `GET /api/engine/series?id=&scope=&scope_id=&start=&end=` | Daily series (`value`, `twr_index`) for portfolio, account and shadow scopes |
+| `GET /api/engine/holdings?date=` | Holdings for a day |
+| `GET /api/engine/value?start=&end=&account=&symbol=` | Value over time, optionally one account or one position |
+| `GET /api/engine/prices?symbol=&start=&end=` | Daily closes `[{date, close}]` |
+| `GET /api/engine/lots?symbol=&account=` | Current tax lots and recent lot files |
 | `GET /api/compare?ids=&window=` | Aligned, rebased series plus the comparison table |
 | `GET /api/live` | Latest quotes, live value, day change (market hours) |
+| `GET /api/live/intraday` | Today's quote ticks `{SYM: [{t, price}]}` |
 | `POST /api/preflight` | Before and after metrics for a hypothetical trade |
 | `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status and tear sheet |
 

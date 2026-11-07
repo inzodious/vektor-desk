@@ -56,7 +56,7 @@ def holdings(request: Request, date: str | None = None) -> JSONResponse:
 
 
 @router.get("/api/engine/value")
-def value(request: Request, start: str | None = None, end: str | None = None, account: str | None = None) -> JSONResponse:
+def value(request: Request, start: str | None = None, end: str | None = None, account: str | None = None, symbol: str | None = None) -> JSONResponse:
     conn = _open(get_cfg(request))
     if conn is None:
         return _json({"series": []})
@@ -70,6 +70,9 @@ def value(request: Request, start: str | None = None, end: str | None = None, ac
     if account:
         where.append("account = ?")
         args.append(account)
+    if symbol:
+        where.append("symbol = ?")
+        args.append(symbol.upper())
     try:
         rows = conn.execute(
             "SELECT date, round(sum(value), 2) AS value, group_concat(DISTINCT quality) AS q, max(source) AS source "
@@ -109,3 +112,108 @@ def live(request: Request) -> JSONResponse:
         return _json(live_view(conn))
     finally:
         conn.close()
+
+
+def _has(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (table,)).fetchone() is not None
+
+
+@router.get("/api/live/intraday")
+def intraday(request: Request) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "quotes_live"):
+        return _json({"day": None, "symbols": {}})
+    try:
+        day = conn.execute("SELECT max(substr(at, 1, 10)) FROM quotes_live WHERE source='finnhub'").fetchone()[0]
+        out: dict[str, list[dict]] = {}
+        if day:
+            for r in conn.execute(
+                "SELECT symbol, at, price FROM quotes_live WHERE source='finnhub' AND substr(at, 1, 10)=? GROUP BY symbol, at ORDER BY symbol, at", (day,)
+            ):
+                out.setdefault(r["symbol"], []).append({"t": r["at"], "price": r["price"]})
+    finally:
+        conn.close()
+    return _json({"day": day, "symbols": out})
+
+
+@router.get("/api/engine/prices")
+def prices(request: Request, symbol: str, start: str | None = None, end: str | None = None) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None:
+        return _json({"symbol": symbol.upper(), "rows": []})
+    union = "SELECT date, close, 0 AS pri FROM prices_daily WHERE symbol=:s UNION ALL SELECT date, close, 1 AS pri FROM price_bars WHERE symbol=:s"
+    try:
+        rows = conn.execute(
+            f"SELECT date, close, min(pri) AS pri FROM ({union}) WHERE date >= :a AND date <= :b GROUP BY date ORDER BY date",
+            {"s": symbol.upper(), "a": start or "0000", "b": end or "9999"},
+        ).fetchall()
+    finally:
+        conn.close()
+    return _json({"symbol": symbol.upper(), "rows": [{"date": r["date"], "close": r["close"]} for r in rows]})
+
+
+@router.get("/api/engine/metrics")
+def metrics(
+    request: Request, ids: str | None = None, scope: str | None = None, scope_id: str | None = None, window: str | None = None, as_of: str | None = None
+) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "metric_values"):
+        return _json({"as_of": None, "engine_version": None, "metrics": []})
+    try:
+        day = as_of or conn.execute("SELECT max(as_of) FROM metric_values").fetchone()[0]
+        where, args = ["as_of = ?"], [day]
+        if ids:
+            wanted = [i.strip() for i in ids.split(",") if i.strip()]
+            prefixes = [i[:-1] for i in wanted if i.endswith("*")]
+            exact = [i for i in wanted if not i.endswith("*")]
+            parts = ([f"metric_id IN ({','.join('?' * len(exact))})"] if exact else []) + ["metric_id LIKE ?"] * len(prefixes)
+            where.append("(" + " OR ".join(parts) + ")")
+            args += exact + [p + "%" for p in prefixes]
+        for col, val in (("scope", scope), ("scope_id", scope_id), ('"window"', window)):
+            if val:
+                where.append(f"{col} = ?")
+                args.append(val)
+        rows = [dict(r) for r in conn.execute(f"SELECT * FROM metric_values WHERE {' AND '.join(where)} ORDER BY metric_id, scope, scope_id", args)]
+    finally:
+        conn.close()
+    return _json({"as_of": day, "engine_version": rows[0]["engine_version"] if rows else None, "metrics": rows})
+
+
+@router.get("/api/engine/series")
+def series(request: Request, id: str, scope: str = "portfolio", scope_id: str = "all", start: str | None = None, end: str | None = None) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "series_daily"):
+        return _json({"id": id, "scope": scope, "scope_id": scope_id, "quality": "insufficient_history", "rows": []})
+    try:
+        rows = conn.execute(
+            "SELECT date, value, quality FROM series_daily WHERE series_id=? AND scope=? AND scope_id=? AND date >= ? AND date <= ? ORDER BY date",
+            (id, scope, scope_id, start or "0000", end or "9999"),
+        ).fetchall()
+    finally:
+        conn.close()
+    return _json(
+        {
+            "id": id,
+            "scope": scope,
+            "scope_id": scope_id,
+            "quality": worst(r["quality"] for r in rows),
+            "rows": [{"date": r["date"], "value": r["value"]} for r in rows],
+        }
+    )
+
+
+@router.get("/api/engine/health")
+def health(request: Request) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    if conn is None or not _has(conn, "data_health"):
+        return _json({"as_of": None, "status": "fail", "checks": []})
+    try:
+        day = conn.execute("SELECT max(as_of) FROM data_health").fetchone()[0]
+        checks = [dict(r) for r in conn.execute("SELECT check_name, status, detail FROM data_health WHERE as_of=? ORDER BY check_name", (day,))]
+        last = None
+        if _has(conn, "engine_runs"):
+            last = conn.execute("SELECT job, started_at, finished_at, ok FROM engine_runs ORDER BY started_at DESC LIMIT 1").fetchone()
+    finally:
+        conn.close()
+    status = "fail" if any(c["status"] == "fail" for c in checks) else ("warn" if any(c["status"] == "warn" for c in checks) else "ok")
+    return _json({"as_of": day, "status": status if checks else "fail", "checks": checks, "last_run": dict(last) if last else None})
