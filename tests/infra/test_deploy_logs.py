@@ -148,7 +148,7 @@ def test_status_says_when_the_installed_compose_is_older_than_the_checkout(tmp_p
     del old["services"]["ntfy"]
     line = drift(tmp_path, rendered=yaml.safe_dump(old))
     assert line.startswith("Compose:     older than the checkout (eval: command; ntfy missing)")
-    assert "paste deploy/compose.yaml" in line
+    assert "new image binwiederhier/ntfy" in line and "paste it into Apps" in line
     assert drift(tmp_path, user_config=yaml.safe_dump({"custom_compose_config_string": current})) == "Compose:     matches the checkout"
     assert "eval: command" in drift(tmp_path, user_config=yaml.safe_dump({"custom_compose_config": old}))
     assert "couldn't read" in drift(tmp_path)

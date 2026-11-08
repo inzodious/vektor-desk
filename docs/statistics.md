@@ -518,7 +518,7 @@ Every strategy on paper shares the one Alpaca **paper** account. The URL comes o
 | Fills | `paper_exec.allocate` | Filled quantity goes to same-side legs pro rata at the average fill price; crossed quantity fills at that price too, or at the day's open when the symbol netted to zero. Rejected orders leave the books alone |
 | Limits | env | `DESK_PAPER_EXECUTE=0` stops orders (reconciling continues); `DESK_PAPER_MAX_STRATEGIES` (default 20) |
 
-**`/api/engine/lab/leaderboard`.** `{as_of, benchmark: "IWM", gate_days: 182, rows, note}`. Each row: `id, version, name, kind ("lane" | "mix" | "strategy"), benchmark, status, started, as_of, days_live, days_to_eligible, eligible_on, waiting_on ("time" | "benchmark" | null), return_pct, bench_return_pct, excess_pts, max_drawdown_pct` (negative), `trades, open_positions, account` (`{as_of, sleeve, cash, value, return_pct}` from the sub-ledger, or null). Order: eligible, paper, retired; then excess desc (nulls last), then days live desc. Empty: `rows: []` and a note. Returns and the gate use the forward record; `account` shows what the paper fills did.
+**`/api/engine/lab/leaderboard`.** `{as_of, benchmark: "IWM", gate_days: 182, rows, note}`. Each row: `id, version, name, kind ("lane" | "mix" | "strategy"), benchmark, status, started, as_of, days_live, days_to_eligible, eligible_on, waiting_on ("time" | "benchmark" | null), return_pct, bench_return_pct, excess_pts, max_drawdown_pct` (negative), `trades, open_positions, account` (`{as_of, sleeve, cash, value, return_pct}` from the sub-ledger, or null). `reward_risk`: `{source, days, ann_return_pct, sharpe, sortino, max_drawdown_pct, calmar, hit_rate}` from the sub-ledger's daily values once it has 20 days (`source: "sub_ledger"`; hit rate = share of up days, Sharpe and Sortino annualized on 252 days, annual return and Calmar from 63 days), else from the forward record (`"forward_record"`; a lane's hit rate is its share of winning closed trades), else nulls. `backtest`: the same keys plus `start, end` from the mix's real-price backtest in the bands (`"bands"`) or a lab strategy's holdout (`"lab_holdout"`), or null. Order: eligible, paper, retired; then excess desc (nulls last), then days live desc. Empty: `rows: []` and a note. Returns and the gate use the forward record; `account` shows what the paper fills did.
 
 ## Strategy catalog and probability bands
 
@@ -559,6 +559,23 @@ There is no single target. Four named mixes run side by side on paper and in the
 Metrics `bands.worst_year_p10`, `bands.p50_10y`, `bands.chance_fi` (scope `strategy`). For the agents, `bands.catalog(cfg)` returns `{id, name, risk_rank, fit, worst_year_p10_pct, p50_value_10y, chance_fi, sharpe, max_drawdown_pct, proxy_note}` per ready row, and raises `bands.NotReady` before the first build.
 
 Limits: leftover swings are drawn month by month, so a fund's own long slumps are understated. Bond and international funds enter only through their link to the US market. The margin debit is not modelled.
+
+## Discount-day scanner
+
+Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run.
+
+| Piece | Rule |
+|---|---|
+| Names | Held (latest holdings, cash left out), then the watchlist, then the quality list (`discounts.QUALITY`: broad ETFs and a dozen large quality names, added to the backfill). A name keeps its first list |
+| Prices | `price_bars` (adjusted), else `alpaca_bars`, extended with today's `prices_daily` close. A name needs 60 sessions |
+| Measures | Day move; its z-score against the root-mean-square of the prior 252 daily moves; drop from the 252-session high; 1-year return |
+| Valuation | `pe_annual` (price ÷ the latest 10-K diluted EPS) when that EPS is positive, else `price_vs_5y_avg`. `pctile_own` = share of the last 5 years' month-end values at or below today |
+| Hit | A first close 10, 20 or 30% under the 52-week high (`crossed_10` …), or a day move of −1% or worse that is −2 z or worse (`big_down_day`). At most 10 a day, biggest discount first |
+| Tables | `discount_signals` (one per `{as_of}-{symbol}`), `discount_cases` (first write wins), `discount_scans` (one per day) |
+
+**`GET /api/engine/discounts`.** `{as_of, scanned, rule, rows, note}`. Rows from the last 10 days, newest first: `signal_id, symbol, name, as_of, list, reason, price, drop_from_high_pct, move_z, valuation {metric, value, pctile_own}, numbers {price, day_move_pct, drop_from_high_pct, move_z, high_52w, ret_1y_pct, valuation_value, valuation_pctile}, case` (null, or `{verdict, case, risks, confidence, horizon_days, numbers_cited, model, written_at, run_id}`).
+
+For the research desk: `discounts.pending(cfg, limit)` returns the last 5 days' hits with no case, biggest discount first, and raises `discounts.NotReady` before the first scan. `discounts.record(cfg, signal_id, case)` checks a case (verdict buy/wait/avoid, case ≤ 400, risks ≤ 240, confidence 0–1, horizon_days ≥ 1, numbers_cited from the hit's `numbers`, model, written_at), raises `ValueError` on bad values and returns False when a case already exists.
 
 ## Strategy lab
 
@@ -850,7 +867,8 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Nightly 03:35 ET | `filings`: yesterday's EDGAR index for universe names, then excerpts (before the scorer at 04:15) |
 | Nightly 23:20 ET | `insider`: SEC insider quarters, live Form 4s, share frames, price history for cluster names, small-cap months (before `lab-export` at 00:55) |
 | Nightly 23:50 ET | `earnings`: EPS facts and release times for 300 companies, then every surprise event |
-| Weekdays 08:45 and 16:45 ET | `paper`: lanes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
+| Weekdays 08:45 and 16:45 ET | `paper`: lanes and catalog mixes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
+| Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
 | Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Stack and tests

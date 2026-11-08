@@ -20,11 +20,11 @@ def alive(cfg, at=None):
     (folder / "host.alive").write_text(boxrun.stamp(at or boxrun.now_utc()))
 
 
-def test_get_box_lists_the_seven_actions(client, cfg):
+def test_get_box_lists_the_eight_actions(client, cfg):
     body = client.get("/api/box").json()
-    assert set(body) == {"now", "host_alive", "pickup_seconds", "script", "actions"}
-    assert body["host_alive"] is False and body["pickup_seconds"] == 300 and body["script"] is None
-    assert [a["name"] for a in body["actions"]] == ["redeploy", "status", "check", "backup", "restore-test", "logs", "update-script"]
+    assert set(body) == {"now", "host_alive", "pickup_seconds", "script", "compose", "actions"}
+    assert body["host_alive"] is False and body["pickup_seconds"] == 300 and body["script"] is None and body["compose"] is None
+    assert [a["name"] for a in body["actions"]] == ["redeploy", "status", "check", "backup", "restore-test", "logs", "update-script", "apply-compose"]
     first = body["actions"][0]
     assert set(first) == {"name", "title", "what", "cooldown_seconds", "running", "queued", "queued_at", "last_run", "cooldown_until", "can_run"}
     assert first["can_run"] is True and first["last_run"] is None
@@ -92,6 +92,7 @@ def test_host_runs_only_allowlisted_actions_and_stores_redacted_results(tmp_path
     assert not list((box / "requests").iterdir())
     assert (box / "host.alive").read_text().strip().endswith("Z")
     assert json.loads((box / "script.json").read_text())["pinned"] is False
+    assert json.loads((box / "compose.json").read_text())["state"] == "unknown"
 
 
 @host_only

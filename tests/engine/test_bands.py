@@ -236,3 +236,44 @@ def test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatc
     worst = conn.execute("SELECT count(*) FROM metric_values WHERE metric_id='bands.worst_year_p10'").fetchone()[0]
     conn.close()
     assert versions == set(rows) and worst == 4
+
+
+# ---- Reward to risk on the leaderboard ----
+
+
+def test_ratios_need_twenty_days_and_read_the_ledger():
+    from datetime import date, timedelta
+
+    from desk.engine import leaderboard
+
+    days = [(date(2026, 1, 1) + timedelta(days=i)).isoformat() for i in range(120)]
+    vals = [1000.0 * (1.001**i) * (0.99 if i % 10 == 5 else 1.0) for i in range(120)]
+    got = leaderboard.ratios(days, vals)
+    assert got["days"] == 120 and got["sharpe"] > 0 and got["sortino"] > got["sharpe"] and got["max_drawdown_pct"] == pytest.approx(-0.901, abs=0.001)
+    assert got["calmar"] > 0 and 0.8 < got["hit_rate"] < 1 and got["ann_return_pct"] > 0
+    assert leaderboard.ratios(days[:20], vals[:20]) is None
+    flat = leaderboard.ratios(days[:30], vals[:30])
+    assert flat["ann_return_pct"] is None and flat["calmar"] is None
+
+
+def test_leaderboard_carries_reward_to_risk_and_backtests(cfg, mirror, monkeypatch, app_client):
+    from desk.engine import leaderboard
+
+    test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatch, app_client)
+    conn = connect(cfg.desk_db)
+    for sym in ("IVV", "VXUS", "FTEC", "SMH"):
+        bars(conn, sym, [100.0])
+    catalog.rebuild(conn, 1000.0, lambda s: 100.0, now=PRE)
+    with conn:
+        conn.executemany(
+            "INSERT INTO paper_ledger_daily VALUES ('safe-mix', 1, ?, 0, ?, ?)",
+            [(f"2026-12-{d:02d}", 1000 + d * 2 - (5 if d % 4 == 0 else 0), 1000 + d * 2 - (5 if d % 4 == 0 else 0)) for d in range(1, 31)],
+        )
+    conn.close()
+    body = app_client(packages=["engine"]).get("/api/engine/lab/leaderboard").json()
+    rows = {r["id"]: r for r in body["rows"]}
+    safe, tech = rows["safe-mix"], rows["tech-tilt"]
+    assert safe["kind"] == "mix" and safe["benchmark"] == "IVV"
+    assert safe["reward_risk"]["source"] == "sub_ledger" and safe["reward_risk"]["days"] == 30 and safe["reward_risk"]["sharpe"] is not None
+    assert tech["reward_risk"]["source"] == "forward_record" and tech["reward_risk"]["max_drawdown_pct"] == 0.0
+    assert safe["backtest"]["source"] == "bands" and safe["backtest"]["start"] == "2008-02" and set(leaderboard.RATIO_KEYS) <= set(safe["backtest"])
