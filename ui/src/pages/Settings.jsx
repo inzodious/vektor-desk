@@ -366,6 +366,9 @@ export default function Settings() {
             <Link className="chip info" to="/settings/first-run" data-testid="first-run-link">
               First-run checklist
             </Link>
+            <Link className="chip info" to="/settings/risk" data-testid="risk-link">
+              Risk check
+            </Link>
             {s.demo ? <span className="sample">Demo data</span> : null}
             {status.error ? <span className="chip watch">Last check failed · showing {etTime(checkedAt)}</span> : null}
           </>

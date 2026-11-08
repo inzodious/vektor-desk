@@ -4,6 +4,7 @@ import { groupLive } from '../src/live/context.js';
 import { chunkIds } from '../src/lib/lab.js';
 import { moneyInFixtures } from './money-in.mjs';
 import { jobsFixtures } from './jobs.mjs';
+import { riskFixtures } from './risk.mjs';
 import { desksFixtures } from './desks.mjs';
 import { leaderboardFixtures } from './leaderboard.mjs';
 import { withFilingSignals } from './filing-signals.mjs';
@@ -203,6 +204,9 @@ for (const [name, body] of Object.entries(leaderboardFixtures())) save(name, bod
 
 // ---------- jobs ----------
 for (const [name, body] of Object.entries(jobsFixtures(await get('/api/jobs')))) save(name, body);
+
+// ---------- risk check ----------
+for (const [name, body] of Object.entries(riskFixtures(await get('/api/decisions/risk'), await get('/api/decisions/risk/versions')))) save(name, body);
 
 // ---------- desk profile status ----------
 const profileStatus = await get('/api/decisions/profile/status');
