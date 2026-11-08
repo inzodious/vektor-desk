@@ -79,12 +79,12 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
 
 ## After updates
 
-Deploys are automatic within 5 minutes of a push to `main`, and so is the cron copy of `deploy.sh`. A compose change still needs you, and `deploy.sh status`, the deploy log and a `desk-ops` alert all say when one is waiting:
+Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change still need you, and `deploy.sh status`, the deploy log and a `desk-ops` alert all say when one is waiting:
 
 | When | Do |
 |---|---|
-| `deploy.sh` changed | Nothing: the cron copy updates itself on the next auto run and sends a `desk-ops` alert. Exception: once, if the copy is older than self-pinning, or if self-pinning is off (`deploy.no-self-pin`), copy it by hand: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh` |
-| Settings → Box says the box isn't checking in | The cron copy of `deploy.sh` is older than box actions: copy it by hand once (row above). After that it keeps itself current |
+| `deploy.sh` changed | Settings → Box → Update box script (the panel shows it when the copy is behind). Once, while the copy is older than this button, or with `deploy.no-self-pin` set, copy it by hand: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh` |
+| Settings → Box says the box isn't checking in | The cron copy of `deploy.sh` is older than box actions: copy it by hand once (row above) |
 | `deploy/compose.yaml` changed | Run the setup script again (it keeps what's there and adds any new folder). Then go to Apps → `vektor-desk` → Edit and paste the new file. `deploy.sh status` says so on its `Compose:` line, naming each service that differs from the checkout |
 
 ## Home network
