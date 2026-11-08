@@ -455,6 +455,22 @@ Forward-only test of one edge: Claude reads filings of small caps nobody covers.
 | `filings.pending(cfg, limit)` | Unscored filings with an excerpt, most material first, then newest: `accession, symbol, form, items, filed_at, url, excerpt, company{name, market_cap, sector}`. `[]` before the first fetch; `NotReady` when the tables don't exist |
 | `filings.record(cfg, accession, result)` | First write wins per accession. `ValueError` on a direction outside −2..2, confidence outside 0..1, an `event_type` not in `filings.EVENT_TYPES`, `horizon_days` under 1, no `model` or `scored_at`, or an unknown accession. `rationale` is cut to 280 characters |
 
+## Paper trading: lanes, sub-ledgers, leaderboard
+
+Every strategy on paper shares the one Alpaca **paper** account. The URL comes only from `desk.paper_check.paper_base()`; the account number must start with `PA` or nothing is sent.
+
+| Piece | Module | Rule |
+|---|---|---|
+| Lanes | `desk.engine.lane` | Forward-only filing strategies. `filings-lane` v1: score ≥ +1, confidence ≥ 0.6, next open after `max(scored_at, filed_at)`, hold 20 sessions, 10 equal slots, $1,000 notional, benchmark IWM. Starts at the first score |
+| Lane variants | `lane.register(conn, id, title, params)`, `lane.register_variant(cfg, …)`, table `lane_variants` | Params `min_direction` 1–2, `min_confidence` 0.5–0.95, `hold_sessions` 5–60, `max_names` 3–20, `event_types` from `filings.EVENT_TYPES`. Same id again = next version (the latest runs). Duplicate params refused; at most 12. A variant starts at its registration and ignores signals known before it |
+| Forward record | `paper_portfolios`, `paper_positions`, `paper_trades` | Lanes rebuild after each universe and paper run; lab strategies replay nightly (`lab-export`). Status `paper` until 182 days, then `eligible` (excess ≥ 0) or `retired` |
+| Sub-ledgers | `paper_exec.books`, tables `paper_legs`, `paper_ledger_daily` | Each strategy has its own sleeve (`DESK_PAPER_BUDGET`, default $1,000, cap $5,000), holdings and cash built only from its own filled legs, never from account positions |
+| Orders | `paper_exec.run` | Before the open only, once per day. Lanes buy whole shares per slot and sell on exit; lab strategies follow `paper_positions` weights × the sleeve's value, rebalancing a name only when it moves $25 or 10%. Retired strategies flatten. Legs net into one market day order per symbol (`vd-{day}-{symbol}-{side}`), so strategies never trade against each other on Alpaca; a sell never exceeds the account's shares. Names Alpaca can't trade are skipped and listed |
+| Fills | `paper_exec.allocate` | Filled quantity goes to same-side legs pro rata at the average fill price; crossed quantity fills at that price too, or at the day's open when the symbol netted to zero. Rejected orders leave the books alone |
+| Limits | env | `DESK_PAPER_EXECUTE=0` stops orders (reconciling continues); `DESK_PAPER_MAX_STRATEGIES` (default 20) |
+
+**`/api/engine/lab/leaderboard`.** `{as_of, benchmark: "IWM", gate_days: 182, rows, note}`. Each row: `id, version, name, kind ("lane" | "strategy"), status, started, as_of, days_live, days_to_eligible, eligible_on, waiting_on ("time" | "benchmark" | null), return_pct, bench_return_pct, excess_pts, max_drawdown_pct` (negative), `trades, open_positions, account` (`{as_of, sleeve, cash, value, return_pct}` from the sub-ledger, or null). Order: eligible, paper, retired; then excess desc (nulls last), then days live desc. Empty: `rows: []` and a note. Returns and the gate use the forward record; `account` shows what the paper fills did.
+
 ## Strategy lab
 
 Where a strategy from deep research gets tested: a backtest over 3, 5 and 10 years that only sees data as it was known on each day, then forward paper trading with fake money. The research desk proposes; the engine runs the rules; nothing in the lab touches real money.
@@ -743,6 +759,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekly, Sunday 02:10 | N-PORT look-through and sector profiles |
 | Weekdays 19:30 ET | `universe`: Alpaca assets, SEC share counts, daily bars, then that day's universe |
 | Nightly 03:35 ET | `filings`: yesterday's EDGAR index for universe names, then excerpts (before the scorer at 04:15) |
+| Weekdays 08:45 and 16:45 ET | `paper`: lanes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Stack and tests

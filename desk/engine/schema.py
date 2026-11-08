@@ -224,6 +224,51 @@ CREATE TABLE IF NOT EXISTS filing_signals (
   numbers_cited TEXT NOT NULL,
   run_id TEXT
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS lane_variants (
+  id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  params TEXT NOT NULL,
+  hypothesis TEXT,
+  registered_at TEXT NOT NULL,
+  PRIMARY KEY (id, version)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS paper_legs (
+  date TEXT NOT NULL,
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  symbol TEXT NOT NULL,
+  qty REAL NOT NULL,
+  client_order_id TEXT,
+  filled_qty REAL,
+  price REAL,
+  status TEXT NOT NULL,
+  PRIMARY KEY (date, strategy_id, version, symbol)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS paper_ledger_daily (
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  date TEXT NOT NULL,
+  cash REAL NOT NULL,
+  invested REAL NOT NULL,
+  value REAL NOT NULL,
+  PRIMARY KEY (strategy_id, version, date)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS paper_orders (
+  client_order_id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  side TEXT NOT NULL CHECK (side IN ('buy', 'sell')),
+  qty REAL NOT NULL,
+  status TEXT NOT NULL,
+  filled_qty REAL,
+  filled_avg_price REAL,
+  filled_at TEXT,
+  submitted_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  alpaca_id TEXT,
+  message TEXT
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS quotes_live (
   symbol TEXT NOT NULL,
   at TEXT NOT NULL,
