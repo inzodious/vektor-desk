@@ -181,6 +181,8 @@ def test_every_problem_names_a_fix(cfg, mirror, monkeypatch):
     monkeypatch.setenv("FINNHUB_API_KEY", "k")
     monkeypatch.setenv("FRED_API_KEY", "k")
     monkeypatch.setenv("DESK_SEC_USER_AGENT", "Desk test@example.com")
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "k")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "k")
     assert health(cfg)["market_keys"][0] == "ok"
 
 
@@ -350,7 +352,7 @@ def test_a_snapshot_carrying_older_closes_is_called_stale(cfg, mirror):
 
 
 def test_market_keys_warn_for_any_missing_key(cfg, mirror, monkeypatch):
-    for key in ("TIINGO_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY"):
+    for key in ("TIINGO_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY", "ALPACA_API_KEY_ID", "ALPACA_API_SECRET_KEY"):
         monkeypatch.setenv(key, "k")
     monkeypatch.delenv("DESK_SEC_USER_AGENT", raising=False)
     seed_like_the_box(mirror)
