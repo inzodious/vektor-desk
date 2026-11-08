@@ -51,6 +51,7 @@ agents:
     scout: false
     strategy: false
     filings: false
+    discounts: false
 
 alerts:
   min_priority: default
