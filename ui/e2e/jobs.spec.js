@@ -1,0 +1,126 @@
+import { readFileSync } from 'node:fs';
+import { expect, test } from '@playwright/test';
+import { MONDAY_MIDDAY, overflow, watchErrors } from './helpers.js';
+
+const JOBS = JSON.parse(readFileSync(new URL('../src/fixtures/jobs.json', import.meta.url), 'utf8'));
+
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(MONDAY_MIDDAY);
+});
+
+function fakeScheduler(page, { fail = [] } = {}) {
+  const state = structuredClone(JOBS);
+  const asked = [];
+  const ticks = {};
+  const job = (name) => state.jobs.find((j) => j.name === name);
+  page.route('**/api/jobs/*/run', (route) => {
+    const name = route.request().url().split('/').slice(-2)[0];
+    asked.push(name);
+    const j = job(name);
+    Object.assign(j, { queued: true, can_run: false });
+    ticks[name] = 0;
+    route.fulfill({ status: 202, json: { ok: true, job: name, request_id: `req-${name}`, requested_at: '2026-11-09T16:42:00Z', message: 'Starts within a few seconds.' } });
+  });
+  page.route('**/api/jobs?*', (route) => route.fallback());
+  page.route(/\/api\/jobs(\?.*)?$/, (route) => {
+    for (const name of Object.keys(ticks)) {
+      const j = job(name);
+      ticks[name] += 1;
+      if (ticks[name] === 1) Object.assign(j, { queued: false, running: true, running_since: '2026-11-09T16:42:05Z' });
+      if (ticks[name] === 2) {
+        const failed = fail.includes(name);
+        Object.assign(j, {
+          running: false,
+          running_since: null,
+          can_run: true,
+          last_run: { trigger: 'request', request_id: `req-${name}`, started: '2026-11-09T16:42:05Z', finished: '2026-11-09T16:43:00Z', result: failed ? 'failed' : 'ok', exit_code: failed ? 1 : 0, detail: failed ? 'Firestore said no.' : null },
+        });
+        delete ticks[name];
+      }
+    }
+    route.fulfill({ json: state });
+  });
+  return asked;
+}
+
+// ---------- settings ----------
+test('jobs list plain names, how each last went and when it runs', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/settings');
+  const card = page.getByTestId('jobs');
+  await expect(card).toHaveAttribute('data-alive', 'true');
+  await expect(card.locator('.job-list').first().locator('.job-row')).toHaveCount(9);
+  await expect(card.locator('[data-job="engine-quotes"]')).toContainText('Prices');
+  await expect(card.locator('[data-job="engine-quotes"]')).toContainText('Every 5 min, 4 AM to 8 PM on weekdays');
+  await expect(card.locator('[data-job="engine-daily"]')).toContainText('8:20 AM and 5:20 PM');
+  await expect(card.locator('[data-job="engine-lookthrough"]')).toContainText('Fund breakdowns');
+  await expect(card.locator('[data-job="engine-research"]')).toHaveAttribute('data-state', 'failed');
+  await expect(card.locator('[data-job="engine-research"]')).toContainText('Didn’t finish');
+  await expect(card.locator('[data-job="mirror"] button')).toBeDisabled();
+  await expect(card.locator('[data-job="mirror"] button')).toContainText('Again at');
+  await card.getByText(/Agents and housekeeping/).click();
+  await expect(card.locator('[data-job="agents-run-tax"]')).toContainText('Tax desk');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  expect(errors).toEqual([]);
+});
+
+test('run now shows starting, running, then done', async ({ page }) => {
+  const asked = fakeScheduler(page);
+  await page.goto('/settings');
+  const row = page.getByTestId('jobs').locator('[data-job="engine-daily"]');
+  await row.getByRole('button', { name: 'Run Daily numbers now' }).click();
+  await expect(row).toHaveAttribute('data-state', 'running');
+  await expect(row.locator('.chip')).toBeVisible();
+  await expect(row).toContainText('Daily numbers done.', { timeout: 15000 });
+  await expect(row).toHaveAttribute('data-state', 'ok');
+  expect(asked).toEqual(['engine-daily']);
+});
+
+test('a failed run says so kindly', async ({ page }) => {
+  fakeScheduler(page, { fail: ['engine-backfill'] });
+  await page.goto('/settings');
+  const row = page.getByTestId('jobs').locator('[data-job="engine-backfill"]');
+  await row.getByRole('button', { name: /Run Backfill now/ }).click();
+  await expect(row).toContainText('Backfill didn’t finish: Firestore said no.', { timeout: 15000 });
+  await expect(row).toHaveAttribute('data-state', 'failed');
+});
+
+test('a refusal shows the reason on the row', async ({ page }) => {
+  await page.route('**/api/jobs/*/run', (route) => route.fulfill({ status: 503, json: { ok: false, error: 'scheduler_down', message: 'The cron service isn’t running.' } }));
+  await page.goto('/settings');
+  const row = page.getByTestId('jobs').locator('[data-job="engine-lots"]');
+  await row.getByRole('button', { name: /Run Lots now/ }).click();
+  await expect(row.locator('.job-note')).toContainText('taking a break');
+});
+
+test('with the scheduler off, run now is off and says why', async ({ page }) => {
+  await page.goto('/settings?scenario=down');
+  const card = page.getByTestId('jobs');
+  await expect(card.getByTestId('scheduler-off')).toBeVisible();
+  await expect(card.getByText('Scheduler off')).toBeVisible();
+  await expect(card.locator('.job-list').first().getByRole('button', { disabled: false })).toHaveCount(0);
+});
+
+// ---------- health banner ----------
+test('refresh data runs accounts, then daily numbers, from the banner', async ({ page }) => {
+  const asked = fakeScheduler(page);
+  await page.goto('/?scenario=fail');
+  const b = page.getByTestId('health-banner');
+  const btn = b.getByTestId('refresh-data');
+  await expect(btn).toHaveAttribute('title', 'Runs accounts, then daily numbers');
+  await btn.click();
+  await expect(b.getByTestId('refresh-status')).toContainText('Refreshing accounts…');
+  await expect(b.getByTestId('refresh-status')).toContainText('Refreshing daily numbers…', { timeout: 15000 });
+  await expect(b.getByTestId('refresh-status')).toContainText('Fresh data is in.', { timeout: 15000 });
+  expect(asked).toEqual(['mirror', 'engine-daily']);
+});
+
+test('no refresh button when no job fixes the check', async ({ page }) => {
+  await page.route(/\/api\/engine\/health/, (route) =>
+    route.fulfill({ json: { status: 'warn', as_of: '2026-11-09', checks: [{ check_name: 'marginal_rate', status: 'warn', detail: 'No marginal tax rate yet.' }] } }),
+  );
+  await page.goto('/research');
+  await expect(page.getByTestId('health-banner')).toBeVisible();
+  await expect(page.getByTestId('refresh-data')).toHaveCount(0);
+});

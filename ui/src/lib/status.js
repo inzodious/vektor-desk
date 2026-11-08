@@ -20,8 +20,6 @@ export const THEMES = [
   { v: 'dark', t: 'Graphite dark' },
 ];
 
-export const JOBS = { mirror: 'Mirror pull', backup: 'Backup', prices: 'Price refresh' };
-
 export function mirrorLine(m) {
   if (m.state === 'empty') return m.note || "The mirror hasn't run yet.";
   if (m.state === 'error' && !m.last_ok) return 'The mirror database could not be read.';

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { groupLive } from '../src/live/context.js';
 import { chunkIds } from '../src/lib/lab.js';
 import { moneyInFixtures } from './money-in.mjs';
+import { jobsFixtures } from './jobs.mjs';
 
 const API = process.env.DESK_API || 'http://127.0.0.1:8000';
 const OUT = fileURLToPath(new URL('../src/fixtures/', import.meta.url));
@@ -193,6 +194,9 @@ save('engine.health.fail', {
   status: 'fail',
   checks: [{ check_name: 'value', status: 'fail', detail: 'Desk value is 4.1% off the broker on 2026-11-06; re-run the mirror pull, then the daily engine.' }, ...engineHealth.checks.filter((c) => c.check_name !== 'value')],
 });
+
+// ---------- jobs ----------
+for (const [name, body] of Object.entries(jobsFixtures(await get('/api/jobs')))) save(name, body);
 
 // ---------- desk profile status ----------
 const profileStatus = await get('/api/decisions/profile/status');

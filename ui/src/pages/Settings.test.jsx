@@ -9,13 +9,17 @@ import empty from '../fixtures/status.empty.json';
 import health from '../fixtures/health.json';
 import crew from '../fixtures/agents.status.json';
 import runs from '../fixtures/agents.runs.json';
+import jobs from '../fixtures/jobs.json';
 
-function serve(status, code = 200) {
+const busyJobs = { ...jobs, jobs: jobs.jobs.map((j) => (j.name === 'mirror' ? { ...j, running: true, running_since: '2026-11-09T16:40:00Z', can_run: false } : j)) };
+
+function serve(status, code = 200, jobList = jobs) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url) => {
       if (String(url).startsWith('/api/health')) return new Response(JSON.stringify(health), { status: 200 });
       if (String(url).startsWith('/api/agents/status')) return new Response(JSON.stringify(crew), { status: 200 });
+      if (String(url).startsWith('/api/jobs')) return new Response(JSON.stringify(jobList), { status: 200 });
       if (String(url).startsWith('/api/agents/runs')) return new Response(JSON.stringify(runs), { status: 200 });
       if (code !== 200) return new Response('{}', { status: code });
       return new Response(JSON.stringify(status), { status: 200 });
@@ -41,16 +45,18 @@ describe('Settings', () => {
     expect(screen.getByText('359 days')).toBeInTheDocument();
     expect(screen.getByText('Good to Nov 3, 2027')).toBeInTheDocument();
     expect(screen.getByText('3f9c2ab')).toBeInTheDocument();
-    expect(screen.getByText('Idle')).toBeInTheDocument();
+    expect(await screen.findByText('Scheduler on')).toBeInTheDocument();
+    expect(screen.getByText('Daily numbers')).toBeInTheDocument();
   });
 
   it('flags a stale mirror, a token to renew and a running job', async () => {
-    serve(stale);
+    serve(stale, 200, busyJobs);
     page();
     expect(await screen.findByText('2 to look at')).toBeInTheDocument();
     expect(screen.getByText('Stale')).toBeInTheDocument();
     expect(screen.getByText('Renew soon')).toBeInTheDocument();
-    expect(screen.getByText('Mirror pull')).toBeInTheDocument();
+    expect(await screen.findByText('1 job running')).toBeInTheDocument();
+    expect(screen.getByText(/^Running since/)).toBeInTheDocument();
   });
 
   it('explains a failing pull and an expired token', async () => {

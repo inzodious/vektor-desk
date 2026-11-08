@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export class ApiError extends Error {
-  constructor(status, message) {
+  constructor(status, message, body = null) {
     super(message);
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -74,8 +75,8 @@ export async function postJson(path, body = {}, { method = 'POST' } = {}) {
   }
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    const msg = typeof data?.detail === 'string' ? data.detail : typeof data?.error === 'string' ? data.error : `The desk API answered ${res.status}.`;
-    throw new ApiError(res.status, msg);
+    const msg = typeof data?.detail === 'string' ? data.detail : typeof data?.message === 'string' ? data.message : typeof data?.error === 'string' ? data.error : `The desk API answered ${res.status}.`;
+    throw new ApiError(res.status, msg, data);
   }
   return data;
 }
