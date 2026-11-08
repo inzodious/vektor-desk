@@ -4,11 +4,11 @@ from datetime import UTC, datetime, timedelta
 from desk.config import Config
 from desk.db import connect
 from desk.engine.french import PORTFOLIO_FILES
-from desk.engine.lab.data import NotReady, ledger_path
+from desk.engine.lab.data import NotReady, data_path, ledger_path
 from desk.engine.lab.library import TRANSFORMS, catalog
 from desk.engine.lab.rulebook import RULES
 
-__all__ = ["NotReady", "desk_view", "eligible", "features", "grammar", "pending_reviews", "rules", "strategies"]
+__all__ = ["NotReady", "desk_view", "eligible", "features", "grammar", "pending_reviews", "rules", "strategies", "universe_ready"]
 
 REVIEW_DAYS = 14
 SPEC_FIELDS = (
@@ -52,6 +52,23 @@ def grammar() -> dict:
             "notes": "margin needs rate_pct as one number; every rule runs against deposits split pro rata with no selling; grid cap 12",
         },
     }
+
+
+READY_TABLES = {"small_caps": "smallcap", "french": "french", "fund_list": "bars", "screen": "bars"}
+
+
+def universe_ready(cfg: Config, kind: str) -> bool:
+    table = READY_TABLES.get(kind)
+    path = data_path(cfg)
+    if table is None or not path.exists():
+        return False
+    conn = connect(path, readonly=True)
+    try:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (table,)).fetchone() is None:
+            return False
+        return conn.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone() is not None
+    finally:
+        conn.close()
 
 
 def features(cfg: Config) -> list[dict]:

@@ -405,3 +405,18 @@ def test_finalize_shows_survivorship_in_the_verdict(cfg):
     assert body["bars"]["price_coverage"] is None and body["bars"]["delist_total_loss"] is False
     assert "trails the benchmark" in body["survivorship"]["note"]
     assert body["survivorship"]["clusters"] == 1 and body["survivorship"]["pending"] == 1 and "still loading" in body["caveats"][-1]
+
+
+def test_universe_ready_reads_the_lab_data(cfg):
+    from desk.engine import lab
+
+    assert lab.universe_ready(cfg, "small_caps") is False
+    conn, _ = lab_desk(cfg)
+    export(cfg, conn, {}, {})
+    assert lab.universe_ready(cfg, "small_caps") and lab.universe_ready(cfg, "fund_list")
+    assert lab.universe_ready(cfg, "french") is False and lab.universe_ready(cfg, "nope") is False
+    with conn:
+        conn.execute("DELETE FROM smallcap_months")
+    export(cfg, conn, {}, {})
+    assert lab.universe_ready(cfg, "small_caps") is False
+    conn.close()

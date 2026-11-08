@@ -475,7 +475,7 @@ Backtestable small-cap family: directors and officers buying their own stock on 
 | `insider.buyers` | Distinct insiders with a buy known in the window's sessions up to d |
 | `insider.buy_usd` | Dollars of those buys |
 
-A cluster rule is `{"metric_id": "insider.buyers", "window": "21d", "transform": "raw"}` with `{"min_signal": 1}` (two or more buyers). Names come from SEC filings, not today's listings, so companies that later vanished stay in; a delisted name sells at its last close less the lab's haircut. Before the first history load a `small_caps` spec is refused with "the engine's insider job builds it".
+A cluster rule is `{"metric_id": "insider.buyers", "window": "21d", "transform": "raw"}` with `{"min_signal": 1}` (two or more buyers). Names come from SEC filings, not today's listings, so companies that later vanished stay in; a delisted name sells at its last close less the lab's haircut. Before the first history load a `small_caps` spec is refused with "the engine's insider job builds it". `desk.engine.lab.universe_ready(cfg, kind)` answers the same question without a spec: true once the lab data holds rows for that universe (`small_caps`, `french`, `fund_list`, `screen`).
 
 **Survivorship.** Free bars can miss names that died. `lab-export` writes `insider.coverage(conn)` into the lab settings: cluster names that are priced, unpriced (history fetched but no bars within a week of the first cluster), still pending, and priced names that stopped trading within a year. Finalize on a `small_caps` spec adds two bars and a `survivorship` block with the counts:
 
