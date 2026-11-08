@@ -12,6 +12,7 @@ import { desksFixtures } from './desks.mjs';
 import { leaderboardFixtures } from './leaderboard.mjs';
 import { bandsFixtures } from './bands.mjs';
 import { discountsFixtures } from './discounts.mjs';
+import { convictionsFixtures, withEditable } from './convictions.mjs';
 import { withFilingSignals } from './filing-signals.mjs';
 
 const API = process.env.DESK_API || 'http://127.0.0.1:8000';
@@ -106,7 +107,7 @@ for (const [scope, id] of [
 }
 
 save('decisions.rules', await get('/api/decisions/rules'));
-for (const [name, body] of Object.entries(moneyInFixtures(await get('/api/decisions/profile'), await get('/api/decisions/deposits')))) save(name, body);
+for (const [name, body] of Object.entries(moneyInFixtures(withEditable(await get('/api/decisions/profile')), await get('/api/decisions/deposits')))) save(name, body);
 
 // ---------- decisions ----------
 const queue = await get('/api/decisions/queue');
@@ -225,6 +226,7 @@ for (const [name, body] of Object.entries(inboxFixtures())) save(name, body);
 
 // ---------- risk check ----------
 for (const [name, body] of Object.entries(riskFixtures(await get('/api/decisions/risk'), await get('/api/decisions/risk/versions')))) save(name, body);
+for (const [name, body] of Object.entries(convictionsFixtures(await get('/api/decisions/risk')))) save(name, body);
 
 // ---------- desk profile status ----------
 const profileStatus = await get('/api/decisions/profile/status');

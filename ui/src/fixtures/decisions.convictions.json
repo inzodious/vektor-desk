@@ -1,0 +1,32 @@
+{
+ "items": [
+  {
+   "rule_id": "conviction-acme",
+   "symbol": "ACME",
+   "band_min_pct": 0,
+   "band_max_pct": 10,
+   "note": "Long-term bet on the satellite build-out",
+   "enabled": true,
+   "weight_pct": 12.4,
+   "weight_as_of": "2026-11-09",
+   "status": "above"
+  },
+  {
+   "rule_id": "conviction-orbt",
+   "symbol": "ORBT",
+   "band_min_pct": 2,
+   "band_max_pct": 8,
+   "note": null,
+   "enabled": true,
+   "weight_pct": 5.1,
+   "weight_as_of": "2026-11-09",
+   "status": "inside"
+  }
+ ],
+ "suggested": {
+  "band_min_pct": 0,
+  "band_max_pct": 10,
+  "from_band": 4,
+  "label": "Moderately aggressive"
+ }
+}
