@@ -898,3 +898,53 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .job-more summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--teal-ink); width: fit-content; }
 .job-more[open] summary { margin-bottom: 4px; }
 @media (max-width: 1100px) { .job-list { grid-template-columns: minmax(0, 1fr); } }
+
+/* ---------- first-run guard ---------- */
+.guard { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 10px; border-radius: 14px; background: var(--mustard-soft); color: var(--ink); font-size: 13px; }
+.guard.off { background: var(--mint-soft); }
+.guard > svg { width: 18px; height: 18px; flex: none; color: var(--watch); }
+.guard.off > svg { color: var(--ok); }
+.guard p { margin: 0; flex: 1 1 260px; min-width: 0; }
+.guard .btn svg { width: 14px; height: 14px; }
+.guard-ask { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.guard-ask small { color: var(--ink-2); font-size: 12px; }
+.crew-tile.guarded { border-style: dashed; }
+.crew small.crew-src { color: var(--ink-2); font-weight: 600; }
+.crew-src .link { font-size: 11.5px; padding: 0; }
+
+/* ---------- leaderboard ---------- */
+.lb-lede { margin: 0 0 8px; font-size: 13.5px; }
+.lb-rows { display: grid; }
+.lb-row { display: grid; grid-template-columns: 34px minmax(0, 1fr) minmax(120px, auto); grid-template-areas: 'rank main edge' 'rank stats edge'; column-gap: 14px; row-gap: 2px; align-items: center; padding: 12px 4px; border-bottom: 1px dashed var(--line); }
+.lb-row:last-child { border-bottom: 0; }
+.lb-row.retired .lb-name b { color: var(--ink-2); }
+.lb-rank { grid-area: rank; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-family: var(--f-poster); font-size: 18px; line-height: 1; padding-top: 2px; background: var(--track); color: var(--ink-2); border: 2px solid var(--line-2); }
+.lb-rank.r1 { background: var(--mustard); color: #1a2426; border-color: var(--mustard-ink); }
+.lb-rank.r2 { background: var(--sky-soft); color: var(--ink); border-color: var(--sky); }
+.lb-rank.r3 { background: var(--coral-soft); color: var(--ink); border-color: var(--coral); }
+.lb-rank.out { background: transparent; border-style: dashed; color: var(--ink-2); }
+.lb-main { grid-area: main; display: grid; gap: 5px; min-width: 0; }
+.lb-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.lb-name b { color: var(--ink); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.lb-name a { display: flex; align-items: center; gap: 6px; min-width: 0; color: inherit; text-decoration: none; }
+.lb-name a:hover b { color: var(--teal-ink); text-decoration: underline; }
+.lb-main small, .lb-stats { font-size: 12px; color: var(--ink-3); }
+.lb-stats { grid-area: stats; }
+.lb-track { position: relative; height: 8px; border-radius: 999px; background: var(--track); margin-right: 14px; }
+.lb-track i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--teal); }
+.lb-track.done i { background: var(--mint); }
+.lb-track.out i { background: var(--ink-3); }
+.lb-track b { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 22px; height: 22px; border-radius: 50%; background: var(--card); border: 2px solid var(--teal); display: grid; place-items: center; color: var(--teal-ink); }
+.lb-track.done b { border-color: var(--ok); color: var(--ok); }
+.lb-track.out b { border-color: var(--ink-3); color: var(--ink-3); }
+.lb-track b svg { width: 12px; height: 12px; }
+.lb-edge { grid-area: edge; display: grid; justify-items: end; gap: 3px; text-align: right; }
+.lb-edge > b { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
+.lb-edge > b.up { color: var(--ok); }
+.lb-edge > b.dn { color: var(--watch); }
+.lb-edge > small { font-size: 11.5px; color: var(--ink-3); margin-top: -3px; }
+@media (max-width: 640px) {
+  .lb-row { grid-template-columns: 32px minmax(0, 1fr) auto; grid-template-areas: 'rank main edge' 'stats stats stats'; }
+  .lb-stats { padding-left: 46px; }
+  .lb-edge > b { font-size: 16px; }
+}

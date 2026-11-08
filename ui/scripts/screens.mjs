@@ -99,6 +99,12 @@ const SHOTS = [
   { name: 'settings-jobs-demo', path: '/settings', el: 'jobs' },
   { name: 'health-refresh', path: '/?scenario=fail', fixtures: true, clock: MONDAY, el: 'health-banner' },
   { name: 'health-refresh-warn', path: '/plan?scenario=warn', fixtures: true, clock: MONDAY, el: 'health-banner' },
+  { name: 'lab-leaderboard', path: '/lab/strategies', fixtures: true, clock: MONDAY, el: 'leaderboard' },
+  { name: 'lab-leaderboard-early', path: '/lab/strategies?scenario=early', fixtures: true, clock: MONDAY, el: 'leaderboard' },
+  { name: 'lab-leaderboard-empty', path: '/lab/strategies?scenario=empty', fixtures: true, clock: MONDAY, el: 'leaderboard' },
+  { name: 'settings-desks', path: '/settings', fixtures: true, clock: MONDAY, el: 'crew' },
+  { name: 'settings-desks-ask', path: '/settings', fixtures: true, clock: MONDAY, el: 'crew', act: async (p) => p.getByTestId('guard').getByRole('button', { name: 'Lift the guard' }).click() },
+  { name: 'settings-desks-lifted', path: '/settings?scenario=lifted', fixtures: true, clock: MONDAY, el: 'crew' },
 ];
 
 // ---------- contrast ----------

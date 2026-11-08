@@ -24,19 +24,98 @@ function useToggle(reload) {
       setBusy(null);
     }
   };
-  return { busy, err, flip };
+  const follow = async (desk) => {
+    setBusy(desk);
+    setErr(null);
+    try {
+      await postJson(`/api/agents/${encodeURIComponent(desk)}/enabled`, {}, { method: 'DELETE' });
+      reload();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const guard = async (enabled) => {
+    setBusy('guard');
+    setErr(null);
+    try {
+      await postJson('/api/agents/guard', { enabled }, { method: 'PUT' });
+      reload();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  return { busy, err, flip, follow, guard };
+}
+
+// ---------- first-run guard ----------
+function Guard({ guard, desks, busy, onSet }) {
+  const [ask, setAsk] = useState(false);
+  if (!guard) return null;
+  const names = (guard.allowed || []).map((n) => desks.find((d) => d.desk === n)?.title || n);
+  const held = desks.filter((d) => d.guarded && d.live).length;
+  if (!guard.on) {
+    return (
+      <div className="guard off" data-testid="guard" data-on="false">
+        <Icon name="flag" />
+        <p>
+          <b>Guard lifted.</b> Every desk that&apos;s on runs on its own schedule.
+        </p>
+        <button className="link" type="button" disabled={busy} onClick={() => onSet(true)}>
+          Put the guard back
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="guard" data-testid="guard" data-on="true">
+      <Icon name="shield" />
+      <p>
+        <b>Training wheels on.</b> Only {names.join(' and ')} run for now{held ? `; ${held} more ${held === 1 ? 'desk waits' : 'desks wait'} for the guard to lift` : ''}.
+      </p>
+      {ask ? (
+        <span className="guard-ask" role="group" aria-label="Lift the guard?">
+          <small data-testid="guard-why">{guard.ready === false && guard.why ? `Heads up: ${guard.why}. ` : ''}Every desk that&apos;s on starts on its schedule.</small>
+          <button
+            className="btn sm"
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              setAsk(false);
+              onSet(false);
+            }}
+          >
+            Lift it
+          </button>
+          <button className="btn ghost sm" type="button" onClick={() => setAsk(false)}>
+            Not yet
+          </button>
+        </span>
+      ) : (
+        <button className="btn sm" type="button" disabled={busy} onClick={() => setAsk(true)}>
+          <Icon name="bolt" />
+          Lift the guard
+        </button>
+      )}
+    </div>
+  );
 }
 
 // ---------- crew tiles ----------
-function Tile({ d, allOn, busy, onFlip, now }) {
+const SOURCE = { app: 'Set here', 'desk.yaml': 'From desk.yaml', default: 'Default' };
+
+function Tile({ d, allOn, busy, onFlip, onFollow, now }) {
   const key = DESK_KEY[d.desk] || 'plan';
   const run = d.last_run;
   const st = run ? RUN_STATUS[run.status] || { t: run.status, tone: '' } : null;
   const over = d.week.cap && d.week.runs > d.week.cap;
   const on = d.enabled && allOn;
-  const next = !d.live ? 'Not live yet' : !on ? 'Off' : d.next_run ? (Date.parse(d.next_run) <= now.getTime() ? 'Due now' : whenLabel(d.next_run, now)) : NEXT_NONE[d.desk] || 'On demand';
+  const next = !d.live ? 'Not live yet' : !on ? 'Off' : d.guarded ? 'When the guard lifts' : d.next_run ? (Date.parse(d.next_run) <= now.getTime() ? 'Due now' : whenLabel(d.next_run, now)) : NEXT_NONE[d.desk] || 'On demand';
   return (
-    <div className={`crew-tile${on ? '' : ' off'}`} data-desk={d.desk}>
+    <div className={`crew-tile${on ? '' : ' off'}${on && d.guarded ? ' guarded' : ''}`} data-desk={d.desk} data-guarded={d.guarded ? 'true' : undefined}>
       <span className="crew-top">
         <span className={`desk-ico ${key}`}>
           <Icon name={DESK_ICO[key] || 'compass'} />
@@ -56,6 +135,19 @@ function Tile({ d, allOn, busy, onFlip, now }) {
         {d.model} · {d.effort}
         {!d.live ? ' · not live' : ''}
       </small>
+      {d.source ? (
+        <small className="crew-src" data-source={d.source}>
+          {SOURCE[d.source] || d.source}
+          {d.source === 'app' && d.yaml != null && d.yaml !== d.app ? (
+            <>
+              {' · '}
+              <button className="link" type="button" disabled={busy} onClick={() => onFollow(d.desk)}>
+                Follow desk.yaml ({d.yaml ? 'on' : 'off'})
+              </button>
+            </>
+          ) : null}
+        </small>
+      ) : null}
       <small className="crew-runs">
         <span>
           Last: {run ? whenLabel(run.started_at, now) : 'Never'}
@@ -76,13 +168,13 @@ function Tile({ d, allOn, busy, onFlip, now }) {
 
 export function Crew({ status, reload }) {
   const now = useNow(60000);
-  const { busy, err, flip } = useToggle(reload);
+  const { busy, err, flip, follow, guard } = useToggle(reload);
   const data = Array.isArray(status.data?.desks) ? status.data : null;
   if (!data) {
     return (
       <div className="card c12" style={{ '--i': 5 }}>
         <div className="card-head">
-          <span className="tag mint">Crew</span>
+          <span className="tag mint">Desks</span>
         </div>
         <p className="empty-hint">{status.error ? "The crew didn't answer. The desks may not be set up on this NAS yet." : 'Reading the crew…'}</p>
       </div>
@@ -91,7 +183,7 @@ export function Crew({ status, reload }) {
   return (
     <div className="card c12" style={{ '--i': 5 }} data-testid="crew">
       <div className="card-head">
-        <span className="tag mint">Crew</span>
+        <span className="tag mint">Desks</span>
         <span className="acts">
           {data.busy ? <span className="chip info">A desk is running</span> : null}
           <span className="kill">
@@ -104,10 +196,12 @@ export function Crew({ status, reload }) {
         <p className="act-err" role="status">
           All desks are paused. Nothing runs, and the Console waits, until you switch them back on.
         </p>
-      ) : null}
+      ) : (
+        <Guard guard={data.guard} desks={data.desks} busy={busy === 'guard'} onSet={guard} />
+      )}
       <div className="crew">
         {data.desks.map((d) => (
-          <Tile key={d.desk} d={d} allOn={data.enabled} busy={busy === d.desk || busy === '*'} onFlip={flip} now={now} />
+          <Tile key={d.desk} d={d} allOn={data.enabled} busy={busy === d.desk || busy === '*'} onFlip={flip} onFollow={follow} now={now} />
         ))}
       </div>
       {err ? (

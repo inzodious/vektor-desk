@@ -1,0 +1,7 @@
+{
+ "as_of": null,
+ "benchmark": "IWM",
+ "gate_days": 182,
+ "note": "No strategies are paper trading yet. The filings lane starts the morning after the first filing is scored.",
+ "rows": []
+}

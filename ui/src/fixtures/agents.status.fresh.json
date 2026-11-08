@@ -16,7 +16,11 @@
     "turns": 0,
     "tokens": 0,
     "cap": 7
-   }
+   },
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": true,
+   "guarded": false
   },
   {
    "desk": "tax",
@@ -32,7 +36,11 @@
     "turns": 0,
     "tokens": 0,
     "cap": 8
-   }
+   },
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": true,
+   "guarded": false
   },
   {
    "desk": "risk",
@@ -48,7 +56,11 @@
     "turns": 0,
     "tokens": 0,
     "cap": 3
-   }
+   },
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": true,
+   "guarded": true
   },
   {
    "desk": "research",
@@ -64,7 +76,11 @@
     "turns": 0,
     "tokens": 0,
     "cap": 4
-   }
+   },
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": true,
+   "guarded": true
   },
   {
    "desk": "skeptic",
@@ -80,7 +96,11 @@
     "turns": 0,
     "tokens": 0,
     "cap": 10
-   }
+   },
+   "source": "default",
+   "app": null,
+   "yaml": null,
+   "guarded": true
   },
   {
    "desk": "scout",
@@ -96,7 +116,11 @@
     "turns": 0,
     "tokens": 0,
     "cap": 1
-   }
+   },
+   "source": "app",
+   "app": true,
+   "yaml": false,
+   "guarded": true
   },
   {
    "desk": "strategy",
@@ -112,7 +136,41 @@
     "turns": 0,
     "tokens": 0,
     "cap": 2
-   }
+   },
+   "source": "default",
+   "app": null,
+   "yaml": null,
+   "guarded": true
+  },
+  {
+   "desk": "filings",
+   "title": "Filings desk",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 7
+   },
+   "enabled": false,
+   "source": "app",
+   "app": true,
+   "yaml": null,
+   "guarded": true
   }
- ]
+ ],
+ "enabled_source": "default",
+ "guard": {
+  "on": true,
+  "allowed": [
+   "plan_keeper",
+   "tax"
+  ],
+  "ready": false,
+  "why": "Tax desk hasn’t finished a run yet"
+ }
 }

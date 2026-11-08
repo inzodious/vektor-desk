@@ -25,11 +25,11 @@ test('settings shows the crew, usage and run log', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/settings');
   const crew = page.getByTestId('crew');
-  await expect(crew.locator('.crew-tile')).toHaveCount(7);
+  await expect(crew.locator('.crew-tile')).toHaveCount(8);
   await expect(crew.locator('.crew-tile[data-desk="risk"]')).toContainText('Not ready yet');
   await expect(crew.locator('.crew-tile[data-desk="tax"]')).toContainText('Nothing new');
   await expect(crew.locator('.crew-tile[data-desk="plan_keeper"]')).toContainText('3 of 7 runs this week');
-  await expect(page.getByTestId('usage').getByRole('row')).toHaveCount(7);
+  await expect(page.getByTestId('usage').getByRole('row')).toHaveCount(8);
   await expect(page.getByTestId('run-log')).toContainText('Timed out');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
