@@ -900,6 +900,38 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .job-more summary { cursor: pointer; font-size: 12.5px; font-weight: 600; color: var(--teal-ink); width: fit-content; }
 .job-more[open] summary { margin-bottom: 4px; }
 @media (max-width: 1100px) { .job-list { grid-template-columns: minmax(0, 1fr); } }
+/* ---------- box ---------- */
+.box-hand { margin-bottom: 8px; }
+.box-hand > span { display: grid; gap: 8px; justify-items: start; min-width: 0; }
+.box-hand code { display: block; width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 10px; background: var(--board); color: var(--flap); font-size: 12px; word-break: break-all; }
+.box-script { display: grid; gap: 6px; padding: 10px 12px; margin-bottom: 6px; border-radius: 14px; background: var(--mustard-soft); color: var(--ink); }
+.box-script > span b { font-size: 13px; }
+.box-script > span small { display: block; font-size: 11.5px; color: var(--ink-2); }
+.box-script .job-row { border-bottom: 0; padding: 4px 0 0; }
+.box-script .box-hand { margin: 0; background: transparent; padding: 0; }
+.box-out { margin-top: 4px; }
+.box-out summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--teal-ink); width: fit-content; }
+.box-out pre { margin: 6px 0 0; max-height: 240px; overflow: auto; padding: 8px 10px; border-radius: 10px; background: var(--board); color: var(--flap); font: 500 11.5px/1.45 ui-monospace, 'SFMono-Regular', Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* ---------- inbox ---------- */
+.inbox-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.inbox-drop { position: relative; display: grid; justify-items: center; gap: 4px; padding: 26px 16px; border: 2px dashed var(--line); border-radius: 18px; background: var(--card-2); color: var(--ink-2); text-align: center; cursor: pointer; }
+.inbox-drop:hover, .inbox-drop.over { border-color: var(--teal); background: var(--teal-soft); }
+.inbox-drop:focus-within { outline: 2px solid var(--teal); outline-offset: 2px; }
+.inbox-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.inbox-drop svg { width: 26px; height: 26px; color: var(--teal-ink); }
+.inbox-drop b { color: var(--ink); font-size: 14px; }
+.inbox-drop small { font-size: 12px; }
+.inbox-side { display: grid; gap: 10px; min-width: 0; }
+.inbox-msg { margin: 0; font-size: 12.5px; overflow-wrap: anywhere; }
+.inbox-msg.done { color: var(--ok); font-weight: 600; }
+.inbox-msg.refused { color: var(--watch); font-weight: 600; }
+.inbox-msg.waiting { color: var(--ink-2); }
+.inbox-read { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.inbox-files { list-style: none; margin: 0; padding: 0; display: grid; }
+.inbox-files li { display: grid; padding: 7px 2px; border-bottom: 1px dashed var(--line); min-width: 0; }
+.inbox-files b { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.inbox-files small { font-size: 12px; color: var(--ink-2); }
+@media (max-width: 760px) { .inbox-grid { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- first-run guard ---------- */
 .guard { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; margin-bottom: 10px; border-radius: 14px; background: var(--mustard-soft); color: var(--ink); font-size: 13px; }

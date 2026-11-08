@@ -80,3 +80,15 @@ export async function postJson(path, body = {}, { method = 'POST' } = {}) {
   }
   return data;
 }
+
+export async function putFile(path, file) {
+  let res;
+  try {
+    res = await fetch(path, { method: 'PUT', headers: { Accept: 'application/json', 'Content-Type': file.type || 'application/octet-stream' }, body: file });
+  } catch {
+    throw new ApiError(0, "The desk API didn't answer. Try again in a moment.");
+  }
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new ApiError(res.status, typeof data?.message === 'string' ? data.message : `The desk API answered ${res.status}.`, data);
+  return data;
+}
