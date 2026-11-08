@@ -169,6 +169,7 @@ Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the 
 | Filings strategy family, forward paper only, 182-day graduation | Statistics | ✅ |
 | Alpaca paper executor (paper URL only) and keys | Statistics + Infra | ✅ |
 | Filings lane card in the Lab, filing chip on the Symbol sheet | Design | ⏳ Lab row done, Symbol chip next |
+| Insider-buying clusters and post-earnings drift families, backtested from 2016 with survivorship checks, then paper | Statistics | ✅ history loads over the first nights |
 | Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
 
 ## Next: No more SSH
