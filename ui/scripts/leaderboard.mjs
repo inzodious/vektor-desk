@@ -1,0 +1,20 @@
+const row = (r) => ({ version: 1, kind: 'strategy', as_of: '2026-11-06', open_positions: 0, ...r });
+
+// ---------- synthetic paper leaderboard until the engine serves real rows ----------
+export function leaderboardFixtures() {
+  const base = { as_of: '2026-11-06', benchmark: 'IWM', gate_days: 182, note: null };
+  const rows = [
+    row({ id: 'low-vol-sectors', name: 'Calm sectors', status: 'eligible', started: '2026-04-20', days_live: 200, days_to_eligible: 0, eligible_on: '2026-10-19', waiting_on: null, return_pct: 6.8, bench_return_pct: 3.1, excess_pts: 3.7, max_drawdown_pct: -4.2, trades: 18, open_positions: 3 }),
+    row({ id: 'filings-lane', kind: 'lane', name: 'Filings lane: buy small caps Claude scores +1 or better', status: 'paper', started: '2026-10-05', days_live: 32, days_to_eligible: 150, eligible_on: '2027-04-05', waiting_on: 'time', return_pct: 4.1, bench_return_pct: 1.2, excess_pts: 2.9, max_drawdown_pct: -3.4, trades: 3, open_positions: 1 }),
+    row({ id: 'sector-momentum', name: 'Sector momentum', status: 'paper', started: '2026-06-30', days_live: 129, days_to_eligible: 53, eligible_on: '2026-12-29', waiting_on: 'time', return_pct: 0.9, bench_return_pct: 5.2, excess_pts: -4.3, max_drawdown_pct: -5.0, trades: 23, open_positions: 4 }),
+    row({ id: 'dip-buyer', name: 'Buy the deepest dip', status: 'retired', started: '2026-05-01', days_live: 189, days_to_eligible: null, eligible_on: null, waiting_on: null, return_pct: -7.9, bench_return_pct: 2.0, excess_pts: -9.9, max_drawdown_pct: -14.2, trades: 31 }),
+  ];
+  const early = row({ id: 'filings-lane', kind: 'lane', name: 'Filings lane: buy small caps Claude scores +1 or better', status: 'paper', started: '2026-11-05', days_live: 2, days_to_eligible: 180, eligible_on: '2027-05-06', waiting_on: 'time', return_pct: null, bench_return_pct: null, excess_pts: null, max_drawdown_pct: null, trades: 1, open_positions: 1 });
+  const empty = { ...base, as_of: null, rows: [], note: 'No strategies are paper trading yet. The filings lane starts the morning after the first filing is scored.' };
+  return {
+    'engine.lab.leaderboard': { ...base, rows },
+    'engine.lab.leaderboard.early': { ...base, rows: [early] },
+    'engine.lab.leaderboard.empty': empty,
+    'engine.lab.leaderboard.fresh': empty,
+  };
+}

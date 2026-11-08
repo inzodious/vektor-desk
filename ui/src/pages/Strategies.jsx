@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
 import { LabHero } from '../lab/parts.jsx';
+import { Leaderboard } from '../lab/Leaderboard.jsx';
 import { useApi } from '../lib/api.js';
 import { plural } from '../lib/format.js';
 import { PAPER_DAYS, dayOf, RULE_WORD, STAGES, paperProgress, paramText, signedPts, splitStrategies, stageCounts, statusOf, verdictOf } from '../lib/strategy.js';
@@ -109,6 +110,7 @@ export default function Strategies() {
         </section>
       ) : (
         <>
+          <Leaderboard />
           <StageRail counts={counts} />
           <section className="grid">
             <div className="card c8 top" data-testid="strategies">
