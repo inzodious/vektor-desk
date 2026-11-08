@@ -88,5 +88,6 @@ test('settings and first run both lead to the risk check', async ({ page }) => {
   const step = page.getByTestId('first-run').locator('[data-step="risk"]');
   await expect(step).toHaveAttribute('data-state', 'todo');
   await step.getByRole('link', { name: 'Take it' }).click();
-  await expect(page.getByTestId('risk-quiz')).toBeVisible();
+  await expect(page).toHaveURL(/\/settings\/risk$/);
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Risk check');
 });
