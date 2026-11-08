@@ -33,7 +33,9 @@ Escape Vektor's `priceCloses` only refresh when Joshua opens it, so they can lag
 | Any day with a Tiingo bar | Tiingo's official close (it wins over the mirror) |
 | Any other day | The mirror's close, else the last close before it |
 | A snapshot day whose newest close predates its last trading day | The broker's own price (value ÷ shares), unless it equals an older close (a stale snapshot), then the newest close |
-| A symbol nothing prices (Empower plan codes) | The broker's snapshot price; backfill lists it under `unpriced`, not `errors` |
+| A symbol nothing prices (Empower plan codes) | The snapshot unit price, drawn in a straight line across trading days between two snapshots (flat after the last), `pro_forma`; backfill lists it under `unpriced`, not `errors` |
+
+**Stale snapshots.** A snapshot dates itself by the closes it carries. When at least 60% of its priced holdings match one older close date, it counts as that day's snapshot, so a sync that re-sends Wednesday's positions on Friday cannot undo Thursday's trades or invent a withdrawal. A snapshot that really was taken that day wins a tie.
 
 A held symbol is fetched from Tiingo unless the mirror already has a close for the last trading day. Weekends and holidays resolve to the last trading day.
 
@@ -281,7 +283,7 @@ Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamen
 | FI number, target date | Escape Vektor pref `fi`: `fiYearlySpend × fiMultiple`, birth date plus `fiTargetAge` |
 | Real or nominal | The same pref's `inflationAdjusted` and `inflation`; real paths deflate each month at that rate |
 | Start value | `value.market` (the desk's accounts only) |
-| Deposits | Your detected cash-in (external deposits and EFT/ACH transfers in) over the trailing 12 months ÷ 12, or ÷ the months since your first deposit when there are fewer; the view says "from your last N months of deposits". None seen: no deposits (caveat). The plan is not used |
+| Deposits | Your net external cash flow (deposits and transfers in, minus withdrawals and transfers out) over the trailing 12 months ÷ 12, or ÷ the months since your first deposit when there are fewer, floored at 0; the view says "from your last N months of deposits, net of withdrawals". None seen: no deposits (caveat). The plan is not used |
 | Mix and fees | Plan targets; bond funds (a known list, `DESK_BOND_FUNDS`, or a sleeve named bond or fixed income) earn the French T-bill rate, the rest the French US market; weighted expense ratios come off monthly |
 | History | `F-F_Research_Data_Factors` monthly (`mkt_rf_m`, `rf_m`, July 1926 on), fetched by the `french` job |
 

@@ -293,7 +293,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _research_metrics(out, desk, kinds)
     _flight_record(out, cfg, desk, tr, targets, kinds, now_rows)
     market = next((m[5] for m in out.metrics if m[0] == "value.market" and m[1] == "portfolio"), total)
-    cash_in = [(f["date"], f["amount"]) for f in flows if f["external_portfolio"] and f["amount"] > 0]
+    cash_in = [(f["date"], f["amount"]) for f in flows if f["external_portfolio"]]
     out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), fi.fi_prefs(current_rows(mirror, "prefs")), desk, market, cash_in)
     out.views["factors"] = fi.exposure(out, tr, desk, {s: w / 100 for s, w in symbol_weights(now_rows, total).items()})
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
@@ -805,20 +805,18 @@ def _history_check(h: broker.History | None) -> tuple[str, str, str]:
     info = broker.summary(h)
     span = f"{info['start']} to {info['end']}"
     detail = f"Fidelity history {span}: {info['rows']} rows over {', '.join(info['accounts'])}; {info['matched']} Escape Vektor rows replaced."
-    problems = []
     if h.kept:
         shown = ", ".join(
             f"{r.get('date')} {r.get('accountKey')} {r.get('kind')} {r.get('symbol') or 'cash'} {float(r.get('amount') or 0):+,.2f}" for r in h.kept[:3]
         )
-        problems.append(f"{len(h.kept)} Escape Vektor rows inside those dates have no broker match and are kept ({shown})")
-    if h.unmapped:
-        problems.append(f"no Escape Vektor account ends with the same 4 digits as {', '.join(h.unmapped)}")
-    if not problems:
+        detail += f" {len(h.kept)} Escape Vektor rows inside those dates had no broker match and are kept as they are ({shown})."
+    if not h.unmapped:
         return "history", "ok", detail
     return (
         "history",
         "warn",
-        f"{detail} But {'; '.join(problems)}. Fix: drop a fresh Fidelity history JSON in the inbox's fidelity folder and check the account names.",
+        f"{detail} But no Escape Vektor account ends with the same 4 digits as {', '.join(h.unmapped)}. "
+        "Fix: check the account names in Escape Vektor, then drop the Fidelity history JSON in the inbox's fidelity folder again.",
     )
 
 
@@ -843,7 +841,7 @@ def _modelled_check(out: Out, lots: list[dict], rows: list[dict]) -> tuple[str, 
     return "shares", "warn", f"{head}: {body}. Fix: drop a lot export CSV in the inbox's fidelity folder; it wins over the rebuilt lots."
 
 
-def _flows_check(implied: dict[tuple[str, str], float], holdings) -> tuple[str, str, str]:
+def _flows_check(implied: dict[tuple[str, str], float], holdings, cover: dict[str, tuple[str, str]] | None = None) -> tuple[str, str, str]:
     snaps = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
     if not snaps:
         return "flows", "ok", "No snapshots yet."
@@ -852,6 +850,15 @@ def _flows_check(implied: dict[tuple[str, str], float], holdings) -> tuple[str, 
     if not mine:
         return "flows", "ok", f"The {last} snapshot matches prices plus recorded activity."
     parts = "; ".join(f"{a} {v:+,.2f}" for a, v in sorted(mine.items()))
+    covered = sorted(a for a in mine if a in (cover or {}) and cover[a][0] <= last <= cover[a][1])
+    if covered:
+        return (
+            "flows",
+            "warn",
+            f"The {last} snapshot moved {parts} beyond prices and recorded activity, and Fidelity history covers {', '.join(covered)} on that day, "
+            "so the gap is a missing or misread row, not unlogged money. Counted as money in or out for now. "
+            "Fix: drop a fresh Fidelity history JSON in the inbox's fidelity folder; if it stays, send the account and date to the statistics thread.",
+        )
     return (
         "flows",
         "ok",
@@ -887,7 +894,7 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
     as_of = out.as_of
     rows = holdings[as_of]
     out.h(*_closes_check(desk, rows, as_of))
-    out.h(*_flows_check(out.implied, holdings))
+    out.h(*_flows_check(out.implied, holdings, out.history.cover if out.history else None))
     snap_days = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
     if snap_days:
         out.h(*_value_check(holdings[max(snap_days)], max(snap_days), price_series(mirror, desk)))

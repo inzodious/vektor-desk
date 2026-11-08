@@ -1,8 +1,8 @@
 import sqlite3
 from bisect import bisect_right
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from desk.engine import broker
 from desk.engine.market import last_trading_day
@@ -10,6 +10,8 @@ from desk.engine.source import SnapshotVersion, closes, snapshot_versions
 
 SHARE_KINDS = {"buy", "sell", "reinvest"}
 CORPORATE_KINDS = {"split", "distribution"}
+STALE_MIN_ROWS = 1
+STALE_SHARE = 0.6
 CASH_SYMBOLS = {"SPAXX", "FDRXX", "FCASH", "CORE", "CASH", "FZFXX", "SPRXX"}
 
 
@@ -64,7 +66,25 @@ def aggregate(positions: list[dict]) -> dict[tuple[str, str], dict]:
     return out
 
 
-def anchors(versions: dict[str, SnapshotVersion]) -> tuple[list[Anchor], list[tuple]]:
+def price_date(rows: dict[tuple[str, str], dict], day: str, prices: "Prices | None") -> str:
+    if prices is None:
+        return day
+    after = (date.fromisoformat(day) + timedelta(days=1)).isoformat()
+    found, priced = [], 0
+    for (_, sym), h in rows.items():
+        if h["is_cash"] or not h["shares"] or not h["value"] or not prices.dates.get(sym):
+            continue
+        priced += 1
+        hit = prices.older_match(sym, h["value"] / h["shares"], after)
+        if hit is not None:
+            found.append(hit)
+    if not found:
+        return day
+    top, n = Counter(found).most_common(1)[0]
+    return top if top < day and n >= max(STALE_MIN_ROWS, priced * STALE_SHARE) else day
+
+
+def anchors(versions: dict[str, SnapshotVersion], prices: "Prices | None" = None) -> tuple[list[Anchor], list[tuple]]:
     by_date: dict[str, Anchor] = {}
     records = []
     for v in versions.values():
@@ -94,9 +114,11 @@ def anchors(versions: dict[str, SnapshotVersion]) -> tuple[list[Anchor], list[tu
         )
         if not rows:
             continue
-        a = Anchor(v.snapshot_id, as_of, as_of[:10], rows, quality)
+        day = price_date(rows, as_of[:10], prices)
+        records[-1][2] = day
+        a = Anchor(v.snapshot_id, as_of, day, rows, quality)
         cur = by_date.get(a.date)
-        if cur is None or (a.as_of, a.snapshot_id) > (cur.as_of, cur.snapshot_id):
+        if cur is None or (a.as_of[:10] == a.date, a.as_of, a.snapshot_id) > (cur.as_of[:10] == cur.date, cur.as_of, cur.snapshot_id):
             by_date[a.date] = a
     picked = {a.snapshot_id for a in by_date.values()}
     for r in records:
@@ -213,10 +235,33 @@ def _anchor_price(a: Anchor, symbol: str) -> float | None:
     return None
 
 
+def unit_prices(anchor_list: list[Anchor]) -> dict[str, list[tuple[str, float]]]:
+    out: dict[str, dict[str, float]] = {}
+    for a in anchor_list:
+        for (_, sym), h in a.rows.items():
+            if not h["is_cash"] and h["shares"] and h["value"]:
+                out.setdefault(sym, {})[a.date] = h["value"] / h["shares"]
+    return {s: sorted(ds.items()) for s, ds in out.items()}
+
+
+def between(units: list[tuple[str, float]] | None, day: str, index: dict[str, int]) -> float | None:
+    if not units:
+        return None
+    i = bisect_right([d for d, _ in units], day)
+    if i == 0 or i == len(units):
+        return None
+    (d0, p0), (d1, p1) = units[i - 1], units[i]
+    if d0 not in index or d1 not in index or d0 == day:
+        return None
+    return p0 + (p1 - p0) * (index[day] - index[d0]) / (index[d1] - index[d0])
+
+
 def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str, list[dict]], days: list[str]) -> list[tuple]:
     out = []
     anchor_dates = [a.date for a in anchor_list]
     act_dates = sorted(activity)
+    units = unit_prices(anchor_list)
+    index = {d: i for i, d in enumerate(days)}
     for day in days:
         a = anchor_list[bisect_right(anchor_dates, day) - 1]
         held = {k: dict(v) for k, v in a.rows.items()}
@@ -239,7 +284,7 @@ def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str,
                 if source == "snapshot" and implied is not None and lagging and not prices.older_match(symbol, implied, found[0]):
                     close = implied
                 elif close is None:
-                    close = implied
+                    close = between(units.get(symbol), day, index) or implied
                     row_quality = "pro_forma" if quality in ("ok", "trimmed") else quality
                 value = round(h["shares"] * close, 2) if close is not None else round(h["value"], 2)
             if abs(h["shares"]) < 1e-9 and abs(value) < 0.005:
@@ -251,10 +296,10 @@ def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str,
 
 def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: str | None = None) -> dict:
     versions = snapshot_versions(mirror)
-    anchor_list, records = anchors(versions)
     series = closes(mirror)
     bars = bar_series(desk)
     prices = Prices(merge(series, bars))
+    anchor_list, records = anchors(versions, prices)
     activity = activity_by_date(broker.activity(mirror, desk))
     days = build_days(anchor_list, prices, through)
     rows = holdings_rows(anchor_list, prices, activity, days)
