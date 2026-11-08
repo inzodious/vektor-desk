@@ -242,3 +242,55 @@ def test_core_tax_metrics_and_wash_calendar(cfg, mirror, app_client):
 def test_no_deposit_is_predicted_from_the_plan_alone(cfg, mirror):
     seed(mirror)
     assert core.next_deposit(cfg, core.latest_plan(open_mirror(cfg)), "2026-11-04", NOW) == (None, None)
+
+
+# ---- Conviction holds ----
+
+
+CONVICTION = [
+    {"id": "no-margin-buys", "kind": "no_margin_buys", "params": {}, "enabled": True},
+    {"id": "no-new-single-stocks", "kind": "no_new_single_stocks", "params": {}, "enabled": True},
+    {"id": "single-stock-band", "kind": "single_stock_band", "params": {"min_pct": 0, "max_pct": 5}, "enabled": True},
+    {"id": "acme-hold", "kind": "conviction_hold", "symbols": ["acme"], "params": {"band_min_pct": 5, "band_max_pct": 20}, "enabled": True},
+]
+
+
+@pytest.fixture
+def conviction(monkeypatch):
+    monkeypatch.setattr("desk.engine.preflight.rules_in_force", lambda cfg, plan: (CONVICTION, "profile"))
+    monkeypatch.setattr("desk.engine.core.rules_in_force", lambda cfg, plan: (CONVICTION, "profile"))
+
+
+def test_convictions_read_enabled_holds():
+    assert core.convictions(CONVICTION) == {"ACME": (5.0, 20.0)}
+    assert core.convictions([CONVICTION[3] | {"enabled": False}]) == {}
+
+
+def test_a_conviction_hold_is_exempt_from_the_single_stock_band(cfg, mirror, conviction):
+    seed(mirror)
+    run_holdings(cfg)
+    lamps = lights(check_trade(cfg, {"kind": "buy", "symbol": "ACME", "amount_usd": 50, "funding": "cash"}, now=NOW))
+    assert lamps["concentration"]["status"] == "ok" and "inside its 5–20% conviction band" in lamps["concentration"]["detail"]
+    assert lamps["plan_rules"]["status"] == "ok"
+
+
+def test_a_conviction_buy_past_its_band_or_on_margin_is_blocked(cfg, mirror, conviction):
+    seed(mirror)
+    run_holdings(cfg)
+    big = check_trade(cfg, {"kind": "buy", "symbol": "ACME", "amount_usd": 280, "funding": "cash"}, now=NOW)
+    lamps = lights(big)
+    assert lamps["concentration"]["status"] == "act" and "past its 20% conviction band" in lamps["concentration"]["detail"]
+    assert "acme-hold" in lamps["plan_rules"]["detail"] and big["status"] == "blocked"
+    margin = lights(check_trade(cfg, {"kind": "buy", "symbol": "ACME", "amount_usd": 20, "funding": "margin"}, now=NOW))
+    assert margin["concentration"]["status"] == "act" and "never bought on margin" in margin["concentration"]["detail"]
+    assert margin["plan_rules"]["status"] == "act" and "acme-hold" in margin["plan_rules"]["detail"]
+
+
+def test_core_scores_the_hold_and_skips_it_in_the_band(cfg, mirror, conviction):
+    from tests.engine.test_core import computed
+
+    seed(mirror)
+    _, m = computed(cfg)
+    assert m[("plan.rules", "rule", "acme-hold", "now")]["value"] == 1
+    assert m[("plan.rules", "rule", "single-stock-band", "now")]["value"] == 1
+    assert m[("plan.single_stock", "holding", "ACME", "now")]["value"] == pytest.approx(13.3333, abs=1e-3)
