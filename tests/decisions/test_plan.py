@@ -62,12 +62,14 @@ def test_upcoming_deposits_mark_landed_late_and_expected(scheduled, mirror):
     assert got == [
         ("payday", "2026-11-06", "landed"),
         ("hsa", "2026-11-13", "landed"),
+        ("money-in-small", "2026-11-20", "landed"),
         ("payday", "2026-11-20", "expected"),
         ("hsa", "2026-12-01", "expected"),
         ("payday", "2026-12-04", "expected"),
     ]
     assert items[0]["landed"]["activity_id"] == "eft"
-    assert [d["id"] for d in deposits_landed(scheduled, since="2026-11-10", now=NOW)] == ["hsa"]
+    assert [d["id"] for d in deposits_landed(scheduled, since="2026-11-10", now=NOW)] == ["hsa", "money-in-small"]
+    assert [d["scheduled"] for d in items[:3]] == [True, True, False] and {d["mode"] for d in items} == {"listed"}
 
 
 def test_missed_deposit_reads_late(scheduled, mirror):

@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from desk.config import Config
+from desk.decisions.detect import schedule as detect_schedule
 from desk.decisions.profile import active_profile
 from desk.decisions.records import DecisionError, _account_ok
 from desk.decisions.store import has_mirror, loads, now_iso, session
@@ -14,6 +15,9 @@ CADENCES = ("weekly", "biweekly", "semimonthly", "monthly")
 LAND_WINDOW_DAYS = 3
 LAND_TOLERANCE = 0.25
 LOOKBACK_DAYS = 14
+AUTO = "auto"
+AUTO_WINDOW_DAYS = 180
+MIN_LATE_OBS = 3
 CASH_IN_WORDS = re.compile(r"TRANSFER|\bEFT\b|\bACH\b|ELECTRONIC|DEPOSIT|CONTRIB|RECEIVED|WIRE", re.I)
 CASH_OUT_WORDS = re.compile(r"JOURNAL|TRANSFERRED TO|\bPAID\b|WITHDRAW|DEBIT|DISTRIBUTION", re.I)
 
@@ -23,8 +27,10 @@ CASH_OUT_WORDS = re.compile(r"JOURNAL|TRANSFERRED TO|\bPAID\b|WITHDRAW|DEBIT|DIS
 
 def validate_deposits(deposits) -> tuple[list[str], list[str]]:
     errors: list[str] = []
+    if deposits == AUTO:
+        return [], []
     if not isinstance(deposits, list):
-        return ["deposits must be a list"], []
+        return ["deposits must be auto or a list"], []
     seen: set[str] = set()
     for i, d in enumerate(deposits):
         where = f"deposits[{i}]"
@@ -132,7 +138,15 @@ def cash_in(rows) -> list[dict]:
         )
         if not twin:
             kept.append(x)
-    return sorted(kept, key=lambda x: (x["date"], x["accountKey"]))
+    days: dict[tuple[str, str], dict] = {}
+    for x in kept:
+        same = days.get((x["accountKey"], x["date"]))
+        if same is None:
+            days[(x["accountKey"], x["date"])] = x | {"activity_ids": [x["activity_id"]]}
+        else:
+            same["amount"] = round(same["amount"] + x["amount"], 2)
+            same["activity_ids"].append(x["activity_id"])
+    return sorted(days.values(), key=lambda x: (x["date"], x["accountKey"]))
 
 
 def mirror_deposits(conn, since: str) -> list[dict]:
@@ -157,15 +171,25 @@ def _today(cfg: Config, now: datetime | None) -> date:
     return (now or datetime.now(UTC)).astimezone(ZoneInfo(cfg.timezone)).date()
 
 
+def deposit_series(cfg: Config, *, now: datetime | None = None) -> tuple[str, list[dict]]:
+    listed = active_profile(cfg).get("deposits", default=AUTO)
+    if listed != AUTO:
+        return "listed", list(listed or [])
+    today = _today(cfg, now)
+    with session(cfg) as conn:
+        seen = mirror_deposits(conn, (today - timedelta(days=AUTO_WINDOW_DAYS)).isoformat())
+    return AUTO, detect_schedule(seen, today)
+
+
 def upcoming_deposits(cfg: Config, days: int = 60, *, now: datetime | None = None) -> list[dict]:
     today = _today(cfg, now)
     start, end = today - timedelta(days=LOOKBACK_DAYS), today + timedelta(days=days)
-    schedule = active_profile(cfg).get("deposits", default=[]) or []
+    mode, plan = deposit_series(cfg, now=now)
     with session(cfg) as conn:
         seen = mirror_deposits(conn, (start - timedelta(days=LAND_WINDOW_DAYS)).isoformat())
     taken: set[str] = set()
     out = []
-    expected = sorted(((day, d) for d in schedule for day in schedule_dates(d, start, end)), key=lambda x: (x[0], x[1]["id"]))
+    expected = sorted(((day, d) for d in plan for day in schedule_dates(d, start, end)), key=lambda x: (x[0], x[1]["id"]))
     for day, d in expected:
         amount = d.get("amount_usd")
         hit = None
@@ -181,9 +205,18 @@ def upcoming_deposits(cfg: Config, days: int = 60, *, now: datetime | None = Non
                 hit = a
         if hit:
             taken.add(hit["activity_id"])
-        status = "landed" if hit else "late" if day < today - timedelta(days=LAND_WINDOW_DAYS) else "expected"
-        out.append({"id": d["id"], "date": day.isoformat(), "account": d.get("account"), "amount_usd": amount, "status": status, "landed": hit})
-    return out
+        overdue = day < today - timedelta(days=LAND_WINDOW_DAYS)
+        if not hit and overdue and mode == AUTO and (d.get("observed") or 0) < MIN_LATE_OBS:
+            continue
+        status = "landed" if hit else "late" if overdue else "expected"
+        item = {"id": d["id"], "date": day.isoformat(), "account": d.get("account"), "amount_usd": amount, "status": status}
+        out.append(item | {"landed": hit, "scheduled": True, "mode": mode})
+    for a in seen:
+        if a["activity_id"] in taken or not start.isoformat() <= a["date"] <= today.isoformat():
+            continue
+        item = {"id": f"money-in-{a['activity_id']}", "date": a["date"], "account": a["accountKey"], "amount_usd": a["amount"], "status": "landed"}
+        out.append(item | {"landed": a, "scheduled": False, "mode": mode})
+    return sorted(out, key=lambda x: (x["date"], x["id"]))
 
 
 def deposits_landed(cfg: Config, since: str | None = None, *, now: datetime | None = None) -> list[dict]:
@@ -233,7 +266,7 @@ def calendar_events(cfg: Config, since: str | None = None, until: str | None = N
     profile = active_profile(cfg)
     events = [e for y in range(start.year, end.year + 1) for e in fixed_events(profile, y) if start.isoformat() <= e["date"] <= end.isoformat()]
     events += [
-        {"date": d["date"], "kind": "deposit", "title": f"Deposit: {d['id']}", "source": "desk", "status": d["status"]}
+        {"date": d["date"], "kind": "deposit", "title": f"Deposit: {d['id']}" if d["scheduled"] else "Money in", "source": "desk", "status": d["status"]}
         for d in _deposit_window(cfg, start, end, now)
     ]
     with session(cfg) as conn:

@@ -29,7 +29,10 @@ def fresh(body) -> JSONResponse:
 
 @router.get("/profile")
 def get_profile(cfg: Cfg) -> JSONResponse:
-    return fresh(profiles.active_profile(cfg).as_dict())
+    body = profiles.active_profile(cfg).as_dict()
+    mode, series = plan.deposit_series(cfg)
+    body["profile"] = {**body["profile"], "deposits": series}
+    return fresh(body | {"deposits_mode": mode})
 
 
 @router.get("/profile/status")

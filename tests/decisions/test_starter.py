@@ -52,9 +52,7 @@ def test_init_from_demo_mirror_writes_a_valid_draft_once(demo_cfg):
     assert path == demo_cfg.data_dir / "desk.yaml" and path.read_text() == text
     data, warnings = parse(text)
     assert warnings == []
-    assert {d["account"] for d in data["deposits"]} == {"individual-0001", "hsa-0002"}
-    assert all(d["cadence"] == "monthly" and d["days"] == [1] for d in data["deposits"])
-    assert sorted(d["amount_usd"] for d in data["deposits"]) == [100, 500]
+    assert data["deposits"] == "auto" and "# - Deposits: auto, read live from your activity at each sync" in text
     assert data["tax"]["wash_sale_accounts"] == ["hsa-0002", "individual-0001"]
     assert data["tax"]["lot_method"] == "highest_cost"
     assert data["agents"]["enabled"] is False and data["agents"]["desks"]["plan_keeper"] is True
@@ -73,9 +71,9 @@ def test_status_lists_what_is_still_default(demo_cfg):
     init(demo_cfg, today=TODAY)
     after = status(demo_cfg)
     assert after["exists"] is True and after["starter"] is None and after["error"] is None
-    assert {"deposits", "tax.wash_sale_accounts", "industry_focus.themes", "agents.desks"} <= set(after["set"])
+    assert {"tax.wash_sale_accounts", "industry_focus.themes", "agents.desks"} <= set(after["set"]) and "deposits" in after["defaults"]
     assert {"risk_level", "agents.enabled", "tax.harvest_threshold_usd", "opportunity.satellite_cap_pct"} <= set(after["defaults"])
-    assert after["agents_enabled"] is False and after["desks_on"] == [] and after["deposits"] == 2
+    assert after["agents_enabled"] is False and after["desks_on"] == [] and after["deposits_mode"] == "auto"
 
 
 def test_falls_back_to_pay_dates_and_plan_amount(cfg):
@@ -83,7 +81,7 @@ def test_falls_back_to_pay_dates_and_plan_amount(cfg):
     plan = {"funds": [{"ticker": "AAAA", "sleeve": "core", "target_weight": 1}], "monthly_plan": [{"month": "2026-12", "contribution": 1000}]}
     snap = {"id": 9, "asOf": "2026-11-19T16:00", "accounts": [{"key": "hsa-1", "kind": "hsa"}, {"key": "brokerage-2", "kind": "individual"}]}
     _mirror(cfg, [*stubs, ("plans", {"id": 1, "plan": plan, "loadedAt": "2026-10-01"}), ("snapshots", snap)])
-    _, text = init(cfg, dry_run=True, today=TODAY)
+    text = starter.deposits_block(cfg, today=TODAY)
     data, _ = parse(text)
     assert data["deposits"] == [{"id": "payday", "account": "brokerage-2", "cadence": "biweekly", "anchor": "2026-11-06", "amount_usd": 462}]
     assert "pay dates from paystubs, amount from the plan" in text
@@ -93,7 +91,7 @@ def test_falls_back_to_pay_dates_and_plan_amount(cfg):
 def test_payroll_transactions_when_no_paystubs(cfg):
     pay = [("transactions", {"date": d.isoformat(), "kind": "income", "category": "Paycheck", "amount": 1}) for d in _every(date(2026, 8, 7), 7, 8)]
     _mirror(cfg, [*pay, ("snapshots", {"id": 1, "asOf": "2026-11-19", "accounts": [{"key": "joint-3", "kind": "joint"}]})])
-    data, _ = parse(init(cfg, dry_run=True, today=TODAY)[1])
+    data, _ = parse(starter.deposits_block(cfg, today=TODAY))
     assert data["deposits"][0]["cadence"] == "weekly" and "amount_usd" not in data["deposits"][0]
 
 
@@ -102,7 +100,8 @@ def test_empty_mirror_still_drafts_and_no_mirror_refuses(cfg):
         init(cfg, today=TODAY)
     _mirror(cfg, [])
     _, text = init(cfg, dry_run=True, today=TODAY)
-    assert "add deposits by hand" in text and "rules stay at the defaults" in text
+    assert "Deposits: auto" in text and "rules stay at the defaults" in text
+    assert "add deposits by hand" in starter.deposits_block(cfg, today=TODAY)
     parse(text)
 
 
@@ -173,7 +172,7 @@ def test_monthly_transfer_found_among_one_offs_and_csv_sync_twins(cfg):
     csv = [_act(d, "individual-0100", "deposit", "Electronic Funds Transfer Received (Cash)", 3000) for d in MONTHLY]
     sync = [_act(d + timedelta(days=1), "individual-0100", "deposit", "ELECTRONIC FUNDS TRANSFER RECEIVED", 3000, source="sync") for d in MONTHLY]
     _brokerage_shape(cfg, [*csv, *sync])
-    data, _ = parse(init(cfg, dry_run=True, today=TODAY)[1])
+    data, _ = parse(starter.deposits_block(cfg, today=TODAY))
     assert data["deposits"] == EXPECTED
 
 
@@ -187,7 +186,7 @@ def test_monthly_transfer_coded_as_transfer_or_other_still_counts(cfg):
         _act(date(2026, 10, 21), "individual-0100", "transfer", "TRANSFER OF ASSETS", 3000, symbol="AAAA"),
     ]
     _brokerage_shape(cfg, [*rows, *noise])
-    _, text = init(cfg, dry_run=True, today=TODAY)
+    text = starter.deposits_block(cfg, today=TODAY)
     data, _ = parse(text)
     assert data["deposits"] == EXPECTED
     assert "individual-0100: 5 one-off deposits left out" in text
@@ -196,7 +195,7 @@ def test_monthly_transfer_coded_as_transfer_or_other_still_counts(cfg):
 def test_stopped_schedule_is_left_out_and_explained(cfg):
     old = [_act(d, "individual-0100", "deposit", "EFT RECEIVED", 3000) for d in MONTHLY[:4]]
     _brokerage_shape(cfg, old)
-    _, text = init(cfg, dry_run=True, today=TODAY)
+    text = starter.deposits_block(cfg, today=TODAY)
     data, _ = parse(text)
     assert data["deposits"] == EXPECTED[:1]
     assert "individual-0100: 1 schedule(s) with no deposit in 45 days left out" in text
@@ -220,4 +219,4 @@ def test_init_deposits_prints_a_block_without_touching_desk_yaml(cfg, monkeypatc
     assert path.read_text() == "risk_level: 2\n"
     data, _ = parse(out)
     assert data["deposits"] == EXPECTED
-    assert "lists 0 now" in out and "replace its deposits: section" in out
+    assert "uses deposits: auto" in out

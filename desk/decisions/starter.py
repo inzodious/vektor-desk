@@ -1,30 +1,35 @@
 import copy
 import json
+import shutil
 import sqlite3
 import statistics
 from collections import Counter
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import yaml
 
 from desk.config import Config
 from desk.db import connect
-from desk.decisions.plan import cash_in
+from desk.decisions.detect import STALE_DAYS, cadence, series, slug
+from desk.decisions.plan import cash_in, deposit_series
 from desk.decisions.profile import DEFAULTS, ProfileError, active_profile, parse, profile_path
 
 WINDOW_DAYS = 180
-SERIES_TOLERANCE = 0.05
-MIN_SERIES = 3
-STALE_DAYS = 45
 PAYS_PER_MONTH = {"weekly": 52 / 12, "biweekly": 26 / 12, "semimonthly": 2, "monthly": 1}
 STARTER_DESKS = ("plan_keeper", "tax", "risk", "skeptic")
 BROKERAGE_KINDS = ("individual", "brokerage", "joint")
 STARTER_RUNS = {"plan_keeper": 10}
+HEADER = "# Vektor Desk profile, drafted from the mirror"
 
 
 class StarterError(Exception):
     pass
+
+
+def _local_today(cfg: Config) -> date:
+    return datetime.now(ZoneInfo(cfg.timezone)).date()
 
 
 # ---- Reading the mirror ----
@@ -77,31 +82,6 @@ def accounts(conn: sqlite3.Connection) -> list[dict]:
 # ---- Cadence ----
 
 
-def cadence(days: list[date]) -> dict | None:
-    days = sorted(set(days))
-    if len(days) < 3:
-        return None
-    gaps = [(b - a).days for a, b in zip(days, days[1:], strict=False)]
-    med = statistics.median(gaps)
-    weekend = "after" if sum(d.weekday() == 0 for d in days) > sum(d.weekday() == 4 for d in days) else "before"
-    if 5 <= med <= 9:
-        return {"cadence": "weekly", "anchor": days[-1].isoformat()}
-    if 12 <= med <= 16:
-        steady = sum(13 <= g <= 15 for g in gaps) / len(gaps)
-        weekday_share = Counter(d.weekday() for d in days).most_common(1)[0][1] / len(days)
-        if steady >= 0.7 and weekday_share >= 0.7:
-            return {"cadence": "biweekly", "anchor": days[-1].isoformat()}
-        low = [d.day for d in days if d.day <= 15]
-        high = [d.day for d in days if d.day > 15]
-        if low and high:
-            pick = [Counter(low).most_common(1)[0][0], Counter(high).most_common(1)[0][0]]
-            return {"cadence": "semimonthly", "days": pick, "weekend": weekend}
-        return None
-    if 26 <= med <= 35:
-        return {"cadence": "monthly", "days": [Counter(d.day for d in days).most_common(1)[0][0]], "weekend": weekend}
-    return None
-
-
 def _activity(conn: sqlite3.Connection, since: date) -> list[tuple[str, dict]]:
     try:
         cursor = conn.execute("SELECT id, json FROM rows WHERE tbl='activity'")
@@ -116,37 +96,6 @@ def _activity(conn: sqlite3.Connection, since: date) -> list[tuple[str, dict]]:
         if isinstance(a, dict) and (d := _day(a.get("date"))) is not None and d >= since:
             out.append((r["id"], a))
     return out
-
-
-def _groups(items: list[tuple[date, float]]) -> list[list[tuple[date, float]]]:
-    groups: list[list[tuple[date, float]]] = []
-    for d, amount in sorted(items, key=lambda x: (x[1], x[0])):
-        if groups and amount <= groups[-1][0][1] * (1 + SERIES_TOLERANCE):
-            groups[-1].append((d, amount))
-        else:
-            groups.append([(d, amount)])
-    return groups
-
-
-def series(items: list[tuple[date, float]], today: date) -> tuple[list[dict], int, int]:
-    found, used, stale = [], 0, 0
-    for g in sorted(_groups(items), key=len, reverse=True):
-        if len(g) < MIN_SERIES:
-            continue
-        hit = cadence([d for d, _ in g])
-        if hit is None:
-            continue
-        if (today - max(d for d, _ in g)).days > STALE_DAYS:
-            stale += 1
-            continue
-        found.append({**hit, "amount_usd": round(statistics.median(a for _, a in g)), "_n": len(g)})
-        used += len(g)
-    if not found and not stale:
-        hit = cadence([d for d, _ in items])
-        if hit is not None:
-            found.append({**hit, "amount_usd": round(statistics.median(a for _, a in items)), "_n": len(items)})
-            used = len(items)
-    return sorted(found, key=lambda x: -x["amount_usd"]), len(items) - used, stale
 
 
 def _inbound_hint(rows: list[tuple[str, dict]], key: str) -> str:
@@ -170,8 +119,9 @@ def deposit_schedule(conn: sqlite3.Connection, plan: dict, accts: list[dict], to
         items = by_account[key]
         found, loose, stale = series(items, today)
         for hit in found:
-            n = hit.pop("_n")
-            out.append({"id": _slug(key, out), "account": key, **hit})
+            n = hit.pop("observed")
+            hit.pop("last")
+            out.append({"id": slug(key, out), "account": key, **hit})
             notes.append(f"{key}: {hit['cadence']} from {n} deposits since {since.isoformat()}")
         if loose:
             notes.append(f"{key}: {loose} one-off deposits left out")
@@ -197,7 +147,7 @@ def deposit_schedule(conn: sqlite3.Connection, plan: dict, accts: list[dict], to
     found = cadence(pay)
     target = min(brokerage) if brokerage else (accts[0]["key"] if accts else None)
     if found is None or target is None:
-        notes.append("No deposit pattern in the mirror yet; add deposits by hand")
+        notes.append(f"No pay-date pattern for {target} either" if out and target else "No deposit pattern in the mirror yet; add deposits by hand")
         return out, notes
     item = {"id": "payday", "account": target, **found}
     monthly, _ = _plan_monthly(plan)
@@ -217,15 +167,6 @@ def _plan_monthly(plan: dict) -> tuple[float | None, str]:
     if isinstance(acct.get("monthly_contribution"), int | float):
         return float(acct["monthly_contribution"]), "plan"
     return None, "none"
-
-
-def _slug(key: str, taken: list[dict]) -> str:
-    base = key.split("-")[0].lower() or "deposit"
-    used = {d["id"] for d in taken}
-    name, n = base, 2
-    while name in used:
-        name, n = f"{base}-{n}", n + 1
-    return name
 
 
 # ---- Plan ----
@@ -259,17 +200,15 @@ def themes_from_plan(plan: dict) -> list[dict]:
 def draft(cfg: Config, *, today: date | None = None) -> tuple[dict, list[str]]:
     if not cfg.mirror_db.exists():
         raise StarterError(f"No mirror at {cfg.mirror_db}. Run the mirror first (deploy.sh mirror).")
-    today = today or datetime.now(UTC).date()
+    today = today or _local_today(cfg)
     conn = connect(cfg.mirror_db, readonly=True)
     try:
         plan = latest_plan(conn)
         accts = accounts(conn)
-        deposits, notes = deposit_schedule(conn, plan, accts, today)
     finally:
         conn.close()
-    data: dict = {}
-    if deposits:
-        data["deposits"] = deposits
+    data: dict = {"deposits": "auto"}
+    notes = ["Deposits: auto, read live from your activity at each sync"]
     if accts:
         data["tax"] = {"wash_sale_accounts": [a["key"] for a in accts]}
         notes.append(f"Wash-sale checks cover {len(accts)} accounts from the latest snapshot")
@@ -284,7 +223,6 @@ def draft(cfg: Config, *, today: date | None = None) -> tuple[dict, list[str]]:
         notes.append("No plan in the mirror; rules stay at the defaults")
     data["usage"] = {"weekly_runs": dict(STARTER_RUNS)}
     data["agents"] = {"enabled": False, "desks": {d: d in STARTER_DESKS for d in DEFAULTS["agents"]["desks"]}}
-    notes.append("Agents stay off until you set agents.enabled: true")
     return data, notes
 
 
@@ -295,10 +233,10 @@ def render(data: dict, notes: list[str], today: date) -> str:
             data[key] = {**copy.deepcopy(DEFAULTS[key]), **value}
     rest = {k: copy.deepcopy(v) for k, v in DEFAULTS.items() if k not in data}
     lines = [
-        "# Vektor Desk profile, drafted from the mirror by `python -m desk.decisions.profile init`.",
+        f"{HEADER} by `python -m desk.decisions.profile init`.",
         f"# Drafted {today.isoformat()}. Check every value, then edit freely: each change becomes a new profile version.",
         "#",
-        *[f"# - {n}" for n in notes],
+        *[f"# - {n}" for n in dict.fromkeys(notes)],
         "",
         yaml.safe_dump(data, sort_keys=False, default_flow_style=False).rstrip(),
         "",
@@ -314,7 +252,7 @@ def init(cfg: Config, path: Path | None = None, *, today: date | None = None, dr
     path = path or profile_path(cfg)
     if path.exists() and not dry_run:
         raise StarterError(f"{path} already exists. The starter never overwrites it; edit it, or move it aside and run init again.")
-    today = today or datetime.now(UTC).date()
+    today = today or _local_today(cfg)
     data, notes = draft(cfg, today=today)
     text = render(data, notes, today)
     try:
@@ -328,10 +266,16 @@ def init(cfg: Config, path: Path | None = None, *, today: date | None = None, dr
     return path, text
 
 
+def _current_line(listed, source: str) -> str:
+    if listed == "auto":
+        return f"# Your desk.yaml ({source}) uses deposits: auto, so the desk reads these live. Paste only to pin a fixed list."
+    return f"# Your desk.yaml ({source}) lists {len(listed or [])} now. To use these, replace its deposits: section, or set deposits: auto."
+
+
 def deposits_block(cfg: Config, *, today: date | None = None) -> str:
     if not cfg.mirror_db.exists():
         raise StarterError(f"No mirror at {cfg.mirror_db}. Run the mirror first (deploy.sh mirror).")
-    today = today or datetime.now(UTC).date()
+    today = today or _local_today(cfg)
     conn = connect(cfg.mirror_db, readonly=True)
     try:
         deposits, notes = deposit_schedule(conn, latest_plan(conn), accounts(conn), today)
@@ -340,9 +284,9 @@ def deposits_block(cfg: Config, *, today: date | None = None) -> str:
     current = active_profile(cfg)
     lines = [
         f"# Deposits detected from the mirror on {today.isoformat()} by `python -m desk.decisions.profile init --deposits`.",
-        f"# Your desk.yaml ({current.source}) lists {len(current.get('deposits') or [])} now. To use these, replace its deposits: section.",
+        _current_line(current.get("deposits", default="auto"), current.source),
         "#",
-        *[f"# - {n}" for n in notes],
+        *[f"# - {n}" for n in dict.fromkeys(notes)],
         "",
     ]
     if not deposits:
@@ -353,6 +297,45 @@ def deposits_block(cfg: Config, *, today: date | None = None) -> str:
     except ProfileError as e:
         raise StarterError(f"The detected deposits didn't validate ({e}).") from e
     return "\n".join([*lines, block, ""])
+
+
+def _top_level(line: str) -> bool:
+    return bool(line) and not line[0].isspace() and line[0] not in "#-"
+
+
+def switch_to_auto(path: Path) -> tuple[bool, str]:
+    if not path.exists():
+        raise StarterError(f"{path} doesn't exist. Run init to draft one; it already uses deposits: auto.")
+    text = path.read_text()
+    parse(text)
+    raw = yaml.safe_load(text) or {}
+    if isinstance(raw, dict) and raw.get("deposits") == "auto":
+        return False, f"{path} already uses deposits: auto. Nothing changed."
+    lines = text.splitlines()
+    start = next((i for i, line in enumerate(lines) if line.split(":")[0].strip() == "deposits" and _top_level(line)), None)
+    if start is None:
+        new = [*lines, "", "deposits: auto"]
+    else:
+        end = next((j for j in range(start + 1, len(lines)) if _top_level(lines[j])), len(lines))
+        while end > start + 1 and (not lines[end - 1].strip() or lines[end - 1].startswith("#")):
+            end -= 1
+        new = [*lines[:start], "deposits: auto", *lines[end:]]
+    if new and new[0].startswith(HEADER):
+        end = 2
+        while end < len(new) and (new[end] == "#" or new[end].startswith("# - ")):
+            end += 1
+        new = [*new[:2], *new[end:]]
+    out = "\n".join(new) + "\n"
+    try:
+        parse(out)
+    except ProfileError as e:
+        raise StarterError(f"Switching to auto didn't validate ({e}); nothing changed.") from e
+    if (yaml.safe_load(out) or {}).get("deposits") != "auto":
+        raise StarterError("Couldn't find the deposits section to switch; nothing changed.")
+    backup = path.with_name(path.name + ".bak")
+    shutil.copy2(path, backup)
+    path.write_text(out)
+    return True, f"{path} now uses deposits: auto. The old file is at {backup}."
 
 
 # ---- Status ----
@@ -393,6 +376,7 @@ def status(cfg: Config) -> dict:
     leaves = _leaves(DEFAULTS)
     defaults = [k for k in leaves if _at(raw, k) is _MISSING or _at(raw, k) == _at(DEFAULTS, k)]
     desks = profile.get("agents", "desks", default={}) or {}
+    mode, series = deposit_series(cfg)
     return {
         "path": str(path),
         "exists": path.exists(),
@@ -405,7 +389,8 @@ def status(cfg: Config) -> dict:
         "defaults": defaults,
         "agents_enabled": bool(profile.get("agents", "enabled")),
         "desks_on": sorted(d for d, on in desks.items() if on) if profile.get("agents", "enabled") else [],
-        "deposits": len(profile.get("deposits", default=[]) or []),
+        "deposits": len(series),
+        "deposits_mode": mode,
         "rules": len(profile.get("rules", default=[]) or []),
         "starter": None if path.exists() else "docker exec vektor-desk-cron python -m desk.decisions.profile init",
     }

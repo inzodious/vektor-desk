@@ -53,17 +53,18 @@ agents:
 alerts:
   min_priority: default
 
-deposits:
-  - id: payday
-    account: brokerage
-    cadence: biweekly
-    anchor: "2026-11-06"
-    amount_usd: 500
-  - id: hsa
-    account: hsa
-    cadence: semimonthly
-    days: [1, 15]
-    amount_usd: 50
+deposits: auto
+# deposits:
+#   - id: payday
+#     account: brokerage
+#     cadence: biweekly
+#     anchor: "2026-11-06"
+#     amount_usd: 500
+#   - id: hsa
+#     account: hsa
+#     cadence: semimonthly
+#     days: [1, 15]
+#     amount_usd: 50
 
 rules:
   - id: no-margin-buys
