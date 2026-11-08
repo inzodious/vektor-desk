@@ -4,6 +4,23 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.6 - 2026-11-08
+
+### Added
+
+- The engine paper-trades every lab strategy and the filings lane on the Alpaca paper account, each strategy in its own $1,000 sleeve with its own ledger; orders net into one day order per symbol, only on a paper account, and `DESK_PAPER_EXECUTE=0` stops them ([#115])
+- The Strategy lab opens with a Race to live leaderboard of paper strategies against IWM, with the filings lane as one row ([#114], [#115])
+- Settings › Desks switches each desk on or off and lifts the first-run guard, so no more editing desk.yaml ([#113], [#114])
+- Strategy desk proposes one new variant a night, rotating through insider clusters, post-earnings drift and the filings lane ([#113])
+- Alpaca free daily bars, a nightly small-cap universe ($50M–$2B with a liquidity floor) and an EDGAR new-filings feed for the filings lane ([#108])
+
+### Fixed
+
+- A snapshot that carries older closes is dated by those closes, so later trades roll forward on top: shares no longer revert, fake withdrawals are gone and margin debt stays ([#112])
+- The FI forecast uses net deposits (money in minus money out) ([#112])
+- 401(k) fund prices are spread between snapshots, so 1D and 1W returns have no snapshot-day jumps ([#112])
+- History and flows checks warn only when something is actually wrong ([#112])
+
 ## 1.0.5 - 2026-11-08
 
 ### Added
@@ -314,3 +331,8 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#105]: https://github.com/inzodious/vektor-desk/pull/105
 [#106]: https://github.com/inzodious/vektor-desk/pull/106
 [#107]: https://github.com/inzodious/vektor-desk/pull/107
+[#108]: https://github.com/inzodious/vektor-desk/pull/108
+[#112]: https://github.com/inzodious/vektor-desk/pull/112
+[#113]: https://github.com/inzodious/vektor-desk/pull/113
+[#114]: https://github.com/inzodious/vektor-desk/pull/114
+[#115]: https://github.com/inzodious/vektor-desk/pull/115

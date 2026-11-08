@@ -163,12 +163,12 @@ Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the 
 |---|---|---|
 | Fidelity 5-year history importer (real shares, lots, flows) | Statistics | ✅ |
 | Run-now jobs in Settings, refresh on the health banner | Infra + Design | ✅ |
-| Alpaca free market data as the lab and universe price source | Statistics | ⏳ |
-| Small-cap universe ($50M–$2B, liquidity floor) and EDGAR new-filings fetch | Statistics | ⏳ |
+| Alpaca free market data as the lab and universe price source | Statistics | ✅ |
+| Small-cap universe ($50M–$2B, liquidity floor) and EDGAR new-filings fetch | Statistics | ✅ |
 | Filings desk: scores each filing (direction, confidence, event) | Agents | ✅ |
-| Filings strategy family, forward paper only, 182-day graduation | Statistics | ⏳ |
-| Alpaca paper executor (paper URL only) and keys | Statistics + Infra | ⏳ keys and guard done (#103) |
-| Filings lane card in the Lab, filing chip on the Symbol sheet | Design | ⏳ |
+| Filings strategy family, forward paper only, 182-day graduation | Statistics | ✅ |
+| Alpaca paper executor (paper URL only) and keys | Statistics + Infra | ✅ |
+| Filings lane card in the Lab, filing chip on the Symbol sheet | Design | ⏳ Lab row done, Symbol chip next |
 | Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
 
 ## Next: No more SSH
@@ -178,7 +178,7 @@ Every box chore becomes a button in the app. SSH stays only for true one-time in
 | Chore today | Becomes | Owner | Status |
 |---|---|---|---|
 | `engine daily`, `backfill` | Run now in Settings → Jobs | Infra + Design | ✅ (#102, #107) |
-| `sed` on desk.yaml for agents and desks | Settings → Desks toggles | Agents + Design | ⏳ |
+| `sed` on desk.yaml for agents and desks | Settings → Desks toggles | Agents + Design | ✅ |
 | `profile init`, profile edits | Settings → Profile and Risk editor | Concept + Design | ⏳ |
 | `scp` into the inbox | Upload button for broker exports and lot CSVs | Infra + Design | ⏳ |
 | `deploy.sh redeploy / status / check / backup / restore-test / logs` | Settings → Box buttons with last result, through a host-side request queue | Infra + Design | ⏳ |
