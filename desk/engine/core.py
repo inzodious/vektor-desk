@@ -9,7 +9,7 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION, fi, lookthrough, patterns, risk, scoring
+from desk.engine import ENGINE_VERSION, SET_KEY, fi, lookthrough, patterns, risk, scoring
 from desk.engine.backfill import NO_PRICES
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
@@ -205,19 +205,6 @@ def next_deposit(cfg: Config, plan: dict, as_of: str, now: datetime | None = Non
         ahead = []
     if ahead:
         return float(ahead[0]["amount_usd"]), ahead[0]["date"]
-    return plan_deposit(plan, as_of)
-
-
-def plan_deposit(plan: dict, as_of: str) -> tuple[float | None, str | None]:
-    month = as_of[:7]
-    for m in sorted(plan.get("monthly_plan") or [], key=lambda m: str(m.get("month"))):
-        if str(m.get("month")) > month and isinstance(m.get("contribution"), int | float):
-            return float(m["contribution"]), f"{m['month']}-01"
-    acct = (plan.get("accounts") or {}).get("individual") or {}
-    if isinstance(acct.get("monthly_contribution"), int | float):
-        d = date.fromisoformat(as_of)
-        nxt = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
-        return float(acct["monthly_contribution"]), nxt.isoformat()
     return None, None
 
 
@@ -509,7 +496,7 @@ def _margin_metrics(out: Out, rows, total):
                 drop = 1 - a["debit"] / ((1 - maint / 100) * a["value"])
                 out.m("margin.call_drop", max(0.0, drop) * 100, "pct", scope="account", scope_id=acct, quality="modelled")
         if rate is None:
-            out.h("margin_rate", "warn", "There is a margin debit but no rate, so its interest cost is unknown. Fix: set DESK_MARGIN_RATE_PCT in settings.env.")
+            out.h("margin_rate", "warn", f"There is a margin debit but no rate, so its interest cost is unknown. Fix: {env_fix(['DESK_MARGIN_RATE_PCT'])}")
     else:
         out.m("margin.cost_month", 0.0, "usd")
 
@@ -807,7 +794,9 @@ def _flows_check(implied: dict[tuple[str, str], float], holdings) -> tuple[str, 
 
 
 def env_fix(keys: list[str]) -> str:
-    return f"set {', '.join(keys)} in desk.env, then redeploy the app."
+    if len(keys) == 1:
+        return f"run `{SET_KEY} {keys[0]}`."
+    return f"run `{SET_KEY} KEY` for each of {', '.join(keys)}."
 
 
 def _market_keys() -> tuple[str, str, str]:

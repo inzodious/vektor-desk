@@ -158,8 +158,10 @@ def test_loss_sale_after_a_recent_buy_is_a_wash(cfg, mirror):
     assert lamps["wash_sales"]["status"] == "act" and lamps["wash_sales"]["clears"] == "2026-11-20" and HSA in lamps["wash_sales"]["detail"]
 
 
-def test_scheduled_deposit_into_the_same_fund_is_flagged(cfg, mirror):
+def test_scheduled_deposit_into_the_same_fund_is_flagged(cfg, mirror, monkeypatch):
     seed(mirror)
+    expected = [{"id": "d1", "status": "expected", "date": "2026-12-01", "amount_usd": 3000.0}]
+    monkeypatch.setattr("desk.engine.core.upcoming_deposits", lambda cfg, days, now=None: expected)
     add_lots(cfg, [(IND, "FXAIX", "2026-01-05", 5, 1100.0)])
     r = check_trade(cfg, {"kind": "harvest", "symbol": "FXAIX", "shares": 5}, now=NOW)
     lamps = lights(r)
@@ -235,3 +237,8 @@ def test_core_tax_metrics_and_wash_calendar(cfg, mirror, app_client):
     assert m[("tax.wash_window", "VOO")] == 21 and m[("tax.wash_window", "VXUS")] == 16
     windows = app_client(packages=["engine"]).get("/api/engine/wash").json()["windows"]
     assert [(w["symbol"], w["kind"]) for w in windows] == [("VXUS", "recent_buy"), ("VOO", "loss_sale")]
+
+
+def test_no_deposit_is_predicted_from_the_plan_alone(cfg, mirror):
+    seed(mirror)
+    assert core.next_deposit(cfg, core.latest_plan(open_mirror(cfg)), "2026-11-04", NOW) == (None, None)

@@ -64,7 +64,7 @@ def test_slices_carry_metrics_lots_wash_and_triggers(cfg, mirror, sent):
     keeper = RealEngine().desk_slice(cfg, "plan_keeper")
     assert keeper["data_as_of"] == stored["as_of"] and {h["check"] for h in keeper["data_health"]} >= {"freshness", "value"}
     keys = {f"{i['metric_id']}:{i['scope_id']}:{i['window']}" for i in keeper["sections"]["drift"]}
-    assert {"plan.drift:FXAIX:now", "plan.drift_max:all:now", "plan.next_deposit:VXUS:now"} <= keys
+    assert {"plan.drift:FXAIX:now", "plan.drift_max:all:now"} <= keys and not any(k.startswith("plan.next_deposit") for k in keys)
     assert "lots" not in keeper["sections"] and all(i["metric_id"].startswith("cash.") for i in keeper["sections"]["cash"])
     tax = brief.desk_slice(cfg, "tax")
     lots = {lot["symbol"]: lot for lot in tax["sections"]["lots"]}

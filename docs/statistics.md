@@ -85,7 +85,7 @@ Before metrics are published for a day, the engine checks:
 | Freshness | Mirror pull under 14 hours old |
 | Closes | Every held symbol has a close for the last trading day, or is a code nothing prices |
 | Flows | Lists any snapshot-day change that prices and recorded activity don't explain. The engine counts it as money in or out, not return (unlogged deposits, payroll contributions, a margin buy without a debit row). Always `ok`; it's there to explain the number |
-| Market keys | Tiingo, Finnhub, FRED and the SEC contact are all set; any missing one warns with `set … in desk.env, then redeploy the app` |
+| Market keys | Tiingo, Finnhub, FRED and the SEC contact are all set; any missing one warns with `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set KEY` (it redeploys). Every missing-key fix line uses that form |
 | Symbol kinds | Every holding is known as a fund or a stock: Escape Vektor's profiles, then SEC's fund list, the benchmark ETFs, ticker shape (5 letters ending in X, plan codes with digits) and SEC titles |
 
 Every non-ok detail ends with `Fix:` and the one step that clears it.
@@ -186,7 +186,7 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 | `plan.in_mix` | Share of value in plan funds | |
 | `plan.drift_max` | Largest drift, in points, and which fund | The Bridge headline |
 | `plan.single_stock` | Single-stock share vs its band | |
-| `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling |
+| `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling. Only when a deposit is expected from your activity (auto-detected series or a schedule); the plan's contributions never predict one |
 | `plan.adherence` | Plan adherence | Share of buy dollars (activity, core sweeps excluded) that went to plan funds; windows `MTD`, `QTD`, `YTD`, `1Y`, `ITD` |
 | `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points. Each a pass or fail with the evidence |
 

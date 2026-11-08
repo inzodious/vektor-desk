@@ -90,7 +90,8 @@ def detect(cfg: Config, conn: sqlite3.Connection, as_of: str, *, now: datetime |
     try:
         since = (date.fromisoformat(as_of) - timedelta(days=3)).isoformat()
         for d in deposits_landed(cfg, since, now=now):
-            found.append((as_of, "deposit_landed", str(d["id"]), {"date": d["landed"]["date"], "account": d.get("account"), "expected": d["date"]}))
+            detail = {"date": d["landed"]["date"], "account": d.get("account") or d["landed"].get("accountKey"), "expected": d["date"]}
+            found.append((as_of, "deposit_landed", str(d["id"]), detail | {"scheduled": d.get("scheduled", True)}))
     except PROFILE_ERRORS:
         pass
     return found
@@ -138,7 +139,9 @@ def _words(t: dict) -> str:
     if t["kind"] == "rule_breach":
         return f"Rule {s} doesn't hold today. Plan shows why."
     if t["kind"] == "deposit_landed":
-        return f"The deposit expected {d['expected']} landed on {d['date']}."
+        if d.get("scheduled", True):
+            return f"The deposit expected {d['expected']} landed on {d['date']}."
+        return f"Money landed in {d.get('account') or 'your account'} on {d['date']}."
     return ""
 
 
