@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
 from desk.config import Config
 from desk.jobrun import _read, _write, now_utc, parse_stamp, stamp
@@ -40,6 +40,12 @@ ACTIONS = {
             timedelta(minutes=5),
             "Copies main's deploy.sh over the one the cron jobs run, once the checkout is clean, at main and the script parses",
         ),
+        Action(
+            "apply-compose",
+            "Apply compose",
+            timedelta(minutes=10),
+            "Backs up, then gives TrueNAS main's compose.yaml, unless the change widens what containers can do",
+        ),
     )
 }
 
@@ -70,6 +76,19 @@ def last_run(cfg: Config, name: str) -> dict | None:
 def cooldown_until(cfg: Config, action: Action) -> datetime | None:
     last = parse_stamp((_read(requests_dir(cfg) / f"{action.name}.last") or {}).get("requested_at"))
     return last + action.cooldown if last else None
+
+
+def compose_state(cfg: Config) -> dict | None:
+    state = _read(box_dir(cfg) / "compose.json")
+    if state is None:
+        return None
+    text = state.pop("compose", None)
+    return state | {"copy_available": isinstance(text, str)}
+
+
+def compose_text(cfg: Config) -> str | None:
+    text = (_read(box_dir(cfg) / "compose.json") or {}).get("compose")
+    return text if isinstance(text, str) else None
 
 
 def is_running(run: dict | None, now: datetime) -> bool:
@@ -117,6 +136,7 @@ def describe(cfg: Config, now: datetime | None = None) -> dict:
         "host_alive": host_alive(cfg, now),
         "pickup_seconds": PICKUP_SECONDS,
         "script": _read(box_dir(cfg) / "script.json"),
+        "compose": compose_state(cfg),
         "actions": rows,
     }
 
@@ -186,6 +206,14 @@ router = APIRouter()
 @router.get("/api/box")
 def get_box(request: Request) -> JSONResponse:
     return JSONResponse(describe(request.app.state.cfg), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/api/box/compose.yaml")
+def get_compose(request: Request) -> Response:
+    text = compose_text(request.app.state.cfg)
+    if text is None:
+        return JSONResponse({"ok": False, "error": "no_change", "message": "The box's compose already matches main."}, status_code=404)
+    return PlainTextResponse(text, media_type="text/yaml", headers={"Cache-Control": "no-store"})
 
 
 @router.post("/api/box/{name}/run")
