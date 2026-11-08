@@ -125,22 +125,9 @@ class RealLab:
 
     def universe_ready(self, cfg: Config, kind: str) -> bool:
         mod, _ = self._lab()
-        if hasattr(mod, "universe_ready"):
-            return bool(self._call("universe_ready", cfg, kind))
-        if kind != "small_caps":
-            return True
-        import sqlite3
-
-        path = _module("desk.engine.lab.data").data_path(cfg)
-        if not path.exists():
+        if not hasattr(mod, "universe_ready"):
             return False
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-        try:
-            return conn.execute("SELECT 1 FROM smallcap LIMIT 1").fetchone() is not None
-        except sqlite3.Error:
-            return False
-        finally:
-            conn.close()
+        return bool(self._call("universe_ready", cfg, kind))
 
 
 class Lane(Protocol):
@@ -176,3 +163,64 @@ class RealFilings:
 
     def record(self, cfg: Config, accession: str, result: dict) -> object:
         return self._call("record", cfg, accession, result)
+
+
+class Advisor(Protocol):
+    def risk(self, cfg: Config) -> dict | None: ...
+
+    def catalog(self, cfg: Config) -> list[dict]: ...
+
+    def convictions(self, cfg: Config) -> list[dict]: ...
+
+    def actions(self, cfg: Config) -> list[str]: ...
+
+
+def _guarded(name: str, attr: str, *args):
+    fn = _fn(name, attr)
+    not_ready = getattr(_module(name), "NotReady", NotReady)
+    try:
+        return fn(*args)
+    except not_ready as e:
+        raise NotReady(str(e) or f"{name} not ready") from None
+
+
+@dataclass
+class RealAdvisor:
+    def risk(self, cfg: Config) -> dict | None:
+        found = _guarded("desk.decisions.risk", "current", cfg)
+        return dict(found) if found else None
+
+    def catalog(self, cfg: Config) -> list[dict]:
+        return [dict(r) for r in _guarded("desk.engine.bands", "catalog", cfg)]
+
+    def convictions(self, cfg: Config) -> list[dict]:
+        return [dict(r) for r in _guarded("desk.decisions.risk", "convictions", cfg)]
+
+    def actions(self, cfg: Config) -> list[str]:
+        items = _guarded("desk.decisions.targets", "planned_actions", cfg)
+        return [str(line) for line in _guarded("desk.decisions.targets", "describe", items)]
+
+
+class Discounts(Protocol):
+    def pending(self, cfg: Config, limit: int) -> list[dict]: ...
+
+    def record(self, cfg: Config, signal_id: str, case: dict) -> object: ...
+
+
+@dataclass
+class RealDiscounts:
+    def _call(self, fn: str, *args):
+        mod = _module("desk.engine.discounts")
+        if not hasattr(mod, fn):
+            raise NotReady(f"desk.engine.discounts.{fn} isn't built yet")
+        not_ready = getattr(mod, "NotReady", NotReady)
+        try:
+            return getattr(mod, fn)(*args)
+        except not_ready as e:
+            raise NotReady(str(e) or "discount scanner not ready") from None
+
+    def pending(self, cfg: Config, limit: int) -> list[dict]:
+        return list(self._call("pending", cfg, limit))
+
+    def record(self, cfg: Config, signal_id: str, case: dict) -> object:
+        return self._call("record", cfg, signal_id, case)

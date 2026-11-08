@@ -76,6 +76,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | high; no tools |
 | **Strategy desk** | Nightly 05:45, one variant in a rotating family (below); on request from the Console; when a lab result lands; 12 runs a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
 | **Filings desk** | Daily 04:15, one call per new filing, up to 40 a night | One small-cap SEC filing from the statistics queue: form, 8-K items, excerpt (first 12,000 characters) | A score per filing in the signal table (see [Filings desk](#filings-desk)); never a proposal or a trade | high; no tools |
+| **Discount cases** | Weekdays 18:15, after the close, up to 3 a day | One discount-day scanner hit (held, watchlist or quality list), his risk band, conviction bands and planned actions, plus the web | A buy / wait / avoid case per hit, through `desk.engine.discounts.record`; never a proposal or a trade | xhigh; WebSearch, WebFetch |
 
 **Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
 
@@ -165,6 +166,32 @@ The prompt carries the family's earlier specs (`lab.strategies`, ids start with 
 The final tear sheet reports each horizon, the post-cutoff window, trials tried, caveats such as survivorship, and a verdict. The Strategy desk then writes a short memo on what the result does and does not show.
 
 Expect most strategies to fail. That is the lab working: a cheap "no" in simulation beats an expensive one in the account.
+
+## Measured against his risk band
+
+There is no single target plan. Every proposal desk (Plan keeper, Tax, Risk, Research, Scout) gets an `advisor` block and the Discount cases desk gets the same:
+
+| Piece | Source | In the prompt |
+|---|---|---|
+| Risk band | `desk.decisions.risk.current(cfg)` (Concept C1) | `advisor.risk_band`; numbers as brief keys `risk.<field>:all:now` (band, equity range, speculative max, single-stock max, worst-year loss) |
+| Strategy catalog | `desk.engine.bands.catalog(cfg)` (Statistics S1, S2) | `advisor.catalog` (id, name, fit, proxy); numbers as `catalog.<field>:<id>:now` |
+| Conviction holds | `desk.decisions.risk.convictions(cfg)` (C2) | `advisor.convictions` |
+| Planned actions | `desk.decisions.targets.planned_actions` + `describe` (C3) | `advisor.planned_actions`, ready sentences |
+
+Each piece is optional: a missing one is listed in `advisor.missing` and the desk carries on. With no risk band yet, desks stay conservative and mention the questionnaire once. The v3 mix is one catalog entry, and v3 items he hasn't re-confirmed are suggestions only. A risk band change counts as a brief change, so the Plan keeper runs that day.
+
+## Discount cases
+
+| Piece | Detail |
+|---|---|
+| Queue | `desk.engine.discounts.pending(cfg, limit)`, biggest discount first; `[]` when no hits, `NotReady` until S4 ships |
+| Write | `desk.engine.discounts.record(cfg, signal_id, case)`, first write wins; a refused case is noted on the run |
+| Case | `schemas/discounts.json`: `verdict` buy / wait / avoid, `case` ≤ 400, `risks` ≤ 240, `confidence` 0..1, `horizon_days` 5..365, `numbers_cited` (keys of the hit's `numbers`; others dropped), plus `model`, `written_at`, `run_id` |
+| Volume | `usage.discount_cases_per_day` in `desk.yaml`, default 3, at most 10; weekly cap is seven days' worth |
+| Stops | Usage limit, run lock busy, weekly cap, switch off, or 2 failures in a row |
+| On switch | Off unless switched on in Settings or `agents.desks.discounts: true`; the first-run guard holds it |
+
+`python -m desk.agents run discounts [--limit N]` writes now; `dry-run discounts` shows the first hit's prompt.
 
 ## Filings desk
 
@@ -275,6 +302,9 @@ desk/agents/
   jobs.py         JOBS for the scheduler, one per live desk schedule
   schema.py       the package's tables
   filings.py      the filings desk's nightly loop: queue, score, number check, record
+  discounts.py    discount cases after the close: queue, case, number check, record
+  advisor.py      risk band, catalog, convictions and planned actions for every brief
+  switches.py     Settings over desk.yaml over defaults
   prompts/        one system prompt per desk (Phase 5 on)
   schemas/        proposal.json, strategy.json, skeptic.json, filings.json (Phase 5 on)
   briefs.py       builds each desk's prompt from engine brief slices (Phase 5 on)

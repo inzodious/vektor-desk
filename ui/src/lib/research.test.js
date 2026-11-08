@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allSources, cleanSymbol, coreFund, eventsOf, freshness, keyNumbers, overnightStart, rangeGeo, rangeLine, rateLines, rebase, sourceKind, triggersOf, upcomingOf, verdictOf } from './research.js';
+import { allSources, cleanSymbol, directionWord, eventWord, filingChip, coreFund, eventsOf, freshness, keyNumbers, overnightStart, rangeGeo, rangeLine, rateLines, rebase, sourceKind, triggersOf, upcomingOf, verdictOf } from './research.js';
 
 describe('research helpers', () => {
   it('grades sources by where they come from', () => {
@@ -106,5 +106,31 @@ describe('research helpers', () => {
     expect(cleanSymbol(' brk.b ')).toBe('BRK.B');
     expect(cleanSymbol('1ABC')).toBeNull();
     expect(cleanSymbol('')).toBeNull();
+  });
+});
+
+describe('filing chip', () => {
+  it('reads the newest scored filing in plain words', () => {
+    const f = filingChip({ filing_signals: [{ form: '8-K', direction: 1, confidence: 0.72, event_type: 'merger_acquisition', lane_open: true }, { form: '4', direction: -1 }] });
+    expect(f.dir).toEqual({ t: 'Leans good', tone: 'ok' });
+    expect(f.sure).toBe('72% sure');
+    expect(f.event).toBe('Merger or acquisition');
+    expect(f.form).toBe('Current report');
+    expect(f.more).toBe(1);
+    expect(f.lane_open).toBe(true);
+  });
+
+  it('stays quiet without scored filings', () => {
+    expect(filingChip(null)).toBeNull();
+    expect(filingChip({ filing_signals: [] })).toBeNull();
+    expect(filingChip({ filings: [] })).toBeNull();
+  });
+
+  it('clamps direction and words events', () => {
+    expect(directionWord(-2).t).toBe('Reads clearly bad');
+    expect(directionWord(5).t).toBe('Reads clearly good');
+    expect(directionWord(0).tone).toBe('');
+    expect(eventWord('insider_sell')).toBe('Insider sell');
+    expect(eventWord(null)).toBeNull();
   });
 });

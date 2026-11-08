@@ -34,6 +34,12 @@ ACTIONS = {
         Action("backup", "Back up now", timedelta(minutes=30), "Copies every database and the inbox to the backup pool"),
         Action("restore-test", "Restore drill", timedelta(minutes=30), "Unpacks the newest backup into a scratch folder and checks every database"),
         Action("logs", "Export logs", timedelta(minutes=1), "Redacted service logs into data/run/logs"),
+        Action(
+            "update-script",
+            "Update box script",
+            timedelta(minutes=5),
+            "Copies main's deploy.sh over the one the cron jobs run, once the checkout is clean, at main and the script parses",
+        ),
     )
 }
 
@@ -106,7 +112,13 @@ def describe(cfg: Config, now: datetime | None = None) -> dict:
                 "can_run": not running and pending is None and not cooling,
             }
         )
-    return {"now": stamp(now), "host_alive": host_alive(cfg, now), "pickup_seconds": PICKUP_SECONDS, "actions": rows}
+    return {
+        "now": stamp(now),
+        "host_alive": host_alive(cfg, now),
+        "pickup_seconds": PICKUP_SECONDS,
+        "script": _read(box_dir(cfg) / "script.json"),
+        "actions": rows,
+    }
 
 
 def request_action(cfg: Config, name: str, client: str | None = None, now: datetime | None = None) -> tuple[int, dict]:

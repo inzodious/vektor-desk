@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { Shell } from './components/Shell.jsx';
 import Settings from './pages/Settings.jsx';
+import FirstRun from './pages/FirstRun.jsx';
 import Bridge from './pages/Bridge.jsx';
 import Plan from './pages/Plan.jsx';
 import Decisions from './pages/Decisions.jsx';
@@ -49,6 +50,8 @@ export default function App() {
               <Route path="lab/boards" element={<Boards />} />
               <Route path="lab/*" element={<NotFound />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="settings/first-run" element={<FirstRun />} />
+              <Route path="start" element={<FirstRun />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
