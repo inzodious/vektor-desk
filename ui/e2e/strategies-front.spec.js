@@ -11,11 +11,13 @@ test('the leaderboard ranks paper strategies against IWM with the filings lane a
   await page.goto('/lab/strategies');
   const board = page.getByTestId('leaderboard');
   await expect(board.getByTestId('lb-lede')).toContainText('Calm sectors leads at +3.7 pts against IWM.');
-  await expect(board.locator('.lb-row')).toHaveCount(4);
+  await expect(board.locator('.lb-row')).toHaveCount(5);
+  await expect(board.locator('[data-row="filings-lane-strong"]')).toContainText('Lane');
   const lane = board.locator('[data-row="filings-lane"]');
   await expect(lane).toContainText('Lane');
   await expect(lane).toContainText('Day 32 of 182 · 150 to go');
   await expect(lane.getByRole('link')).toHaveCount(0);
+  await expect(lane.getByTestId('lb-account')).toHaveText('Paper account $1,012 of $1,000 (+1.2%) · $906 cash');
   await expect(board.locator('[data-row="sector-momentum"] .lb-edge b')).toHaveClass(/dn/);
   await expect(board.locator('[data-row="dip-buyer"] .lb-rank')).toHaveText('—');
   await board.locator('[data-row="sector-momentum"]').getByRole('link').click();

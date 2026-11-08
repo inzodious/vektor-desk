@@ -1,11 +1,13 @@
-const row = (r) => ({ version: 1, kind: 'strategy', as_of: '2026-11-06', open_positions: 0, ...r });
+const row = (r) => ({ version: 1, kind: 'strategy', as_of: '2026-11-06', open_positions: 0, account: null, ...r });
+const acct = (value, cash, ret) => ({ as_of: '2026-11-06', sleeve: 1000, cash, value, return_pct: ret });
 
 // ---------- synthetic paper leaderboard until the engine serves real rows ----------
 export function leaderboardFixtures() {
   const base = { as_of: '2026-11-06', benchmark: 'IWM', gate_days: 182, note: null };
   const rows = [
-    row({ id: 'low-vol-sectors', name: 'Calm sectors', status: 'eligible', started: '2026-04-20', days_live: 200, days_to_eligible: 0, eligible_on: '2026-10-19', waiting_on: null, return_pct: 6.8, bench_return_pct: 3.1, excess_pts: 3.7, max_drawdown_pct: -4.2, trades: 18, open_positions: 3 }),
-    row({ id: 'filings-lane', kind: 'lane', name: 'Filings lane: buy small caps Claude scores +1 or better', status: 'paper', started: '2026-10-05', days_live: 32, days_to_eligible: 150, eligible_on: '2027-04-05', waiting_on: 'time', return_pct: 4.1, bench_return_pct: 1.2, excess_pts: 2.9, max_drawdown_pct: -3.4, trades: 3, open_positions: 1 }),
+    row({ id: 'low-vol-sectors', name: 'Calm sectors', status: 'eligible', started: '2026-04-20', days_live: 200, days_to_eligible: 0, eligible_on: '2026-10-19', waiting_on: null, return_pct: 6.8, bench_return_pct: 3.1, excess_pts: 3.7, max_drawdown_pct: -4.2, trades: 18, open_positions: 3, account: acct(1061.4, 212.3, 6.1) }),
+    row({ id: 'filings-lane', kind: 'lane', name: 'Filings lane: buy small caps Claude scores +1 or better', status: 'paper', started: '2026-10-05', days_live: 32, days_to_eligible: 150, eligible_on: '2027-04-05', waiting_on: 'time', return_pct: 4.1, bench_return_pct: 1.2, excess_pts: 2.9, max_drawdown_pct: -3.4, trades: 3, open_positions: 1, account: acct(1012.0, 905.5, 1.2) }),
+    row({ id: 'filings-lane-strong', kind: 'lane', name: 'Filings lane: +2 scores only, hold 10 sessions', status: 'paper', started: '2026-10-20', days_live: 17, days_to_eligible: 165, eligible_on: '2027-04-20', waiting_on: 'time', return_pct: 1.6, bench_return_pct: 0.4, excess_pts: 1.2, max_drawdown_pct: -1.1, trades: 1, open_positions: 1, account: acct(1004.8, 899.0, 0.5) }),
     row({ id: 'sector-momentum', name: 'Sector momentum', status: 'paper', started: '2026-06-30', days_live: 129, days_to_eligible: 53, eligible_on: '2026-12-29', waiting_on: 'time', return_pct: 0.9, bench_return_pct: 5.2, excess_pts: -4.3, max_drawdown_pct: -5.0, trades: 23, open_positions: 4 }),
     row({ id: 'dip-buyer', name: 'Buy the deepest dip', status: 'retired', started: '2026-05-01', days_live: 189, days_to_eligible: null, eligible_on: null, waiting_on: null, return_pct: -7.9, bench_return_pct: 2.0, excess_pts: -9.9, max_drawdown_pct: -14.2, trades: 31 }),
   ];

@@ -948,3 +948,4 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
   .lb-stats { padding-left: 46px; }
   .lb-edge > b { font-size: 16px; }
 }
+.lb-acct { display: block; color: var(--ink-2); font-weight: 600; }
