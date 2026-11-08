@@ -67,7 +67,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
 
     | `check` line | Good looks like | If not |
     |---|---|---|
-    | Claude | `signed in, answered: OK` | Redo step 4. Then run the setup script again, answer "n" to keeping `desk.env`, and run `midclt call app.redeploy vektor-desk` |
+    | Claude | `signed in, answered: OK` | Redo step 4. Then `bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set CLAUDE_CODE_OAUTH_TOKEN` (it saves the new token and redeploys) |
     | Firestore | `read access ok, N tables` | A 403 means the account has no role in the Firebase project. If it was made in another project, grant its `client_email` the Cloud Datastore Viewer role under IAM in the Firebase project. Then check the project ID and UID in `settings.env` |
     | Address | `match` | Redo step 7 with the printed address, then wait up to 10 minutes |
     | Home network | `not published` until you do [Home network](#home-network), then `match` | Steps 1–5 of that section |
@@ -112,6 +112,7 @@ Open the desk at home without Tailscale, the way Hemline has its own address. Ca
 | When | Do |
 |---|---|
 | RAM goes to 32 GB | In Apps → `vektor-desk` → Edit, raise cron to `2g`. When the lab is switched on, raise it to `8g`, `cpus: 8` and `DESK_LAB_WORKERS` 8 (the notes in `compose.yaml` say where) |
-| 30 days before the Claude token expires | Settings and a `desk-ops` alert flag it. Run `claude setup-token`, run the setup script again, answer "n" to keeping `desk.env` and `settings.env`, then run `midclt call app.redeploy vektor-desk` |
+| 30 days before the Claude token expires | Settings and a `desk-ops` alert flag it. Run `claude setup-token`, then `setup-truenas.sh set CLAUDE_CODE_OAUTH_TOKEN` and `setup-truenas.sh set DESK_CLAUDE_TOKEN_EXPIRES` |
 | The morning after the first nightly backup | `bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh restore-test`: it should end with "Restore drill passed" |
-| A market key arrives | Run the setup script again and answer "n" to keeping `desk.env` |
+| A market key arrives | `setup-truenas.sh set TIINGO_API_KEY` (or `FINNHUB_API_KEY`, `FRED_API_KEY`) |
+| Any one setting changes | `bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set KEY`, e.g. `DESK_SEC_USER_AGENT` or `DESK_MARGIN_RATE_PCT`. It asks for the value (spaces kept; keys hidden), changes that one line in the right `*.env` file and redeploys. After editing an env file by hand, run `deploy.sh redeploy`: a `docker restart` or `deploy.sh now` with nothing new to build doesn't re-read env files |

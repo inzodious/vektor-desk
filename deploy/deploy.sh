@@ -12,6 +12,8 @@
 #                      home-network addresses, a test phone alert
 #   deploy.sh logs     redacted tails of every desk service's log into data/run/logs, for the eval container
 #                      (docs/eval-access.md); auto does this every 5 minutes
+#   deploy.sh redeploy recreate the containers on the images already live, so an edited *.env file takes effect (a
+#                      docker restart doesn't re-read env files); refuses while a desk job is running
 #   deploy.sh card     the app's icon and Web UI button in TrueNAS Apps; TrueNAS drops them when the YAML is edited, so
 #                      now and auto put them back
 # Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
@@ -226,6 +228,19 @@ deploy() {
     die "rolled back; the previous version is live again. Pre-deploy backup: $files"
   fi
   die "the rollback didn't come up either. Check the app in the TrueNAS Apps screen. Pre-deploy backup: $files"
+}
+
+redeploy() {
+  local why target
+  if why=$(busy); then die "a desk job is running: $why. Nothing was changed" "$BUSY"; fi
+  target=$(live_build vektor-desk-api)
+  log "Redeploying $APP on ${target:0:7} to pick up the env files"
+  if restart_app && healthy "$target"; then
+    log "Live again: ${target:0:7}"
+    app_card || true
+    return 0
+  fi
+  die "$APP didn't come back healthy after the redeploy. See the app's logs"
 }
 
 note() {
@@ -520,13 +535,18 @@ main() {
       app_card >/dev/null 2>&1 || true
       logs_export || true
       ;;
+    redeploy)
+      exec 9>"$LOCK"
+      flock -n 9 || die "a deploy is already running: tail -f $LOG"
+      redeploy
+      ;;
     card) app_card ;;
     logs) logs_export ;;
     status) status ;;
     restore-test) restore_test ;;
     check) check ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy]" >&2
       exit 2
       ;;
   esac
