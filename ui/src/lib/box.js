@@ -16,9 +16,10 @@ const short = (sha) => (sha ? String(sha).slice(0, 7) : null);
 
 // ---------- actions ----------
 export function splitBox(actions = []) {
-  const list = (actions || []).filter((a) => a.name !== 'update-script');
+  const list = (actions || []).filter((a) => a.name !== 'update-script' && a.name !== 'apply-compose');
   const update = (actions || []).find((a) => a.name === 'update-script') || null;
-  return { list, update };
+  const compose = (actions || []).find((a) => a.name === 'apply-compose') || null;
+  return { list, update, compose };
 }
 
 export function lastLine(run) {
@@ -70,4 +71,18 @@ export function boxRefusal(err, now = new Date()) {
   if (b.error === 'host_down') return 'The box hasn’t checked in, so nothing would pick this up yet. See the one-time step above.';
   if (b.error === 'unknown_action') return 'The desk doesn’t know that action any more. Refresh the page.';
   return err?.message || 'The desk didn’t take that. Try again in a moment.';
+}
+
+// ---------- compose ----------
+export function composeView(c) {
+  if (!c || c.state === 'current') return null;
+  if (c.state === 'unknown') return { state: 'unknown', line: 'The box couldn’t compare its compose file with main. Box → Status shows why.', drift: [], needs: [] };
+  const needs = [...(c.escalations || []), ...(c.missing_files || []).map((f) => `needs ${f}`)];
+  return {
+    state: c.can_apply ? 'apply' : 'eyes',
+    line: c.can_apply ? 'The compose file changed on main. Apply it and TrueNAS picks it up after a backup.' : 'The compose file changed on main, and the change needs your eyes before it goes in.',
+    drift: c.drift || [],
+    needs,
+    copy: !!c.copy_available,
+  };
 }

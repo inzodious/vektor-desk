@@ -1,0 +1,136 @@
+{
+ "now": "2026-11-09T16:42:00Z",
+ "host_alive": true,
+ "ready": true,
+ "keys": [
+  {
+   "name": "CLAUDE_CODE_OAUTH_TOKEN",
+   "file": "desk.env",
+   "secret": true,
+   "what": "Claude token from claude setup-token on your PC",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "DESK_CLAUDE_TOKEN_EXPIRES",
+   "file": "settings.env",
+   "secret": false,
+   "what": "When that token expires, YYYY-MM-DD",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "TIINGO_API_KEY",
+   "file": "desk.env",
+   "secret": true,
+   "what": "Tiingo prices",
+   "set": true,
+   "pending": false,
+   "last": {
+    "name": "TIINGO_API_KEY",
+    "request_id": "k1",
+    "result": "saved",
+    "message": "Saved to desk.env",
+    "at": "2026-11-09T14:00:00Z"
+   }
+  },
+  {
+   "name": "FINNHUB_API_KEY",
+   "file": "desk.env",
+   "secret": true,
+   "what": "Finnhub news and earnings",
+   "set": false,
+   "pending": true,
+   "last": null
+  },
+  {
+   "name": "FRED_API_KEY",
+   "file": "desk.env",
+   "secret": true,
+   "what": "FRED rates and macro series",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "DESK_SEC_USER_AGENT",
+   "file": "desk.env",
+   "secret": false,
+   "what": "SEC contact for its User-Agent, e.g. 'Vektor Desk you@example.com'",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "ALPACA_API_KEY_ID",
+   "file": "desk.env",
+   "secret": true,
+   "what": "Alpaca PAPER key ID (starts with PK); live keys are refused",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "ALPACA_API_SECRET_KEY",
+   "file": "desk.env",
+   "secret": true,
+   "what": "Alpaca PAPER secret key",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "DESK_FIREBASE_PROJECT",
+   "file": "settings.env",
+   "secret": false,
+   "what": "Escape Vektor's Firebase project ID",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "DESK_UID",
+   "file": "settings.env",
+   "secret": false,
+   "what": "Your Escape Vektor user ID",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "PORKBUN_API_KEY",
+   "file": "caddy.env",
+   "secret": true,
+   "what": "Porkbun API key, for the certificate",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "PORKBUN_API_SECRET_KEY",
+   "file": "caddy.env",
+   "secret": true,
+   "what": "Porkbun secret API key",
+   "set": true,
+   "pending": false,
+   "last": null
+  },
+  {
+   "name": "TS_AUTHKEY",
+   "file": "tailscale.env",
+   "secret": true,
+   "what": "Tailscale auth key, only for a fresh sign-in",
+   "set": false,
+   "pending": false,
+   "last": {
+    "name": "TS_AUTHKEY",
+    "request_id": "k2",
+    "result": "refused",
+    "message": "That value has a line break.",
+    "at": "2026-11-09T13:10:00Z"
+   }
+  }
+ ]
+}
