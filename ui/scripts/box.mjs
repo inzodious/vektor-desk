@@ -15,6 +15,9 @@ const lastRun = (name) => {
   return { action: name, request_id: `b0${name.length}c0ffee0`, started: at(s), finished: at(f), result, exit_code: rc, output: out };
 };
 
+const compose = (o) => ({ checked_at: at('16:40'), state: 'drift', drift: ['cron: environment', 'api: healthcheck'], escalations: [], missing_dirs: [], missing_files: [], can_apply: true, copy_available: true, ...o });
+const eyes = compose({ drift: ['cron: cap_add, volumes'], escalations: ['cron: new cap_add SYS_ADMIN', 'cron: bind mount /mnt/Other/share is outside the app folder'], can_apply: false });
+
 const script = (o) => ({ checked_at: at('16:40'), pinned: true, current: false, behind: 2, from: 'a1b2c3d4e5f60718293a4b5c6d7e8f9012345678', to: 'f9e8d7c6b5a49382716051f4e3d2c1b0a9876543', off: false, ...o });
 
 // ---------- box actions: today, host quiet, first day, script states ----------
@@ -26,12 +29,12 @@ export function boxFixtures(api) {
     const queued = a.name === 'logs';
     return { ...idle(a), last_run: lastRun(a.name), queued, queued_at: queued ? at('16:40') : null, cooldown_until: cooling ? at('16:43') : null, can_run: !cooling && !queued };
   });
-  const quiet = { ...base, host_alive: false, script: null, actions: api.actions.map(idle) };
+  const quiet = { ...base, host_alive: false, script: null, compose: null, actions: api.actions.map(idle) };
   return {
-    box: { ...base, script: script(), actions },
+    box: { ...base, script: script(), compose: compose(), actions },
     'box.down': quiet,
     'box.fresh': quiet,
-    'box.current': { ...base, script: script({ current: true, behind: 0, from: null, to: null }), actions },
-    'box.off': { ...base, script: script({ off: true, pinned: false }), actions },
+    'box.current': { ...base, script: script({ current: true, behind: 0, from: null, to: null }), compose: compose({ state: 'current', drift: [], can_apply: false, copy_available: false }), actions },
+    'box.off': { ...base, script: script({ off: true, pinned: false }), compose: eyes, actions },
   };
 }

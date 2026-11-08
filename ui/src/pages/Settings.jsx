@@ -4,6 +4,7 @@ import { Hero } from '../components/Hero.jsx';
 import { Jobs } from '../settings/Jobs.jsx';
 import { Box } from '../settings/Box.jsx';
 import { Inbox } from '../settings/Inbox.jsx';
+import { Keys } from '../settings/Keys.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
 import { Panel } from '../components/Panel.jsx';
@@ -383,6 +384,7 @@ export default function Settings() {
         <Jobs />
         <Box />
         <Inbox />
+        <Keys />
         <Profile api={profile} />
         <Crew
           status={agents}

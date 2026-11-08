@@ -3,6 +3,7 @@
  "host_alive": false,
  "pickup_seconds": 300,
  "script": null,
+ "compose": null,
  "actions": [
   {
    "name": "redeploy",
@@ -81,6 +82,18 @@
    "title": "Update box script",
    "what": "Copies main's deploy.sh over the one the cron jobs run, once the checkout is clean, at main and the script parses",
    "cooldown_seconds": 300,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "apply-compose",
+   "title": "Apply compose",
+   "what": "Backs up, then gives TrueNAS main's compose.yaml, unless the change widens what containers can do",
+   "cooldown_seconds": 600,
    "running": false,
    "queued": false,
    "queued_at": null,

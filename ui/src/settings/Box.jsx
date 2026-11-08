@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Icon } from '../components/Icon.jsx';
-import { postJson, useApi } from '../lib/api.js';
-import { HAND_COPY, QUEUED_TEXT, boxBusy, boxRefusal, boxState, cooldownText, lastLine, scriptView, splitBox } from '../lib/box.js';
+import { getText, postJson, useApi } from '../lib/api.js';
+import { HAND_COPY, QUEUED_TEXT, boxBusy, boxRefusal, boxState, composeView, cooldownText, lastLine, scriptView, splitBox } from '../lib/box.js';
 
 function HandCopy({ lede }) {
   const [copied, setCopied] = useState(false);
@@ -24,6 +24,54 @@ function HandCopy({ lede }) {
           {copied ? 'Copied' : 'Copy the line'}
         </button>
       </span>
+    </div>
+  );
+}
+
+function CopyCompose() {
+  const [state, setState] = useState(null);
+  const copy = async () => {
+    try {
+      const text = await getText('/api/box/compose.yaml');
+      await navigator.clipboard.writeText(text);
+      setState('copied');
+    } catch (e) {
+      setState(e?.status === 404 ? 'same' : 'failed');
+    }
+  };
+  return (
+    <span className="key-acts">
+      <button className="btn sm" type="button" onClick={copy} data-testid="compose-copy">
+        <Icon name={state === 'copied' ? 'check' : 'copy'} />
+        {state === 'copied' ? 'Copied' : 'Copy compose.yaml'}
+      </button>
+      {state === 'same' ? <small className="job-note done">Already matches main; nothing to paste.</small> : null}
+      {state === 'failed' ? <small className="job-note refused">Couldn’t copy. Try again in a moment.</small> : null}
+    </span>
+  );
+}
+
+function Compose({ cv, action, alive, mine, onRun }) {
+  return (
+    <div className={`box-script${cv.state === 'apply' ? '' : ' eyes'}`} data-testid="box-compose" data-state={cv.state}>
+      <span>
+        <b>{cv.line}</b>
+        {cv.drift.length ? <small>What changed: {cv.drift.join('; ')}</small> : null}
+      </span>
+      {cv.state === 'apply' && action ? <ActionRow a={action} alive={alive} mine={mine} onRun={onRun} /> : null}
+      {cv.state === 'eyes' ? (
+        <>
+          {cv.needs.length ? (
+            <ul className="box-needs" data-testid="compose-needs">
+              {cv.needs.map((n) => (
+                <li key={n}>{n}</li>
+              ))}
+            </ul>
+          ) : null}
+          <small>Read it, then paste it into TrueNAS → Apps → vektor-desk → Edit.</small>
+          {cv.copy ? <CopyCompose /> : null}
+        </>
+      ) : null}
     </div>
   );
 }
@@ -92,8 +140,9 @@ export function Box() {
   const api = useApi('/api/box', { every: (d) => (boxBusy(d) || pending ? 5000 : 60000) });
   const d = api.data;
   const alive = !!d?.host_alive;
-  const { list, update } = splitBox(d?.actions);
+  const { list, update, compose } = splitBox(d?.actions);
   const sv = scriptView(d?.script);
+  const cv = composeView(d?.compose);
 
   const run = async (a) => {
     setMine((m) => ({ ...m, [a.name]: { phase: 'queued', id: null } }));
@@ -139,6 +188,7 @@ export function Box() {
               {sv.state === 'off' ? <HandCopy lede="Copy it by hand from a TrueNAS shell:" /> : update ? <ActionRow a={update} alive={alive} mine={mine[update.name]} onRun={run} /> : null}
             </div>
           ) : null}
+          {cv ? <Compose cv={cv} action={compose} alive={alive} mine={compose ? mine[compose.name] : null} onRun={run} /> : null}
           <div className="job-list">
             {list.map((a) => (
               <ActionRow key={a.name} a={a} alive={alive} mine={mine[a.name]} onRun={run} />

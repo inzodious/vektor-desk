@@ -5,6 +5,7 @@ import { chunkIds } from '../src/lib/lab.js';
 import { moneyInFixtures } from './money-in.mjs';
 import { jobsFixtures } from './jobs.mjs';
 import { boxFixtures } from './box.mjs';
+import { keysFixtures } from './keys.mjs';
 import { inboxFixtures } from './inbox.mjs';
 import { riskFixtures } from './risk.mjs';
 import { desksFixtures } from './desks.mjs';
@@ -213,6 +214,7 @@ for (const [name, body] of Object.entries(jobsFixtures(await get('/api/jobs'))))
 
 // ---------- box ----------
 for (const [name, body] of Object.entries(boxFixtures(await get('/api/box')))) save(name, body);
+for (const [name, body] of Object.entries(keysFixtures(await get('/api/box/keys')))) save(name, body);
 
 // ---------- inbox ----------
 for (const [name, body] of Object.entries(inboxFixtures())) save(name, body);

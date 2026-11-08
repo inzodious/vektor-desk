@@ -86,6 +86,8 @@ const SHOTS = [
   { name: 'settings-box-down', path: '/settings?scenario=down', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('box').scrollIntoViewIfNeeded() },
   { name: 'settings-box-off', path: '/settings?scenario=off', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('box').scrollIntoViewIfNeeded() },
   { name: 'settings-inbox', path: '/settings#inbox', fixtures: true, clock: MONDAY },
+  { name: 'settings-keys', path: '/settings#keys', fixtures: true, clock: MONDAY },
+  { name: 'settings-keys-open', path: '/settings#keys', fixtures: true, clock: MONDAY, act: async (p) => p.getByRole('button', { name: 'Set FINNHUB_API_KEY' }).or(p.getByRole('button', { name: 'Replace FRED_API_KEY' })).first().click() },
   { name: 'risk', path: '/settings/risk', fixtures: true, clock: MONDAY },
   { name: 'mixes', path: '/lab/mixes', fixtures: true, clock: MONDAY },
   { name: 'mixes-noprofile', path: '/lab/mixes?scenario=noprofile', fixtures: true, clock: MONDAY },
