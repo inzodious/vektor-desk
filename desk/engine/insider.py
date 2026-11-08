@@ -304,6 +304,31 @@ def fetch_history(conn: sqlite3.Connection, http, symbols: list[str], *, now: da
     return {"symbols": len(todo), "bars": len(rows), "left": max(0, len([s for s in symbols if s not in done]) - len(todo))}
 
 
+def coverage(conn: sqlite3.Connection, limit: int = 20) -> dict:
+    found = clusters(conn)
+    fetched = {r[0]: r[1] for r in conn.execute("SELECT symbol, bars FROM alpaca_history")}
+    spans = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT symbol, min(date), max(date) FROM alpaca_bars GROUP BY symbol")}
+    priced, unpriced, pending, ended = [], [], [], []
+    for sym, first in sorted(found.items()):
+        span = spans.get(sym)
+        if sym not in fetched:
+            pending.append(sym)
+        elif not span or span[0] > (date.fromisoformat(first) + timedelta(days=7)).isoformat() or span[1] < first:
+            unpriced.append(sym)
+        else:
+            priced.append(sym)
+            if span[1] < (date.fromisoformat(first) + timedelta(days=365)).isoformat():
+                ended.append(sym)
+    return {
+        "clusters": len(found),
+        "priced": len(priced),
+        "unpriced": len(unpriced),
+        "pending": len(pending),
+        "ended_within_a_year": len(ended),
+        "unpriced_symbols": unpriced[:limit],
+    }
+
+
 # ---- Point-in-time small-cap membership ----
 
 
