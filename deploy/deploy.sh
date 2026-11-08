@@ -40,6 +40,7 @@ HEALTH_WAIT=${DESK_HEALTH_WAIT:-120}
 LOG=$ROOT/deploy.log
 BUILD_LOG=$ROOT/deploy-build.log
 DEBUG_MAX=${DESK_DEBUG_MAX:-104857600}
+NO_SELF_PIN=${DESK_NO_SELF_PIN:-$ROOT/deploy.no-self-pin}
 SELF=${DESK_SELF:-$(readlink -f "${BASH_SOURCE[0]}")}
 BOX_ACTIONS="redeploy status check backup restore-test logs"
 BOX_TIMEOUT=${DESK_BOX_TIMEOUT:-1800}
@@ -287,9 +288,30 @@ auto() {
   trap 'auto_stopped $?' EXIT
   deploy
   trap - EXIT
-  if pinned_stale && note "deploy.sh changed on main; read it, then copy it again for the cron jobs (docs/setup.md, After updates)"; then
-    alert "Desk needs you" "deploy.sh changed. Read it, then copy it again for the cron jobs. See docs/setup.md."
+}
+
+self_pin() {
+  local head new ALERTS=self-pin
+  [ -f "$PINNED" ] && [ "$(readlink -f "$PINNED")" != "$(readlink -f "$SRC/deploy/deploy.sh")" ] || return 0
+  pinned_stale || return 0
+  if [ -e "$NO_SELF_PIN" ]; then
+    note "deploy.sh changed on main and self-pinning is off ($NO_SELF_PIN); read it, then copy it again (docs/setup.md, After updates)" &&
+      alert "Desk needs you" "deploy.sh changed and self-pinning is off. Copy it again for the cron jobs. See docs/setup.md."
+    return 0
   fi
+  [ -z "$(repo status --porcelain --untracked-files=no 2>/dev/null)" ] || return 0
+  head=$(repo rev-parse HEAD 2>/dev/null) || return 0
+  [ "$head" = "$(repo rev-parse "origin/$BRANCH" 2>/dev/null)" ] || return 0
+  if ! bash -n "$SRC/deploy/deploy.sh" 2>>"$LOG"; then
+    note "deploy.sh at ${head:0:7} doesn't parse; the cron copy stays as it is" || true
+    return 1
+  fi
+  new=$(mktemp "$(dirname "$PINNED")/.deploy.sh.XXXXXX")
+  cat "$SRC/deploy/deploy.sh" >"$new"
+  chmod 700 "$new"
+  mv -f "$new" "$PINNED"
+  log "deploy.sh updated itself to ${head:0:7}: $(repo log -1 --format=%s "$head" -- deploy/deploy.sh)"
+  alert "Desk updated deploy.sh" "The cron copy now matches main at ${head:0:7}. To turn this off: touch $NO_SELF_PIN"
 }
 
 status() {
@@ -304,7 +326,7 @@ status() {
   crons=$(midclt call cronjob.query 2>/dev/null | jq -r '[.[] | select(.enabled and (.command | test("vektor-desk-deploy/deploy\\.sh auto")))] | length' 2>/dev/null || true)
   if [ "${crons:-0}" -gt 0 ]; then echo "Auto-deploy: on"; else echo "Auto-deploy: off (docs/setup.md, step 8)"; fi
   if [ -s "$AUTO_FAILED" ]; then echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or run deploy.sh now"; fi
-  if [ ! -f "$PINNED" ]; then echo "Cron copy:   none at $PINNED (step 8)"; elif pinned_stale; then echo "Cron copy:   differs from the checkout's deploy.sh; read the change, then copy it again (docs/setup.md, After updates)"; fi
+  if [ ! -f "$PINNED" ]; then echo "Cron copy:   none at $PINNED (step 8)"; elif pinned_stale && [ -e "$NO_SELF_PIN" ]; then echo "Cron copy:   differs from the checkout's deploy.sh and self-pinning is off; read the change, then copy it again (docs/setup.md, After updates)"; elif pinned_stale; then echo "Cron copy:   updates itself to the checkout's deploy.sh on the next auto run"; fi
   compose_drift
   echo
   docker exec vektor-desk-api python -m desk.status 2>/dev/null || echo "(the desk's own status isn't answering)"
@@ -596,7 +618,7 @@ main() {
       flock -n 9 || die "a deploy is already running: tail -f $LOG"
       deploy
       app_card || true
-      if pinned_stale; then log "deploy.sh changed: copy it again for the cron jobs (docs/setup.md, After updates)"; fi
+      self_pin || true
       ;;
     backup)
       ALERTS="Nightly backup failed"
@@ -605,6 +627,7 @@ main() {
       ;;
     auto)
       auto
+      self_pin || true
       exec 9>&-
       app_card >/dev/null 2>&1 || true
       logs_export || true

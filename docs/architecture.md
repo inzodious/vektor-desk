@@ -148,6 +148,7 @@ The same pattern as Hemline: `deploy/deploy.sh` runs as root on the NAS.
 - `auto` does the same every 5 minutes when `main` has moved, waits out running jobs, and doesn't retry a failed commit until the next push.
 - `status` shows what's live, GitHub, container health, the tailnet address, backups and the desk's own status.
 - `check` tests the Claude sign-in, Firestore read access, the DNS record against the tailnet address and the certificate, and sends a test alert to `desk-ops`.
+- The cron jobs run a pinned copy at `/mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`. It **updates itself**: after `auto` or `now`, if the checkout is clean, sits exactly at `origin/main`, and its `deploy.sh` parses, the copy is replaced through a temp file and `mv`, and a `desk-ops` alert names the commit. The trade-off is that a push to `main` reaches root on the NAS within 5 minutes, the same reach a push already has into the containers. To go back to copying it by hand, `touch /mnt/Manifest/apps/vektor-desk/deploy.no-self-pin`.
 - `auto` and `backup` send a high-priority `desk-ops` alert when they stop on an error; `now` doesn't, since you're watching it.
 - A change to `deploy/compose.yaml` isn't picked up by a redeploy. The deploy log says when it changed; paste it into Apps → vektor-desk → Edit.
 
