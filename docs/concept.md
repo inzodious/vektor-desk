@@ -104,7 +104,17 @@ This is the heart of the desk.
 
 ### Settings
 
-- **Desk profile:** risk level, industry focus, satellite cap (share allowed outside the plan mix), growth versus income tilt, tax preferences (harvest threshold, avoid short-term gains), horizon. Stored in `desk.yaml`; every proposal records the profile version it used.
+- **Desk profile:** risk band (from the risk questions), industry focus, satellite cap (share allowed outside the plan mix), growth versus income tilt, tax preferences (harvest threshold, avoid short-term gains), horizon. Stored in `desk.yaml`; every proposal records the profile version it used.
+- **Editing without SSH.** Every profile change goes through the API, which rewrites only the touched section of `desk.yaml` and keeps the old file as `desk.yaml.bak`.
+
+| Endpoint | Does |
+|---|---|
+| `PATCH /api/decisions/profile` `{changes}` | Deep-merges sections listed in `GET /profile` → `editable`; `risk_level` is refused |
+| `GET /api/decisions/convictions` | `{items, suggested}`; each item has its band, weight and status (inside, above, below) |
+| `PUT /api/decisions/convictions/{symbol}` | Adds or updates a conviction hold; missing band values come from the risk band |
+| `DELETE /api/decisions/convictions/{symbol}` | Removes it |
+
+- **Conviction hold.** A held conviction position (rule `conviction_hold`) is exempt from the single-stock cap and has its own band instead. No adds above the ceiling, never on margin, and one friendly alert a week only while above it.
 - Agent status: last run, next run, usage cost of each run in turns, on or off.
 - Data freshness: last mirror, last price tick, last lot import.
 - Claude token renewal date, with a reminder a month ahead.

@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from desk.config import Config
-from desk.decisions import plan, records, risk, starter, tickets
+from desk.decisions import plan, records, risk, starter, tickets, yamlfile
 from desk.decisions import profile as profiles
 from desk.decisions import rules as ruleset
 from desk.decisions.store import session
@@ -32,7 +32,20 @@ def get_profile(cfg: Cfg) -> JSONResponse:
     body = profiles.active_profile(cfg).as_dict()
     mode, series = plan.deposit_series(cfg)
     body["profile"] = {**body["profile"], "deposits": series}
-    return fresh(body | {"deposits_mode": mode})
+    return fresh(body | {"deposits_mode": mode, "editable": list(yamlfile.EDITABLE)})
+
+
+class ProfilePatch(BaseModel):
+    changes: dict
+
+
+@router.patch("/profile")
+def patch_profile(body: ProfilePatch, cfg: Cfg) -> JSONResponse:
+    try:
+        result = yamlfile.edit_profile(cfg, body.changes)
+    except yamlfile.EditError as e:
+        raise HTTPException(e.status, str(e)) from e
+    return fresh(result | {"status": starter.status(cfg)})
 
 
 class Answers(BaseModel):
@@ -51,6 +64,39 @@ def put_risk(body: Answers, cfg: Cfg) -> JSONResponse:
     except risk.RiskError as e:
         raise HTTPException(422, str(e)) from e
     return fresh({"changed": changed, "result": saved, "current": risk.current(cfg)})
+
+
+class Band(BaseModel):
+    band_min_pct: float | None = None
+    band_max_pct: float | None = None
+    note: str | None = None
+
+
+@router.get("/convictions")
+def get_convictions(cfg: Cfg) -> JSONResponse:
+    return fresh({"items": risk.convictions(cfg), "suggested": risk.suggested_band(cfg)})
+
+
+@router.put("/convictions/{symbol}")
+def put_conviction(symbol: str, body: Band, cfg: Cfg) -> JSONResponse:
+    try:
+        result = risk.set_conviction(cfg, symbol, band_min_pct=body.band_min_pct, band_max_pct=body.band_max_pct, note=body.note)
+    except risk.RiskError as e:
+        raise HTTPException(422, str(e)) from e
+    except yamlfile.EditError as e:
+        raise HTTPException(e.status, str(e)) from e
+    return fresh(result | {"suggested": risk.suggested_band(cfg)})
+
+
+@router.delete("/convictions/{symbol}")
+def delete_conviction(symbol: str, cfg: Cfg) -> JSONResponse:
+    try:
+        result = risk.drop_conviction(cfg, symbol)
+    except risk.RiskError as e:
+        raise HTTPException(404, str(e)) from e
+    except yamlfile.EditError as e:
+        raise HTTPException(e.status, str(e)) from e
+    return fresh(result)
 
 
 @router.get("/risk/versions")

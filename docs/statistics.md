@@ -225,7 +225,7 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 | `plan.single_stock` | Single-stock share vs its band | |
 | `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling. Only when a deposit is expected from your activity (auto-detected series or a schedule); the plan's contributions never predict one |
 | `plan.adherence` | Plan adherence | Share of buy dollars (activity, core sweeps excluded) that went to plan funds; windows `MTD`, `QTD`, `YTD`, `1Y`, `ITD` |
-| `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points. Each a pass or fail with the evidence |
+| `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points, conviction holds (pass while the symbol's weight sits inside `band_min_pct`–`band_max_pct`). A conviction symbol is exempt from the single-stock band and from no new single stocks. Each a pass or fail with the evidence |
 
 ### Tax (needs the lot export or the Fidelity history)
 
@@ -379,6 +379,7 @@ Code: `desk.engine.preflight.check_trade(cfg, trade, ticket_id=None)`; the trade
 | Lamp | `act` when | `watch` when |
 |---|---|---|
 | Concentration | A buy opens a new single stock, takes one past its band (default: the satellite cap), or takes all single stocks past `opportunity.satellite_cap_pct` | A sale leaves one past its band; a buy of a symbol whose kind is unknown |
+| Conviction hold | A buy of the symbol that ends above `band_max_pct`, or any margin-funded buy of it (also breaks the hold in Plan rules). The symbol is left out of the single-stock band and the satellite total | Nothing; inside or under the band is ok |
 | Drift after | | Largest drift grows past the drift limit |
 | Funding | A buy is margin-funded or cash runs short, with the monthly interest in dollars and the drop to a call | |
 | Wash sales | A buy within 30 days of a loss sale of that symbol; a loss sale within 30 days of a buy of it in any account | A scheduled deposit or dividend reinvest would buy it back; a possibly identical fund |
