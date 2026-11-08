@@ -5,6 +5,7 @@ import { Jobs } from '../settings/Jobs.jsx';
 import { Box } from '../settings/Box.jsx';
 import { Inbox } from '../settings/Inbox.jsx';
 import { Keys } from '../settings/Keys.jsx';
+import { ProfileEditor } from '../settings/ProfileEditor.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
 import { Panel } from '../components/Panel.jsx';
@@ -208,6 +209,7 @@ function MirrorTables({ mirror, open, onClose }) {
 function Profile({ api }) {
   const p = api.data;
   const [copied, setCopied] = useState(null);
+  const [editing, setEditing] = useState(false);
   if (!p) {
     return (
       <div className="card c12" data-testid="profile">
@@ -235,6 +237,12 @@ function Profile({ api }) {
         <span className="acts">
           <span className="chip">v{p.version ?? '—'}</span>
           <span className={`chip${p.exists ? '' : ' lilac'}`}>{profileSource(p)}</span>
+          {p.exists ? (
+            <button className="btn sm" type="button" onClick={() => setEditing(true)} data-testid="profile-edit">
+              <Icon name="settings" />
+              Edit
+            </button>
+          ) : null}
         </span>
       </div>
       {p.error ? (
@@ -294,6 +302,7 @@ function Profile({ api }) {
           ))}
         </ul>
       ) : null}
+      <ProfileEditor open={editing} onClose={() => setEditing(false)} onSaved={() => api.reload()} />
     </div>
   );
 }

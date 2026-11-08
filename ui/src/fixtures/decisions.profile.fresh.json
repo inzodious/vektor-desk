@@ -65,5 +65,16 @@
    "weekly_runs": {}
   }
  },
- "deposits_mode": "auto"
+ "deposits_mode": "auto",
+ "editable": [
+  "industry_focus",
+  "opportunity",
+  "tax",
+  "growth",
+  "usage",
+  "agents",
+  "deposits",
+  "alerts",
+  "rules"
+ ]
 }

@@ -4,6 +4,7 @@ import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Gauge } from '../components/Gauge.jsx';
 import { Panel } from '../components/Panel.jsx';
+import { Convictions } from '../settings/Convictions.jsx';
 import { postJson, useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
 import { usd } from '../lib/format.js';
@@ -326,6 +327,7 @@ export default function RiskCheck() {
             onCancel={c ? () => setRetake(false) : null}
           />
         ) : null}
+        {d ? <Convictions i={3} /> : null}
         <History versions={versions} />
       </section>
       {d ? <Bands bands={d.bands} current={c} open={bandsOpen} onClose={() => setBandsOpen(false)} /> : null}
