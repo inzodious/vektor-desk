@@ -1,7 +1,5 @@
 import json
 import random
-import sys
-import types
 from datetime import UTC, datetime
 
 import pytest
@@ -165,12 +163,11 @@ def test_fit_badge_follows_the_risk_profile(monkeypatch):
     ladder = list(bands.LADDER)
     assert bands.rank(-8.0, ladder) == 1 and bands.rank(-30.0, ladder) == 4 and bands.rank(-80.0, ladder) == 5
     assert bands.fit_to(-30.0, None, ladder) is None
-    fake = types.ModuleType("desk.decisions.risk")
-    fake.BANDS = {b: {"label": str(b), "worst_year_loss_pct": w} for b, w in ((1, 10), (2, 18), (3, 25), (4, 33), (5, 45))}
-    fake.current = lambda cfg: {"band": 3, "label": "Moderate", "worst_year_loss_pct": 25, "version": 1}
-    monkeypatch.setitem(sys.modules, "desk.decisions.risk", fake)
+    from desk.decisions import risk as profile_risk
+
+    monkeypatch.setattr(profile_risk, "current", lambda cfg: {"band": 3, "label": "Moderate", "worst_year_loss_pct": -25, "version": 1})
     lad, prof, source = bands.ladder_and_profile(object())
-    assert source == "profile" and lad[0] == {"band": 1, "label": "1", "worst_year_loss_pct": 10} and prof["band"] == 3
+    assert source == "profile" and lad[0] == {"band": 1, "label": "Conservative", "worst_year_loss_pct": 10.0} and prof["band"] == 3
     assert [bands.fit_to(x, prof, lad) for x in (-30.0, -20.0, -8.0)] == ["above", "fits", "below"]
 
 
@@ -216,7 +213,13 @@ def test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatc
     conn.close()
     computed(cfg)
     body = client.get("/api/engine/bands").json()
-    assert body["status"] == "ok" and body["book"] == "as-held" and body["horizons"] == [1, 5, 10, 20, 40] and body["ladder_source"] == "default"
+    assert (
+        body["status"] == "ok"
+        and body["book"] == "as-held"
+        and body["horizons"] == [1, 5, 10, 20, 40]
+        and body["ladder_source"] == "profile"
+        and body["ladder"][0]["worst_year_loss_pct"] == 10
+    )
     rows = {r["id"]: r for r in body["rows"]}
     assert set(rows) == {"safe-mix", "as-held", "tech-tilt", "dip-buy"} and all(r["status"] == "ok" for r in rows.values())
     safe, tech, held = rows["safe-mix"], rows["tech-tilt"], rows["as-held"]

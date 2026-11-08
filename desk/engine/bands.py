@@ -273,13 +273,19 @@ def ladder_and_profile(cfg: Config | None) -> tuple[list[dict], dict | None, str
     except ImportError:
         return list(LADDER), None, "default"
     raw = getattr(profile_risk, "BANDS", None) or LADDER
-    ladder = [{"band": int(k)} | dict(v) for k, v in raw.items()] if isinstance(raw, dict) else [dict(b) for b in raw]
+    rows = [{"band": int(k)} | dict(v) for k, v in raw.items()] if isinstance(raw, dict) else [dict(b) for b in raw]
+    ladder = [{"band": b["band"], "label": b.get("label") or b.get("name"), "worst_year_loss_pct": limit(b)} for b in rows if limit(b) is not None]
     current = getattr(profile_risk, "current", None)
     try:
         prof = current(cfg) if current and cfg is not None else None
     except Exception:
         prof = None
     return ladder, prof, "profile"
+
+
+def limit(band: dict | None) -> float | None:
+    raw = (band or {}).get("worst_year_loss_pct", (band or {}).get("worst_year_pct"))
+    return abs(float(raw)) if isinstance(raw, int | float) else None
 
 
 def rank(worst_p10: float, ladder: list[dict]) -> int:
@@ -290,9 +296,10 @@ def rank(worst_p10: float, ladder: list[dict]) -> int:
 
 
 def fit_to(worst_p10: float, prof: dict | None, ladder: list[dict]) -> str | None:
-    if not prof or prof.get("worst_year_loss_pct") is None:
+    own = limit(prof)
+    if own is None:
         return None
-    if -worst_p10 > float(prof["worst_year_loss_pct"]):
+    if -worst_p10 > own:
         return "above"
     lower = [b for b in ladder if int(b["band"]) == int(prof.get("band") or 0) - 1]
     if lower and -worst_p10 <= float(lower[0]["worst_year_loss_pct"]):
@@ -423,7 +430,7 @@ def run(
         "history": {"start": history[0][0][:7], "end": history[-1][0][:7], "months": len(history)},
         "ladder": ladder,
         "ladder_source": ladder_source,
-        "profile": {k: prof.get(k) for k in ("band", "label", "worst_year_loss_pct", "version")} if prof else None,
+        "profile": {"band": prof.get("band"), "label": prof.get("label"), "worst_year_loss_pct": limit(prof), "version": prof.get("version")} if prof else None,
         "method": METHOD,
         "caveats": caveats,
     }
