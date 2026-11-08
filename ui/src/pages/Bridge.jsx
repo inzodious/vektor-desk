@@ -11,6 +11,7 @@ import { Gauge } from '../components/Gauge.jsx';
 import { DriftRows } from '../components/DriftRows.jsx';
 import { QueueCard } from '../decisions/QueueCard.jsx';
 import { BriefCard } from '../agents/BriefCard.jsx';
+import { Discounts } from '../research/Discounts.jsx';
 import { CashDrawer, DriftDrawer, ExcessDrawer, SinglesDrawer, ValueDrawer } from './BridgeDrawers.jsx';
 import { LIVE_STATES, useLive, useSymbol } from '../live/context.js';
 import { useApi } from '../lib/api.js';
@@ -276,6 +277,7 @@ export default function Bridge() {
       <section className="grid">
         <BriefCard brief={brief} i={7} />
         <QueueCard queue={queue} i={7} span="c8" />
+        <Discounts i={7} />
         <div className="card c12" style={{ '--i': 7 }}>
           <div className="card-head">
             <span className="tag mustard">Departures board</span>

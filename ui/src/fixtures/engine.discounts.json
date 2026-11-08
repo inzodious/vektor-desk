@@ -1,0 +1,179 @@
+{
+ "as_of": "2026-11-06",
+ "scanned": 31,
+ "rule": "After the close: a down day of 2+ standard deviations of its last year and 1% or more, or a first close 10, 20 or 30% under its 52-week high",
+ "note": null,
+ "rows": [
+  {
+   "signal_id": "2026-11-06-ACME",
+   "symbol": "ACME",
+   "name": "Acme Rockets (synthetic)",
+   "as_of": "2026-11-06",
+   "list": "held",
+   "reason": "crossed_20",
+   "price": 2.96,
+   "drop_from_high_pct": -21.4,
+   "move_z": -1.6,
+   "valuation": {
+    "metric": "price_vs_5y_avg",
+    "value": 0.62,
+    "pctile_own": 0.08
+   },
+   "numbers": {
+    "price": 2.96,
+    "day_move_pct": -4.1,
+    "drop_from_high_pct": -21.4,
+    "move_z": -1.6,
+    "high_52w": 3.77,
+    "ret_1y_pct": -38.2,
+    "valuation_value": 0.62,
+    "valuation_pctile": 0.08
+   },
+   "case": {
+    "verdict": "wait",
+    "case": "The drop follows a delayed launch, not a funding problem. Wait for the next schedule update before adding.",
+    "risks": "Another slip would push cash needs into next year.",
+    "confidence": 0.6,
+    "horizon_days": 30,
+    "numbers_cited": [
+     "drop_from_high_pct"
+    ],
+    "model": "claude",
+    "written_at": "2026-11-06T23:10:00Z",
+    "run_id": "r-disc-1"
+   }
+  },
+  {
+   "signal_id": "2026-11-06-FTEC",
+   "symbol": "FTEC",
+   "name": "Fidelity MSCI Information Technology ETF",
+   "as_of": "2026-11-06",
+   "list": "held",
+   "reason": "big_down_day",
+   "price": 182.4,
+   "drop_from_high_pct": -7.9,
+   "move_z": -2.4,
+   "valuation": {
+    "metric": "price_vs_5y_avg",
+    "value": 1.18,
+    "pctile_own": 0.71
+   },
+   "numbers": {
+    "price": 182.4,
+    "day_move_pct": -3.2,
+    "drop_from_high_pct": -7.9,
+    "move_z": -2.4,
+    "high_52w": 198,
+    "ret_1y_pct": 21.6,
+    "valuation_value": 1.18,
+    "valuation_pctile": 0.71
+   },
+   "case": {
+    "verdict": "buy",
+    "case": "A broad tech fund down 2.4 swings on a rate scare; nothing in the holdings changed. Fits the plan if it goes to the tech sleeve.",
+    "risks": "Rates could keep pressing growth names for weeks.",
+    "confidence": 0.7,
+    "horizon_days": 90,
+    "numbers_cited": [
+     "move_z"
+    ],
+    "model": "claude",
+    "written_at": "2026-11-06T23:12:00Z",
+    "run_id": "r-disc-1"
+   }
+  },
+  {
+   "signal_id": "2026-11-05-MSFT",
+   "symbol": "MSFT",
+   "name": "Microsoft",
+   "as_of": "2026-11-05",
+   "list": "quality",
+   "reason": "crossed_10",
+   "price": 402.1,
+   "drop_from_high_pct": -10.6,
+   "move_z": -1.2,
+   "valuation": {
+    "metric": "pe_annual",
+    "value": 29.4,
+    "pctile_own": 0.22
+   },
+   "numbers": {
+    "price": 402.1,
+    "day_move_pct": -1.8,
+    "drop_from_high_pct": -10.6,
+    "move_z": -1.2,
+    "high_52w": 449.8,
+    "ret_1y_pct": 8.4,
+    "valuation_value": 29.4,
+    "valuation_pctile": 0.22
+   },
+   "case": null
+  },
+  {
+   "signal_id": "2026-11-04-NOVA",
+   "symbol": "NOVA",
+   "name": "Nova Fission (synthetic)",
+   "as_of": "2026-11-04",
+   "list": "watchlist",
+   "reason": "crossed_30",
+   "price": 24.1,
+   "drop_from_high_pct": -31.2,
+   "move_z": -2.9,
+   "valuation": {
+    "metric": "price_vs_5y_avg",
+    "value": 0.84,
+    "pctile_own": 0.3
+   },
+   "numbers": {
+    "price": 24.1,
+    "day_move_pct": -6.4,
+    "drop_from_high_pct": -31.2,
+    "move_z": -2.9,
+    "high_52w": 35,
+    "ret_1y_pct": -12,
+    "valuation_value": 0.84,
+    "valuation_pctile": 0.3
+   },
+   "case": {
+    "verdict": "avoid",
+    "case": "The share sale behind the drop dilutes holders by about a tenth; the plan rules out new single stocks.",
+    "risks": "Missing a rebound if the offering prices well.",
+    "confidence": 0.65,
+    "horizon_days": 60,
+    "numbers_cited": [
+     "drop_from_high_pct"
+    ],
+    "model": "claude",
+    "written_at": "2026-11-05T22:40:00Z",
+    "run_id": "r-disc-0"
+   }
+  },
+  {
+   "signal_id": "2026-11-03-COST",
+   "symbol": "COST",
+   "name": "Costco",
+   "as_of": "2026-11-03",
+   "list": "quality",
+   "reason": "big_down_day",
+   "price": 881,
+   "drop_from_high_pct": -9.1,
+   "move_z": -2.2,
+   "valuation": {
+    "metric": "pe_annual",
+    "value": 48.2,
+    "pctile_own": 0.55
+   },
+   "numbers": {
+    "price": 881,
+    "day_move_pct": -2.6,
+    "drop_from_high_pct": -9.1,
+    "move_z": -2.2,
+    "high_52w": 969,
+    "ret_1y_pct": 14.1,
+    "valuation_value": 48.2,
+    "valuation_pctile": 0.55
+   },
+   "case": null
+  }
+ ]
+}
