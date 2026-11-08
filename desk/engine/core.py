@@ -285,7 +285,8 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _research_metrics(out, desk, kinds)
     _flight_record(out, cfg, desk, tr, targets, kinds, now_rows)
     market = next((m[5] for m in out.metrics if m[0] == "value.market" and m[1] == "portfolio"), total)
-    out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), fi.fi_prefs(current_rows(mirror, "prefs")), desk, market)
+    cash_in = [(f["date"], f["amount"]) for f in flows if f["external_portfolio"] and f["amount"] > 0]
+    out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), fi.fi_prefs(current_rows(mirror, "prefs")), desk, market, cash_in)
     out.views["factors"] = fi.exposure(out, tr, desk, {s: w / 100 for s, w in symbol_weights(now_rows, total).items()})
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:

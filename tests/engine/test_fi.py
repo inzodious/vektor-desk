@@ -39,7 +39,10 @@ def test_prefs_deposits_and_bond_share(monkeypatch):
     p = fi.fi_prefs([{"key": "taxEngine", "value": {}}, PREFS])
     assert p == {"fi_number": 1_000_000.0, "target_date": "2040-07-12", "inflation": 0.03, "real": True}
     assert fi.fi_prefs([{"key": "fi", "value": {"fiYearlySpend": None}}]) is None and fi.fi_prefs([]) is None
-    assert fi.monthly_deposit(PLAN) == (1500.0, "plan") and fi.monthly_deposit({}) == (None, "none")
+    year = [(f"2026-{m:02d}-03", 1000.0) for m in range(1, 12)] + [("2025-10-03", 9999.0), ("2026-11-03", -500.0)]
+    assert fi.monthly_deposit(year, "2026-11-07") == (pytest.approx(11000 / 12), "activity", 12)
+    assert fi.monthly_deposit([("2026-09-15", 600.0), ("2026-10-15", 600.0)], "2026-11-07") == (pytest.approx(600.0), "activity", 2)
+    assert fi.monthly_deposit([], "2026-11-07") == (None, "none", 0)
     targets = {"FXAIX": 0.8, "FXNAX": 0.2}
     assert fi.bond_share(PLAN, targets) == 0.2
     monkeypatch.setenv("DESK_BOND_FUNDS", "fxaix")
@@ -70,7 +73,9 @@ def test_run_writes_percentiles_and_lines(desk_db, monkeypatch):
     monkeypatch.setenv("DESK_MC_PATHS", "400")
     monthly(desk_db)
     out = Out(as_of="2026-11-07")
-    view = fi.run(out, PLAN, {"FXAIX": 0.8, "FXNAX": 0.2}, {"FXAIX": 0.015, "FXNAX": 0.025}, fi.fi_prefs([PREFS]), desk_db, 100_000.0)
+    deposits = [("2026-09-01", 1500.0), ("2026-10-01", 1500.0), ("2026-11-01", 1500.0)]
+    view = fi.run(out, PLAN, {"FXAIX": 0.8, "FXNAX": 0.2}, {"FXAIX": 0.015, "FXNAX": 0.025}, fi.fi_prefs([PREFS]), desk_db, 100_000.0, deposits)
+    assert view["deposit_source"] == "activity" and view["deposit_note"] == "from your last 3 months of deposits" and view["monthly_deposit"] == 1500.0
     assert view["status"] == "ok" and view["paths"] == 400 and view["mix"] == {"equity": 0.8, "bonds_as_bills": 0.2}
     assert view["fee_pct"] == pytest.approx(0.017) and view["history"]["months"] == 600
     known = [x for x in view["fi_date"].values() if x]
