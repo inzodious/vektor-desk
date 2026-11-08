@@ -58,7 +58,7 @@ class FakeWeb:
             assert headers["APCA-API-KEY-ID"] == "paper-id"
             out = {}
             for s in params["symbols"].split(","):
-                _, _, _, _, px, vol = COMPANIES[s]
+                _, _, _, _, px, vol = COMPANIES.get(s, (0, "", "", 0, 200.0, 1_000_000))
                 scale = 0.5 if params["adjustment"] == "all" else 1.0
                 out[s] = [
                     {"t": midnight(d), "o": px, "h": px, "l": px, "c": px * scale, "v": vol, "vw": px} for d in SESSIONS if d.isoformat() >= params["start"]

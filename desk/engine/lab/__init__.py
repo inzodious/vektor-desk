@@ -67,7 +67,7 @@ def _ledger(cfg: Config):
 def strategies(cfg: Config) -> list[dict]:
     conn = _ledger(cfg)
     if conn is None:
-        return []
+        return _lanes(cfg)
     try:
         rows = [
             dict(r)
@@ -81,10 +81,35 @@ def strategies(cfg: Config) -> list[dict]:
         r["hypothesis"] = _raw(r.pop("spec")).get("hypothesis")
         r["trials"] = counts.get((r["id"], r["version"]), 0)
         p = paper.get((r["id"], r["version"]))
+        r["kind"] = "strategy"
         if p:
             r["paper"] = p
             r["status"] = p["status"] if p["status"] != "paper" else r["status"]
-    return rows
+    return _lanes(cfg) + rows
+
+
+def _lanes(cfg: Config) -> list[dict]:
+    from desk.engine import lane
+
+    if not cfg.desk_db.exists():
+        return []
+    conn = connect(cfg.desk_db, readonly=True)
+    try:
+        specs = lane.variants(conn)
+    finally:
+        conn.close()
+    paper = _paper(cfg)
+    out = []
+    for v in specs:
+        p = paper.get((v.id, v.version))
+        if p is None and not v.registered_at:
+            continue
+        row = {"id": v.id, "version": v.version, "title": v.title, "kind": "lane", "status": p["status"] if p else "waiting", "registered_at": v.registered_at}
+        row |= {"hypothesis": v.hypothesis, "params": v.params(), "rule": v.rule(), "trials": 0}
+        if p:
+            row["paper"] = p
+        out.append(row)
+    return out
 
 
 def _raw(text: str | None) -> dict:

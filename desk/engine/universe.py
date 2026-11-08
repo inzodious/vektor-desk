@@ -23,6 +23,7 @@ EXCLUDE = re.compile(
     r"ACQUISITION CORP|ACQUISITION CO|ACQUISITION INC|BDC)\b",
     re.I,
 )
+BENCHMARK = "IWM"
 RULE = "US common stock on NYSE, Nasdaq or NYSE American; market cap $50M to $2B (SEC shares x close); 20-day median dollar volume at least $500K"
 
 
@@ -115,6 +116,12 @@ def members(conn: sqlite3.Connection, day: str | None = None) -> list[dict]:
 # ---- Nightly job ----
 
 
+def lane_symbols(conn: sqlite3.Connection) -> set[str]:
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='filing_signals'").fetchone() is None:
+        return set()
+    return {r[0] for r in conn.execute("SELECT DISTINCT symbol FROM filing_signals")}
+
+
 def run(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> dict:
     if alpaca.headers() is None:
         return {"ok": True, "skipped": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"}
@@ -127,6 +134,7 @@ def run(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> d
         pool = candidates(conn)
         have = latest_shares(conn, now.date().isoformat())
         symbols = [sym for sym, _, _, cik in pool if cik in have]
+        symbols = sorted(set(symbols) | {BENCHMARK} | lane_symbols(conn))
         bars = alpaca.run_bars(conn, http, symbols, now=now, sleep=sleep)
     except (ProviderError, NotPaper) as e:
         return {"ok": False, "error": str(e)}

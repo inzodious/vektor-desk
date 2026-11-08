@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import lab, schema, watchlist
+from desk.engine import lab, leaderboard, paper_exec, schema, watchlist
 from desk.engine.compare import CompareError, compare
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
@@ -372,6 +372,17 @@ def lookthrough_view(request: Request, fund: str | None = None, limit: int = 50)
 def lab_strategies(request: Request) -> JSONResponse:
     cfg = get_cfg(request)
     return _json({"strategies": lab.strategies(cfg), "rules": lab.rules(cfg), "features": lab.features(cfg), "grammar": lab.grammar()})
+
+
+@router.get("/api/engine/lab/leaderboard")
+def lab_leaderboard(request: Request) -> JSONResponse:
+    cfg = get_cfg(request)
+    conn = connect(cfg.desk_db, readonly=True) if cfg.desk_db.exists() else None
+    try:
+        return _json(leaderboard.build(conn, paper_exec.budget()))
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @router.get("/api/lab/strategies/{strategy_id}")
