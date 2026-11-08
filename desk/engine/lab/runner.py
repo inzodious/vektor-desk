@@ -424,7 +424,8 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
     survivorship = None
     if spec.universe.get("kind") == SMALL_CAPS:
         stress = stats.summary(simulate(data, spec, v, exp["windows"]["holdout_start"], last, delist_haircut=1.0))
-        survivorship = _survivorship(data.coverage(), stress)
+        drift = any(m.startswith("earnings.") for m, _, _ in spec.signals)
+        survivorship = _survivorship(data.coverage("earnings_coverage" if drift else "insider_coverage"), stress, "earnings" if drift else "insider-cluster")
         bars["delist_total_loss"] = survivorship["stress_excess_pts"] > 0 if survivorship["stress_excess_pts"] is not None else None
         bars["price_coverage"] = survivorship["coverage_ok"]
     factor_ran = bars["factor"] is not None
@@ -448,17 +449,17 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
     return _record(conn, spec, "finalize", body, now)
 
 
-def _survivorship(cov: dict | None, stress: dict) -> dict:
+def _survivorship(cov: dict | None, stress: dict, label: str = "insider-cluster") -> dict:
     x = stress.get("excess_vs_bench_pts")
     if not cov or not cov.get("clusters"):
-        return {"coverage_ok": None, "stress_excess_pts": x, "note": "No price-coverage count for insider names yet, so the verdict waits for it."}
+        return {"coverage_ok": None, "stress_excess_pts": x, "note": f"No price-coverage count for {label} names yet, so the verdict waits for it."}
     missing = cov["unpriced"] + cov["pending"]
     share = missing / cov["clusters"]
     ok = None if cov["pending"] or share > COVERAGE_MAX_MISSING else True
     note = (
-        f"{cov['unpriced']} of {cov['clusters']} insider-cluster names have no price after the event (likely delisted) and {cov['pending']} "
+        f"{cov['unpriced']} of {cov['clusters']} {label} names have no price after the event (likely delisted) and {cov['pending']} "
         f"are still loading; they are left out, which can flatter results. {cov['ended_within_a_year']} priced names stopped trading within a year "
-        f"of their cluster. "
+        f"of their first event. "
     )
     if x is None:
         note += "The total-loss stress could not be measured."

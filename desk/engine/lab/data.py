@@ -25,6 +25,7 @@ CREATE TABLE factors (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT N
 CREATE TABLE french (set_name TEXT NOT NULL, name TEXT NOT NULL, date TEXT NOT NULL, ret REAL NOT NULL, PRIMARY KEY (set_name, name, date)) WITHOUT ROWID;
 CREATE TABLE insider (symbol TEXT NOT NULL, known TEXT NOT NULL, owner INTEGER NOT NULL, usd REAL NOT NULL);
 CREATE TABLE smallcap (symbol TEXT NOT NULL, month TEXT NOT NULL, PRIMARY KEY (symbol, month)) WITHOUT ROWID;
+CREATE TABLE earnings (symbol TEXT NOT NULL, known TEXT NOT NULL, surprise REAL NOT NULL);
 """
 SMALLCAP_KIND = "stock"
 SMALL_CAPS = "small_caps"
@@ -103,6 +104,11 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
             from desk.engine.insider import coverage
 
             settings["insider_coverage"] = json.dumps(coverage(desk))
+        if small and _has(desk, "earnings_events"):
+            from desk.engine import earnings
+
+            out.executemany("INSERT INTO earnings VALUES (?, ?, ?)", [tuple(r) for r in desk.execute("SELECT symbol, known, surprise FROM earnings_events")])
+            settings["earnings_coverage"] = json.dumps(earnings.coverage(desk))
         out.executemany("INSERT INTO settings VALUES (?, ?)", list(settings.items()))
         out.commit()
     finally:
@@ -161,9 +167,10 @@ class LabData:
     french_sets: dict[str, list[str]] = field(default_factory=dict)
     insider: dict[str, tuple[list[str], list[int], list[float]]] = field(default_factory=dict)
     smallcap: dict[str, set[str]] = field(default_factory=dict)
+    earnings: dict[str, tuple[list[str], list[float]]] = field(default_factory=dict)
 
-    def coverage(self) -> dict | None:
-        raw = self.settings.get("insider_coverage")
+    def coverage(self, key: str = "insider_coverage") -> dict | None:
+        raw = self.settings.get(key)
         try:
             return json.loads(raw) if raw else None
         except ValueError:
@@ -284,6 +291,12 @@ def load(path: Path) -> LabData:
                 u.append(r[3])
             for r in conn.execute("SELECT symbol, month FROM smallcap"):
                 smallcap.setdefault(r[0], set()).add(r[1])
+        earnings: dict[str, tuple[list[str], list[float]]] = {}
+        if _has(conn, "earnings"):
+            for r in conn.execute("SELECT symbol, known, surprise FROM earnings ORDER BY symbol, known"):
+                d, v = earnings.setdefault(r[0], ([], []))
+                d.append(r[1])
+                v.append(r[2])
     finally:
         conn.close()
     ref = next((s for s in ("SPY", "VTI", "FXAIX") if s in series), None) or max(series, key=lambda s: len(series[s].dates), default=None)
@@ -294,4 +307,6 @@ def load(path: Path) -> LabData:
         ref = FRENCH_MARKET if market is not None else None
     if not ref:
         raise NotReady("The lab data has no prices yet.")
-    return LabData(series, kinds, roles, last, macro, plan, settings, list(series[ref].dates), factors, path, insider=insider, smallcap=smallcap)
+    return LabData(
+        series, kinds, roles, last, macro, plan, settings, list(series[ref].dates), factors, path, insider=insider, smallcap=smallcap, earnings=earnings
+    )
