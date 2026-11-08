@@ -1,0 +1,283 @@
+{
+ "questions": [
+  {
+   "id": "max_drawdown",
+   "part": "tolerance",
+   "prompt": "In a bad year, how far could your portfolio fall before you'd lose sleep?",
+   "options": [
+    {
+     "value": 10,
+     "label": "10% (about $1,600 today)",
+     "drop_pct": 10,
+     "dollars": 1600
+    },
+    {
+     "value": 20,
+     "label": "20% (about $3,300 today)",
+     "drop_pct": 20,
+     "dollars": 3300
+    },
+    {
+     "value": 30,
+     "label": "30% (about $4,900 today)",
+     "drop_pct": 30,
+     "dollars": 4900
+    },
+    {
+     "value": 40,
+     "label": "40% (about $6,600 today)",
+     "drop_pct": 40,
+     "dollars": 6600
+    },
+    {
+     "value": 50,
+     "label": "50% (about $8,200 today)",
+     "drop_pct": 50,
+     "dollars": 8200
+    }
+   ]
+  },
+  {
+   "id": "drop_reaction",
+   "part": "tolerance",
+   "prompt": "Markets fall 30% in three months. What do you do?",
+   "options": [
+    {
+     "value": "sell_all",
+     "label": "Sell everything"
+    },
+    {
+     "value": "sell_some",
+     "label": "Sell some to stop the bleeding"
+    },
+    {
+     "value": "hold",
+     "label": "Hold and wait"
+    },
+    {
+     "value": "buy_some",
+     "label": "Buy a little more"
+    },
+    {
+     "value": "buy_lots",
+     "label": "Buy a lot more"
+    }
+   ]
+  },
+  {
+   "id": "one_year_range",
+   "part": "tolerance",
+   "prompt": "Pick the one-year range you'd take.",
+   "options": [
+    {
+     "value": "r1",
+     "label": "Up 4% to down 2%"
+    },
+    {
+     "value": "r2",
+     "label": "Up 8% to down 8%"
+    },
+    {
+     "value": "r3",
+     "label": "Up 15% to down 15%"
+    },
+    {
+     "value": "r4",
+     "label": "Up 22% to down 25%"
+    },
+    {
+     "value": "r5",
+     "label": "Up 30% to down 35%"
+    }
+   ]
+  },
+  {
+   "id": "goal",
+   "part": "tolerance",
+   "prompt": "What matters more for this money?",
+   "options": [
+    {
+     "value": "preserve",
+     "label": "Not losing it"
+    },
+    {
+     "value": "income",
+     "label": "Steady income"
+    },
+    {
+     "value": "balanced",
+     "label": "A balance of growth and safety"
+    },
+    {
+     "value": "growth",
+     "label": "Growth"
+    },
+    {
+     "value": "max_growth",
+     "label": "As much growth as possible"
+    }
+   ]
+  },
+  {
+   "id": "experience",
+   "part": "tolerance",
+   "prompt": "How much investing have you done?",
+   "options": [
+    {
+     "value": "none",
+     "label": "None yet"
+    },
+    {
+     "value": "funds",
+     "label": "Index funds and a 401(k)"
+    },
+    {
+     "value": "some_stocks",
+     "label": "Some single stocks"
+    },
+    {
+     "value": "active",
+     "label": "Active trading through a bear market"
+    },
+    {
+     "value": "advanced",
+     "label": "Options, margin or short selling"
+    }
+   ]
+  },
+  {
+   "id": "horizon",
+   "part": "capacity",
+   "prompt": "When will you start drawing on this money?",
+   "options": [
+    {
+     "value": "lt3",
+     "label": "Within 3 years",
+     "years": 2
+    },
+    {
+     "value": "3to7",
+     "label": "3 to 7 years",
+     "years": 5
+    },
+    {
+     "value": "7to12",
+     "label": "7 to 12 years",
+     "years": 10
+    },
+    {
+     "value": "12to20",
+     "label": "12 to 20 years",
+     "years": 15
+    },
+    {
+     "value": "20plus",
+     "label": "20 years or more",
+     "years": 25
+    }
+   ]
+  },
+  {
+   "id": "income_stability",
+   "part": "capacity",
+   "prompt": "How steady is your income?",
+   "options": [
+    {
+     "value": "none",
+     "label": "No steady income"
+    },
+    {
+     "value": "variable",
+     "label": "It swings a lot"
+    },
+    {
+     "value": "mostly",
+     "label": "Mostly steady"
+    },
+    {
+     "value": "steady",
+     "label": "Steady salary"
+    },
+    {
+     "value": "very",
+     "label": "Very secure salary plus other income"
+    }
+   ]
+  },
+  {
+   "id": "emergency_months",
+   "part": "capacity",
+   "prompt": "How many months of expenses do you keep in cash, outside investments?",
+   "options": [
+    {
+     "value": "0",
+     "label": "None"
+    },
+    {
+     "value": "1to2",
+     "label": "1 to 2 months"
+    },
+    {
+     "value": "3to5",
+     "label": "3 to 5 months"
+    },
+    {
+     "value": "6to11",
+     "label": "6 to 11 months"
+    },
+    {
+     "value": "12plus",
+     "label": "A year or more"
+    }
+   ]
+  }
+ ],
+ "current": null,
+ "bands": {
+  "1": {
+   "label": "Conservative",
+   "equity_min_pct": 20,
+   "equity_max_pct": 40,
+   "speculative_max_pct": 0,
+   "worst_year_loss_pct": 10,
+   "single_stock_max_pct": 2
+  },
+  "2": {
+   "label": "Moderately conservative",
+   "equity_min_pct": 40,
+   "equity_max_pct": 60,
+   "speculative_max_pct": 2,
+   "worst_year_loss_pct": 18,
+   "single_stock_max_pct": 3
+  },
+  "3": {
+   "label": "Moderate",
+   "equity_min_pct": 60,
+   "equity_max_pct": 75,
+   "speculative_max_pct": 5,
+   "worst_year_loss_pct": 25,
+   "single_stock_max_pct": 5
+  },
+  "4": {
+   "label": "Moderately aggressive",
+   "equity_min_pct": 75,
+   "equity_max_pct": 90,
+   "speculative_max_pct": 10,
+   "worst_year_loss_pct": 33,
+   "single_stock_max_pct": 10
+  },
+  "5": {
+   "label": "Aggressive",
+   "equity_min_pct": 90,
+   "equity_max_pct": 100,
+   "speculative_max_pct": 20,
+   "worst_year_loss_pct": 45,
+   "single_stock_max_pct": 15
+  }
+ },
+ "inputs": {
+  "fi_horizon_years": null,
+  "savings_rate_pct": 55.8,
+  "portfolio_value": 16393.49
+ }
+}

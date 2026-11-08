@@ -25,6 +25,7 @@ export const ROUTES = [
   { path: '/lab/boards', h1: 'Saved boards' },
   { path: '/settings', h1: 'Settings' },
   { path: '/settings/first-run', h1: 'First run' },
+  { path: '/settings/risk', h1: 'Risk check' },
   { path: '/?scenario=fresh', h1: 'Bridge' },
   { path: '/research?scenario=fresh', h1: 'Research' },
   { path: '/decisions?scenario=fresh', h1: 'Decisions' },

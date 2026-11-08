@@ -3,13 +3,14 @@ const lastOk = (jobs, name) => (jobs?.jobs || []).find((j) => j.name === name)?.
 const ready = (...apis) => apis.every((x) => x && (x.data != null || x.error || !x.loading));
 
 // ---------- steps ----------
-export function firstRunSteps({ status, jobs, health, profile, agents, board } = {}) {
+export function firstRunSteps({ status, jobs, health, profile, agents, board, risk } = {}) {
   const s = status?.data;
   const h = health?.data;
   const j = jobs?.data;
   const p = profile?.data;
   const a = agents?.data;
   const b = board?.data;
+  const r = risk?.data;
   const mirrorOk = s?.mirror?.state === 'ok' || s?.mirror?.state === 'stale';
   const token = s?.claude_token?.state;
   const closes = check(h, 'closes');
@@ -83,8 +84,8 @@ export function firstRunSteps({ status, jobs, health, profile, agents, board } =
       id: 'risk',
       title: 'Take the risk check',
       line: 'Eight questions set the bands every strategy is measured against.',
-      state: 'soon',
-      action: { kind: 'link', to: '/settings/risk', label: 'Take it' },
+      state: !ready(risk) ? 'loading' : risk?.error?.status === 404 ? 'soon' : r?.current ? 'done' : 'todo',
+      action: { kind: 'link', to: '/settings/risk', label: r?.current ? `Band ${r.current.band}` : 'Take it' },
     },
   ];
 }

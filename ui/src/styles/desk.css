@@ -1007,6 +1007,39 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
   .fr-act { grid-column: 2; }
 }
 
+/* ---------- risk check ---------- */
+.risk-body { display: grid; grid-template-columns: minmax(180px, 240px) minmax(0, 1fr); gap: 18px; align-items: center; }
+.risk-gauge { grid-template-columns: minmax(0, 1fr); }
+.risk-gauge .gauge svg { max-width: 190px; }
+.risk-side { display: grid; gap: 10px; min-width: 0; }
+.risk-lede { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+.risk-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.risk-facts b { font-size: 15px; color: var(--ink); }
+.risk-note { margin: 0; font-size: 12.5px; }
+.risk-msg { margin: 0; font-size: 12.5px; font-weight: 600; }
+.risk-msg.done { color: var(--ok); }
+.risk-msg.refused { color: var(--watch); }
+.risk-quiz { display: grid; gap: 12px; }
+.risk-quiz .fr-track { margin-bottom: 4px; }
+.rq-part { display: grid; gap: 8px; }
+.rq-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding-top: 4px; border-top: 1px dashed var(--line); }
+.rq-head small { font-size: 12px; }
+.rq-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.rq { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 16px; background: var(--card-2); min-width: 0; }
+.rq[data-answered="true"] { border-color: var(--teal); }
+.rq legend { float: left; width: 100%; margin-bottom: 8px; padding: 0; font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.rq-opts { clear: both; display: grid; gap: 4px; }
+.rq-opt { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; align-items: center; padding: 6px 8px; border-radius: 10px; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+.rq-opt:hover { background: var(--track); }
+.rq-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.rq-opt:has(input:focus-visible) { outline: 2px solid var(--teal); outline-offset: 1px; }
+.rq-dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink-3); box-sizing: border-box; }
+.rq-opt.on { background: var(--teal-soft); color: var(--ink); font-weight: 600; }
+.rq-opt.on .rq-dot { border-color: var(--teal); background: radial-gradient(circle, var(--teal) 0 3px, transparent 3.5px); }
+.t tr.on td { background: var(--teal-soft); }
+.risk-you { margin-left: 8px; }
+@media (max-width: 900px) { .rq-grid { grid-template-columns: minmax(0, 1fr); } .risk-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .risk-body { grid-template-columns: minmax(0, 1fr); } }
 /* ---------- keys and compose ---------- */
 .key-name { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 12.5px; overflow-wrap: anywhere; }
 .key-form { display: grid; gap: 6px; margin-top: 6px; }
