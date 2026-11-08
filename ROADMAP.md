@@ -171,6 +171,22 @@ Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the 
 | Filings lane card in the Lab, filing chip on the Symbol sheet | Design | ⏳ |
 | Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
 
+## Next: No more SSH
+
+Every box chore becomes a button in the app. SSH stays only for true one-time installs (Joshua, 2026-11-08).
+
+| Chore today | Becomes | Owner | Status |
+|---|---|---|---|
+| `engine daily`, `backfill` | Run now in Settings → Jobs | Infra + Design | ✅ (#102, #107) |
+| `sed` on desk.yaml for agents and desks | Settings → Desks toggles | Agents + Design | ⏳ |
+| `profile init`, profile edits | Settings → Profile and Risk editor | Concept + Design | ⏳ |
+| `scp` into the inbox | Upload button for broker exports and lot CSVs | Infra + Design | ⏳ |
+| `deploy.sh redeploy / status / check / backup / restore-test / logs` | Settings → Box buttons with last result, through a host-side request queue | Infra + Design | ⏳ |
+| `setup-truenas.sh set KEY` | Masked, write-only Keys form, or stays one-time | Infra | ⏳ decide |
+| Re-pinning deploy.sh | deploy.sh pins itself | Infra | ⏳ |
+| Compose paste after compose changes | Applied by the host, or one banner with a copy button | Infra | ⏳ |
+| Command lists in docs | First-run checklist page | Design | ⏳ |
+
 ## Key dates
 
 | Date | What |
