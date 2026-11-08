@@ -393,7 +393,7 @@ def test_fi_deposits_come_from_broker_history(cfg, mirror):
     engine_main.run_history(cfg)
     run_holdings(cfg)
     out = computed(cfg)
-    assert out.views["fi"]["deposit_note"] == "from your last 2 months of deposits"
+    assert out.views["fi"]["deposit_note"] == "from your last 2 months of deposits, net of withdrawals"
 
 
 def test_decisions_see_broker_deposits(cfg, mirror):

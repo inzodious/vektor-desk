@@ -46,13 +46,13 @@ def fi_prefs(rows) -> dict | None:
 
 def monthly_deposit(deposits: list[tuple[str, float]], as_of: str) -> tuple[float | None, str, int]:
     start = add_months(as_of, -DEPOSIT_MONTHS)
-    seen = sorted((d, a) for d, a in deposits if a > 0 and d <= as_of)
-    if not seen:
+    seen = sorted((d, a) for d, a in deposits if a and d <= as_of)
+    if not any(a > 0 for _, a in seen):
         return None, "none", 0
-    first = max(seen[0][0], start)
+    first = max(next(d for d, a in seen if a > 0), start)
     months = max(1, min(DEPOSIT_MONTHS, months_between(first, as_of) + 1))
     total = sum(a for d, a in seen if d > start)
-    return total / months, "activity", months
+    return max(0.0, total / months), "activity", months
 
 
 def bond_share(plan: dict, targets: dict[str, float]) -> float:
@@ -171,7 +171,7 @@ def run(
     out.m("fi.required_return", req * 100 if req is not None else None, "pct", quality="modelled")
     history = monthly_history(desk)
     view |= {"fi_number": goal, "target_date": prefs["target_date"], "start_value": value, "monthly_deposit": deposit, "deposit_source": source}
-    view["deposit_note"] = f"from your last {months} month{'s' if months != 1 else ''} of deposits" if months else "no deposits seen yet"
+    view["deposit_note"] = f"from your last {months} month{'s' if months != 1 else ''} of deposits, net of withdrawals" if months else "no deposits seen yet"
     view["required_return_pct"] = round(req * 100, 4) if req is not None else None
     if len(history) < 10 * 12 or value is None:
         view["note"] = "The Monte Carlo needs the French monthly market history; the engine's monthly french job fetches it."
