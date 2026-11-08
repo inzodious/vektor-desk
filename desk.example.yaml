@@ -38,6 +38,7 @@ usage:
     skeptic: 10
     scout: 1
     strategy: 2
+  filings_per_night: 40
 
 agents:
   enabled: false

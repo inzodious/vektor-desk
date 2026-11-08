@@ -75,6 +75,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Scout** | First Sunday of the month, 03:00 | Industry focus, growth tilt, satellite room left | Up to N ideas inside the satellite cap, each with its bear case | xhigh; WebSearch, WebFetch |
 | **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | high; no tools |
 | **Strategy desk** | On request from the Console; at most two new strategies a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
+| **Filings desk** | Daily 04:15, one call per new filing, up to 40 a night | One small-cap SEC filing from the statistics queue: form, 8-K items, excerpt (first 12,000 characters) | A score per filing in the signal table (see [Filings desk](#filings-desk)); never a proposal or a trade | high; no tools |
 
 **Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
 
@@ -155,6 +156,25 @@ The final tear sheet reports each horizon, the post-cutoff window, trials tried,
 
 Expect most strategies to fail. That is the lab working: a cheap "no" in simulation beats an expensive one in the account.
 
+## Filings desk
+
+Scores new small-cap SEC filings for the lab's forward paper test (`docs/statistics.md` owns the queue, the signal table and the strategy). Advisory only: it writes a score, never a proposal, order or ticket.
+
+| Piece | Detail |
+|---|---|
+| Queue | `desk.engine.filings.pending(cfg, limit)`, most material first; `[]` before the first fetch, `NotReady` until the table exists |
+| Write | `desk.engine.filings.record(cfg, accession, result)`, first write wins; a refused score is noted on the run and the night goes on |
+| Output | `schemas/filings.json`: `direction` −2..2, `confidence` 0..1, `event_type`, `horizon_days` 1..120, `rationale` ≤ 280, `numbers_cited` |
+| Recorded with it | `model` (the id the CLI served), `scored_at` (UTC), `run_id` |
+| Number check | Each `numbers_cited` entry must appear verbatim in the excerpt sent; the rest are dropped |
+| Hindsight | The prompt forbids anything the model remembers about the company after the filing; scores are judged forward only |
+| Model | Opus at high effort, one call per filing, up to 4 turns, no tools; never downgraded |
+| Volume | `usage.filings_per_night` in `desk.yaml`, default 40, at most 200; weekly cap is seven nights' worth |
+| Stops | Usage limit, run lock busy for 5 minutes, weekly cap, Settings switch, or 3 failures in a row; what's left waits for the next night |
+| On switch | Off unless `agents.desks.filings: true`; the first-run guard also holds it |
+
+Commands: `python -m desk.agents run filings [--limit N]` scores now; `python -m desk.agents dry-run filings --system --schema` shows the first filing's prompt without a call.
+
 ## Proposal contract
 
 Every desk returns the same shape (`agents/schemas/proposal.json`). The UI and the scorecard depend on it; the statistics and design threads build against it.
@@ -205,7 +225,7 @@ A blocked proposal still appears, labelled with its cost, because the decision i
 Agent runs share the subscription's 5-hour and weekly limits with Joshua's interactive Claude Code and the cloud threads that build both apps.
 
 - **Overnight by default.** Scheduled runs sit between 01:00 and 06:00 ET, except the plan keeper's short daily run.
-- **Priority when the budget is tight:** plan keeper, then tax desk (first in December), risk desk, research desk, scout, strategy desk. The scheduler skips lower-priority runs rather than squeezing them in.
+- **Priority when the budget is tight:** plan keeper, then tax desk (first in December), risk desk, research desk, scout, strategy desk, filings desk. The filings desk's volume is the main usage lever: lower `usage.filings_per_night` first. The scheduler skips lower-priority runs rather than squeezing them in.
 - **Metered.** Each run logs turns, tokens and wall time. The status page shows usage per desk per week. Start with a small weekly budget and set the real one after two weeks of logs.
 - **Weekly caps** count scheduled, trigger, retry and lab runs. Console questions are his own asks and bypass the cap; Skeptic runs ride on the run that asked for them.
 - **Rate limits.** If a run fails on a usage or rate limit, it is marked `deferred` and retried once in the next window. No retry loops.
@@ -244,8 +264,9 @@ desk/agents/
   api.py          /api/agents/status, /api/agents/{desk}/enabled
   jobs.py         JOBS for the scheduler, one per live desk schedule
   schema.py       the package's tables
+  filings.py      the filings desk's nightly loop: queue, score, number check, record
   prompts/        one system prompt per desk (Phase 5 on)
-  schemas/        proposal.json, strategy.json (Phase 5 on)
+  schemas/        proposal.json, strategy.json, skeptic.json, filings.json (Phase 5 on)
   briefs.py       builds each desk's prompt from engine brief slices (Phase 5 on)
 tests/agents/     fake adapter and a stand-in claude binary only; never the real CLI
 desk.example.yaml

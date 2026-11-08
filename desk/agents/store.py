@@ -59,6 +59,11 @@ def finish_run(cfg: Config, run_id: int, status: str, *, usage: dict | None = No
         )
 
 
+def note_run(cfg: Config, run_id: int, note: str) -> None:
+    with db(cfg) as conn:
+        conn.execute("UPDATE agent_runs SET note=? WHERE id=?", (note, run_id))
+
+
 def last_run(cfg: Config, desk: str) -> dict | None:
     with db(cfg) as conn:
         row = conn.execute("SELECT * FROM agent_runs WHERE desk=? ORDER BY id DESC LIMIT 1", (desk,)).fetchone()
