@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from desk.engine.lab import library as features
-from desk.engine.lab.data import FRENCH_KIND, FUND_KINDS, LabData
+from desk.engine.lab.data import FRENCH_KIND, FUND_KINDS, SMALL_CAPS, LabData
 from desk.engine.lab.spec import Spec, Variant
 
 START_CASH = 10_000.0
@@ -55,6 +55,15 @@ def universe(data: LabData, spec: Spec, day: str) -> list[str]:
         return [s for s in u["symbols"] if s in data.series]
     if u["kind"] == FRENCH_KIND:
         return data.french(u["set"])
+    if u["kind"] == SMALL_CAPS:
+        month = day[:7]
+        out = []
+        for sym, months in data.smallcap.items():
+            s = data.series.get(sym)
+            i = s.index.get(day) if s else None
+            if month in months and i is not None and s.adj[i] >= u["min_price"]:
+                out.append(sym)
+        return sorted(out)
     out = []
     for sym, s in data.series.items():
         if data.kinds.get(sym) in FUND_KINDS or sym in data.plan_mix:
@@ -97,7 +106,7 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         i = s.index.get(day)
         if i is None:
             continue
-        vals = [features.value(m, s, i, w) for (m, _, _), w in zip(spec.signals, v.windows, strict=True)]
+        vals = [features.value(m, s, i, w, data.insider.get(sym)) for (m, _, _), w in zip(spec.signals, v.windows, strict=True)]
         if any(x is None for x in vals):
             continue
         raw[sym] = vals

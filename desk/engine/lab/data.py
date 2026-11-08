@@ -9,6 +9,8 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine.market import BENCHMARKS
 
+SMALLCAP_BENCHMARK = "IWM"
+
 FUND_KINDS = ("fund", "etf")
 EXPORT_SCHEMA = """
 CREATE TABLE bars (
@@ -20,7 +22,12 @@ CREATE TABLE plan_mix (symbol TEXT PRIMARY KEY, weight REAL NOT NULL) WITHOUT RO
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
 CREATE TABLE factors (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
 CREATE TABLE french (set_name TEXT NOT NULL, name TEXT NOT NULL, date TEXT NOT NULL, ret REAL NOT NULL, PRIMARY KEY (set_name, name, date)) WITHOUT ROWID;
+CREATE TABLE insider (symbol TEXT NOT NULL, known TEXT NOT NULL, owner INTEGER NOT NULL, usd REAL NOT NULL);
+CREATE TABLE smallcap (symbol TEXT NOT NULL, month TEXT NOT NULL, PRIMARY KEY (symbol, month)) WITHOUT ROWID;
 """
+SMALLCAP_KIND = "stock"
+SMALL_CAPS = "small_caps"
+SMALLCAP_ROLE = "small_cap"
 FRENCH_KIND = "french"
 FRENCH_MARKET = "FF.MKT"
 
@@ -62,12 +69,21 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
             bars[(r["symbol"], r["date"])] = (r["symbol"], r["date"], r["open"], r["close"], r["adj_close"], r["volume"])
         for r in desk.execute("SELECT symbol, date, close, adj_close FROM prices_daily"):
             bars.setdefault((r["symbol"], r["date"]), (r["symbol"], r["date"], None, r["close"], r["adj_close"], None))
+        small = _small_caps(desk, out)
+        for sym in small | {SMALLCAP_BENCHMARK}:
+            for r in (
+                desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM alpaca_bars WHERE symbol=?", (sym,)) if _has(desk, "alpaca_bars") else []
+            ):
+                bars.setdefault((r["symbol"], r["date"]), (r["symbol"], r["date"], r["open"], r["close"], r["adj_close"], r["volume"]))
         out.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?)", bars.values())
         roles = {r["symbol"]: r["role"] for r in desk.execute("SELECT symbol, role FROM market_symbols")}
+        roles |= {sym: roles.get(sym) or SMALLCAP_ROLE for sym in small}
         spans = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, min(date), max(date) FROM bars GROUP BY symbol")}
         rows = []
         for sym, (first, last) in spans.items():
-            kind = kinds.get(sym) or ("fund" if sym in BENCHMARKS or sym in targets else "unknown")
+            kind = kinds.get(sym) or (
+                "fund" if sym in BENCHMARKS or sym in targets or sym == SMALLCAP_BENCHMARK else SMALLCAP_KIND if sym in small else "unknown"
+            )
             rows.append((sym, kind, roles.get(sym), first, last))
         out.executemany("INSERT INTO symbols VALUES (?, ?, ?, ?, ?)", rows)
         french_rows = 0
@@ -87,7 +103,26 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
     finally:
         out.close()
     os.replace(tmp, final)
-    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": len(bars), "french_rows": french_rows}
+    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": len(bars), "french_rows": french_rows, "small_caps": len(small)}
+
+
+def _has(conn: sqlite3.Connection, name: str) -> bool:
+    return conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (name,)).fetchone() is not None
+
+
+def _small_caps(desk: sqlite3.Connection, out: sqlite3.Connection) -> set[str]:
+    if not _has(desk, "smallcap_months"):
+        return set()
+    from desk.engine.insider import known_day
+
+    months = desk.execute("SELECT symbol, month FROM smallcap_months").fetchall()
+    out.executemany("INSERT INTO smallcap VALUES (?, ?)", [tuple(r) for r in months])
+    if _has(desk, "insider_buys"):
+        out.executemany(
+            "INSERT INTO insider VALUES (?, ?, ?, ?)",
+            [(r[0], known_day(r[1]), r[2], r[3]) for r in desk.execute("SELECT symbol, filed_date, owner_cik, usd FROM insider_buys")],
+        )
+    return {r[0] for r in months}
 
 
 # ---- Load (lab side) ----
@@ -119,6 +154,8 @@ class LabData:
     factors: dict[str, dict[str, float]] = field(default_factory=dict)
     path: Path | None = None
     french_sets: dict[str, list[str]] = field(default_factory=dict)
+    insider: dict[str, tuple[list[str], list[int], list[float]]] = field(default_factory=dict)
+    smallcap: dict[str, set[str]] = field(default_factory=dict)
 
     @property
     def end(self) -> str:
@@ -225,6 +262,16 @@ def load(path: Path) -> LabData:
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factors'").fetchone():
             for r in conn.execute("SELECT series, date, value FROM factors"):
                 factors.setdefault(r[0], {})[r[1]] = r[2]
+        insider: dict[str, tuple[list[str], list[int], list[float]]] = {}
+        smallcap: dict[str, set[str]] = {}
+        if _has(conn, "insider"):
+            for r in conn.execute("SELECT symbol, known, owner, usd FROM insider ORDER BY symbol, known"):
+                d, o, u = insider.setdefault(r[0], ([], [], []))
+                d.append(r[1])
+                o.append(r[2])
+                u.append(r[3])
+            for r in conn.execute("SELECT symbol, month FROM smallcap"):
+                smallcap.setdefault(r[0], set()).add(r[1])
     finally:
         conn.close()
     ref = next((s for s in ("SPY", "VTI", "FXAIX") if s in series), None) or max(series, key=lambda s: len(series[s].dates), default=None)
@@ -235,4 +282,4 @@ def load(path: Path) -> LabData:
         ref = FRENCH_MARKET if market is not None else None
     if not ref:
         raise NotReady("The lab data has no prices yet.")
-    return LabData(series, kinds, roles, last, macro, plan, settings, list(series[ref].dates), factors, path)
+    return LabData(series, kinds, roles, last, macro, plan, settings, list(series[ref].dates), factors, path, insider=insider, smallcap=smallcap)

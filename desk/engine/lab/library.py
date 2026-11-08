@@ -1,5 +1,6 @@
 import math
 import re
+from bisect import bisect_left, bisect_right
 
 from desk.engine.lab.data import Series
 
@@ -11,7 +12,10 @@ FEATURES = {
     "ma_gap": "Distance of the close from its moving average over the window",
     "range_52w": "Position between the window's low (0) and high (1); 252 days is the 52-week range",
     "dd": "Drawdown from the window's high",
+    "insider.buyers": "Distinct directors and officers with open-market Form 4 purchases known inside the window (small caps; known the session after filing)",
+    "insider.buy_usd": "Dollars of open-market Form 4 purchases by directors and officers known inside the window",
 }
+EVENT_FEATURES = {"insider.buyers", "insider.buy_usd"}
 TRANSFORMS = {
     "raw": "The value itself",
     "rank": "Cross-sectional percentile, higher value ranks higher",
@@ -35,7 +39,14 @@ def window_days(text: str) -> int:
 
 def catalog() -> list[dict]:
     return [
-        {"metric_id": k, "description": v, "window_options": list(WINDOWS), "transforms": list(TRANSFORMS), "point_in_time": True, "kind": "price"}
+        {
+            "metric_id": k,
+            "description": v,
+            "window_options": list(WINDOWS),
+            "transforms": list(TRANSFORMS),
+            "point_in_time": True,
+            "kind": "insider" if k in EVENT_FEATURES else "price",
+        }
         for k, v in FEATURES.items()
     ]
 
@@ -44,7 +55,19 @@ def lookback(metric_id: str, days: int) -> int:
     return days + SKIP if metric_id == "ret_skip" else days
 
 
-def value(metric_id: str, s: Series, i: int, days: int) -> float | None:
+def events_in(events: tuple[list[str], list[int], list[float]] | None, lo: str, hi: str) -> tuple[list[int], list[float]]:
+    if not events:
+        return [], []
+    dates, owners, usd = events
+    a, b = bisect_left(dates, lo), bisect_right(dates, hi)
+    return owners[a:b], usd[a:b]
+
+
+def value(metric_id: str, s: Series, i: int, days: int, events=None) -> float | None:
+    if metric_id in EVENT_FEATURES:
+        lo = s.dates[max(0, i - days + 1)]
+        owners, usd = events_in(events, lo, s.dates[i])
+        return float(len(set(owners))) if metric_id == "insider.buyers" else float(sum(usd))
     need = lookback(metric_id, days)
     if i < need:
         return None

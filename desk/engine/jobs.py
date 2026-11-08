@@ -9,6 +9,7 @@ JOBS = [
     ("30 3 2 * *", "python -m desk.engine french"),
     ("30 19 * * 1-5", "python -m desk.engine universe"),
     ("35 3 * * *", "python -m desk.engine filings"),
+    ("20 23 * * *", "python -m desk.engine insider"),
     ("45 8 * * 1-5", "python -m desk.engine paper"),
     ("45 16 * * 1-5", "python -m desk.engine paper"),
 ]

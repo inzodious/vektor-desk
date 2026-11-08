@@ -13,7 +13,7 @@ import requests
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, broker, core, filings, french, lane, paper_exec, schema, triggers, universe
+from desk.engine import ENGINE_VERSION, broker, core, filings, french, insider, lane, paper_exec, schema, triggers, universe
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.lab import data as lab_data
@@ -198,6 +198,10 @@ def _universe(desk, http) -> dict:
     return result
 
 
+def run_insider(cfg: Config, http=None) -> dict:
+    return _with_desk(cfg, "insider", lambda desk: insider.run(desk, http or http_session(), now=datetime.now(UTC)))
+
+
 def run_paper(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "paper", lambda desk: paper_exec.run(desk, http or http_session(), now=datetime.now(UTC)))
 
@@ -219,6 +223,7 @@ JOBS = {
     "universe": run_universe,
     "filings": run_filings,
     "paper": run_paper,
+    "insider": run_insider,
     "quotes": run_quotes,
     "backfill": run_market_backfill,
     "lookthrough": run_lookthrough,
