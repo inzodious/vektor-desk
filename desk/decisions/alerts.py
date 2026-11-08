@@ -5,6 +5,7 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.records import queue, unmatched
+from desk.decisions.risk import convictions
 from desk.decisions.store import loads, session
 from desk.notify import PRIORITIES, publish
 
@@ -132,5 +133,23 @@ def send_alerts(cfg: Config, *, now: datetime | None = None) -> list[str]:
                 "/plan",
                 f"wash-{r['id']}-{clear}",
                 ("calendar",),
+            )
+
+    # ---- Conviction holds ----
+    week = "{}-W{:02d}".format(*today.isocalendar()[:2])
+    for c in convictions(cfg):
+        if c["enabled"] and c["status"] == "above":
+            _send(
+                sent,
+                cfg,
+                floor,
+                "alerts",
+                f"{c['symbol']} is above its band",
+                f"{c['symbol']} is {c['weight_pct']:g}% of the portfolio, past your {c['band_max_pct']:g}% ceiling. No rush: trimming back is an option, "
+                "and the desk won't suggest adding until it's back inside.",
+                "default",
+                "/plan",
+                f"conviction-{c['symbol']}-{week}",
+                ("balance_scale",),
             )
     return sent

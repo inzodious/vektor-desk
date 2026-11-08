@@ -343,3 +343,110 @@ def current(cfg: Config) -> dict | None:
         "answered_at": row["created_at"],
         "taken_at": row["created_at"],
     }
+
+
+# ---- Conviction holds ----
+
+
+def suggested_band(cfg: Config) -> dict | None:
+    now = current(cfg)
+    if now is None:
+        return None
+    return {"band_min_pct": 0, "band_max_pct": now["speculative_max_pct"], "from_band": now["band"], "label": now["label"]}
+
+
+def _weights(conn: sqlite3.Connection, symbols: list[str]) -> dict[str, tuple[float, str]]:
+    if not symbols:
+        return {}
+    marks = ",".join("?" * len(symbols))
+    try:
+        rows = conn.execute(
+            "SELECT scope_id, value, as_of FROM metric_values WHERE metric_id='plan.single_stock' AND scope='holding' "
+            f"AND scope_id IN ({marks}) AND value IS NOT NULL ORDER BY as_of",
+            symbols,
+        ).fetchall()
+    except sqlite3.Error:
+        return {}
+    return {r["scope_id"]: (float(r["value"]), r["as_of"]) for r in rows}
+
+
+def _status(weight: float | None, low: float, high: float) -> str | None:
+    if weight is None:
+        return None
+    return "above" if weight > high else "below" if weight < low else "inside"
+
+
+def convictions(cfg: Config) -> list[dict]:
+    from desk.decisions.profile import active_profile
+
+    rules = [r for r in active_profile(cfg).data.get("rules", []) if r.get("kind") == "conviction_hold" and r.get("symbols")]
+    symbols = [r["symbols"][0].upper() for r in rules]
+    with session(cfg) as conn:
+        weights = _weights(conn, symbols)
+    out = []
+    for rule, symbol in zip(rules, symbols, strict=True):
+        p = rule.get("params") or {}
+        weight, as_of = weights.get(symbol, (None, None))
+        out.append(
+            {
+                "rule_id": rule["id"],
+                "symbol": symbol,
+                "band_min_pct": p["band_min_pct"],
+                "band_max_pct": p["band_max_pct"],
+                "note": rule.get("note"),
+                "enabled": rule.get("enabled", True),
+                "weight_pct": round(weight, 2) if weight is not None else None,
+                "weight_as_of": as_of,
+                "status": _status(weight, p["band_min_pct"], p["band_max_pct"]),
+            }
+        )
+    return out
+
+
+def _clean_symbol(symbol: str) -> str:
+    clean = (symbol or "").strip().upper()
+    if not clean or len(clean) > 12 or not all(c.isalnum() or c in ".-" for c in clean):
+        raise RiskError(f"{symbol!r} doesn't look like a ticker")
+    return clean
+
+
+def set_conviction(cfg: Config, symbol: str, *, band_min_pct: float | None = None, band_max_pct: float | None = None, note: str | None = None) -> dict:
+    from desk.decisions.profile import active_profile
+    from desk.decisions.yamlfile import edit_profile
+
+    symbol = _clean_symbol(symbol)
+    rules = [dict(r) for r in active_profile(cfg).data.get("rules", [])]
+    found = next((r for r in rules if r.get("kind") == "conviction_hold" and [s.upper() for s in r.get("symbols") or []] == [symbol]), None)
+    old = (found or {}).get("params") or {}
+    hint = suggested_band(cfg) or {}
+    low = band_min_pct if band_min_pct is not None else old.get("band_min_pct", hint.get("band_min_pct", 0))
+    high = band_max_pct if band_max_pct is not None else old.get("band_max_pct", hint.get("band_max_pct"))
+    if high is None:
+        raise RiskError("Answer the risk questions first, or give band_max_pct, so the band has a ceiling")
+    rule = {
+        "id": (found or {}).get("id") or f"conviction-{symbol.lower()}",
+        "kind": "conviction_hold",
+        "symbols": [symbol],
+        "params": {"band_min_pct": low, "band_max_pct": high},
+    }
+    text = note if note is not None else (found or {}).get("note")
+    if text:
+        rule["note"] = str(text)
+    if found is not None and found.get("enabled") is False:
+        rule["enabled"] = False
+    rules = [rule if r is found else r for r in rules] if found is not None else [*rules, rule]
+    result = edit_profile(cfg, {"rules": rules})
+    item = next(c for c in convictions(cfg) if c["symbol"] == symbol)
+    return {**result, "item": item}
+
+
+def drop_conviction(cfg: Config, symbol: str) -> dict:
+    from desk.decisions.profile import active_profile
+    from desk.decisions.yamlfile import edit_profile
+
+    symbol = _clean_symbol(symbol)
+    rules = active_profile(cfg).data.get("rules", [])
+    kept = [r for r in rules if not (r.get("kind") == "conviction_hold" and [s.upper() for s in r.get("symbols") or []] == [symbol])]
+    if len(kept) == len(rules):
+        raise RiskError(f"{symbol} has no conviction hold")
+    return edit_profile(cfg, {"rules": kept})
