@@ -165,6 +165,7 @@ The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free.
 | Pull Escape Vektor now | Settings → Jobs → Run now, or `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
 | Run any scheduled job now | Settings → Jobs (Run now, below); no SSH needed |
 | Redeploy, status, check, backup, restore drill, logs, update box script | Settings → Box (Box actions, below); picked up within 5 minutes |
+| Drop a Fidelity export in the inbox | Settings → Upload (Inbox upload, below) |
 | Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log`; redacted copies in `data/run/logs` every 5 minutes (`deploy.sh logs` now) |
 | Let Claude QA the box | [eval-access.md](eval-access.md): a Remote Control session in the sealed `eval` container |
 | Add a schedule | A line in `deploy/crontab` (minute hour day month weekday command, Eastern time) |
@@ -201,6 +202,26 @@ The host refuses to work through a symlinked `data/run/box` or a symlinked reque
 
 Cooldowns: redeploy and update-script 5 minutes, status and logs 1, check 2, backup and restore-test 30. `update-script` ends `skipped` while the checkout is still catching up to `main`. Every request is logged to `data/run/box-requests.log`. `deploy.sh box` runs pending requests right away.
 
+## Inbox upload
+
+Broker exports go into `data/inbox/{broker}/` from the app, so no file copying over SSH. The engine's import job picks them up: `engine-lots` every 15 minutes, or straight away with Run now.
+
+| Call | Answer |
+|---|---|
+| `GET /api/inbox` | `{max_bytes, suffixes: [".json", ".csv"], brokers: {fidelity: {import_job: "engine-lots", files: [{name, size, modified}]}}}` |
+| `PUT /api/inbox/{broker}/{name}` | The file's bytes as the raw body (no form encoding). `201 {ok: true, broker, name, size, sha256, duplicate: false, import_job}`, or `200` with `duplicate: true` when the same bytes are already there |
+| Refusals | `{ok: false, error, message}`: `404 unknown_broker`; `400 bad_name`, `empty`, `not_text`, `bad_json`, `bad_csv`; `413 too_large` |
+
+The rules:
+- Brokers on the allowlist: `fidelity`.
+- Names: letters, numbers, spaces and `. _ - ( )`, ending in `.json` or `.csv`. No leading dot and no `..`.
+- Content: UTF-8 text; JSON must parse; a CSV needs a comma or tab in its first line.
+- Size: 25 MB (`DESK_INBOX_MAX_MB`, up to 200).
+- Same name, new bytes: stored as `name-2.csv` and so on, never overwritten.
+- Writes: a hidden temp file, then a hard link, so the import never sees half a file.
+
+Every upload is logged in `data/run/inbox-uploads.log`, with its outcome, size and sha256.
+
 ## Package seams
 
 Each package under `desk/` plugs in through three optional modules, found on their own at startup:
@@ -211,7 +232,7 @@ Each package under `desk/` plugs in through three optional modules, found on the
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
 | `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command"}` dicts | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
 
-Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/box/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
+Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/box/...`, `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
 ## Web app
 
