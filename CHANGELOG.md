@@ -4,6 +4,18 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.7 - 2026-11-08
+
+### Added
+
+- The lab can backtest insider-buying clusters in point-in-time small caps, built from SEC insider data since 2016 plus live Form 4s ([#118])
+- The lab can backtest post-earnings drift in point-in-time small caps, using SEC first-filed EPS and 8-K release times ([#120])
+- The leaderboard shows what each strategy's paper account did, and lists every filing-lane variant ([#117])
+
+### Changed
+
+- Small-cap lab verdicts count names without prices and stress-test delistings as total losses, so a strategy can't pass on survivors alone ([#119])
+
 ## 1.0.6 - 2026-11-08
 
 ### Added
@@ -336,3 +348,7 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#113]: https://github.com/inzodious/vektor-desk/pull/113
 [#114]: https://github.com/inzodious/vektor-desk/pull/114
 [#115]: https://github.com/inzodious/vektor-desk/pull/115
+[#117]: https://github.com/inzodious/vektor-desk/pull/117
+[#118]: https://github.com/inzodious/vektor-desk/pull/118
+[#119]: https://github.com/inzodious/vektor-desk/pull/119
+[#120]: https://github.com/inzodious/vektor-desk/pull/120
