@@ -146,6 +146,84 @@ CREATE TABLE IF NOT EXISTS broker_realized (
   wash_disallowed REAL NOT NULL DEFAULT 0,
   method TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS alpaca_assets (
+  symbol TEXT PRIMARY KEY,
+  name TEXT,
+  exchange TEXT,
+  tradable INTEGER NOT NULL,
+  fetched_at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS alpaca_bars (
+  symbol TEXT NOT NULL,
+  date TEXT NOT NULL,
+  open REAL,
+  high REAL,
+  low REAL,
+  close REAL NOT NULL,
+  adj_close REAL,
+  volume REAL,
+  vwap REAL,
+  PRIMARY KEY (symbol, date)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sec_shares (
+  cik INTEGER NOT NULL,
+  end TEXT NOT NULL,
+  val REAL NOT NULL,
+  accn TEXT,
+  fetched_at TEXT NOT NULL,
+  PRIMARY KEY (cik, end)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS universe_daily (
+  date TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  cik INTEGER NOT NULL,
+  name TEXT,
+  exchange TEXT,
+  close REAL NOT NULL,
+  shares REAL NOT NULL,
+  shares_end TEXT NOT NULL,
+  market_cap REAL NOT NULL,
+  dollar_volume REAL NOT NULL,
+  PRIMARY KEY (date, symbol)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS filings_feed (
+  accession TEXT PRIMARY KEY,
+  cik INTEGER NOT NULL,
+  symbol TEXT NOT NULL,
+  form TEXT NOT NULL,
+  items TEXT NOT NULL,
+  filed_at TEXT NOT NULL,
+  filed_date TEXT,
+  url TEXT,
+  company TEXT,
+  sector TEXT,
+  materiality INTEGER NOT NULL,
+  fetched_at TEXT NOT NULL,
+  excerpt TEXT,
+  excerpt_tries INTEGER NOT NULL DEFAULT 0
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS filings_feed_queue ON filings_feed (materiality, filed_at);
+CREATE TABLE IF NOT EXISTS filing_days (
+  day TEXT PRIMARY KEY,
+  ok INTEGER NOT NULL,
+  fetched_at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS filing_signals (
+  accession TEXT PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  filed_at TEXT NOT NULL,
+  form TEXT NOT NULL,
+  items TEXT NOT NULL,
+  scored_at TEXT NOT NULL,
+  model TEXT NOT NULL,
+  direction INTEGER NOT NULL CHECK (direction BETWEEN -2 AND 2),
+  confidence REAL NOT NULL CHECK (confidence BETWEEN 0 AND 1),
+  event_type TEXT NOT NULL,
+  horizon_days INTEGER NOT NULL,
+  rationale TEXT,
+  numbers_cited TEXT NOT NULL,
+  run_id TEXT
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS quotes_live (
   symbol TEXT NOT NULL,
   at TEXT NOT NULL,

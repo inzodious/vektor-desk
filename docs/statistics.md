@@ -21,6 +21,7 @@ Siblings: [architecture.md](architecture.md) (mirror, compose app), [agents.md](
 | **Fidelity history** (activity-and-orders JSON dropped in `/data/inbox/fidelity/`) | Every transaction with real quantities, prices, deposits, dividends, splits and margin rows (see [Fidelity history](#fidelity-history)) | Manual. Last 4 digits of each account only | Whenever you export it; the `lots` job (every 15 min) and `daily` import it |
 | **Tiingo** (existing key) | Daily OHLC, `adjClose`, `divCash`, `splitFactor` for benchmarks and comparison symbols not already in the mirror | Free tier is personal use; request and unique-symbol caps apply ([docs](https://api.tiingo.com/documentation)) | Nightly, incremental |
 | **Finnhub** (existing key) | Live quotes in market hours, earnings calendar, basic financials, insider transactions where the free tier allows | 60 calls a minute; some endpoints are premium, checked at build time | Every 5 min in market hours |
+| **Alpaca market data** (paper keys, free plan) | Daily bars for the small-cap universe, raw and split/dividend adjusted, plus the asset list (exchange, tradable) | `data.alpaca.markets` is a fixed constant, read only; the asset list comes from the paper trading host via `desk.paper_check.paper_base()`. SIP feed by default (`DESK_ALPACA_FEED`), 20 minutes behind, so bars end there | Weekdays 19:30 ET |
 | **SEC EDGAR** | Filings index, XBRL company facts (revenue, margins, share count), Form 4 insider trades, N-PORT fund holdings | Free; a `User-Agent` with contact details is required (`DESK_SEC_USER_AGENT`), at most 10 requests a second | Nightly for holdings and watchlist |
 | **FRED** (free key, `FRED_API_KEY`) | Risk-free rate (3-month T-bill), 10y and 2y yields, CPI, high-yield spread, VIX close | Free key, generous rate limit | Nightly |
 | **Ken French data library** | Daily and monthly Fama-French 5 factors plus momentum, US market back to 1926 | Free CSV ([library](https://mba.tuck.dartmouth.edu/pages/faculty/ken.French/data_library.html)) | Monthly |
@@ -87,7 +88,7 @@ Before metrics are published for a day, the engine checks:
 | Freshness | Mirror pull under 14 hours old |
 | Closes | Every held symbol has a close for the last trading day, or is a code nothing prices |
 | Flows | Lists any snapshot-day change that prices and recorded activity don't explain. The engine counts it as money in or out, not return (unlogged deposits, payroll contributions, a margin buy without a debit row). Always `ok`; it's there to explain the number |
-| Market keys | Tiingo, Finnhub, FRED and the SEC contact are all set; any missing one warns with `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set KEY` (it redeploys). Every missing-key fix line uses that form |
+| Market keys | Tiingo, Finnhub, FRED, the SEC contact and the Alpaca paper keys (`ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY`) are all set; any missing one warns with `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set KEY` (it redeploys). Every missing-key fix line uses that form |
 | Symbol kinds | Every holding is known as a fund or a stock: Escape Vektor's profiles, then SEC's fund list, the benchmark ETFs, ticker shape (5 letters ending in X, plan codes with digits) and SEC titles |
 
 Every non-ok detail ends with `Fix:` and the one step that clears it.
@@ -433,6 +434,25 @@ Scoring and patterns run inside every core run (`desk.engine.scoring`, `desk.eng
 
 `GET /api/engine/patterns` adds drawdown base-rate tables (market and each fund: past drawdowns at least as deep, median and longest trading days back to the high), monthly seasonality per symbol labelled "description, never a signal", correlation shifts of 0.3 or more, and your behavior: buys after a 5% drop, a 5% rise or flat (90-day scores), scheduled vs off-schedule vs margin-funded buys, trades a month, and the median holding period of sold single stocks.
 
+## Filings lane: data
+
+Forward-only test of one edge: Claude reads filings of small caps nobody covers. The engine supplies the universe, the filings and the signal table; the agents' scorer fills the signals.
+
+| Piece | Module | Rule |
+|---|---|---|
+| Universe | `desk.engine.universe`, table `universe_daily(date, symbol, cik, name, exchange, close, shares, shares_end, market_cap, dollar_volume)` | Alpaca asset on NYSE, Nasdaq or NYSE American, tradable, a plain 1 to 5 letter ticker, with a SEC CIK; not in SEC's fund list; name without ETF, fund, ADR, depositary, warrant, unit, right, preferred, notes or SPAC wording. Market cap = SEC `dei:EntityCommonStockSharesOutstanding` (latest of the last 3 quarterly frames, under 400 days old) × that day's raw close, $50M to $2B. 20-session median close × volume at least $500K, with at least 15 sessions and a bar on the day. Each night writes its own date; past dates are never rewritten |
+| Bars | `desk.engine.alpaca`, table `alpaca_bars(symbol, date, open, high, low, close, adj_close, volume, vwap)` | 45 days for a new symbol, then a 7-day overlap. `close` is raw, `adj_close` is split and dividend adjusted |
+| Filings | `desk.engine.filings`, table `filings_feed` | EDGAR's daily `master.idx` for each weekday since the last good day (at most 10 back), filtered to universe CIKs and to 8-K, 10-Q, 10-K (and amendments), S-1, S-3, 424B*, Form 4. Each company's submissions JSON adds the acceptance time (`filed_at`), 8-K item numbers, primary document and SIC sector. Up to 120 excerpts a night, most material first: the primary document as plain text, first 12,000 characters, three tries |
+| Materiality | `filings.materiality(form, items)` | 8-K by its weightiest item (1.03 bankruptcy 10, 3.01 delisting and 4.02 non-reliance 9, 2.01 and 3.02 8, 2.02 and 2.06 7 …), S-1/S-3/424B 6, 10-K 5, 10-Q 4, Form 4 3; amendments one less |
+| Signals | table `filing_signals(accession, symbol, filed_at, form, items, scored_at, model, direction, confidence, event_type, horizon_days, rationale, numbers_cited, run_id)` | Point in time, never backfilled. The lane starts at the first `scored_at` (`filings.lane_start(conn)`) |
+
+**The scorer's seam.**
+
+| Call | Does |
+|---|---|
+| `filings.pending(cfg, limit)` | Unscored filings with an excerpt, most material first, then newest: `accession, symbol, form, items, filed_at, url, excerpt, company{name, market_cap, sector}`. `[]` before the first fetch; `NotReady` when the tables don't exist |
+| `filings.record(cfg, accession, result)` | First write wins per accession. `ValueError` on a direction outside −2..2, confidence outside 0..1, an `event_type` not in `filings.EVENT_TYPES`, `horizon_days` under 1, no `model` or `scored_at`, or an unknown accession. `rationale` is cut to 280 characters |
+
 ## Strategy lab
 
 Where a strategy from deep research gets tested: a backtest over 3, 5 and 10 years that only sees data as it was known on each day, then forward paper trading with fake money. The research desk proposes; the engine runs the rules; nothing in the lab touches real money.
@@ -719,6 +739,8 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Nightly | Tiingo, EDGAR, FRED pulls (the scorecard and patterns refresh with each core run) |
 | Nightly, 00:55 | `lab-export`: fresh `lab/data/lab.db`, then paper portfolios replay to the newest bar. Queued lab experiments run 01:00 to 06:00 ET under `job_lock("lab")` |
 | Weekly, Sunday 02:10 | N-PORT look-through and sector profiles |
+| Weekdays 19:30 ET | `universe`: Alpaca assets, SEC share counts, daily bars, then that day's universe |
+| Nightly 03:35 ET | `filings`: yesterday's EDGAR index for universe names, then excerpts (before the scorer at 04:15) |
 | Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Stack and tests

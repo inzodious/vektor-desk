@@ -34,6 +34,8 @@ MARKET_KEYS = (
     ("FINNHUB_API_KEY", "no live quotes"),
     ("FRED_API_KEY", "no macro series"),
     ("DESK_SEC_USER_AGENT", "no SEC research or fund look-through"),
+    ("ALPACA_API_KEY_ID", "no small-cap universe or filings lane"),
+    ("ALPACA_API_SECRET_KEY", "no small-cap universe or filings lane"),
 )
 FUND_WORDS = {"ETF", "ETFS", "FUND", "FUNDS", "ISHARES", "SPDR", "PROSHARES", "INDEX"}
 PROFILE_ERRORS = (sqlite3.Error, TypeError, KeyError, ValueError, OSError, AttributeError)
@@ -867,7 +869,7 @@ def env_fix(keys: list[str]) -> str:
 def _market_keys() -> tuple[str, str, str]:
     need = [(k, why) for k, why in MARKET_KEYS if not os.environ.get(k)]
     if not need:
-        return "market_keys", "ok", "Tiingo, Finnhub, FRED and SEC are all set."
+        return "market_keys", "ok", "Tiingo, Finnhub, FRED, SEC and Alpaca paper are all set."
     gaps = "; ".join(f"{k} ({why})" for k, why in need)
     return "market_keys", "warn", f"Missing {gaps}. Fix: {env_fix([k for k, _ in need])}"
 

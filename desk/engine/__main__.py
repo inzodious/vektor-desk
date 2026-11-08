@@ -13,7 +13,7 @@ import requests
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, broker, core, french, schema, triggers
+from desk.engine import ENGINE_VERSION, broker, core, filings, french, schema, triggers, universe
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.lab import data as lab_data
@@ -188,6 +188,14 @@ def run_french(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "french", lambda desk: french.run(desk, http or http_session()))
 
 
+def run_universe(cfg: Config, http=None) -> dict:
+    return _with_desk(cfg, "universe", lambda desk: universe.run(desk, http or http_session(), now=datetime.now(UTC)))
+
+
+def run_filings(cfg: Config, http=None) -> dict:
+    return _with_desk(cfg, "filings", lambda desk: filings.run(desk, http or http_session(), now=datetime.now(UTC)))
+
+
 def run_market_backfill(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "backfill", lambda desk: run_backfill(desk, http or http_session()))
 
@@ -198,6 +206,8 @@ JOBS = {
     "daily": run_daily,
     "lots": run_lots,
     "history": run_history,
+    "universe": run_universe,
+    "filings": run_filings,
     "quotes": run_quotes,
     "backfill": run_market_backfill,
     "lookthrough": run_lookthrough,
