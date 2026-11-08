@@ -82,6 +82,8 @@ const SHOTS = [
   { name: 'lab-factors-empty', path: '/lab/risk?scenario=empty', fixtures: true, clock: MONDAY, el: 'factors' },
   { name: 'lab-factors-demo', path: '/lab/risk', el: 'factors' },
   { name: 'settings', path: '/settings' },
+  { name: 'bridge-discounts', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('discounts').scrollIntoViewIfNeeded() },
+  { name: 'bridge-discounts-quiet', path: '/?scenario=quiet', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('discounts').scrollIntoViewIfNeeded() },
   { name: 'settings-box', path: '/settings', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('box').scrollIntoViewIfNeeded() },
   { name: 'settings-box-down', path: '/settings?scenario=down', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('box').scrollIntoViewIfNeeded() },
   { name: 'settings-box-off', path: '/settings?scenario=off', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('box').scrollIntoViewIfNeeded() },

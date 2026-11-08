@@ -11,6 +11,7 @@ import { riskFixtures } from './risk.mjs';
 import { desksFixtures } from './desks.mjs';
 import { leaderboardFixtures } from './leaderboard.mjs';
 import { bandsFixtures } from './bands.mjs';
+import { discountsFixtures } from './discounts.mjs';
 import { withFilingSignals } from './filing-signals.mjs';
 
 const API = process.env.DESK_API || 'http://127.0.0.1:8000';
@@ -208,6 +209,9 @@ for (const [name, body] of Object.entries(leaderboardFixtures())) save(name, bod
 
 // ---------- bands ----------
 for (const [name, body] of Object.entries(bandsFixtures(await get('/api/engine/bands')))) save(name, body);
+
+// ---------- discounts ----------
+for (const [name, body] of Object.entries(discountsFixtures(await get('/api/engine/discounts')))) save(name, body);
 
 // ---------- jobs ----------
 for (const [name, body] of Object.entries(jobsFixtures(await get('/api/jobs')))) save(name, body);
