@@ -84,6 +84,7 @@ Shared seams, so nobody edits another owner's code:
 | 2026-11-07 | Agents run the Claude Code CLI (`claude -p`) on a `claude setup-token` token; no paid API, no Agent SDK with subscription login |
 | 2026-11-07 | Advisory only: no broker credentials, no trade execution |
 | 2026-11-08 | Alpaca paper trading allowed for the Strategy lab; a live $1,000 Alpaca sandbox only after a strategy survives 6 months of paper, with hard caps and a kill switch. Fidelity stays advisory |
+| 2026-11-08 | No single target plan: Plan v3 is one safe mix in a strategy catalog. A risk profile sets the bands. ASTS is a held-conviction position with its own band (tax-loss sale Dec 7–15, rebuy after 31 days). Never buy single stocks on margin. Every box chore becomes a button |
 | 2026-11-07 | Free services only beyond what is already paid for |
 | 2026-11-07 | Design borrows Escape Vektor's look with a single investing focus |
 | 2026-11-07 | Engine is Python; Preflight is engine code that agents call and Design renders |

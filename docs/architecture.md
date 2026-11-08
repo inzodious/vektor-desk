@@ -162,7 +162,8 @@ The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free.
 | Deploy | Nothing: within 5 minutes of a push to `main`. Right away: `deploy.sh now` |
 | Status | `deploy.sh status`, or `https://desk.escape-vektor.com/api/status` |
 | Pull Escape Vektor now | Settings → Jobs → Run now, or `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
-| Run any scheduled job now | Settings → Jobs (the API below); no SSH needed |
+| Run any scheduled job now | Settings → Jobs (Run now, below); no SSH needed |
+| Redeploy, status, check, backup, restore drill, logs | Settings → Box (Box actions, below); picked up within 5 minutes |
 | Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log`; redacted copies in `data/run/logs` every 5 minutes (`deploy.sh logs` now) |
 | Let Claude QA the box | [eval-access.md](eval-access.md): a Remote Control session in the sealed `eval` container |
 | Add a schedule | A line in `deploy/crontab` (minute hour day month weekday command, Eastern time) |
@@ -182,6 +183,22 @@ The API never runs a command. `POST /api/jobs/{name}/run` drops a request file i
 
 To follow a run, poll `GET /api/jobs` every few seconds. A queued job shows `queued: true`, then `running: true`, then `last_run.finished` with the same `request_id`. The cooldown is 5 minutes from the last accepted request, per job. Times are UTC, ISO 8601, ending in `Z`.
 
+## Box actions
+
+Chores that need root on the NAS are requests the host picks up, the same way Run now works. `POST /api/box/{action}/run` drops `data/run/box/requests/{action}.json`. The auto-deploy cron job (`deploy.sh auto`, every 5 minutes, as root) then runs `deploy.sh {action}` for each request on its allowlist: `redeploy`, `status`, `check`, `backup`, `restore-test` and `logs`. It reads nothing from the request except a hex id. The redacted last 300 lines of output go to `data/run/box/{action}.json`.
+
+The host refuses to work through a symlinked `data/run/box` or a symlinked request. It writes results with `mktemp` and `mv`, so a planted link can't redirect a root write. Each auto run stamps `data/run/box/host.alive`.
+
+| Call | Answer |
+|---|---|
+| `GET /api/box` | `{now, host_alive, pickup_seconds: 300, actions: [...]}` |
+| One action | `name`, `title`, `what`, `cooldown_seconds`, `running`, `queued`, `queued_at`, `last_run`, `cooldown_until`, `can_run` |
+| `last_run` | `null`, or `{action, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, output}`. `result` is `null` while it runs; a run with no finish after 2 hours counts as stale |
+| `POST /api/box/{action}/run` | `202 {ok: true, action, request_id, requested_at, message}` |
+| Refusals | `{ok: false, error, message, ...}`: `404 unknown_action`; `409 running` or `queued` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 host_down` (no `host.alive` in 12 minutes: the cron copy of `deploy.sh` is older than this feature, or auto-deploy is off) |
+
+Cooldowns: redeploy 5 minutes, status and logs 1, check 2, backup and restore-test 30. Every request is logged to `data/run/box-requests.log`. `deploy.sh box` runs pending requests right away.
+
 ## Package seams
 
 Each package under `desk/` plugs in through three optional modules, found on their own at startup:
@@ -192,7 +209,7 @@ Each package under `desk/` plugs in through three optional modules, found on the
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
 | `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command"}` dicts | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
 
-Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
+Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/box/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
 ## Web app
 
