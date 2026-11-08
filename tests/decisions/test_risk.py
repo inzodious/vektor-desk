@@ -37,7 +37,7 @@ def _mirror(cfg, rows):
 
 def test_middle_answers_give_a_moderate_band():
     r = score(MIDDLE)
-    assert r["band"] == 3 and r["name"] == "Moderate" and r["equity_pct"] == [60, 75] and r["limited_by"] == "both"
+    assert r["band"] == 3 and r["label"] == "Moderate" and (r["equity_min_pct"], r["equity_max_pct"]) == (60, 75) and r["limited_by"] == "both"
     assert r["tolerance"]["score"] == 3 and r["capacity"]["parts"] == {"horizon": 3, "income_stability": 3, "emergency_months": 3}
 
 
@@ -45,7 +45,7 @@ def test_the_lower_of_tolerance_and_capacity_wins():
     thin = score(BOLD | {"emergency_months": "0", "income_stability": "variable", "horizon": "3to7"})
     assert thin["tolerance"]["band"] == 5 and thin["capacity"]["band"] == 2 and thin["band"] == 2 and thin["limited_by"] == "capacity"
     roomy = score(BOLD | {"emergency_months": "12plus", "income_stability": "very", "horizon": "20plus"}, fi_horizon=27.5, savings_pct=40)
-    assert roomy["band"] == 5 and roomy["single_stock_max_pct"] == 15 and roomy["worst_year_pct"] == -45
+    assert roomy["band"] == 5 and roomy["single_stock_max_pct"] == 15 and roomy["worst_year_loss_pct"] == 45
     assert roomy["capacity"]["horizon_years"] == 27.5 and roomy["capacity"]["horizon_source"] == "fi_goal" and roomy["capacity"]["parts"]["savings_rate"] == 5
     timid = score(MIDDLE | {"max_drawdown": 10, "drop_reaction": "sell_all", "one_year_range": "r1", "goal": "preserve", "experience": "none"})
     assert timid["band"] == 1 and timid["limited_by"] == "tolerance"
@@ -113,9 +113,12 @@ def test_saving_versions_and_overlaying_the_profile(cfg):
         "equity_min_pct": 60,
         "equity_max_pct": 75,
         "speculative_max_pct": 5,
+        "worst_year_loss_pct": 25,
         "single_stock_max_pct": 5,
-        "worst_year_loss_pct": -25,
+        "tolerance_band": 3,
+        "capacity_band": 3,
         "limited_by": "both",
+        "answered_at": "2026-11-08T15:00:00+00:00",
         "taken_at": "2026-11-08T15:00:00+00:00",
     }
     p = active_profile(cfg)
