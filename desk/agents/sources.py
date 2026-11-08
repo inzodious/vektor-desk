@@ -125,22 +125,9 @@ class RealLab:
 
     def universe_ready(self, cfg: Config, kind: str) -> bool:
         mod, _ = self._lab()
-        if hasattr(mod, "universe_ready"):
-            return bool(self._call("universe_ready", cfg, kind))
-        if kind != "small_caps":
-            return True
-        import sqlite3
-
-        path = _module("desk.engine.lab.data").data_path(cfg)
-        if not path.exists():
+        if not hasattr(mod, "universe_ready"):
             return False
-        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-        try:
-            return conn.execute("SELECT 1 FROM smallcap LIMIT 1").fetchone() is not None
-        except sqlite3.Error:
-            return False
-        finally:
-            conn.close()
+        return bool(self._call("universe_ready", cfg, kind))
 
 
 class Lane(Protocol):
