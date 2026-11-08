@@ -13,8 +13,8 @@ from desk.agents.pipeline import prepare, run_proposal_desk
 from desk.agents.runner import FIRST_RUN, GUARD_NOTE, LOCK, run_desk
 from desk.agents.sources import NotReady, RealLab
 from desk.agents.status import crew
+from desk.agents.strategy import NO_FAMILY, nightly_inputs, queue_reviews, run_nightly
 from desk.agents.strategy import build_prompt as build_strategy_prompt
-from desk.agents.strategy import queue_reviews
 from desk.config import Config
 from desk.runlock import running
 
@@ -39,7 +39,7 @@ def _dry_run(cfg: Config, name: str, args) -> int:
         report, prompt = preview_filings(cfg)
         print(report.note)
         if report.status == "disabled":
-            print("Would skip (disabled): Off in desk.yaml: set agents.desks.filings to true.")
+            print("Would skip (disabled): switch it on in Settings or set agents.desks.filings to true.")
         elif report.status == "ok" and store.guard_on(cfg):
             print(f"Would skip (guarded): {GUARD_NOTE}")
         if not prompt:
@@ -47,7 +47,15 @@ def _dry_run(cfg: Config, name: str, args) -> int:
         schema = briefs.schema_file("filings")
     elif name == "strategy":
         try:
-            _, prompt = build_strategy_prompt(cfg, RealLab(), question=args.question, strategy_id=args.symbol)
+            question, extra = args.question, None
+            if args.trigger == "schedule" and not args.question and not args.symbol:
+                inputs = nightly_inputs(cfg, RealLab())
+                if inputs is None:
+                    print(f"Would skip (not_ready): {NO_FAMILY}")
+                    return 0
+                question, extra = inputs
+                print(f"  nightly family {extra['family']['key']}, {len(extra['family']['prior'])} earlier specs")
+            _, prompt = build_strategy_prompt(cfg, RealLab(), question=question, strategy_id=args.symbol, extra=extra)
         except NotReady as e:
             print(f"Would skip (not_ready): Strategy lab not ready: {e}")
             return 0
@@ -142,6 +150,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.trigger == "schedule" and not desk.due_on(datetime.now(ZoneInfo(cfg.timezone)).date()):
         print(f"{desk.title}: not due today.")
         return 0
+    if desk.name == "strategy":
+        nightly = run_nightly(cfg, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
+        queued = f" Queued {nightly.queued.name}." if nightly.queued else ""
+        print(f"{desk.title}: {nightly.status}.{queued} {nightly.note or ''}".rstrip())
+        return EXIT.get(nightly.status, 1)
     if desk.name == "filings":
         night = run_filings_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
         extra = f", {len(night.rejected)} refused" if night.rejected else ""

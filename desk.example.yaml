@@ -37,7 +37,7 @@ usage:
     research: 4
     skeptic: 10
     scout: 1
-    strategy: 2
+    strategy: 12
   filings_per_night: 40
 
 agents:
