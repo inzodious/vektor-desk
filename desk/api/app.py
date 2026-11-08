@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from desk import __version__
+from desk.boxkeys import router as keys_router
 from desk.boxrun import router as box_router
 from desk.config import Config
 from desk.db import apply_schemas, connect
@@ -103,6 +104,7 @@ def create_app(cfg: Config | None = None, *, packages: list[str] | None = None, 
 
     app.state.packages = packages
     app.include_router(jobs_router)
+    app.include_router(keys_router)
     app.include_router(box_router)
     app.include_router(inbox_router)
     app.state.routers = []
