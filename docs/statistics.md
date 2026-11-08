@@ -85,7 +85,7 @@ Before metrics are published for a day, the engine checks:
 | Freshness | Mirror pull under 14 hours old |
 | Closes | Every held symbol has a close for the last trading day, or is a code nothing prices |
 | Flows | Lists any snapshot-day change that prices and recorded activity don't explain. The engine counts it as money in or out, not return (unlogged deposits, payroll contributions, a margin buy without a debit row). Always `ok`; it's there to explain the number |
-| Market keys | Tiingo, Finnhub, FRED and the SEC contact are all set; any missing one warns with `set … in desk.env, then redeploy the app` |
+| Market keys | Tiingo, Finnhub, FRED and the SEC contact are all set; any missing one warns with `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set KEY` (it redeploys). Every missing-key fix line uses that form |
 | Symbol kinds | Every holding is known as a fund or a stock: Escape Vektor's profiles, then SEC's fund list, the benchmark ETFs, ticker shape (5 letters ending in X, plan codes with digits) and SEC titles |
 
 Every non-ok detail ends with `Fix:` and the one step that clears it.

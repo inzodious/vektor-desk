@@ -357,7 +357,7 @@ def test_market_keys_warn_for_any_missing_key(cfg, mirror, monkeypatch):
     run_holdings(cfg)
     checks = health(cfg)
     status, detail = checks["market_keys"]
-    assert status == "warn" and detail.endswith("Fix: set DESK_SEC_USER_AGENT in desk.env, then redeploy the app.")
+    assert status == "warn" and detail.endswith("Fix: run `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set DESK_SEC_USER_AGENT`.")
     assert all("answer n" not in d for _, d in checks.values())
 
 
