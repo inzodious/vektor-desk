@@ -23,7 +23,7 @@ DEFAULTS: dict = {
     "growth": {"horizon_years": 10, "tilt": "growth", "fi_target_from_plan": True},
     "usage": {"overnight_window": "01:00-05:00", "weekly_runs": {}},
     "agents": {"enabled": False, "desks": {d: False for d in DESKS}},
-    "deposits": [],
+    "deposits": "auto",
     "alerts": {"min_priority": "default"},
     "rules": [
         {"id": "no-margin-buys", "kind": "no_margin_buys"},
@@ -309,12 +309,18 @@ def main(argv: list[str] | None = None) -> int:
     init.add_argument("--print", dest="dry_run", action="store_true", help="print the draft instead of writing it")
     init.add_argument("--deposits", action="store_true", help="print only the detected deposits block, to paste into an existing desk.yaml")
     sub.add_parser("status", help="show the active version and which settings are still defaults")
+    auto = sub.add_parser("deposits-auto", help="switch an existing desk.yaml to deposits: auto (keeps a .bak); safe to run twice")
+    auto.add_argument("--path", type=Path, help="which file (default $DESK_PROFILE or /data/desk.yaml)")
     args = parser.parse_args(argv)
     cfg = Config.from_env()
     if args.command == "status":
         print(json.dumps(starter.status(cfg), indent=2))
         return 0
     try:
+        if args.command == "deposits-auto":
+            changed, message = starter.switch_to_auto(args.path or profile_path(cfg))
+            print(message)
+            return 0
         if args.deposits:
             print(starter.deposits_block(cfg))
             return 0
