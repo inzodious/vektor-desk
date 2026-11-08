@@ -40,8 +40,9 @@ HEALTH_WAIT=${DESK_HEALTH_WAIT:-120}
 LOG=$ROOT/deploy.log
 BUILD_LOG=$ROOT/deploy-build.log
 DEBUG_MAX=${DESK_DEBUG_MAX:-104857600}
+NO_SELF_PIN=${DESK_NO_SELF_PIN:-$ROOT/deploy.no-self-pin}
 SELF=${DESK_SELF:-$(readlink -f "${BASH_SOURCE[0]}")}
-BOX_ACTIONS="redeploy status check backup restore-test logs"
+BOX_ACTIONS="redeploy status check backup restore-test logs update-script"
 BOX_TIMEOUT=${DESK_BOX_TIMEOUT:-1800}
 LOCK=/run/vektor-desk-deploy.lock
 AUTO_FAILED=$ROOT/deploy-auto.failed
@@ -287,9 +288,109 @@ auto() {
   trap 'auto_stopped $?' EXIT
   deploy
   trap - EXIT
-  if pinned_stale && note "deploy.sh changed on main; read it, then copy it again for the cron jobs (docs/setup.md, After updates)"; then
-    alert "Desk needs you" "deploy.sh changed. Read it, then copy it again for the cron jobs. See docs/setup.md."
+}
+
+script_from() {
+  local want c
+  want=$(repo hash-object "$PINNED" 2>/dev/null) || return 1
+  for c in $(repo log --format=%H -n 300 HEAD -- deploy/deploy.sh 2>/dev/null); do
+    if [ "$(repo rev-parse "$c:deploy/deploy.sh" 2>/dev/null)" = "$want" ]; then
+      printf '%s\n' "$c"
+      return 0
+    fi
+  done
+  return 1
+}
+
+script_state() {
+  local head from='' behind=null current=false off=false
+  [ ! -e "$NO_SELF_PIN" ] || off=true
+  head=$(repo rev-parse HEAD 2>/dev/null) || head=
+  if [ ! -f "$PINNED" ]; then
+    jq -n --arg at "$(date -u +%FT%TZ)" --argjson off "$off" '{checked_at: $at, pinned: false, current: false, behind: null, from: null, to: null, off: $off}'
+    return 0
   fi
+  if ! pinned_stale; then
+    behind=0
+    current=true
+    from=$head
+  elif from=$(script_from); then
+    behind=$(repo rev-list --count "$from..HEAD" -- deploy/deploy.sh 2>/dev/null || echo null)
+  else
+    from=
+  fi
+  jq -n --arg at "$(date -u +%FT%TZ)" --arg f "$from" --arg h "$head" --argjson b "$behind" --argjson c "$current" --argjson off "$off" \
+    '{checked_at: $at, pinned: true, current: $c, behind: $b, from: (if $f == "" then null else $f end), to: (if $h == "" then null else $h end), off: $off}'
+}
+
+script_line() {
+  local state behind from to
+  state=$(script_state)
+  if [ "$(jq -r .pinned <<<"$state")" != true ]; then
+    echo "none at $PINNED (docs/setup.md, step 8)"
+    return 0
+  fi
+  [ "$(jq -r .current <<<"$state")" != true ] || {
+    echo "current"
+    return 0
+  }
+  behind=$(jq -r '.behind // "some"' <<<"$state")
+  from=$(jq -r '.from // "an unknown version" | .[0:7]' <<<"$state")
+  to=$(jq -r '.to // "?" | .[0:7]' <<<"$state")
+  if [ "$(jq -r .off <<<"$state")" = true ]; then
+    echo "$behind commits behind main ($from, main is $to); updating from the app is off ($NO_SELF_PIN), so copy it by hand (docs/setup.md, After updates)"
+  else
+    echo "$behind commits behind main ($from, main is $to); Settings → Box → Update box script"
+  fi
+}
+
+update_script() {
+  local head from new ALERTS=update-script
+  [ -f "$PINNED" ] || {
+    echo "There's no cron copy at $PINNED yet; set one up first (docs/setup.md, step 8)"
+    return 1
+  }
+  if [ "$(readlink -f "$PINNED")" = "$(readlink -f "$SRC/deploy/deploy.sh")" ]; then
+    echo "The cron jobs run the checkout's deploy.sh directly; nothing to copy"
+    return 0
+  fi
+  head=$(repo rev-parse HEAD 2>/dev/null) || {
+    echo "Can't read the checkout at $SRC"
+    return 1
+  }
+  if ! pinned_stale; then
+    echo "Box script is current at ${head:0:7}"
+    return 0
+  fi
+  if [ -e "$NO_SELF_PIN" ]; then
+    echo "Updating from the app is off ($NO_SELF_PIN). Read the change, then copy it by hand (docs/setup.md, After updates)"
+    return 1
+  fi
+  if [ -n "$(repo status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    echo "The checkout at $SRC has local edits, so its deploy.sh isn't main's. The box script stays as it is"
+    return 1
+  fi
+  if [ "$head" != "$(repo rev-parse "origin/$BRANCH" 2>/dev/null)" ]; then
+    echo "The checkout (${head:0:7}) isn't at main yet; auto-deploy catches up within 5 minutes. Try again then"
+    return "$BUSY"
+  fi
+  if ! bash -n "$SRC/deploy/deploy.sh" 2>&1; then
+    echo "deploy.sh at ${head:0:7} doesn't parse; the box script stays as it is"
+    return 1
+  fi
+  from=$(script_from) || from=
+  new=$(mktemp "$(dirname "$PINNED")/.deploy.sh.XXXXXX")
+  cat "$SRC/deploy/deploy.sh" >"$new"
+  chmod 700 "$new"
+  mv -f "$new" "$PINNED"
+  if [ -n "$from" ]; then
+    log "Box script updated from ${from:0:7} to ${head:0:7}"
+    echo "Changes to deploy.sh:"
+    repo log --format='  %h %s' "$from..$head" -- deploy/deploy.sh
+  else
+    log "Box script updated from an unknown version to ${head:0:7}"
+  fi
+  alert "Desk updated its box script" "deploy.sh for the cron jobs now matches main at ${head:0:7}."
 }
 
 status() {
@@ -304,7 +405,7 @@ status() {
   crons=$(midclt call cronjob.query 2>/dev/null | jq -r '[.[] | select(.enabled and (.command | test("vektor-desk-deploy/deploy\\.sh auto")))] | length' 2>/dev/null || true)
   if [ "${crons:-0}" -gt 0 ]; then echo "Auto-deploy: on"; else echo "Auto-deploy: off (docs/setup.md, step 8)"; fi
   if [ -s "$AUTO_FAILED" ]; then echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or run deploy.sh now"; fi
-  if [ ! -f "$PINNED" ]; then echo "Cron copy:   none at $PINNED (step 8)"; elif pinned_stale; then echo "Cron copy:   differs from the checkout's deploy.sh; read the change, then copy it again (docs/setup.md, After updates)"; fi
+  echo "Box script:  $(script_line)"
   compose_drift
   echo
   docker exec vektor-desk-api python -m desk.status 2>/dev/null || echo "(the desk's own status isn't answering)"
@@ -346,6 +447,8 @@ check() {
   echo "Phone alerts:"
   docker exec vektor-desk-cron python -m desk.notify test ops 2>&1 | sed 's/^/  /' || true
   echo "  subscribe in the ntfy app: server https://desk.escape-vektor.com:8443, topics desk-alerts, desk-research, desk-ops"
+  echo "Box script:"
+  echo "  $(script_line)"
   echo "Certificate:"
   docker logs vektor-desk-caddy 2>&1 | grep -E 'certificate obtained|could not get certificate|obtain' | tail -n 2 | sed 's/^/  /' || true
 }
@@ -378,7 +481,7 @@ box_run() {
   local dir=$1 action=$2 id=$3 started out rc=0 result list
   started=$(date -u +%FT%TZ)
   jq -n --arg a "$action" --arg id "$id" --arg s "$started" \
-    '{action: $a, request_id: ($id | select(. != "")), started: $s, finished: null, result: null, exit_code: null, output: null}' | box_put "$dir" "$action.json"
+    '{action: $a, request_id: (if $id == "" then null else $id end), started: $s, finished: null, result: null, exit_code: null, output: null}' | box_put "$dir" "$action.json"
   log "Box action from the app: $action${id:+ ($id)}"
   out=$(timeout "$BOX_TIMEOUT" bash "$SELF" "$action" 2>&1 </dev/null) || rc=$?
   case $rc in
@@ -392,7 +495,7 @@ box_run() {
   out=$(printf '%s\n' "$out" | tail -n 300 | redact "$list")
   rm -f "$list"
   jq -n --arg a "$action" --arg id "$id" --arg s "$started" --arg f "$(date -u +%FT%TZ)" --arg r "$result" --argjson rc "$rc" --arg o "$out" \
-    '{action: $a, request_id: ($id | select(. != "")), started: $s, finished: $f, result: $r, exit_code: $rc, output: $o}' | box_put "$dir" "$action.json"
+    '{action: $a, request_id: (if $id == "" then null else $id end), started: $s, finished: $f, result: $r, exit_code: $rc, output: $o}' | box_put "$dir" "$action.json"
 }
 
 box_requests() {
@@ -402,6 +505,7 @@ box_requests() {
     return 0
   }
   date -u +%FT%TZ | box_put "$dir" host.alive
+  script_state 2>/dev/null | box_put "$dir" script.json || true
   for action in $BOX_ACTIONS; do
     file=$dir/requests/$action.json
     if [ -L "$file" ]; then
@@ -596,7 +700,6 @@ main() {
       flock -n 9 || die "a deploy is already running: tail -f $LOG"
       deploy
       app_card || true
-      if pinned_stale; then log "deploy.sh changed: copy it again for the cron jobs (docs/setup.md, After updates)"; fi
       ;;
     backup)
       ALERTS="Nightly backup failed"
@@ -621,8 +724,9 @@ main() {
     status) status ;;
     restore-test) restore_test ;;
     check) check ;;
+    update-script) update_script ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box | update-script]" >&2
       exit 2
       ;;
   esac
