@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import board from '../fixtures/engine.lab.leaderboard.json';
 import early from '../fixtures/engine.lab.leaderboard.early.json';
-import { accountText, boardHead, boardRows, boardStatus, edgeText, edgeTone, statLine, trackText } from './leaderboard.js';
+import { accountText, rewardLine, boardHead, boardRows, boardStatus, edgeText, edgeTone, statLine, trackText } from './leaderboard.js';
 
 describe('leaderboard', () => {
   it('ranks racers and leaves retired ones unranked', () => {
     const rows = boardRows(board);
-    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, 4, null]);
+    expect(rows.map((r) => r.rank)).toEqual([1, 2, 3, 4, 5, null]);
     expect(rows[1].share).toBeCloseTo(32 / 182, 3);
     expect(rows[0].share).toBe(1);
   });
@@ -47,7 +47,16 @@ describe('leaderboard', () => {
   });
 
   it('names the leader', () => {
-    expect(boardHead(board)).toMatchObject({ racing: 4, eligible: 1, leader: { id: 'low-vol-sectors' } });
+    expect(boardHead(board)).toMatchObject({ racing: 5, eligible: 1, leader: { id: 'low-vol-sectors' } });
     expect(boardHead({ rows: [] })).toMatchObject({ racing: 0, eligible: 0 });
   });
 });
+
+describe('reward to risk', () => {
+  it('reads Sharpe and Sortino, then the backtest', () => {
+    expect(rewardLine({ reward_risk: { sharpe: 1.12, sortino: 1.58, days: 200 }, backtest: { sharpe: 0.98, ann_return_pct: 9.4 } })).toBe('Reward to risk 1.12 Sharpe, 1.58 Sortino over 200 days · backtest 0.98 at +9.4% a year');
+    expect(rewardLine({ reward_risk: { sharpe: null }, backtest: null })).toBeNull();
+    expect(rewardLine({})).toBeNull();
+  });
+});
+

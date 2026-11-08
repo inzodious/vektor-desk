@@ -1,0 +1,428 @@
+{
+ "as_of": "2026-11-06",
+ "status": "ok",
+ "rows": [
+  {
+   "id": "dip-buy",
+   "name": "Dip-buy",
+   "weights": {
+    "IVV": 0.6,
+    "FTEC": 0.2,
+    "VXUS": 0.15,
+    "BND": 0.05
+   },
+   "cash": 0.2,
+   "priced_from": {
+    "IVV": "IVV",
+    "FTEC": "FTEC",
+    "VXUS": "VXUS",
+    "BND": "BND"
+   },
+   "status": "ok",
+   "risk_rank": 2,
+   "fit": "below",
+   "worst_year_p10_pct": -12.4,
+   "cvar95_1y_pct": -19.8,
+   "p50_value_10y": 127889,
+   "chance_fi": 0.31,
+   "sharpe": 0.58,
+   "max_drawdown_pct": -16.1,
+   "drawdown_10y": {
+    "p10": -24.8,
+    "p50": -16.1,
+    "p90": -9.9
+   },
+   "bands": [
+    {
+     "years": 1,
+     "p10": 21750,
+     "p50": 25043,
+     "p90": 28835,
+     "contributed": 23970,
+     "chance_loss": 0.42,
+     "chance_below_contributed": 0.4,
+     "return_p50_pct": 6.4
+    },
+    {
+     "years": 5,
+     "p10": 46536,
+     "p50": 63781,
+     "p90": 87417,
+     "contributed": 52770,
+     "chance_loss": 0.188,
+     "chance_below_contributed": 0.179,
+     "return_p50_pct": 6.4
+    },
+    {
+     "years": 10,
+     "p10": 81888,
+     "p50": 127889,
+     "p90": 199730,
+     "contributed": 88770,
+     "chance_loss": 0.133,
+     "chance_below_contributed": 0.126,
+     "return_p50_pct": 6.4
+    },
+    {
+     "years": 20,
+     "p10": 178082,
+     "p50": 334523,
+     "p90": 628396,
+     "contributed": 160770,
+     "chance_loss": 0.094,
+     "chance_below_contributed": 0.089,
+     "return_p50_pct": 6.4
+    },
+    {
+     "years": 40,
+     "p10": 587660,
+     "p50": 1433334,
+     "p90": 3495980,
+     "contributed": 304770,
+     "chance_loss": 0.066,
+     "chance_below_contributed": 0.063,
+     "return_p50_pct": 6.4
+    }
+   ],
+   "backtest": {
+    "months": 120,
+    "cagr_pct": 8.3,
+    "vol_pct": 11,
+    "sharpe": 0.58,
+    "sortino": 0.81,
+    "max_drawdown_pct": -14.9,
+    "calmar": 0.5,
+    "worst_year_pct": -12.4,
+    "hit_rate": 0.6,
+    "start": "2016-11",
+    "end": "2026-10"
+   },
+   "long_history": {
+    "months": 1205,
+    "cagr_pct": 6.4,
+    "max_drawdown_pct": -27.3,
+    "worst_year_pct": -18.6,
+    "start": "1926-07",
+    "end": "2026-10"
+   },
+   "model": {
+    "beta": 1,
+    "alpha_dropped_pct": 1.2,
+    "resid_vol_pct": 8,
+    "months": 120,
+    "start": "2016-11",
+    "end": "2026-10"
+   },
+   "fee_pct": 0,
+   "proxy_note": null,
+   "notes": []
+  },
+  {
+   "id": "safe-mix",
+   "name": "Safe mix",
+   "weights": {
+    "IVV": 0.6,
+    "FTEC": 0.2,
+    "VXUS": 0.15,
+    "BND": 0.05
+   },
+   "cash": 0,
+   "priced_from": {
+    "IVV": "IVV",
+    "FTEC": "FTEC",
+    "VXUS": "VXUS",
+    "BND": "BND"
+   },
+   "status": "ok",
+   "risk_rank": 3,
+   "fit": "fits",
+   "worst_year_p10_pct": -17.8,
+   "cvar95_1y_pct": -28.5,
+   "p50_value_10y": 134034,
+   "chance_fi": 0.42,
+   "sharpe": 0.55,
+   "max_drawdown_pct": -23.1,
+   "drawdown_10y": {
+    "p10": -35.6,
+    "p50": -23.1,
+    "p90": -14.2
+   },
+   "bands": [
+    {
+     "years": 1,
+     "p10": 21042,
+     "p50": 25177,
+     "p90": 30126,
+     "contributed": 23970,
+     "chance_loss": 0.42,
+     "chance_below_contributed": 0.4,
+     "return_p50_pct": 7.2
+    },
+    {
+     "years": 5,
+     "p10": 43727,
+     "p50": 65312,
+     "p90": 97552,
+     "contributed": 52770,
+     "chance_loss": 0.188,
+     "chance_below_contributed": 0.179,
+     "return_p50_pct": 7.2
+    },
+    {
+     "years": 10,
+     "p10": 75998,
+     "p50": 134034,
+     "p90": 236390,
+     "contributed": 88770,
+     "chance_loss": 0.133,
+     "chance_below_contributed": 0.126,
+     "return_p50_pct": 7.2
+    },
+    {
+     "years": 20,
+     "p10": 165430,
+     "p50": 369058,
+     "p90": 823335,
+     "contributed": 160770,
+     "chance_loss": 0.094,
+     "chance_below_contributed": 0.089,
+     "return_p50_pct": 7.2
+    },
+    {
+     "years": 40,
+     "p10": 573603,
+     "p50": 1784181,
+     "p90": 5549660,
+     "contributed": 304770,
+     "chance_loss": 0.066,
+     "chance_below_contributed": 0.063,
+     "return_p50_pct": 7.2
+    }
+   ],
+   "backtest": {
+    "months": 120,
+    "cagr_pct": 9.4,
+    "vol_pct": 14,
+    "sharpe": 0.55,
+    "sortino": 0.77,
+    "max_drawdown_pct": -21.4,
+    "calmar": 0.5,
+    "worst_year_pct": -17.8,
+    "hit_rate": 0.6,
+    "start": "2016-11",
+    "end": "2026-10"
+   },
+   "long_history": {
+    "months": 1205,
+    "cagr_pct": 7.2,
+    "max_drawdown_pct": -39.2,
+    "worst_year_pct": -26.7,
+    "start": "1926-07",
+    "end": "2026-10"
+   },
+   "model": {
+    "beta": 1,
+    "alpha_dropped_pct": 1.2,
+    "resid_vol_pct": 8,
+    "months": 120,
+    "start": "2016-11",
+    "end": "2026-10"
+   },
+   "fee_pct": 0,
+   "proxy_note": null,
+   "notes": []
+  },
+  {
+   "id": "as-held",
+   "name": "As held",
+   "weights": {
+    "IVV": 0.45,
+    "ACME": 0.25,
+    "FTEC": 0.2,
+    "VXUS": 0.1
+   },
+   "cash": 0.04,
+   "priced_from": {
+    "IVV": "IVV",
+    "ACME": "ACME",
+    "FTEC": "FTEC",
+    "VXUS": "VXUS"
+   },
+   "status": "ok",
+   "risk_rank": 5,
+   "fit": "above",
+   "worst_year_p10_pct": -38.6,
+   "cvar95_1y_pct": -61.8,
+   "p50_value_10y": 143025,
+   "chance_fi": 0.47,
+   "sharpe": 0.41,
+   "max_drawdown_pct": -50.2,
+   "drawdown_10y": {
+    "p10": -77.2,
+    "p50": -50.2,
+    "p90": -30.9
+   },
+   "bands": [
+    {
+     "years": 1,
+     "p10": 17943,
+     "p50": 25362,
+     "p90": 35848,
+     "contributed": 23970,
+     "chance_loss": 0.42,
+     "chance_below_contributed": 0.4,
+     "return_p50_pct": 8.3
+    },
+    {
+     "years": 5,
+     "p10": 31126,
+     "p50": 67478,
+     "p90": 146284,
+     "contributed": 52770,
+     "chance_loss": 0.188,
+     "chance_below_contributed": 0.179,
+     "return_p50_pct": 8.3
+    },
+    {
+     "years": 10,
+     "p10": 47883,
+     "p50": 143025,
+     "p90": 427206,
+     "contributed": 88770,
+     "chance_loss": 0.133,
+     "chance_below_contributed": 0.126,
+     "return_p50_pct": 8.3
+    },
+    {
+     "years": 20,
+     "p10": 90062,
+     "p50": 423265,
+     "p90": 1989227,
+     "contributed": 160770,
+     "chance_loss": 0.094,
+     "chance_below_contributed": 0.089,
+     "return_p50_pct": 8.3
+    },
+    {
+     "years": 40,
+     "p10": 271919,
+     "p50": 2426007,
+     "p90": 21644363,
+     "contributed": 304770,
+     "chance_loss": 0.066,
+     "chance_below_contributed": 0.063,
+     "return_p50_pct": 8.3
+    }
+   ],
+   "backtest": {
+    "months": 120,
+    "cagr_pct": 10.8,
+    "vol_pct": 27,
+    "sharpe": 0.41,
+    "sortino": 0.57,
+    "max_drawdown_pct": -46.3,
+    "calmar": 0.5,
+    "worst_year_pct": -38.6,
+    "hit_rate": 0.6,
+    "start": "2016-11",
+    "end": "2026-10"
+   },
+   "long_history": {
+    "months": 1205,
+    "cagr_pct": 8.3,
+    "max_drawdown_pct": -84.9,
+    "worst_year_pct": -57.9,
+    "start": "1926-07",
+    "end": "2026-10"
+   },
+   "model": {
+    "beta": 1,
+    "alpha_dropped_pct": 1.2,
+    "resid_vol_pct": 8,
+    "months": 120,
+    "start": "2016-11",
+    "end": "2026-10"
+   },
+   "fee_pct": 0,
+   "proxy_note": "FXAIX trades as IVV",
+   "notes": []
+  },
+  {
+   "id": "tech-tilt",
+   "name": "Aggressive tech tilt",
+   "weights": {
+    "IVV": 0.5,
+    "FTEC": 0.3,
+    "SMH": 0.1,
+    "VXUS": 0.1
+   },
+   "cash": 0,
+   "priced_from": {},
+   "status": "not_ready",
+   "note": "Needs 36 months of prices for its funds; has 14.",
+   "notes": []
+  }
+ ],
+ "book": "as-held",
+ "start_value": 16770,
+ "monthly_deposit": 600,
+ "deposit_source": "activity",
+ "deposit_note": "from your last 12 months of deposits",
+ "fi_number": 1000000,
+ "target_date": "2035-01-01",
+ "real": false,
+ "horizons": [
+  1,
+  5,
+  10,
+  20,
+  40
+ ],
+ "paths": 2000,
+ "history": {
+  "start": "1926-07",
+  "end": "2026-10",
+  "months": 1203
+ },
+ "ladder": [
+  {
+   "band": 1,
+   "label": "Conservative",
+   "worst_year_loss_pct": 10
+  },
+  {
+   "band": 2,
+   "label": "Moderately conservative",
+   "worst_year_loss_pct": 18
+  },
+  {
+   "band": 3,
+   "label": "Moderate",
+   "worst_year_loss_pct": 25
+  },
+  {
+   "band": 4,
+   "label": "Moderately aggressive",
+   "worst_year_loss_pct": 33
+  },
+  {
+   "band": 5,
+   "label": "Aggressive",
+   "worst_year_loss_pct": 45
+  }
+ ],
+ "ladder_source": "profile",
+ "profile": {
+  "band": 4,
+  "label": "Moderately aggressive",
+  "worst_year_loss_pct": 33,
+  "version": 2
+ },
+ "method": "Each mix is fitted to the US market on its own price history (beta plus leftover swings, alpha set to zero), then replayed in 12-month blocks of market history since 1926",
+ "caveats": [
+  "Alpha is set to zero: no mix gets credit for beating the market in its own history.",
+  "Leftover swings are drawn month by month, so a fund's own long slumps are understated.",
+  "International and bond funds are modelled through their link to the US market since 1926.",
+  "The margin debit is not modelled."
+ ]
+}

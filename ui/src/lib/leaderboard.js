@@ -57,6 +57,15 @@ export function boardHead(board) {
   return { racing: racing.length, eligible, leader };
 }
 
+export function rewardLine(r) {
+  const rr = r?.reward_risk;
+  const bt = r?.backtest;
+  const parts = [];
+  if (rr?.sharpe != null) parts.push(`Reward to risk ${rr.sharpe.toFixed(2)} Sharpe${rr.sortino != null ? `, ${rr.sortino.toFixed(2)} Sortino` : ''}${rr.days ? ` over ${rr.days} days` : ''}`);
+  if (bt?.sharpe != null) parts.push(`backtest ${bt.sharpe.toFixed(2)}${bt.ann_return_pct != null ? ` at ${signedPct(bt.ann_return_pct)} a year` : ''}`);
+  return parts.join(' · ') || null;
+}
+
 export function accountText(r) {
   const a = r?.account;
   if (!a || a.value == null) return null;

@@ -4,6 +4,7 @@ import { pct } from './format.js';
 export const LAB_TABS = [
   { to: '/lab', label: 'Compare', end: true },
   { to: '/lab/risk', label: 'Risk' },
+  { to: '/lab/mixes', label: 'Mixes' },
   { to: '/lab/strategies', label: 'Strategies' },
   { to: '/lab/patterns', label: 'Patterns' },
   { to: '/lab/boards', label: 'Boards' },
