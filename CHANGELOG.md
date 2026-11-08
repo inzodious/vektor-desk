@@ -4,6 +4,25 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.8 - 2026-11-08
+
+### Added
+
+- Risk check: eight questions plus your FI horizon, savings rate and emergency fund set a risk band from 1 to 5, versioned, and the band replaces `risk_level` everywhere ([#125], [#132], [#137])
+- Strategy catalog: safe mix, as held, aggressive tech tilt and dip-buy race side by side, each in its own Alpaca paper sleeve with ETF proxies ([#127])
+- Lab → Mixes shows each mix's range of outcomes over 1 to 40 years, a bad year, its chance of reaching FI and how it fits your risk band ([#127], [#139])
+- The leaderboard shows Sharpe, Sortino, max drawdown, Calmar and hit rate for each strategy, plus its backtest ([#133], [#139])
+- Discount days: a scanner flags held, watchlist and quality names that fell hard, the research desk writes a buy, wait or avoid case for each, and the Bridge shows them ([#129], [#133], [#140])
+- Settings → Box runs redeploy, status, check, backup, restore drill, logs and box script updates from buttons, and applies a changed compose file unless the change widens container access ([#126], [#128], [#134], [#135], [#138])
+- Settings → Keys saves keys to the box without a terminal; values are sealed to the host, never shown back, and live Alpaca keys are refused ([#136], [#138])
+- Broker exports upload straight into the inbox from Settings ([#130], [#134])
+- A first-run checklist runs box setup from buttons, and the Symbol sheet shows the latest filing read ([#131], [#127])
+
+### Changed
+
+- Desks measure against your risk band and the strategy catalog, never one fixed plan ([#129])
+- The strategy desk waits for the small-cap history before insider and drift nights, and registers filings lane variants (forward paper only) ([#122], [#123])
+
 ## 1.0.7 - 2026-11-08
 
 ### Added
@@ -352,3 +371,21 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#118]: https://github.com/inzodious/vektor-desk/pull/118
 [#119]: https://github.com/inzodious/vektor-desk/pull/119
 [#120]: https://github.com/inzodious/vektor-desk/pull/120
+[#122]: https://github.com/inzodious/vektor-desk/pull/122
+[#123]: https://github.com/inzodious/vektor-desk/pull/123
+[#125]: https://github.com/inzodious/vektor-desk/pull/125
+[#126]: https://github.com/inzodious/vektor-desk/pull/126
+[#127]: https://github.com/inzodious/vektor-desk/pull/127
+[#128]: https://github.com/inzodious/vektor-desk/pull/128
+[#129]: https://github.com/inzodious/vektor-desk/pull/129
+[#130]: https://github.com/inzodious/vektor-desk/pull/130
+[#131]: https://github.com/inzodious/vektor-desk/pull/131
+[#132]: https://github.com/inzodious/vektor-desk/pull/132
+[#133]: https://github.com/inzodious/vektor-desk/pull/133
+[#134]: https://github.com/inzodious/vektor-desk/pull/134
+[#135]: https://github.com/inzodious/vektor-desk/pull/135
+[#136]: https://github.com/inzodious/vektor-desk/pull/136
+[#137]: https://github.com/inzodious/vektor-desk/pull/137
+[#138]: https://github.com/inzodious/vektor-desk/pull/138
+[#139]: https://github.com/inzodious/vektor-desk/pull/139
+[#140]: https://github.com/inzodious/vektor-desk/pull/140
