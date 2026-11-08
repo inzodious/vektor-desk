@@ -153,6 +153,8 @@ def main(argv: list[str] | None = None) -> int:
     if desk.name == "strategy":
         nightly = run_nightly(cfg, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
         queued = f" Queued {nightly.queued.name}." if nightly.queued else ""
+        if nightly.lane:
+            queued = f" Registered lane {nightly.lane['id']} v{nightly.lane['version']}."
         print(f"{desk.title}: {nightly.status}.{queued} {nightly.note or ''}".rstrip())
         return EXIT.get(nightly.status, 1)
     if desk.name == "filings":

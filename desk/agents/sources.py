@@ -123,6 +123,35 @@ class RealLab:
     def strategies(self, cfg: Config) -> list[dict]:
         return list(self._call("strategies", cfg))
 
+    def universe_ready(self, cfg: Config, kind: str) -> bool:
+        mod, _ = self._lab()
+        if hasattr(mod, "universe_ready"):
+            return bool(self._call("universe_ready", cfg, kind))
+        if kind != "small_caps":
+            return True
+        import sqlite3
+
+        path = _module("desk.engine.lab.data").data_path(cfg)
+        if not path.exists():
+            return False
+        conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            return conn.execute("SELECT 1 FROM smallcap LIMIT 1").fetchone() is not None
+        except sqlite3.Error:
+            return False
+        finally:
+            conn.close()
+
+
+class Lane(Protocol):
+    def register(self, cfg: Config, strategy_id: str, title: str, params: dict, hypothesis: str | None) -> dict: ...
+
+
+@dataclass
+class RealLane:
+    def register(self, cfg: Config, strategy_id: str, title: str, params: dict, hypothesis: str | None) -> dict:
+        return dict(_fn("desk.engine.lane", "register_variant")(cfg, strategy_id, title, params, hypothesis=hypothesis))
+
 
 class Filings(Protocol):
     def pending(self, cfg: Config, limit: int) -> list[dict]: ...
