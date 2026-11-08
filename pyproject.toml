@@ -1,6 +1,6 @@
 [project]
 name = "vektor-desk"
-version = "1.0.4"
+version = "1.0.5"
 description = "Private investing desk for Escape Vektor, self-hosted on TrueNAS"
 requires-python = ">=3.12"
 dependencies = [

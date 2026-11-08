@@ -161,13 +161,13 @@ Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the 
 
 | Item | Owner | Status |
 |---|---|---|
-| Fidelity 5-year history importer (real shares, lots, flows) | Statistics | ⏳ |
-| Run-now jobs in Settings, refresh on the health banner | Infra + Design | ⏳ |
+| Fidelity 5-year history importer (real shares, lots, flows) | Statistics | ✅ |
+| Run-now jobs in Settings, refresh on the health banner | Infra + Design | ✅ |
 | Alpaca free market data as the lab and universe price source | Statistics | ⏳ |
 | Small-cap universe ($50M–$2B, liquidity floor) and EDGAR new-filings fetch | Statistics | ⏳ |
-| Filings desk: scores each filing (direction, confidence, event) | Agents | ⏳ |
+| Filings desk: scores each filing (direction, confidence, event) | Agents | ✅ |
 | Filings strategy family, forward paper only, 182-day graduation | Statistics | ⏳ |
-| Alpaca paper executor (paper URL only) and keys | Statistics + Infra | ⏳ |
+| Alpaca paper executor (paper URL only) and keys | Statistics + Infra | ⏳ keys and guard done (#103) |
 | Filings lane card in the Lab, filing chip on the Symbol sheet | Design | ⏳ |
 | Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
 

@@ -4,6 +4,22 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.5 - 2026-11-08
+
+### Added
+
+- Settings has a Jobs panel with Run now for every scheduled job, and the health banner's Refresh data runs the job that fixes the failing check, so nothing needs SSH ([#102], [#107])
+- The engine imports Fidelity's activity-and-orders history JSON: broker rows win over Escape Vektor's activity, tax lots and realized gains are rebuilt (FIFO for stocks and ETFs, average cost for mutual funds) with wash-sale disallowance, and margin interest is tracked ([#104])
+- Filings desk scores up to 40 new small-cap SEC filings a night for the forward paper lane; advisory only, off by default ([#105])
+- Alpaca paper keys can be set with `setup-truenas.sh set`, and `deploy.sh check` verifies the paper account; any non-paper Alpaca URL is refused ([#103])
+- `setup-truenas.sh set KEY` changes one setting and redeploys, and `deploy.sh redeploy` re-reads env files ([#97])
+
+### Changed
+
+- Plan reads deposits from your activity, lists the rhythm it found and the money that came in, and shows irregular deposits as landed, never late ([#98], [#100])
+- The FI forecast uses your average monthly deposits from the last 12 months of activity ([#99])
+- Deposits, fills and unmatched trades read the imported broker history first ([#106])
+
 ## 1.0.4 - 2026-11-08
 
 ### Added
@@ -288,3 +304,13 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#93]: https://github.com/inzodious/vektor-desk/pull/93
 [#94]: https://github.com/inzodious/vektor-desk/pull/94
 [#95]: https://github.com/inzodious/vektor-desk/pull/95
+[#97]: https://github.com/inzodious/vektor-desk/pull/97
+[#98]: https://github.com/inzodious/vektor-desk/pull/98
+[#99]: https://github.com/inzodious/vektor-desk/pull/99
+[#100]: https://github.com/inzodious/vektor-desk/pull/100
+[#102]: https://github.com/inzodious/vektor-desk/pull/102
+[#103]: https://github.com/inzodious/vektor-desk/pull/103
+[#104]: https://github.com/inzodious/vektor-desk/pull/104
+[#105]: https://github.com/inzodious/vektor-desk/pull/105
+[#106]: https://github.com/inzodious/vektor-desk/pull/106
+[#107]: https://github.com/inzodious/vektor-desk/pull/107
