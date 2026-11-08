@@ -44,6 +44,9 @@ NO_SELF_PIN=${DESK_NO_SELF_PIN:-$ROOT/deploy.no-self-pin}
 SELF=${DESK_SELF:-$(readlink -f "${BASH_SOURCE[0]}")}
 BOX_ACTIONS="redeploy status check backup restore-test logs update-script apply-compose"
 BOX_TIMEOUT=${DESK_BOX_TIMEOUT:-1800}
+KEYS_PEM=${DESK_KEYS_PEM:-$ROOT/box-keys.pem}
+ENV_FILES="settings.env desk.env caddy.env tailscale.env"
+PAPER_URL=https://paper-api.alpaca.markets
 LOCK=/run/vektor-desk-deploy.lock
 AUTO_FAILED=$ROOT/deploy-auto.failed
 AUTO_NOTE=$ROOT/deploy-auto.note
@@ -503,6 +506,7 @@ box_requests() {
   date -u +%FT%TZ | box_put "$dir" host.alive
   script_state 2>/dev/null | box_put "$dir" script.json || true
   compose_state 2>/dev/null | box_put "$dir" compose.json || true
+  box_keys "$dir" || true
   for action in $BOX_ACTIONS; do
     file=$dir/requests/$action.json
     if [ -L "$file" ]; then
@@ -515,6 +519,124 @@ box_requests() {
     box_run "$dir" "$action" "$id"
   done
   find "$dir/requests" -maxdepth 1 \( -type f -o -type l \) -name '*.json' -delete 2>/dev/null || true
+}
+
+# ---- Keys from the app ----
+
+key_file_for() {
+  local key=$1 f
+  case $key in
+    DESK_FIREBASE_PROJECT | DESK_UID | DESK_CLAUDE_TOKEN_EXPIRES) echo settings.env ;;
+    CLAUDE_CODE_OAUTH_TOKEN | TIINGO_API_KEY | FINNHUB_API_KEY | FRED_API_KEY | DESK_SEC_USER_AGENT | ALPACA_API_KEY_ID | ALPACA_API_SECRET_KEY) echo desk.env ;;
+    PORKBUN_API_KEY | PORKBUN_API_SECRET_KEY) echo caddy.env ;;
+    TS_AUTHKEY) echo tailscale.env ;;
+    *)
+      for f in $ENV_FILES; do
+        if grep -qE "^(export[[:space:]]+)?$key=" "$ROOT/$f" 2>/dev/null; then
+          echo "$f"
+          return 0
+        fi
+      done
+      return 1
+      ;;
+  esac
+}
+
+key_refusal() {
+  local key=$1 value=$2
+  if ! [[ "$key" =~ ^[A-Z_][A-Z0-9_]{0,63}$ ]]; then
+    echo "isn't a key name"
+  elif [[ "$key" =~ ^(PATH|HOME|USER|SHELL|ENV|BASH_ENV|NODE_OPTIONS|LD_.*|PYTHON.*|DESK_DATA_DIR)$ ]]; then
+    echo "can't be set from the app"
+  elif ! key_file_for "$key" >/dev/null; then
+    echo "isn't one of the desk's keys"
+  elif [ -z "$value" ]; then
+    echo "is empty"
+  elif [ "${#value}" -gt 1024 ]; then
+    echo "is longer than 1024 characters"
+  elif [[ "$value" == *$'\n'* || "$value" == *$'\r'* || "$value" == *"'"* ]]; then
+    echo "can't contain a line break or a single quote"
+  elif [ "$key" = ALPACA_API_KEY_ID ] && [[ "$value" != PK* ]]; then
+    echo "isn't a paper key ID (paper key IDs start with PK); live keys are never allowed"
+  elif [[ "$key" == *ALPACA*URL* ]] && [[ ! "$value" =~ ^https://paper-api\.alpaca\.markets(:443)?(/v2)?/?$ ]]; then
+    echo "isn't Alpaca's paper API ($PAPER_URL); only paper trading is allowed"
+  else
+    return 1
+  fi
+}
+
+key_line() {
+  local key=$1 value=$2
+  if [[ "$value" =~ ^[A-Za-z0-9_./:@+=,-]*$ ]]; then printf '%s=%s' "$key" "$value"; else printf "%s='%s'" "$key" "$value"; fi
+}
+
+set_env_key() {
+  local key=$1 value=$2 file new
+  file=$ROOT/$(key_file_for "$key") || return 1
+  [ ! -L "$file" ] || return 1
+  [ -e "$file" ] || (umask 077 && : >"$file")
+  new=$(mktemp "$file.XXXXXX")
+  chmod 600 "$new"
+  KEY_LINE=$(key_line "$key" "$value") KEY_NAME=$key awk '
+    $0 ~ "^(export[[:space:]]+)?" ENVIRON["KEY_NAME"] "=" { if (!done) print ENVIRON["KEY_LINE"]; done = 1; next }
+    { print }
+    END { if (!done) print ENVIRON["KEY_LINE"] }' "$file" >"$new"
+  mv -f "$new" "$file"
+  basename "$file"
+}
+
+key_names() {
+  local f
+  for f in $ENV_FILES; do
+    [ -f "$ROOT/$f" ] && [ ! -L "$ROOT/$f" ] || continue
+    sed -nE "s/^(export[[:space:]]+)?([A-Z_][A-Z0-9_]*)=.*/\\2\\t$f/p" "$ROOT/$f"
+  done
+}
+
+box_keys() {
+  local dir=$1 kdir=$1/keys file name req value why id result message saved=0
+  if [ ! -f "$KEYS_PEM" ]; then
+    (umask 077 && openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "$KEYS_PEM" 2>/dev/null) || return 0
+  fi
+  chmod 600 "$KEYS_PEM"
+  openssl pkey -in "$KEYS_PEM" -pubout 2>/dev/null | box_put "$dir" keys.pub
+  if [ -L "$kdir" ]; then rm -f "$kdir"; fi
+  [ -d "$kdir" ] || mkdir "$kdir"
+  [ "$(realpath "$kdir")" = "$kdir" ] || return 0
+  chown 568:568 "$kdir" 2>/dev/null || true
+  for file in "$kdir"/*.req; do
+    if [ -L "$file" ]; then
+      rm -f "$file"
+      continue
+    fi
+    [ -f "$file" ] || continue
+    name=$(basename "$file" .req)
+    req=$(head -c 8192 "$file")
+    rm -f "$file"
+    [[ "$name" =~ ^[A-Z_][A-Z0-9_]{0,63}$ ]] || continue
+    id=$(jq -r '.id // empty' <<<"$req" 2>/dev/null | tr -cd 'a-f0-9' | head -c 32 || true)
+    value=$(jq -r '.ciphertext // empty' <<<"$req" 2>/dev/null | base64 -d 2>/dev/null |
+      openssl pkeyutl -decrypt -inkey "$KEYS_PEM" -pkeyopt rsa_padding_mode:oaep -pkeyopt rsa_oaep_md:sha256 -pkeyopt rsa_mgf1_md:sha256 2>/dev/null) || value=
+    if [ -z "$value" ]; then
+      result=failed message="The box couldn't read it; save it again"
+    elif why=$(key_refusal "$name" "$value"); then
+      result=refused message="$name $why"
+    elif file=$(set_env_key "$name" "$value"); then
+      result=saved message="Saved in $file; the desk redeploys to pick it up"
+      saved=1
+    else
+      result=failed message="Couldn't write the env file"
+    fi
+    value=
+    log "Key from the app: $name $result"
+    jq -n --arg n "$name" --arg id "$id" --arg r "$result" --arg m "$message" --arg at "$(date -u +%FT%TZ)" \
+      '{name: $n, request_id: (if $id == "" then null else $id end), result: $r, message: $m, at: $at}' | box_put "$kdir" "$name.json"
+  done
+  key_names | jq -R -s --arg at "$(date -u +%FT%TZ)" \
+    '{checked_at: $at, present: [split("\n")[] | select(. != "") | split("\t") | {name: .[0], file: .[1]}]}' | box_put "$dir" keys.json
+  if [ "$saved" -eq 1 ] && [ ! -e "$dir/requests/redeploy.json" ]; then
+    jq -n --arg id "$(openssl rand -hex 6)" --arg at "$(date -u +%FT%TZ)" '{id: $id, requested_at: $at}' | box_put "$dir/requests" redeploy.json
+  fi
 }
 
 # ---- Compose on the box vs the checkout ----
