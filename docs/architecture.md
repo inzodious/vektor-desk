@@ -150,7 +150,16 @@ The same pattern as Hemline: `deploy/deploy.sh` runs as root on the NAS.
 - `check` tests the Claude sign-in, Firestore read access, the DNS record against the tailnet address and the certificate, and sends a test alert to `desk-ops`.
 - The cron jobs run a pinned copy at `/mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`, so a push to `main` never reaches root on its own. When `main`'s `deploy.sh` moves on, `status`, `check` and Settings → Box say how many `deploy.sh` commits the copy is behind, and the **Update box script** action copies it over once the checkout is clean, sits exactly at `origin/main` and the script parses (temp file and `mv`, then a `desk-ops` alert). Its output names the old commit, the new one and the commits between. `touch /mnt/Manifest/apps/vektor-desk/deploy.no-self-pin` turns the action off.
 - `auto` and `backup` send a high-priority `desk-ops` alert when they stop on an error; `now` doesn't, since you're watching it.
-- A change to `deploy/compose.yaml` isn't picked up by a redeploy. The deploy log says when it changed; paste it into Apps → vektor-desk → Edit.
+- A change to `deploy/compose.yaml` isn't picked up by a redeploy. The deploy log, a `desk-ops` alert and Settings → Box say when it changed, and **Apply compose** hands it to TrueNAS (`midclt call app.update` with `custom_compose_config_string`) after a backup. It does that only when the checkout is clean at `origin/main`, the live build is main, no job is running, and the change doesn't widen what containers can do (table below). Otherwise Settings → Box shows one banner with the reason and a Copy button, and you paste it into Apps → vektor-desk → Edit yourself.
+
+| Needs your eyes (never applied from the app) | Compared with the installed compose, per service |
+|---|---|
+| Privilege | `privileged`, `build`, a `host` network, pid, ipc, uts, userns or cgroup mode |
+| Grants | new `cap_add`, `devices`, `security_opt` (other than no-new-privileges), `device_cgroup_rules`, `group_add`; a shorter `cap_drop`; a changed `user`; `read_only` turned off |
+| Images | an image repository the box doesn't already run (tags may change; `vektor-desk*:local` always pass) |
+| Host paths | a bind mount outside `/mnt/Manifest/apps/vektor-desk` that the installed compose doesn't already have, after resolving symlinks; a relative path or `..`; a named volume with new `driver_opts`; a missing file (a missing folder is made, owned by 568) |
+
+The check lives in the pinned `deploy.sh`, so a push to `main` can't loosen it without an Update box script tap.
 
 ## One-time setup
 
@@ -164,7 +173,7 @@ The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free.
 | Status | `deploy.sh status`, or `https://desk.escape-vektor.com/api/status` |
 | Pull Escape Vektor now | Settings → Jobs → Run now, or `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
 | Run any scheduled job now | Settings → Jobs (Run now, below); no SSH needed |
-| Redeploy, status, check, backup, restore drill, logs, update box script | Settings → Box (Box actions, below); picked up within 5 minutes |
+| Redeploy, status, check, backup, restore drill, logs, update box script, apply compose | Settings → Box (Box actions, below); picked up within 5 minutes |
 | Drop a Fidelity export in the inbox | Settings → Upload (Inbox upload, below) |
 | Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log`; redacted copies in `data/run/logs` every 5 minutes (`deploy.sh logs` now) |
 | Let Claude QA the box | [eval-access.md](eval-access.md): a Remote Control session in the sealed `eval` container |
@@ -187,20 +196,22 @@ To follow a run, poll `GET /api/jobs` every few seconds. A queued job shows `que
 
 ## Box actions
 
-Chores that need root on the NAS are requests the host picks up, the same way Run now works. `POST /api/box/{action}/run` drops `data/run/box/requests/{action}.json`. The auto-deploy cron job (`deploy.sh auto`, every 5 minutes, as root) then runs `deploy.sh {action}` for each request on its allowlist: `redeploy`, `status`, `check`, `backup`, `restore-test`, `logs` and `update-script`. It reads nothing from the request except a hex id. The redacted last 300 lines of output go to `data/run/box/{action}.json`.
+Chores that need root on the NAS are requests the host picks up, the same way Run now works. `POST /api/box/{action}/run` drops `data/run/box/requests/{action}.json`. The auto-deploy cron job (`deploy.sh auto`, every 5 minutes, as root) then runs `deploy.sh {action}` for each request on its allowlist: `redeploy`, `status`, `check`, `backup`, `restore-test`, `logs`, `update-script` and `apply-compose`. It reads nothing from the request except a hex id. The redacted last 300 lines of output go to `data/run/box/{action}.json`.
 
-The host refuses to work through a symlinked `data/run/box` or a symlinked request. It writes results with `mktemp` and `mv`, so a planted link can't redirect a root write. Each auto run stamps `data/run/box/host.alive` and writes `data/run/box/script.json`.
+The host refuses to work through a symlinked `data/run/box` or a symlinked request. It writes results with `mktemp` and `mv`, so a planted link can't redirect a root write. Each auto run stamps `data/run/box/host.alive` and writes `data/run/box/script.json` and `compose.json`.
 
 | Call | Answer |
 |---|---|
-| `GET /api/box` | `{now, host_alive, pickup_seconds: 300, script, actions: [...]}` |
+| `GET /api/box` | `{now, host_alive, pickup_seconds: 300, script, compose, actions: [...]}` |
 | `script` | `null` until the host checks in, else `{checked_at, pinned, current, behind, from, to, off}`. `behind` counts `deploy.sh` commits since the cron copy (`null` if it matches no commit); `from` and `to` are full SHAs. Show Update box script when `current` is false |
+| `compose` | `null` until the host checks in, else `{checked_at, state: current\|drift\|unknown, drift, escalations, missing_dirs, missing_files, can_apply, copy_available}`. On `drift`: `can_apply` shows Apply compose; otherwise one banner with `escalations` and a Copy button |
+| `GET /api/box/compose.yaml` | The checkout's `compose.yaml` as `text/yaml` for the Copy button while `state` is `drift`; `404 no_change` otherwise |
 | One action | `name`, `title`, `what`, `cooldown_seconds`, `running`, `queued`, `queued_at`, `last_run`, `cooldown_until`, `can_run` |
 | `last_run` | `null`, or `{action, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, output}`. `result` is `null` while it runs; a run with no finish after 2 hours counts as stale |
 | `POST /api/box/{action}/run` | `202 {ok: true, action, request_id, requested_at, message}` |
 | Refusals | `{ok: false, error, message, ...}`: `404 unknown_action`; `409 running` or `queued` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 host_down` (no `host.alive` in 12 minutes: the cron copy of `deploy.sh` is older than this feature, or auto-deploy is off) |
 
-Cooldowns: redeploy and update-script 5 minutes, status and logs 1, check 2, backup and restore-test 30. `update-script` ends `skipped` while the checkout is still catching up to `main`. Every request is logged to `data/run/box-requests.log`. `deploy.sh box` runs pending requests right away.
+Cooldowns: apply-compose 10 minutes, redeploy and update-script 5, status and logs 1, check 2, backup and restore-test 30. `update-script` and `apply-compose` end `skipped` while the checkout or live build is still catching up to `main`. Every request is logged to `data/run/box-requests.log`. `deploy.sh box` runs pending requests right away.
 
 ## Inbox upload
 

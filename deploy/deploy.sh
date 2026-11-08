@@ -42,7 +42,7 @@ BUILD_LOG=$ROOT/deploy-build.log
 DEBUG_MAX=${DESK_DEBUG_MAX:-104857600}
 NO_SELF_PIN=${DESK_NO_SELF_PIN:-$ROOT/deploy.no-self-pin}
 SELF=${DESK_SELF:-$(readlink -f "${BASH_SOURCE[0]}")}
-BOX_ACTIONS="redeploy status check backup restore-test logs update-script"
+BOX_ACTIONS="redeploy status check backup restore-test logs update-script apply-compose"
 BOX_TIMEOUT=${DESK_BOX_TIMEOUT:-1800}
 LOCK=/run/vektor-desk-deploy.lock
 AUTO_FAILED=$ROOT/deploy-auto.failed
@@ -213,8 +213,8 @@ deploy() {
     return 0
   fi
   if [ -n "$before" ] && ! repo diff --quiet "$before" "$target" -- deploy/compose.yaml; then
-    log "deploy/compose.yaml changed since ${before:0:7}: run setup-truenas.sh, then paste it into Apps → $APP → Edit (docs/setup.md, After updates)"
-    alert "Desk needs you" "compose.yaml changed. Run setup-truenas.sh, then paste it into Apps, Edit. See docs/setup.md."
+    log "deploy/compose.yaml changed since ${before:0:7}: Settings → Box → Apply compose (docs/setup.md, After updates)"
+    alert "Desk needs you" "compose.yaml changed. Open Settings, Box to apply it."
   fi
 
   files=$(backup) || die "the backup failed, so nothing was restarted"
@@ -345,7 +345,7 @@ script_line() {
 }
 
 update_script() {
-  local head from new ALERTS=update-script
+  local head from new rc ALERTS=update-script
   [ -f "$PINNED" ] || {
     echo "There's no cron copy at $PINNED yet; set one up first (docs/setup.md, step 8)"
     return 1
@@ -366,14 +366,10 @@ update_script() {
     echo "Updating from the app is off ($NO_SELF_PIN). Read the change, then copy it by hand (docs/setup.md, After updates)"
     return 1
   fi
-  if [ -n "$(repo status --porcelain --untracked-files=no 2>/dev/null)" ]; then
-    echo "The checkout at $SRC has local edits, so its deploy.sh isn't main's. The box script stays as it is"
-    return 1
-  fi
-  if [ "$head" != "$(repo rev-parse "origin/$BRANCH" 2>/dev/null)" ]; then
-    echo "The checkout (${head:0:7}) isn't at main yet; auto-deploy catches up within 5 minutes. Try again then"
-    return "$BUSY"
-  fi
+  at_main || {
+    rc=$?
+    return "$rc"
+  }
   if ! bash -n "$SRC/deploy/deploy.sh" 2>&1; then
     echo "deploy.sh at ${head:0:7} doesn't parse; the box script stays as it is"
     return 1
@@ -506,6 +502,7 @@ box_requests() {
   }
   date -u +%FT%TZ | box_put "$dir" host.alive
   script_state 2>/dev/null | box_put "$dir" script.json || true
+  compose_state 2>/dev/null | box_put "$dir" compose.json || true
   for action in $BOX_ACTIONS; do
     file=$dir/requests/$action.json
     if [ -L "$file" ]; then
@@ -522,16 +519,20 @@ box_requests() {
 
 # ---- Compose on the box vs the checkout ----
 
-compose_drift() {
-  local drift
-  drift=$(python3 - "$APP_CONFIGS/$APP" "$SRC/deploy/compose.yaml" <<'PY'
+compose_report() {
+  python3 - "$APP_CONFIGS/$APP" "$SRC/deploy/compose.yaml" "$ROOT" <<'PY' 2>/dev/null || echo '{"state": "unknown", "drift": [], "escalations": [], "missing_dirs": [], "missing_files": []}'
 import glob
+import json
 import os
 import sys
 
 import yaml
 
-app, main = sys.argv[1:3]
+app, main, root = sys.argv[1:4]
+LOCAL = {"vektor-desk", "vektor-desk/caddy"}
+HOST = ("network_mode", "pid", "ipc", "uts", "userns_mode", "cgroup")
+GRANTS = ("cap_add", "devices", "security_opt", "device_cgroup_rules", "group_add")
+SAFE_OPTS = {"no-new-privileges:true", "no-new-privileges"}
 
 
 def load(p):
@@ -560,32 +561,212 @@ def installed():
     return None
 
 
-box, want = installed(), load(main).get("services") or {}
+def repo_of(image):
+    name = str(image or "").split("@")[0]
+    head, _, last = name.rpartition("/")
+    last = last.split(":")[0]
+    return f"{head}/{last}" if head else last
+
+
+def binds(svc):
+    out = []
+    for v in svc.get("volumes") or []:
+        if isinstance(v, str):
+            src = v.split(":")[0]
+        elif isinstance(v, dict):
+            src = str(v.get("source") or "")
+            if v.get("type") != "bind" and not src.startswith(("/", ".", "~")):
+                src = ""
+        else:
+            src = ""
+        if src and (src.startswith(("/", ".", "~")) or "/" in src):
+            out.append(src)
+    return out
+
+
+def as_set(value):
+    if isinstance(value, dict):
+        return {f"{k}={v}" for k, v in value.items()}
+    return {str(x) for x in value or []}
+
+
+box, compose = installed(), load(main)
+want = compose.get("services") or {}
 if box is None or not want:
-    print("unknown")
+    print(json.dumps({"state": "unknown", "drift": [], "escalations": [], "missing_dirs": [], "missing_files": []}))
     sys.exit()
 have = box.get("services") or {}
-out = []
+drift = []
 for name in sorted(set(want) | set(have)):
     if name not in have:
-        out.append(f"{name} missing")
+        drift.append(f"{name} missing")
     elif name not in want:
-        out.append(f"{name} extra")
+        drift.append(f"{name} extra")
     else:
         keys = [k for k in want[name] if want[name][k] != have[name].get(k)]
         if keys:
-            out.append(f"{name}: {', '.join(keys)}")
-print("; ".join(out) if out else "current")
+            drift.append(f"{name}: {', '.join(keys)}")
+
+known_repos = {repo_of(s.get("image")) for s in have.values()} | LOCAL
+known_binds = {os.path.realpath(b) for s in have.values() for b in binds(s) if b.startswith("/")}
+base = os.path.realpath(root)
+esc, missing_dirs, missing_files = [], [], []
+for name, w in sorted(want.items()):
+    h = have.get(name) or {}
+    if w.get("privileged"):
+        esc.append(f"{name}: privileged")
+    if "build" in w:
+        esc.append(f"{name}: build")
+    for k in HOST:
+        if str(w.get(k, "")) == "host" and str(h.get(k, "")) != "host":
+            esc.append(f"{name}: {k} host")
+    for k in GRANTS:
+        new = as_set(w.get(k)) - as_set(h.get(k)) - (SAFE_OPTS if k == "security_opt" else set())
+        if new:
+            esc.append(f"{name}: {k} {', '.join(sorted(new))}")
+    if as_set(h.get("cap_drop")) - as_set(w.get("cap_drop")):
+        esc.append(f"{name}: cap_drop loosened")
+    if "user" in h and str(w.get("user")) != str(h.get("user")):
+        esc.append(f"{name}: user")
+    if h.get("read_only") and not w.get("read_only"):
+        esc.append(f"{name}: read_only off")
+    if repo_of(w.get("image")) not in known_repos:
+        esc.append(f"{name}: new image {repo_of(w.get('image'))}")
+    for b in binds(w):
+        if not b.startswith("/") or ".." in b.split("/"):
+            esc.append(f"{name}: host path {b}")
+            continue
+        real = os.path.realpath(b)
+        if real in known_binds:
+            continue
+        if real != base and not real.startswith(base + "/"):
+            esc.append(f"{name}: host path {b}")
+        elif not os.path.exists(b):
+            (missing_files if "." in os.path.basename(b) else missing_dirs).append(b)
+for k, v in (compose.get("volumes") or {}).items():
+    if isinstance(v, dict) and v.get("driver_opts") and v != (box.get("volumes") or {}).get(k):
+        esc.append(f"volume {k}: driver_opts")
+print(
+    json.dumps(
+        {
+            "state": "drift" if drift else "current",
+            "drift": drift,
+            "escalations": esc,
+            "missing_dirs": sorted(set(missing_dirs)),
+            "missing_files": sorted(set(missing_files)),
+        }
+    )
+)
 PY
-  ) || drift=unknown
-  case $drift in
+}
+
+compose_drift() {
+  local report
+  report=$(compose_report)
+  case $(jq -r .state <<<"$report") in
     current) echo "Compose:     matches the checkout" ;;
     unknown) echo "Compose:     couldn't read the app's installed compose under $APP_CONFIGS/$APP" ;;
-    *) echo "Compose:     older than the checkout ($drift): run setup-truenas.sh, then paste deploy/compose.yaml into Apps → $APP → Edit (docs/setup.md, After updates)" ;;
+    *)
+      if [ "$(jq '(.escalations + .missing_files) | length' <<<"$report")" -eq 0 ]; then
+        echo "Compose:     older than the checkout ($(jq -r '.drift | join("; ")' <<<"$report")): Settings → Box → Apply compose"
+      else
+        echo "Compose:     older than the checkout ($(jq -r '.drift | join("; ")' <<<"$report")), and the change needs your eyes ($(jq -r '(.escalations + (.missing_files | map("needs " + .))) | join("; ")' <<<"$report")): read deploy/compose.yaml, then paste it into Apps → $APP → Edit (Settings → Box has a Copy button)"
+      fi
+      ;;
   esac
 }
 
-# ---- App card: icon and Web UI button in TrueNAS Apps ----
+compose_state() {
+  local report
+  report=$(compose_report)
+  jq -n --arg at "$(date -u +%FT%TZ)" --argjson r "$report" --rawfile text "$SRC/deploy/compose.yaml" \
+    '$r + {checked_at: $at, can_apply: ($r.state == "drift" and (($r.escalations + $r.missing_files) | length) == 0), compose: (if $r.state == "drift" then $text else null end)}' 2>/dev/null ||
+    jq -n --arg at "$(date -u +%FT%TZ)" --argjson r "$report" '$r + {checked_at: $at, can_apply: false, compose: null}'
+}
+
+at_main() {
+  local head
+  if [ -n "$(repo status --porcelain --untracked-files=no 2>/dev/null)" ]; then
+    echo "The checkout at $SRC has local edits, so it isn't main. Nothing was changed"
+    return 1
+  fi
+  head=$(repo rev-parse HEAD 2>/dev/null) || {
+    echo "Can't read the checkout at $SRC"
+    return 1
+  }
+  if [ "$head" != "$(repo rev-parse "origin/$BRANCH" 2>/dev/null)" ]; then
+    echo "The checkout (${head:0:7}) isn't at main yet; auto-deploy catches up within 5 minutes. Try again then"
+    return "$BUSY"
+  fi
+}
+
+apply_compose() {
+  local report head why d files payload rc ALERTS="Apply compose stopped"
+  at_main || {
+    rc=$?
+    return "$rc"
+  }
+  head=$(repo rev-parse HEAD)
+  if [ "$(live_build vektor-desk-api)" != "$head" ]; then
+    echo "The live build isn't main's ${head:0:7} yet; auto-deploy catches up within 5 minutes. Try again then"
+    return "$BUSY"
+  fi
+  report=$(compose_report)
+  case $(jq -r .state <<<"$report") in
+    current)
+      echo "Compose already matches main"
+      return 0
+      ;;
+    unknown)
+      echo "Couldn't read the app's installed compose under $APP_CONFIGS/$APP. Nothing was changed"
+      return 1
+      ;;
+  esac
+  echo "Differs: $(jq -r '.drift | join("; ")' <<<"$report")"
+  if [ "$(jq '.escalations | length' <<<"$report")" -gt 0 ]; then
+    echo "Not applied from the app: the change widens what containers can do ($(jq -r '.escalations | join("; ")' <<<"$report"))."
+    echo "Read deploy/compose.yaml, then paste it into Apps → $APP → Edit (Settings → Box has a Copy button)"
+    return 1
+  fi
+  if [ "$(jq '.missing_files | length' <<<"$report")" -gt 0 ]; then
+    echo "Not applied: it needs files that aren't there yet ($(jq -r '.missing_files | join(", ")' <<<"$report")). Run setup-truenas.sh first"
+    return 1
+  fi
+  if docker compose version >/dev/null 2>&1 && ! docker compose -f "$SRC/deploy/compose.yaml" config -q 2>&1; then
+    echo "deploy/compose.yaml at ${head:0:7} doesn't pass docker compose config. Nothing was changed"
+    return 1
+  fi
+  if why=$(busy); then
+    echo "A desk job is running: $why. Nothing was changed"
+    return "$BUSY"
+  fi
+  while IFS= read -r d; do
+    [ -n "$d" ] || continue
+    mkdir -p "$d"
+    chown 568:568 "$d"
+    echo "Made $d"
+  done < <(jq -r '.missing_dirs[]' <<<"$report")
+  files=$(backup) || {
+    echo "The backup failed, so nothing was changed"
+    return 1
+  }
+  log "Backed up: $files"
+  payload=$(jq -n --rawfile c "$SRC/deploy/compose.yaml" '{custom_compose_config_string: $c}')
+  log "Applying deploy/compose.yaml at ${head:0:7} to $APP"
+  if ! run_job app.update "$APP" "$payload"; then
+    echo "TrueNAS didn't take the update (see $BUILD_LOG). Paste deploy/compose.yaml into Apps → $APP → Edit instead (Settings → Box has a Copy button)"
+    alert "$ALERTS" "TrueNAS didn't take the compose update. Paste it by hand; Settings, Box has a Copy button."
+    return 1
+  fi
+  if ! healthy "$head"; then
+    echo "$APP didn't come back healthy within ${HEALTH_WAIT}s of the update. See the app's logs"
+    alert "$ALERTS" "$APP didn't come back healthy after the compose update."
+    return 1
+  fi
+  log "Compose applied at ${head:0:7}"
+  [ "$(compose_report | jq -r .state)" = current ] || echo "TrueNAS took it, but its installed compose still reads differently; check Apps → $APP → Edit"
+  app_card >/dev/null 2>&1 || true
+}
 
 app_card() {
   local file=$APP_CONFIGS/$APP/metadata.yaml changed
@@ -725,8 +906,13 @@ main() {
     restore-test) restore_test ;;
     check) check ;;
     update-script) update_script ;;
+    apply-compose)
+      exec 9>"$LOCK"
+      flock -n 9 || die "a deploy is already running: tail -f $LOG" "$BUSY"
+      apply_compose
+      ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box | update-script]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box | update-script | apply-compose]" >&2
       exit 2
       ;;
   esac
