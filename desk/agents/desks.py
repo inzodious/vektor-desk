@@ -38,6 +38,7 @@ DESKS: dict[str, Desk] = {
         Desk("scout", "Scout", "xhigh", 5, 40, 1, ("0 3 * * 0",), WEB, live=True, only_if=_first_week),
         Desk("strategy", "Strategy desk", "xhigh", 6, 40, 12, ("45 5 * * *",), WEB, live=True),
         Desk("filings", "Filings desk", "high", 7, 4, 280, ("15 4 * * *",), live=True),
+        Desk("discounts", "Discount cases", "xhigh", 5, 16, 21, ("15 18 * * 1-5",), WEB, live=True),
     )
 }
 

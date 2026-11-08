@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 from desk.agents import briefs, store
 from desk.agents.console import process_queue, process_triggers, queue_retry
 from desk.agents.desks import DESKS, Desk, get
+from desk.agents.discounts import preview as preview_discounts
+from desk.agents.discounts import run_discount_desk
 from desk.agents.filings import preview as preview_filings
 from desk.agents.filings import run_filings_desk
 from desk.agents.pipeline import prepare, run_proposal_desk
@@ -35,16 +37,16 @@ def _dry_run(cfg: Config, name: str, args) -> int:
         print("The Skeptic only runs on a proposal; dry-run research or scout instead.")
         return 2
     print(f"# Dry run: {get(name).title} (no model call, nothing written)")
-    if name == "filings":
-        report, prompt = preview_filings(cfg)
+    if name in ("filings", "discounts"):
+        report, prompt = (preview_filings if name == "filings" else preview_discounts)(cfg)
         print(report.note)
         if report.status == "disabled":
-            print("Would skip (disabled): switch it on in Settings or set agents.desks.filings to true.")
+            print(f"Would skip (disabled): switch it on in Settings or set agents.desks.{name} to true.")
         elif report.status == "ok" and store.guard_on(cfg):
             print(f"Would skip (guarded): {GUARD_NOTE}")
         if not prompt:
             return 0
-        schema = briefs.schema_file("filings")
+        schema = briefs.schema_file(name)
     elif name == "strategy":
         try:
             question, extra = args.question, None
@@ -79,7 +81,7 @@ def _dry_run(cfg: Config, name: str, args) -> int:
         prompt, schema = prep.prompt, prep.schema
     if args.system:
         print("\n## System prompt\n")
-        print(briefs.prompt_file(name) if name == "filings" else briefs.system_prompt(name))
+        print(briefs.prompt_file(name) if name in ("filings", "discounts") else briefs.system_prompt(name))
     print(f"\n## Prompt ({len(prompt):,} characters, about {len(prompt) // 4:,} tokens)\n")
     print(prompt)
     if args.schema:
@@ -94,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run one desk now")
     run.add_argument("desk", choices=sorted(DESKS))
     run.add_argument("--trigger", default="schedule")
-    run.add_argument("--limit", type=int, help="filings desk only: score at most this many tonight")
+    run.add_argument("--limit", type=int, help="filings and discount desks only: at most this many this run")
     queue = sub.add_parser("queue", help="work through Console and trigger requests")
     queue.add_argument("--now-only", action="store_true", help="only requests marked Run now")
     sub.add_parser("triggers", help="turn today's engine triggers into requests")
@@ -157,6 +159,13 @@ def main(argv: list[str] | None = None) -> int:
             queued = f" Registered lane {nightly.lane['id']} v{nightly.lane['version']}."
         print(f"{desk.title}: {nightly.status}.{queued} {nightly.note or ''}".rstrip())
         return EXIT.get(nightly.status, 1)
+    if desk.name == "discounts":
+        day = run_discount_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
+        votes = list(day.verdicts.values())
+        tally = ", ".join(f"{v} {votes.count(v)}" for v in ("buy", "wait", "avoid") if v in votes)
+        written = f"{len(day.written)} written" + (f" ({tally})" if tally else "")
+        print(f"{desk.title}: {day.status}, {written}, {len(day.failed)} failed of {day.pending}. {day.note or ''}".strip())
+        return EXIT.get(day.status, 1)
     if desk.name == "filings":
         night = run_filings_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
         extra = f", {len(night.rejected)} refused" if night.rejected else ""

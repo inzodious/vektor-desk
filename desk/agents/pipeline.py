@@ -2,17 +2,18 @@ import json
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
-from desk.agents import alerts, briefs, store, switches
+from desk.agents import advisor, alerts, briefs, store, switches
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.runner import Outcome, run_desk
-from desk.agents.sources import Decisions, Engine, Lab, NotReady, RealDecisions, RealEngine, RealLab
+from desk.agents.sources import Advisor, Decisions, Engine, Lab, NotReady, RealDecisions, RealEngine, RealLab
 from desk.config import Config
 
 SKIP_UNCHANGED = {"plan_keeper"}
 SKEPTIC_FOR = {"research", "scout"}
 SKEPTIC_KINDS = {"buy", "sell"}
 STALE_ENGINE_HOURS = 36
+ADVISED = {"plan_keeper", "tax", "risk", "research", "scout"}
 
 
 @dataclass
@@ -140,6 +141,7 @@ def prepare(
     symbol: str | None = None,
     trigger_row: dict | None = None,
     lab: Lab | None = None,
+    advice: Advisor | None = None,
 ) -> Prepared:
     engine = engine or RealEngine()
     decisions = decisions or RealDecisions()
@@ -160,10 +162,16 @@ def prepare(
     problem = health_problem(prep.slice_)
     if problem:
         prep.skip = prep.skip or ("unhealthy", problem)
+    view = None
+    if name in ADVISED:
+        view = advisor.gather(cfg, advice)
+        prep.slice_ = advisor.attach(prep.slice_, view)
     prep.digest = briefs.digest(prep.slice_)
     if name in SKIP_UNCHANGED and trigger == "schedule" and store.last_digest(cfg, name) == prep.digest:
         prep.skip = prep.skip or ("unchanged", "Nothing in the brief changed since the last run.")
     extra, prep.symbol = _extra(cfg, name, prep.slice_, symbol, question, trigger_row, lab)
+    if view is not None:
+        extra["advisor"] = advisor.summary(view)
     if name == "research" and not prep.symbol:
         prep.skip = prep.skip or ("not_ready", "No holdings in the brief to research.")
     try:
@@ -188,9 +196,12 @@ def run_proposal_desk(
     symbol: str | None = None,
     trigger_row: dict | None = None,
     lab: Lab | None = None,
+    advice: Advisor | None = None,
 ) -> Report:
     decisions = decisions or RealDecisions()
-    prep = prepare(cfg, name, engine=engine, decisions=decisions, trigger=trigger, question=question, symbol=symbol, trigger_row=trigger_row, lab=lab)
+    prep = prepare(
+        cfg, name, engine=engine, decisions=decisions, trigger=trigger, question=question, symbol=symbol, trigger_row=trigger_row, lab=lab, advice=advice
+    )
     if prep.skip:
         report = _log_skip(cfg, name, *prep.skip, trigger)
         report.symbol = prep.symbol
