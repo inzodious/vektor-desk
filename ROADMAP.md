@@ -172,6 +172,21 @@ Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the 
 | Insider-buying clusters and post-earnings drift families, backtested from 2016 with survivorship checks, then paper | Statistics | ✅ history loads over the first nights |
 | Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
 
+## Next: Advisor foundation
+
+There is no single target plan. Each strategy is measured against his risk profile and the others (2026-11-08). Brief: owners and contracts per item.
+
+| Item | Owner | Status |
+|---|---|---|
+| Risk profile: questionnaire plus capacity, giving bands 1–5 (replaces `risk_level`) | Concept + Design | ⏳ |
+| Held-conviction positions with their own band (ASTS); never buy single stocks on margin | Concept | ⏳ |
+| One-off actions on the calendar: ASTS tax-loss sale Dec 7–15 with a rebuy after 31 days; margin repaid 11-18 | Concept | ⏳ |
+| Strategy catalog racing side by side: Safe mix, As held, Aggressive tech tilt, Dip-buy, plus the filings, insider and drift families | Statistics | ⏳ |
+| Probability bands: Monte Carlo p10–p90 at 1–40 years, chance of loss, drawdown, CVaR, chance of FI, fit to his risk band | Statistics + Design | ⏳ |
+| Reward-to-risk on the leaderboard (Sharpe, Sortino, max drawdown, Calmar) | Statistics + Design | ⏳ |
+| Discount-day scanner with a research case per hit | Statistics + Agents + Design | ⏳ |
+| Briefs measure against the risk band and the catalog, not one plan | Agents | ⏳ |
+
 ## Next: No more SSH
 
 Every box chore becomes a button in the app. SSH stays only for true one-time installs (Joshua, 2026-11-08).
