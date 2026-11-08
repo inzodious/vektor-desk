@@ -269,7 +269,13 @@ def import_inbox(cfg: Config, conn: sqlite3.Connection) -> dict:
     return {"ok": not errors, "imported": [d for d in done if "rows" in d], "skipped": [d for d in done if "skipped" in d], "errors": errors}
 
 
-def current_lots(conn: sqlite3.Connection) -> list[dict]:
+def _has(conn: sqlite3.Connection, name: str) -> bool:
+    return conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (name,)).fetchone() is not None
+
+
+def export_lots(conn: sqlite3.Connection) -> list[dict]:
+    if not _has(conn, "lots"):
+        return []
     rows = conn.execute(
         """SELECT l.* FROM lots l
            JOIN (SELECT account, max(f.as_of || printf('%010d', f.id)) AS pick FROM lots x JOIN lot_files f ON f.id = x.file_id GROUP BY account) p
@@ -277,4 +283,32 @@ def current_lots(conn: sqlite3.Connection) -> list[dict]:
            JOIN lot_files f ON f.id = l.file_id AND f.as_of || printf('%010d', f.id) = p.pick
            ORDER BY l.account, l.symbol, l.acquired"""
     ).fetchall()
-    return [dict(r) for r in rows]
+    return [dict(r) | {"method": "export", "quality": "ok"} for r in rows]
+
+
+def stored_lots(conn: sqlite3.Connection) -> list[dict]:
+    if not _has(conn, "broker_lots"):
+        return []
+    return [
+        dict(r) | {"value": None, "term": None, "quality": "modelled"} for r in conn.execute("SELECT * FROM broker_lots ORDER BY account, symbol, acquired")
+    ]
+
+
+def current_lots(conn: sqlite3.Connection, modelled: list[dict] | None = None) -> list[dict]:
+    export = export_lots(conn)
+    have = {r["account"] for r in export}
+    modelled = stored_lots(conn) if modelled is None else modelled
+    return export + [r for r in modelled if r["account"] not in have]
+
+
+def realized_rows(conn: sqlite3.Connection, modelled: list[dict] | None = None) -> list[dict]:
+    export = (
+        [dict(r) | {"method": "export", "quality": "ok"} for r in conn.execute("SELECT * FROM realized_lots ORDER BY id")]
+        if _has(conn, "realized_lots")
+        else []
+    )
+    have = {(r["account"], str(r["sold"] or "")[:4]) for r in export}
+    if modelled is None:
+        stored = conn.execute("SELECT * FROM broker_realized ORDER BY id") if _has(conn, "broker_realized") else []
+        modelled = [dict(r) | {"quality": "modelled"} for r in stored]
+    return export + [r for r in modelled if (r["account"], str(r["sold"] or "")[:4]) not in have]

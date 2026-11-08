@@ -4,10 +4,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date
 
+from desk.engine import broker
 from desk.engine.market import last_trading_day
-from desk.engine.source import SnapshotVersion, closes, current_rows, snapshot_versions
+from desk.engine.source import SnapshotVersion, closes, snapshot_versions
 
 SHARE_KINDS = {"buy", "sell", "reinvest"}
+CORPORATE_KINDS = {"split", "distribution"}
 CASH_SYMBOLS = {"SPAXX", "FDRXX", "FCASH", "CORE", "CASH", "FZFXX", "SPRXX"}
 
 
@@ -128,7 +130,7 @@ def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict], price=No
             if not px:
                 continue
             qty = -amount / px
-        if kind in SHARE_KINDS and symbol and not core and qty:
+        if kind in SHARE_KINDS | CORPORATE_KINDS and symbol and not core and qty:
             cur = held.setdefault((account, symbol), {"shares": 0.0, "value": 0.0, "cost": None, "is_cash": False})
             cur["shares"] += qty
             moved = True
@@ -253,7 +255,7 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
     series = closes(mirror)
     bars = bar_series(desk)
     prices = Prices(merge(series, bars))
-    activity = activity_by_date(current_rows(mirror, "activity"))
+    activity = activity_by_date(broker.activity(mirror, desk))
     days = build_days(anchor_list, prices, through)
     rows = holdings_rows(anchor_list, prices, activity, days)
     with desk:

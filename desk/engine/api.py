@@ -96,13 +96,26 @@ def lots(request: Request, symbol: str | None = None, account: str | None = None
         return _json({"lots": [], "files": []})
     conn = connect(cfg.desk_db, readonly=True)
     try:
-        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='lot_files'").fetchone() is None:
-            return _json({"lots": [], "files": []})
         rows = [r for r in current_lots(conn) if (not symbol or r["symbol"] == symbol.upper()) and (not account or r["account"] == account)]
-        files = [dict(r) for r in conn.execute("SELECT id, name, kind, as_of, imported_at, rows, warnings FROM lot_files ORDER BY id DESC LIMIT 20")]
+        has = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE name IN ('lot_files', 'broker_files')")}
+        files = (
+            [dict(r) for r in conn.execute("SELECT id, name, kind, as_of, imported_at, rows, warnings FROM lot_files ORDER BY id DESC LIMIT 20")]
+            if "lot_files" in has
+            else []
+        )
+        history = (
+            [
+                dict(r)
+                for r in conn.execute(
+                    "SELECT id, name, imported_at, window_start, window_end, rows, added, cancelled FROM broker_files ORDER BY id DESC LIMIT 20"
+                )
+            ]
+            if "broker_files" in has
+            else []
+        )
     finally:
         conn.close()
-    return _json({"lots": rows, "files": files})
+    return _json({"lots": rows, "files": files, "history": history})
 
 
 @router.get("/api/live")

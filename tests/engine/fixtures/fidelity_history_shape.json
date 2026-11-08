@@ -1,0 +1,805 @@
+{
+ "config": {
+  "yearsBack": 5,
+  "windowDays": 365,
+  "accounts": [
+   "X55550003",
+   "X55550002"
+  ]
+ },
+ "fetchLog": [
+  {
+   "range": "2025-11-08 \u2192 2026-11-07",
+   "status": 200,
+   "count": 13,
+   "note": "synthetic"
+  }
+ ],
+ "transactions": [
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 162.59,
+    "commission": 2,
+    "fees": 6,
+    "interest": 0,
+    "net": 37.15,
+    "principal": 268.41
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "dataSrc": "F",
+     "depositWithdrawalCode": "W",
+     "isFloatingNavInd": false,
+     "batchId": "xxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 183.48,
+   "catDetail": {
+    "txnTypeCode": "ST",
+    "txnTypeDesc": "Security Transaction or Trade",
+    "txnCatCode": "IA",
+    "txnCatDesc": "Investment Activity",
+    "txnSubCatCode": "BY",
+    "txnSubCatDesc": "Buy"
+   },
+   "date": 1793854800,
+   "dateDetail": {
+    "stlmntDate": 1793941200,
+    "tradedDate": 1793854800,
+    "postedDate": 1793854800
+   },
+   "dcDetails": [],
+   "description": "YOU BOUGHT FIDELITY MSCI INFORMATION TECHNOLOGY... (FTEC) (Cash)",
+   "quantity": "1.631",
+   "securityDetail": {
+    "typeCode": "E",
+    "typeCodeDesc": "Equity",
+    "subTypeCode": "1",
+    "subTypeCodeDesc": "Common Stock",
+    "symbol": "FTEC",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "01",
+    "fedTaxStatusCode": "T",
+    "floorTradingSymbol": "xxxx",
+    "isQuotable": true,
+    "isAdviced": false
+   },
+   "txnNum": "S00000",
+   "typeCode": "1",
+   "shortDesc": "YOU BOUGHT",
+   "mobileDesc": "YOU BOUGHT FIDELITY MSCI INFORMATION TECHNOLOGY... (FTEC) (Cash)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 283.16,
+    "commission": 3,
+    "fees": 9,
+    "interest": 0,
+    "net": 9,
+    "principal": 9
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "dataSrc": "F",
+     "depositWithdrawalCode": "W",
+     "isFloatingNavInd": false,
+     "batchId": "xxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 198.94,
+   "catDetail": {
+    "txnTypeCode": "ST",
+    "txnTypeDesc": "Security Transaction or Trade",
+    "txnCatCode": "IA",
+    "txnCatDesc": "Investment Activity",
+    "txnSubCatCode": "BY",
+    "txnSubCatDesc": "Buy"
+   },
+   "date": 1793854800,
+   "dateDetail": {
+    "stlmntDate": 1793941200,
+    "tradedDate": 1793854800,
+    "postedDate": 1793854800
+   },
+   "dcDetails": [],
+   "description": "YOU BOUGHT PROSPECTUS UNDER SEPARATE COVER FIDELITY 999 INDEX FUND (FXAIX) (Cash)",
+   "quantity": "19.537",
+   "securityDetail": {
+    "typeCode": "M",
+    "typeCodeDesc": "Mutual Fund",
+    "subTypeCode": "F",
+    "subTypeCodeDesc": "Fidelity Mutual Fund",
+    "symbol": "FXAIX",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "04",
+    "fedTaxStatusCode": "T",
+    "floorTradingSymbol": "xxxxx",
+    "isQuotable": true,
+    "isAdviced": false
+   },
+   "txnNum": "S00001",
+   "typeCode": "1",
+   "shortDesc": "YOU BOUGHT PROSPECTUS UNDER SEPARATE COVER",
+   "mobileDesc": "YOU BOUGHT PROSPECTUS UNDER SEPARATE COVER FIDELITY 999 INDEX FUND (FXAIX) (Cash)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 3,
+    "commission": 7,
+    "fees": 8,
+    "interest": 6,
+    "net": 5,
+    "principal": 7
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "bankDetailsDescPos": "xx",
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "30",
+     "mnemonic": "ETF",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "D",
+     "isFloatingNavInd": false,
+     "batchId": "xxxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 293.2,
+   "catDetail": {
+    "txnTypeCode": "CT",
+    "txnTypeDesc": "Cash Transaction",
+    "txnCatCode": "X2",
+    "txnCatDesc": "Transfers From Your Bank",
+    "txnSubCatCode": "DP",
+    "txnSubCatDesc": "Deposit"
+   },
+   "date": 1793854800,
+   "dateDetail": {
+    "tradedDate": 1793854800,
+    "postedDate": 1793854800
+   },
+   "dcDetails": [],
+   "description": "Electronic Funds Transfer Received (Cash)",
+   "quantity": "9.337",
+   "securityDetail": {
+    "desc": "SYNTHETIC SECURITY NAME",
+    "isQuotable": false,
+    "isAdviced": false
+   },
+   "txnDetailNum": "xxxxxxxx",
+   "txnDetailType": "ER",
+   "txnNum": "S00002",
+   "typeCode": "0",
+   "shortDesc": "MONEY LINE RECEIVED EFT FUNDS RECEIVED ER99999999 /WEB",
+   "mobileDesc": "Electronic Funds Transfer Received (Cash)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 4,
+    "commission": 3,
+    "fees": 2,
+    "interest": 3,
+    "net": 41.85,
+    "principal": 4
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "2",
+    "tradeTypeCodeDesc": "Margin",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "13",
+     "mnemonic": "FRN",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "W",
+     "isFloatingNavInd": false,
+     "batchId": "*xxx*",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 263.07,
+   "catDetail": {
+    "txnTypeCode": "CT",
+    "txnTypeDesc": "Cash Transaction",
+    "txnCatCode": "ZZ",
+    "txnCatDesc": "Other",
+    "txnSubCatCode": "TX",
+    "txnSubCatDesc": "Taxes"
+   },
+   "date": 1793768400,
+   "dateDetail": {
+    "tradedDate": 1793768400,
+    "postedDate": 1793768400
+   },
+   "dcDetails": [],
+   "description": "FOREIGN TAX PAID ASML HOLDING NV EUR9.99 NY REGISTRY ... (ASML) (Margin)",
+   "quantity": "17.565",
+   "securityDetail": {
+    "typeCode": "F",
+    "typeCodeDesc": "Foreign",
+    "subTypeCode": "1",
+    "subTypeCodeDesc": "Common Stock",
+    "symbol": "ASML",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "01",
+    "fedTaxStatusCode": "T",
+    "floorTradingSymbol": "xxxx",
+    "isQuotable": true,
+    "isAdviced": false
+   },
+   "txnNum": "S00003",
+   "typeCode": "0",
+   "shortDesc": "FOREIGN TAX PAID",
+   "mobileDesc": "FOREIGN TAX PAID ASML HOLDING NV EUR9.99 NY REGISTRY ... (ASML) (Margin)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 7,
+    "commission": 4,
+    "fees": 9,
+    "interest": 1,
+    "net": 59.91,
+    "principal": 6
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "2",
+    "tradeTypeCodeDesc": "Margin",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "39",
+     "mnemonic": "FRN",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "D",
+     "isFloatingNavInd": false,
+     "batchId": "*xxx*",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 83.32,
+   "catDetail": {
+    "txnTypeCode": "IT",
+    "txnTypeDesc": "Income Transaction",
+    "txnCatCode": "DV",
+    "txnCatDesc": "Dividend / Interest",
+    "txnSubCatCode": "VP",
+    "txnSubCatDesc": "Dividend Paid"
+   },
+   "date": 1793768400,
+   "dateDetail": {
+    "tradedDate": 1793768400,
+    "postedDate": 1793768400
+   },
+   "dcDetails": [],
+   "description": "DIVIDEND RECEIVED ASML HOLDING NV EUR9.99 NY REGISTRY ... (ASML) (Margin)",
+   "quantity": "7.17",
+   "securityDetail": {
+    "typeCode": "F",
+    "typeCodeDesc": "Foreign",
+    "subTypeCode": "1",
+    "subTypeCodeDesc": "Common Stock",
+    "symbol": "ASML",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "01",
+    "fedTaxStatusCode": "T",
+    "floorTradingSymbol": "xxxx",
+    "isQuotable": true,
+    "isAdviced": false
+   },
+   "txnNum": "S00004",
+   "typeCode": "0",
+   "shortDesc": "DIVIDEND RECEIVED",
+   "mobileDesc": "DIVIDEND RECEIVED ASML HOLDING NV EUR9.99 NY REGISTRY ... (ASML) (Margin)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 5,
+    "commission": 5,
+    "fees": 9,
+    "interest": 7,
+    "net": 290.37,
+    "principal": 228.65
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "10",
+     "mnemonic": "RIN",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "W",
+     "isFloatingNavInd": false,
+     "batchId": "xxxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 420.14,
+   "catDetail": {
+    "txnTypeCode": "ST",
+    "txnTypeDesc": "Security Transaction or Trade",
+    "txnCatCode": "DV",
+    "txnCatDesc": "Dividend / Interest",
+    "txnSubCatCode": "RN",
+    "txnSubCatDesc": "Dividend reinvest"
+   },
+   "date": 1793332800,
+   "dateDetail": {
+    "tradedDate": 1793332800,
+    "postedDate": 1793332800
+   },
+   "dcDetails": [],
+   "description": "REINVESTMENT FIDELITY GOVERNMENT MONEY MARKET (SPAXX) (Cash)",
+   "quantity": "18.921",
+   "securityDetail": {
+    "typeCode": "M",
+    "typeCodeDesc": "Mutual Fund",
+    "subTypeCode": "F",
+    "subTypeCodeDesc": "Fidelity Mutual Fund",
+    "symbol": "SPAXX",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "04",
+    "fedTaxStatusCode": "T",
+    "floorTradingSymbol": "xxxxx",
+    "isQuotable": true,
+    "isAdviced": false
+   },
+   "txnNum": "S00005",
+   "typeCode": "2",
+   "shortDesc": "REINVESTMENT REINVEST @ 9.99",
+   "mobileDesc": "REINVESTMENT FIDELITY GOVERNMENT MONEY MARKET (SPAXX) (Cash)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 334.66,
+    "commission": 0,
+    "fees": 470.38,
+    "interest": 5,
+    "net": 84.86,
+    "principal": 1
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "2",
+    "tradeTypeCodeDesc": "Margin",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "dataSrc": "F",
+     "depositWithdrawalCode": "D",
+     "isFloatingNavInd": false,
+     "batchId": "xxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 247.35,
+   "catDetail": {
+    "txnTypeCode": "ST",
+    "txnTypeDesc": "Security Transaction or Trade",
+    "txnCatCode": "IA",
+    "txnCatDesc": "Investment Activity",
+    "txnSubCatCode": "SL",
+    "txnSubCatDesc": "Sell"
+   },
+   "date": 1791864000,
+   "dateDetail": {
+    "stlmntDate": 1791950400,
+    "tradedDate": 1791864000,
+    "postedDate": 1791864000
+   },
+   "dcDetails": [],
+   "description": "YOU SOLD RIVIAN AUTOMOTIVE INC COM CL A (RIVN) (Margin)",
+   "quantity": "-4.755",
+   "securityDetail": {
+    "typeCode": "E",
+    "typeCodeDesc": "Equity",
+    "subTypeCode": "1",
+    "subTypeCodeDesc": "Common Stock",
+    "symbol": "TICK",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "01",
+    "fedTaxStatusCode": "T",
+    "floorTradingSymbol": "xxxx",
+    "isQuotable": true,
+    "isAdviced": false
+   },
+   "txnNum": "S00006",
+   "typeCode": "3",
+   "shortDesc": "YOU SOLD",
+   "mobileDesc": "YOU SOLD RIVIAN AUTOMOTIVE INC COM CL A (RIVN) (Margin)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 7,
+    "commission": 1,
+    "fees": 1,
+    "interest": 7,
+    "net": 496.56,
+    "principal": 7
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "2",
+    "tradeTypeCodeDesc": "Margin",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "31",
+     "mnemonic": "INT",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "W",
+     "isFloatingNavInd": false,
+     "batchId": "*xxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 240.72,
+   "catDetail": {
+    "txnTypeCode": "CT",
+    "txnTypeDesc": "Cash Transaction",
+    "txnCatCode": "IA",
+    "txnCatDesc": "Investment Activity",
+    "txnSubCatCode": "OC",
+    "txnSubCatDesc": "Other Cash"
+   },
+   "date": 1784606400,
+   "dateDetail": {
+    "tradedDate": 1784520000,
+    "postedDate": 1784606400
+   },
+   "dcDetails": [],
+   "description": "MARGIN INTEREST as of 9999-99-99 (Margin)",
+   "quantity": "6.581",
+   "securityDetail": {
+    "desc": "SYNTHETIC SECURITY NAME",
+    "isQuotable": false,
+    "isAdviced": false
+   },
+   "txnNum": "S00007",
+   "typeCode": "0",
+   "shortDesc": "MARGIN INTEREST @ 9.99 AVG BAL 9,999DR 99/99-99/99",
+   "mobileDesc": "MARGIN INTEREST as of 9999-99-99 (Margin)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 5,
+    "commission": 3,
+    "fees": 9,
+    "interest": 3,
+    "net": 3,
+    "principal": 6
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "bankDetailsDescPos": "xx",
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "30",
+     "mnemonic": "ETT",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "W",
+     "isFloatingNavInd": false,
+     "batchId": "xxxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 370.2,
+   "catDetail": {
+    "txnTypeCode": "CT",
+    "txnTypeDesc": "Cash Transaction",
+    "txnCatCode": "X3",
+    "txnCatDesc": "Transfers To Your Bank",
+    "txnSubCatCode": "WD",
+    "txnSubCatDesc": "Withdrawal"
+   },
+   "date": 1779163200,
+   "dateDetail": {
+    "tradedDate": 1779163200,
+    "postedDate": 1779163200
+   },
+   "dcDetails": [],
+   "description": "Electronic Funds Transfer Paid (Cash)",
+   "quantity": "4.921",
+   "securityDetail": {
+    "desc": "SYNTHETIC SECURITY NAME",
+    "isQuotable": false,
+    "isAdviced": false
+   },
+   "txnDetailNum": "xxxxxxxx",
+   "txnDetailType": "ED",
+   "txnNum": "S00008",
+   "typeCode": "0",
+   "shortDesc": "MONEY LINE PAID EFT FUNDS PAID ED99999999 /WEB",
+   "mobileDesc": "Electronic Funds Transfer Paid (Cash)"
+  },
+  {
+   "acctNum": "X55550002",
+   "amtDetail": {
+    "price": 0,
+    "commission": 2,
+    "fees": 9,
+    "interest": 7,
+    "net": 403.44,
+    "principal": 2
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "30",
+     "mnemonic": "CYP",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "D",
+     "isFloatingNavInd": false,
+     "batchId": "xxxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 306.18,
+   "catDetail": {
+    "txnTypeCode": "CT",
+    "txnTypeDesc": "Cash Transaction",
+    "txnCatCode": "IA",
+    "txnCatDesc": "Investment Activity",
+    "txnSubCatCode": "OC",
+    "txnSubCatDesc": "Other Cash"
+   },
+   "date": 1793854800,
+   "dateDetail": {
+    "tradedDate": 1793854800,
+    "postedDate": 1793854800
+   },
+   "dcDetails": [],
+   "description": "PARTIC CONTR CURRENT HSA CONTRIBUTION CURRENT YEAR CONTRIB (Cash)",
+   "quantity": "12.119",
+   "securityDetail": {
+    "desc": "SYNTHETIC SECURITY NAME",
+    "isQuotable": false,
+    "isAdviced": false
+   },
+   "txnNum": "S00009",
+   "typeCode": "0",
+   "shortDesc": "PARTIC CONTR CURRENT HSA CONTRIBUTION CURRENT YEAR CONTRIB",
+   "mobileDesc": "PARTIC CONTR CURRENT HSA CONTRIBUTION CURRENT YEAR CONTRIB (Cash)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 1,
+    "commission": 8,
+    "fees": 0,
+    "interest": 3,
+    "net": 3,
+    "principal": 4,
+    "bookkeptFairValue": 22.06
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "10",
+     "mnemonic": "REV",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "D",
+     "isFloatingNavInd": false,
+     "batchId": "xxxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 49.77,
+   "catDetail": {
+    "txnTypeCode": "CA",
+    "txnTypeDesc": "Corporate Action",
+    "txnCatCode": "IA",
+    "txnCatDesc": "Investment Activity",
+    "txnSubCatCode": "RS",
+    "txnSubCatDesc": "Reverse Split"
+   },
+   "date": 1732683600,
+   "dateDetail": {
+    "tradedDate": 1732683600,
+    "postedDate": 1732683600
+   },
+   "dcDetails": [],
+   "description": "REVERSE SPLIT R/S TO 99999X999#REOR M9999999999999 INVESTMENT MANAGERS SER TR II TRADR ... (99999X999) (Cash)",
+   "quantity": "-9.317",
+   "securityDetail": {
+    "typeCode": "E",
+    "typeCodeDesc": "Equity",
+    "subTypeCode": "1",
+    "subTypeCodeDesc": "Common Stock",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "01",
+    "fedTaxStatusCode": "T",
+    "isQuotable": false,
+    "isAdviced": false
+   },
+   "txnNum": "S00010",
+   "typeCode": "4",
+   "shortDesc": "REVERSE SPLIT R/S TO 99999X999#REOR M9999999999999",
+   "mobileDesc": "REVERSE SPLIT R/S TO 99999X999#REOR M9999999999999 INVESTMENT MANAGERS SER TR II TRADR ... (99999X999) (Cash)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 8,
+    "commission": 8,
+    "fees": 7,
+    "interest": 8,
+    "net": 470.81,
+    "principal": 8
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "10",
+     "mnemonic": "LEU",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "D",
+     "isFloatingNavInd": false,
+     "batchId": "xxxxx",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 438.39,
+   "catDetail": {
+    "txnTypeCode": "IT",
+    "txnTypeDesc": "Income Transaction",
+    "txnCatCode": "IA",
+    "txnCatDesc": "Investment Activity",
+    "txnSubCatCode": "OI",
+    "txnSubCatDesc": "Other Interest"
+   },
+   "date": 1732683600,
+   "dateDetail": {
+    "tradedDate": 1732683600,
+    "postedDate": 1732683600
+   },
+   "dcDetails": [],
+   "description": "IN LIEU OF FRX SHARE LEU PAYOUT 99999X999#REORLM9999999999999 INVESTMENT MANAGERS SER TR II TRADR ... (99999X999) (Cash)",
+   "quantity": "18.873",
+   "securityDetail": {
+    "typeCode": "E",
+    "typeCodeDesc": "Equity",
+    "subTypeCode": "1",
+    "subTypeCodeDesc": "Common Stock",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "01",
+    "fedTaxStatusCode": "T",
+    "isQuotable": false,
+    "isAdviced": false
+   },
+   "txnNum": "S00011",
+   "typeCode": "0",
+   "shortDesc": "IN LIEU OF FRX SHARE LEU PAYOUT 99999X999#REORLM9999999999999",
+   "mobileDesc": "IN LIEU OF FRX SHARE LEU PAYOUT 99999X999#REORLM9999999999999 INVESTMENT MANAGERS SER TR II TRADR ... (99999X999) (Cash)"
+  },
+  {
+   "acctNum": "X55550003",
+   "amtDetail": {
+    "price": 7,
+    "commission": 2,
+    "fees": 3,
+    "interest": 2,
+    "net": 6,
+    "principal": 8,
+    "bookkeptFairValue": 202.5
+   },
+   "brokerageDetail": {
+    "tradeTypeCode": "1",
+    "tradeTypeCodeDesc": "Cash",
+    "isCancelled": false,
+    "isCollateral": false,
+    "additionalDetail": {
+     "runningCashBalCode": "Y",
+     "isIntraday": false,
+     "keyCode": "10",
+     "mnemonic": "DST",
+     "dataSrc": "F",
+     "depositWithdrawalCode": "D",
+     "isFloatingNavInd": false,
+     "batchId": "*xxx*",
+     "isLoanPayTxn": false
+    }
+   },
+   "cashBalance": 211.22,
+   "catDetail": {
+    "txnTypeCode": "CA",
+    "txnTypeDesc": "Corporate Action",
+    "txnCatCode": "IA",
+    "txnCatDesc": "Investment Activity",
+    "txnSubCatCode": "DS",
+    "txnSubCatDesc": "Distribution/Split spin-off"
+   },
+   "date": 1658462400,
+   "dateDetail": {
+    "tradedDate": 1658462400,
+    "postedDate": 1658462400
+   },
+   "dcDetails": [],
+   "description": "DISTRIBUTION GAMESTOP CORPORATION COM USD9.999 CL... (GME) (Cash)",
+   "quantity": "7.454",
+   "securityDetail": {
+    "typeCode": "E",
+    "typeCodeDesc": "Equity",
+    "subTypeCode": "1",
+    "subTypeCodeDesc": "Common Stock",
+    "symbol": "TICK",
+    "desc": "SYNTHETIC SECURITY NAME",
+    "cusip": "000000000",
+    "assetClass": "01",
+    "fedTaxStatusCode": "T",
+    "floorTradingSymbol": "xxx",
+    "isQuotable": true,
+    "isAdviced": false
+   },
+   "txnNum": "S00012",
+   "typeCode": "2",
+   "shortDesc": "DISTRIBUTION",
+   "mobileDesc": "DISTRIBUTION GAMESTOP CORPORATION COM USD9.999 CL... (GME) (Cash)"
+  }
+ ],
+ "_note": "SYNTHETIC: structure of Fidelity's activity-and-orders export; every value is scrubbed or random."
+}

@@ -91,7 +91,7 @@ def _has(conn: sqlite3.Connection, table: str) -> bool:
 
 
 def _lots(conn: sqlite3.Connection, as_of: str) -> list[dict]:
-    if not _has(conn, "lot_files"):
+    if not _has(conn, "holdings_daily"):
         return []
     closes = {r["symbol"]: r["close"] for r in conn.execute("SELECT symbol, max(close) AS close FROM holdings_daily WHERE date=? GROUP BY symbol", (as_of,))}
     out = []

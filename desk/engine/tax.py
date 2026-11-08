@@ -1,4 +1,3 @@
-import sqlite3
 from datetime import date, timedelta
 
 WASH_DAYS = 30
@@ -78,21 +77,25 @@ def split_gain(picked: list[dict]) -> tuple[float, float]:
 # ---- Realized ----
 
 
-def realized(conn: sqlite3.Connection, year: int) -> dict:
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='realized_lots'").fetchone() is None:
-        return {"st": 0.0, "lt": 0.0, "wash_disallowed": 0.0, "rows": 0}
-    out = {"st": 0.0, "lt": 0.0, "wash_disallowed": 0.0, "rows": 0}
+def realized(rows: list[dict], year: int) -> dict:
+    out = {"st": 0.0, "lt": 0.0, "wash_disallowed": 0.0, "rows": 0, "unknown": 0, "modelled": 0}
     seen = set()
-    for r in conn.execute("SELECT * FROM realized_lots WHERE substr(sold, 1, 4)=? ORDER BY id", (str(year),)):
+    for r in rows:
+        if str(r.get("sold") or "")[:4] != str(year):
+            continue
         key = (r["account"], r["symbol"], r["acquired"], r["sold"], r["shares"], r["proceeds"])
         if key in seen:
             continue
         seen.add(key)
-        gain = r["gain"] if r["gain"] is not None else (r["proceeds"] or 0) - (r["cost"] or 0)
+        if r.get("gain") is None and r.get("cost") is None:
+            out["unknown"] += 1
+            continue
+        gain = r["gain"] if r.get("gain") is not None else (r["proceeds"] or 0) - (r["cost"] or 0)
         long = r["term"] == "long" or (r["term"] is None and held_long(r["acquired"], r["sold"]))
         out["lt" if long else "st"] += gain
-        out["wash_disallowed"] += r["wash_disallowed"] or 0
+        out["wash_disallowed"] += r.get("wash_disallowed") or 0
         out["rows"] += 1
+        out["modelled"] += int(r.get("quality") == "modelled")
     return {k: round(v, 2) if isinstance(v, float) else v for k, v in out.items()}
 
 

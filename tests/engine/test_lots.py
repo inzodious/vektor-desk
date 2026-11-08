@@ -83,7 +83,7 @@ def test_inbox_import_is_idempotent_and_latest_file_wins(cfg):
 
 def test_api_lots(cfg, app_client):
     client = app_client(packages=["engine"])
-    assert client.get("/api/engine/lots").json() == {"lots": [], "files": []}
+    assert client.get("/api/engine/lots").json() == {"lots": [], "files": [], "history": []}
     inbox = cfg.inbox / "fidelity"
     inbox.mkdir(parents=True)
     (inbox / "lots.csv").write_text(UNREALIZED)

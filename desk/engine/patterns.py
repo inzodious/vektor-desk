@@ -4,6 +4,7 @@ from bisect import bisect_right
 from datetime import date, timedelta
 from statistics import median
 
+from desk.engine.lots import realized_rows
 from desk.engine.risk import as_of_value, macro_lookup, market_symbol
 
 Z90 = 1.645
@@ -341,10 +342,9 @@ def behavior(card: dict, tr, desk: sqlite3.Connection, kinds: dict[str, str], as
     cut = (date.fromisoformat(as_of) - timedelta(days=365)).isoformat()
     trades = [s for s in mine if s["start"] and s["start"] >= cut and s["kind"] in ("buy", "sell", "trim", "harvest", "rebalance")]
     held = []
-    if desk.execute("SELECT 1 FROM sqlite_master WHERE name='realized_lots'").fetchone():
-        for r in desk.execute("SELECT symbol, acquired, sold FROM realized_lots WHERE acquired IS NOT NULL AND sold IS NOT NULL"):
-            if kinds.get(r["symbol"], "stock") == "stock":
-                held.append((date.fromisoformat(r["sold"]) - date.fromisoformat(r["acquired"])).days)
+    for r in realized_rows(desk):
+        if r["acquired"] and r["sold"] and kinds.get(r["symbol"], "stock") == "stock":
+            held.append((date.fromisoformat(r["sold"]) - date.fromisoformat(r["acquired"])).days)
 
     def stat(xs):
         return {"n": len(xs), "mean_usd": round(sum(xs) / len(xs), 2) if xs else None, "total_usd": round(sum(xs), 2)}
