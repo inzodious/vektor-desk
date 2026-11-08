@@ -1,0 +1,40 @@
+{
+ "deposits": [
+  {
+   "id": "money-in-2026-10-28-transfer-1",
+   "date": "2026-10-28",
+   "account": "individual-0001",
+   "amount_usd": 1200,
+   "status": "landed",
+   "landed": {
+    "activity_id": "2026-10-28-transfer-1",
+    "date": "2026-10-28",
+    "accountKey": "individual-0001",
+    "amount": 1200,
+    "activity_ids": [
+     "2026-10-28-transfer-1"
+    ]
+   },
+   "scheduled": false,
+   "mode": "auto"
+  },
+  {
+   "id": "money-in-2026-11-05-transfer-1",
+   "date": "2026-11-05",
+   "account": "individual-0001",
+   "amount_usd": 250,
+   "status": "landed",
+   "landed": {
+    "activity_id": "2026-11-05-transfer-1",
+    "date": "2026-11-05",
+    "accountKey": "individual-0001",
+    "amount": 250,
+    "activity_ids": [
+     "2026-11-05-transfer-1"
+    ]
+   },
+   "scheduled": false,
+   "mode": "auto"
+  }
+ ]
+}

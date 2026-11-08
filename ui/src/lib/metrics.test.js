@@ -29,7 +29,7 @@ describe('metrics', () => {
   });
 
   it('reads plan limits from desk.yaml', () => {
-    expect(planLimits(profile, rules)).toMatchObject({ driftPts: 5, satelliteCap: 10, version: 1, rulesVersion: 1 });
+    expect(planLimits(profile, rules)).toMatchObject({ driftPts: 5, satelliteCap: 10, version: 2, rulesVersion: 1 });
     expect(planLimits(null, null)).toMatchObject({ driftPts: 5, satelliteCap: 10, version: null });
   });
 });

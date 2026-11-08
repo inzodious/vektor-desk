@@ -13,17 +13,11 @@ import { planLimits } from '../lib/plan.js';
 import { dayLabel } from '../lib/charts.js';
 import { QUALITY } from '../lib/quality.js';
 import { plural, usd } from '../lib/format.js';
+import { emptyText, moneyIn, rhythmText, seenText } from '../lib/deposits.js';
 
 const HEAD_IDS = 'plan.drift_max,plan.in_mix,plan.single_stock,plan.rules,tax.harvestable';
 const TILT = { growth: 'Growth tilt', balanced: 'Balanced', income: 'Income tilt' };
 const fmtPts = (v) => (v == null ? '—' : `${v < 0 ? '−' : v > 0 ? '+' : ''}${Math.abs(v).toFixed(1)} pts`);
-
-function cadence(d) {
-  const amt = d.amount_usd ?? d.amount;
-  const every = d.every || d.cadence || d.frequency;
-  const day = d.day ?? d.day_of_month;
-  return [amt != null ? usd(amt) : null, every ? `every ${every}` : null, day ? `on day ${day}` : null, d.account ? `to ${d.account}` : null].filter(Boolean).join(' ');
-}
 
 // ---------- cards ----------
 function Rules({ rules, m, version }) {
@@ -122,43 +116,66 @@ function Funds({ funds, live, names }) {
   );
 }
 
-function Deposits({ funds, deposits, deskValue }) {
+function Deposits({ funds, deposits, mode, landed, deskValue }) {
   const split = funds.filter((f) => f.next != null && f.next > 0);
   const total = split.reduce((a, f) => a + f.next, 0);
   const after = (f) => (deskValue && f.weight != null && f.target != null ? (((f.weight / 100) * deskValue + f.next) / (deskValue + total)) * 100 - f.target : null);
   const modelled = funds.some((f) => f.next != null && f.quality === 'modelled');
+  const auto = mode === 'auto';
+  const money = moneyIn(landed);
   return (
-    <div className="card c5" style={{ '--i': 10 }}>
+    <div className="card c5" style={{ '--i': 10 }} data-testid="deposits" data-mode={mode || 'listed'}>
       <div className="card-head">
         <span className="tag mustard">Next deposit</span>
-        <span className="acts">{modelled ? <span className="chip lilac">{QUALITY.modelled}</span> : null}</span>
+        <span className="acts">
+          {auto ? <span className="chip">From your activity</span> : null}
+          {modelled ? <span className="chip lilac">{QUALITY.modelled}</span> : null}
+        </span>
       </div>
       {deposits.length ? (
-        <div className="rows" style={{ marginBottom: 8 }}>
+        <div className="rows" style={{ marginBottom: 8 }} data-testid="rhythm">
           {deposits.map((d, i) => (
-            <div className="rule" key={`${d.account || 'dep'}-${i}`}>
+            <div className="rule" key={`${d.id || d.account || 'dep'}-${i}`}>
               <span style={{ color: 'var(--teal-ink)' }}>
                 <Icon name="calendar" />
               </span>
               <span>
-                <b>{d.label || d.name || 'Deposit'}</b>
-                <small>{cadence(d) || 'Scheduled'}</small>
+                <b>{d.label || d.name || d.id || 'Deposit'}</b>
+                <small>{[rhythmText(d) || 'Scheduled', seenText(d)].filter(Boolean).join(' · ')}</small>
               </span>
               <span />
             </div>
           ))}
         </div>
       ) : (
-        <p className="empty-hint" style={{ marginBottom: 8 }}>
-          No deposit schedule in desk.yaml yet. The split below is modelled from the plan.
+        <p className="empty-hint" style={{ marginBottom: 8 }} data-testid="rhythm-empty">
+          {emptyText(mode)}
+          {split.length ? ' The split below is modelled from the plan.' : ''}
         </p>
       )}
+      {money.length ? (
+        <div className="rows money-in" style={{ marginBottom: 8 }} data-testid="money-in">
+          <span className="kicker">Money in</span>
+          {money.map((d) => (
+            <div className="row" key={d.key} data-status={d.status} data-scheduled={d.scheduled}>
+              <span className="l">
+                <span className={`mi-dot ${d.status}`} aria-hidden="true" />
+                <span>
+                  <b>{d.label}</b>
+                  <small>{d.when}</small>
+                </span>
+              </span>
+              <span className="v">{usd(d.amount)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {split.length ? (
         <>
           <p className="muted" style={{ fontSize: 12.5, marginBottom: 6 }}>
             {usd(total)} split to pull every fund back toward its target.
           </p>
-          <div className="rows">
+          <div className="rows" data-testid="split">
             {split.map((f) => (
               <div className="row" key={f.symbol} data-sym={f.symbol} tabIndex={0}>
                 <span className="l">
@@ -230,6 +247,7 @@ export default function Plan() {
   const rules = useApi('/api/decisions/rules');
   const tax = useMetrics('tax.*');
   const calendar = useApi('/api/decisions/calendar');
+  const deposits = useApi('/api/decisions/deposits');
   const wash = useApi('/api/engine/wash');
   const limits = planLimits(profile.data, rules.data);
   const funds = useMemo(() => fundsFromMetrics(plan.rows), [plan.rows]);
@@ -304,7 +322,7 @@ export default function Plan() {
       />
       <section className="kpis kpis-6">
         <Kpi i={1} label="Largest drift" metric="plan.drift_max" value={driftV == null ? '—' : driftV.toFixed(1)} unit="pts" tone={driftV != null && driftV >= limits.driftPts ? 'watch' : undefined} line={`Rebalance at ${limits.driftPts}`} quality={drift?.quality} asOf={engineAsOf} />
-        <Kpi i={2} label="Next deposit" metric="plan.next_deposit" value={next ? usd(next) : '—'} line={next ? `${plural(funds.filter((f) => f.next > 0).length, 'fund')} get some` : 'Nothing scheduled'} quality={nextModelled ? 'modelled' : undefined} asOf={engineAsOf} />
+        <Kpi i={2} label="Next deposit" metric="plan.next_deposit" value={next ? usd(next) : '—'} line={next ? `${plural(funds.filter((f) => f.next > 0).length, 'fund')} get some` : profile.data?.deposits_mode === 'auto' ? 'None on a steady rhythm' : 'Nothing scheduled'} quality={nextModelled ? 'modelled' : undefined} asOf={engineAsOf} />
         <Kpi i={3} label="Rules" metric="plan.rules" value={ruleRows.length ? `${passing} of ${ruleRows.length}` : '—'} tone={ruleRows.length && passing < ruleRows.length ? 'watch' : undefined} line={ruleRows.length && passing === ruleRows.length ? 'All passing' : 'Some need a look'} asOf={engineAsOf} />
         <Kpi i={4} label="In the mix" metric="plan.in_mix" value={inMixV == null ? '—' : inMixV.toFixed(1)} unit="%" line="Of the desk in plan funds" quality={inMix?.quality} asOf={engineAsOf} />
         <Kpi i={5} label="Single stocks" metric="plan.single_stock" value={singleV == null ? '—' : singleV.toFixed(1)} unit="%" line={`Cap ${limits.satelliteCap}%`} quality={single?.quality} asOf={engineAsOf} />
@@ -322,7 +340,7 @@ export default function Plan() {
         </div>
         <Rules rules={ruleList} m={m} version={limits.rulesVersion} />
         <Funds funds={funds} live={ctx.symbols} names={ctx.names} />
-        <Deposits funds={funds} deposits={p.deposits || []} deskValue={ctx.live?.value} />
+        <Deposits funds={funds} deposits={Array.isArray(p.deposits) ? p.deposits : []} mode={profile.data?.deposits_mode} landed={deposits.data?.deposits} deskValue={ctx.live?.value} />
         <Taxes m={tax} calendar={calendar} wash={wash} />
         <FiPath />
       </section>

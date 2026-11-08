@@ -18,7 +18,7 @@ test('plan shows KPIs, drift, rules, funds and the deposit split', async ({ page
   await expect(page.getByText('desk.yaml rules v1')).toBeVisible();
   const deposit = page.locator('.card', { hasText: 'Next deposit' }).last();
   await expect(deposit).toContainText('Modelled');
-  await expect(deposit.locator('.row')).toHaveCount(3);
+  await expect(deposit.getByTestId('split').locator('.row')).toHaveCount(3);
   await expect(deposit.locator('.row', { hasText: 'VXUS' })).toContainText('→');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
