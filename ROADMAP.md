@@ -155,6 +155,22 @@ Research hypotheses become strategies, tested on history without seeing the futu
 | Early February 2027 (three months) | At least 95% of Fidelity trades match a decision record |
 | May 2027 (six months) | Flight record review: desks that don't beat following the plan are switched off |
 
+## Next: Filings lane
+
+Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the signal forward from day one (no backtest is possible, because the model knows pre-cutoff history).
+
+| Item | Owner | Status |
+|---|---|---|
+| Fidelity 5-year history importer (real shares, lots, flows) | Statistics | ⏳ |
+| Run-now jobs in Settings, refresh on the health banner | Infra + Design | ⏳ |
+| Alpaca free market data as the lab and universe price source | Statistics | ⏳ |
+| Small-cap universe ($50M–$2B, liquidity floor) and EDGAR new-filings fetch | Statistics | ⏳ |
+| Filings desk: scores each filing (direction, confidence, event) | Agents | ⏳ |
+| Filings strategy family, forward paper only, 182-day graduation | Statistics | ⏳ |
+| Alpaca paper executor (paper URL only) and keys | Statistics + Infra | ⏳ |
+| Filings lane card in the Lab, filing chip on the Symbol sheet | Design | ⏳ |
+| Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
+
 ## Key dates
 
 | Date | What |
