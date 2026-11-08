@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import lab, lane, leaderboard, paper_exec, schema, watchlist
+from desk.engine import discounts, lab, lane, leaderboard, paper_exec, schema, watchlist
 from desk.engine.compare import CompareError, compare
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
@@ -408,7 +408,7 @@ def lab_leaderboard(request: Request) -> JSONResponse:
     cfg = get_cfg(request)
     conn = connect(cfg.desk_db, readonly=True) if cfg.desk_db.exists() else None
     try:
-        return _json(leaderboard.build(conn, paper_exec.budget()))
+        return _json(leaderboard.build(conn, paper_exec.budget(), leaderboard.backtests(cfg)))
     finally:
         if conn is not None:
             conn.close()
@@ -525,3 +525,13 @@ def factors_view(request: Request) -> JSONResponse:
 @router.get("/api/engine/bands")
 def bands_view(request: Request) -> JSONResponse:
     return _view(request, "bands", {"as_of": None, "status": "not_ready", "rows": [], "book": "as-held"})
+
+
+@router.get("/api/engine/discounts")
+def discounts_view(request: Request) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    try:
+        return _json(discounts.view(conn))
+    finally:
+        if conn is not None:
+            conn.close()

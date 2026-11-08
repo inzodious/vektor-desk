@@ -13,7 +13,7 @@ import requests
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, broker, core, earnings, filings, french, insider, lane, paper_exec, schema, triggers, universe
+from desk.engine import ENGINE_VERSION, broker, core, discounts, earnings, filings, french, insider, lane, paper_exec, schema, triggers, universe
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.lab import data as lab_data
@@ -214,6 +214,10 @@ def run_filings(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "filings", lambda desk: filings.run(desk, http or http_session(), now=datetime.now(UTC)))
 
 
+def run_discounts(cfg: Config) -> dict:
+    return _with_desk(cfg, "discounts", lambda desk: discounts.scan(desk, now=datetime.now(UTC)))
+
+
 def run_market_backfill(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "backfill", lambda desk: run_backfill(desk, http or http_session()))
 
@@ -229,6 +233,7 @@ JOBS = {
     "paper": run_paper,
     "insider": run_insider,
     "earnings": run_earnings,
+    "discounts": run_discounts,
     "quotes": run_quotes,
     "backfill": run_market_backfill,
     "lookthrough": run_lookthrough,

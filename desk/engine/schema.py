@@ -307,6 +307,40 @@ CREATE TABLE IF NOT EXISTS lane_variants (
   registered_at TEXT NOT NULL,
   PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS discount_signals (
+  signal_id TEXT PRIMARY KEY,
+  as_of TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  name TEXT,
+  list TEXT NOT NULL CHECK (list IN ('held', 'watchlist', 'quality')),
+  reason TEXT NOT NULL,
+  price REAL NOT NULL,
+  drop_from_high_pct REAL NOT NULL,
+  move_z REAL,
+  valuation TEXT NOT NULL,
+  numbers TEXT NOT NULL,
+  scanned_at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS discount_signals_day ON discount_signals (as_of);
+CREATE TABLE IF NOT EXISTS discount_cases (
+  signal_id TEXT PRIMARY KEY,
+  verdict TEXT NOT NULL CHECK (verdict IN ('buy', 'wait', 'avoid')),
+  case_text TEXT NOT NULL,
+  risks TEXT NOT NULL,
+  confidence REAL NOT NULL CHECK (confidence BETWEEN 0 AND 1),
+  horizon_days INTEGER NOT NULL CHECK (horizon_days >= 1),
+  numbers_cited TEXT NOT NULL,
+  model TEXT NOT NULL,
+  written_at TEXT NOT NULL,
+  run_id TEXT
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS discount_scans (
+  as_of TEXT PRIMARY KEY,
+  ran_at TEXT NOT NULL,
+  scanned INTEGER NOT NULL,
+  hits INTEGER NOT NULL,
+  short_history TEXT
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS catalog_strategies (
   id TEXT NOT NULL,
   version INTEGER NOT NULL,
