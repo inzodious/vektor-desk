@@ -32,6 +32,7 @@ def grammar() -> dict:
         "universe": {
             "fund_list": 'symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks. {"type": "fund_list", "set": "sector_etfs"}',
             "screen": "single stocks in the backfill universe; min_history_days, min_price. Carries a survivorship caveat",
+            "small_caps": 'point-in-time US small caps from insider-filing names since 2016; min_price (default 2); benchmark IWM. {"type": "small_caps"}',
             "french": "Ken French research portfolios, no survivorship bias, daily from 1963 on the factor calendar. set: "
             + " | ".join(PORTFOLIO_FILES)
             + '. {"type": "french", "set": "industry_12"}. Benchmark defaults to FF.MKT; a pass is research only, never paper',

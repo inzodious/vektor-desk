@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 
 from desk.engine.french import PORTFOLIO_FILES
-from desk.engine.lab.data import FRENCH_KIND, FRENCH_MARKET, FUND_KINDS, LabData
+from desk.engine.lab.data import FRENCH_KIND, FRENCH_MARKET, FUND_KINDS, SMALL_CAPS, SMALLCAP_BENCHMARK, LabData
 from desk.engine.lab.library import FEATURES, TRANSFORMS, window_days
 from desk.engine.market import BENCHMARKS
 
@@ -168,7 +168,15 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
     if kind == "screen":
         caveats.append("Screens run over today's backfill list, which skips companies that vanished before the backfill: survivorship bias.")
         return {"kind": "screen", "min_history_days": int(u.get("min_history_days") or 252), "min_price": float(u.get("min_price") or 5.0)}
-    problems.append('universe type must be "fund_list", "french" or "screen"')
+    if kind in (SMALL_CAPS, "small_cap", "smallcaps"):
+        if data is not None and not data.smallcap:
+            problems.append("small-cap history is not in the lab yet; the engine's insider job builds it")
+            return {}
+        caveats.append(
+            "Small caps are point in time from SEC share counts and prices since 2016; names come from insider filings, so firms that later vanished stay in."
+        )
+        return {"kind": SMALL_CAPS, "min_price": float(u.get("min_price") or 2.0)}
+    problems.append('universe type must be "fund_list", "french", "screen" or "small_caps"')
     return {}
 
 
@@ -227,7 +235,9 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
         constraints={"max_position_pct": float(constraints.get("max_position_pct") or 100), "max_turnover": constraints.get("max_turnover")},
         success_criteria=raw.get("success_criteria") or {},
         horizons=sorted(set(horizons)),
-        benchmark=(str(raw["benchmark"]).upper() if raw.get("benchmark") else (FRENCH_MARKET if universe.get("kind") == FRENCH_KIND else None)),
+        benchmark=(
+            str(raw["benchmark"]).upper() if raw.get("benchmark") else {FRENCH_KIND: FRENCH_MARKET, SMALL_CAPS: SMALLCAP_BENCHMARK}.get(universe.get("kind"))
+        ),
         taxable=not any(k in account for k in SHELTERED),
         model=model or str(raw.get("model") or ""),
         caveats=caveats,

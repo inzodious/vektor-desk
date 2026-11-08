@@ -455,6 +455,28 @@ Forward-only test of one edge: Claude reads filings of small caps nobody covers.
 | `filings.pending(cfg, limit)` | Unscored filings with an excerpt, most material first, then newest: `accession, symbol, form, items, filed_at, url, excerpt, company{name, market_cap, sector}`. `[]` before the first fetch; `NotReady` when the tables don't exist |
 | `filings.record(cfg, accession, result)` | First write wins per accession. `ValueError` on a direction outside −2..2, confidence outside 0..1, an `event_type` not in `filings.EVENT_TYPES`, `horizon_days` under 1, no `model` or `scored_at`, or an unknown accession. `rationale` is cut to 280 characters |
 
+## Insider-buying clusters: data
+
+Backtestable small-cap family: directors and officers buying their own stock on the open market. Module `desk.engine.insider`, job `insider` nightly 23:20 ET.
+
+| Piece | Table | Rule |
+|---|---|---|
+| Bulk history | `insider_buys`, `insider_quarters` | SEC Insider Transactions data sets, one zip per quarter from 2016 Q1 (Alpaca bars start 2016), 8 quarters a night until caught up. Form 4 and 4/A, transaction code P, acquired, shares and price above 0, owner is a director or officer (10% owners alone are left out). One row per filing and owner: shares, dollars, latest trade date, filing date |
+| Live | `insider_buys` (`source` form4), `insider_form4_seen` | Form 4s in `filings_feed` (universe names) after the last bulk quarter: the raw XML, same rules, 200 a night. Bulk rows replace them when the quarter is published |
+| Known date | | The session after the filing date. Nothing counts before then |
+| Prices | `alpaca_bars`, `alpaca_history` | Names that ever had 2 or more insiders buying within 30 days, plus IWM: daily bars since 2016-01-01 (raw and adjusted), 300 names a night |
+| Share counts | `sec_shares`, `sec_frames` | SEC `dei:EntityCommonStockSharesOutstanding` frames since late 2014, each quarter once (the last two refresh) |
+| Membership | `smallcap_months` | At each month's first session: shares from a period ending 45+ days earlier (under 400 days old) × raw close between $50M and $2B, and median dollar volume over the prior 20 sessions at least $500K. The whole month uses that answer |
+
+**In the lab.** `lab-export` adds tables `insider(symbol, known, owner, usd)` and `smallcap(symbol, month)`, and the member names' bars (kind `stock`, role `small_cap`, Tiingo wins where both exist).
+
+| Feature | Value on day d |
+|---|---|
+| `insider.buyers` | Distinct insiders with a buy known in the window's sessions up to d |
+| `insider.buy_usd` | Dollars of those buys |
+
+A cluster rule is `{"metric_id": "insider.buyers", "window": "21d", "transform": "raw"}` with `{"min_signal": 1}` (two or more buyers). Names come from SEC filings, not today's listings, so companies that later vanished stay in; a delisted name sells at its last close less the lab's haircut. Before the first history load a `small_caps` spec is refused with "the engine's insider job builds it".
+
 ## Paper trading: lanes, sub-ledgers, leaderboard
 
 Every strategy on paper shares the one Alpaca **paper** account. The URL comes only from `desk.paper_check.paper_base()`; the account number must start with `PA` or nothing is sent.
@@ -598,8 +620,8 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 | Field | Accepted |
 |---|---|
-| `universe` | `{"type": "fund_list", "set": "sector_etfs" \| "core_etfs" \| "benchmarks"}`, `{"type": "fund_list", "symbols": [funds only]}`, a `rule` naming a set, or `{"type": "screen", "min_history_days", "min_price"}` for single stocks (survivorship caveat). A hand-picked stock list is rejected |
-| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `range_52w`, `dd`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
+| `universe` | `{"type": "fund_list", "set": "sector_etfs" \| "core_etfs" \| "benchmarks"}`, `{"type": "fund_list", "symbols": [funds only]}`, a `rule` naming a set, or `{"type": "screen", "min_history_days", "min_price"}` for single stocks (survivorship caveat), or `{"type": "small_caps", "min_price"}` (default 2) for point-in-time small caps, benchmark IWM. A hand-picked stock list is rejected |
+| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `range_52w`, `dd`, `insider.buyers`, `insider.buy_usd`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
 | `entry` | `{"top_n": 3 \| "param:top_n", "min_signal": 0}` or "top 3 by rank". `min_signal` applies to the first signal's raw value; slots it leaves empty stay in cash |
 | `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
 | `rebalance`, `sizing` | Weekly, monthly or quarterly; `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash |
@@ -611,7 +633,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 **What the desk sees** (`desk_view`): folds, the walk-forward summary, the start-month distribution per horizon (walk-forward when long enough, else the full range flagged `in_sample`), deflated Sharpe (trials counted across the spec's whole `parent_id` family, Sharpe variance across variants), PBO by combinatorial cross-validation over 10 blocks, the factor check, the analyses it asked for (`param_sensitivity`, `regime_split` bull/bear and high/low rates, `turnover_cost` at 1×, 2×, 4×, `factor_regression`), caveats, and rejection reasons. A changed spec under the same version, or any spec after finalize, is rejected.
 
-**Finalize** runs the last fold's parameters on the holdout and on the days after the writing model's cutoff (`DESK_LAB_MODEL_CUTOFFS`, a JSON map of model to date, default 2026-06-30), then checks the bars: start-month 5th percentile above zero on the longest horizon, deflated Sharpe over 0.95, PBO under 0.2, holdout excess positive and at least half the walk-forward excess, and the spec's own `excess_vs_plan_pts`, `max_drawdown_pct`, `min_trades`. Any failed bar is `fail`; all computed bars passing is `pass`; anything missing is `inconclusive`. The factor bar is alpha t of 2 or more; it is `null`, and does not block, only when the factors are missing or overlap fewer than 252 days. A pass moves a fund or screen strategy to `paper` and a French one to `research`.
+**Finalize** runs the last fold's parameters on the holdout and on the days after the writing model's cutoff (`DESK_LAB_MODEL_CUTOFFS`, a JSON map of model to date, default 2026-06-30), then checks the bars: start-month 5th percentile above zero on the longest horizon, deflated Sharpe over 0.95, PBO under 0.2, holdout excess positive and at least half the walk-forward excess, and the spec's own `excess_vs_plan_pts`, `max_drawdown_pct`, `min_trades`. Any failed bar is `fail`; all computed bars passing is `pass`; anything missing is `inconclusive`. The factor bar is alpha t of 2 or more; it is `null`, and does not block, only when the factors are missing or overlap fewer than 252 days. A pass moves a fund, screen or small-cap strategy to `paper` and a French one to `research`.
 
 **Paper.** Each night the engine replays a paper strategy with its finalized parameters from the finalize day to the newest bar on fresh data, so it can never be tuned after the fact. After 182 days it becomes `eligible` if it is level with or ahead of its benchmark, otherwise `retired`. `desk.engine.lab.eligible` lists the eligible ones for Scout.
 
@@ -759,6 +781,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekly, Sunday 02:10 | N-PORT look-through and sector profiles |
 | Weekdays 19:30 ET | `universe`: Alpaca assets, SEC share counts, daily bars, then that day's universe |
 | Nightly 03:35 ET | `filings`: yesterday's EDGAR index for universe names, then excerpts (before the scorer at 04:15) |
+| Nightly 23:20 ET | `insider`: SEC insider quarters, live Form 4s, share frames, price history for cluster names, small-cap months (before `lab-export` at 00:55) |
 | Weekdays 08:45 and 16:45 ET | `paper`: lanes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 

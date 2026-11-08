@@ -224,6 +224,46 @@ CREATE TABLE IF NOT EXISTS filing_signals (
   numbers_cited TEXT NOT NULL,
   run_id TEXT
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS insider_buys (
+  accession TEXT NOT NULL,
+  owner_cik INTEGER NOT NULL,
+  issuer_cik INTEGER NOT NULL,
+  symbol TEXT NOT NULL,
+  trans_date TEXT NOT NULL,
+  filed_date TEXT NOT NULL,
+  shares REAL NOT NULL,
+  usd REAL NOT NULL,
+  role TEXT NOT NULL,
+  source TEXT NOT NULL,
+  PRIMARY KEY (accession, owner_cik)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS insider_buys_symbol ON insider_buys (symbol, filed_date);
+CREATE TABLE IF NOT EXISTS insider_quarters (
+  quarter TEXT PRIMARY KEY,
+  fetched_at TEXT NOT NULL,
+  rows INTEGER NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS insider_form4_seen (
+  accession TEXT PRIMARY KEY,
+  rows INTEGER NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sec_frames (
+  frame TEXT PRIMARY KEY,
+  fetched_at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS alpaca_history (
+  symbol TEXT PRIMARY KEY,
+  start TEXT NOT NULL,
+  bars INTEGER NOT NULL,
+  fetched_at TEXT NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS smallcap_months (
+  symbol TEXT NOT NULL,
+  month TEXT NOT NULL,
+  market_cap REAL NOT NULL,
+  dollar_volume REAL NOT NULL,
+  PRIMARY KEY (symbol, month)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS lane_variants (
   id TEXT NOT NULL,
   version INTEGER NOT NULL,
