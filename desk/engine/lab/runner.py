@@ -9,7 +9,7 @@ from pathlib import Path
 from desk.config import Config
 from desk.db import connect
 from desk.engine.lab import factors, rulebook, stats
-from desk.engine.lab.data import FRENCH_KIND, LabData, data_path, lab_dir, ledger_path, load
+from desk.engine.lab.data import FRENCH_KIND, SMALL_CAPS, LabData, data_path, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
 from desk.engine.lab.spec import Spec, SpecError, Variant, parse, resolve, variants
 
@@ -18,6 +18,7 @@ DEFAULT_CUTOFF = "2026-06-30"
 POST_CUTOFF_MIN_DAYS = 63
 DSR_BAR = 0.95
 PBO_BAR = 0.2
+COVERAGE_MAX_MISSING = 0.05
 LEDGER = """
 CREATE TABLE IF NOT EXISTS strategies (
   id TEXT NOT NULL,
@@ -420,6 +421,12 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
     with conn:
         _trial(conn, spec, v, f"{exp['windows']['holdout_start']}..{last}", "holdout", holdout, now)
     bars = _bars(spec, exp, holdout)
+    survivorship = None
+    if spec.universe.get("kind") == SMALL_CAPS:
+        stress = stats.summary(simulate(data, spec, v, exp["windows"]["holdout_start"], last, delist_haircut=1.0))
+        survivorship = _survivorship(data.coverage(), stress)
+        bars["delist_total_loss"] = survivorship["stress_excess_pts"] > 0 if survivorship["stress_excess_pts"] is not None else None
+        bars["price_coverage"] = survivorship["coverage_ok"]
     factor_ran = bars["factor"] is not None
     computed = [x for k, x in bars.items() if k != "factor" or factor_ran]
     verdict = "fail" if any(x is False for x in computed) else ("pass" if computed and all(x is True for x in computed) else "inconclusive")
@@ -435,9 +442,29 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
         "post_cutoff": {"cutoff": cutoff, **(post or {"days": 0, "note": "The data ends before the model's training cutoff."})},
         "paper_start": last if verdict == "pass" and not research else None,
         "factor_check": exp.get("factor_check"),
-        "caveats": exp.get("caveats", []),
+        "survivorship": survivorship,
+        "caveats": exp.get("caveats", []) + ([survivorship["note"]] if survivorship else []),
     }
     return _record(conn, spec, "finalize", body, now)
+
+
+def _survivorship(cov: dict | None, stress: dict) -> dict:
+    x = stress.get("excess_vs_bench_pts")
+    if not cov or not cov.get("clusters"):
+        return {"coverage_ok": None, "stress_excess_pts": x, "note": "No price-coverage count for insider names yet, so the verdict waits for it."}
+    missing = cov["unpriced"] + cov["pending"]
+    share = missing / cov["clusters"]
+    ok = None if cov["pending"] or share > COVERAGE_MAX_MISSING else True
+    note = (
+        f"{cov['unpriced']} of {cov['clusters']} insider-cluster names have no price after the event (likely delisted) and {cov['pending']} "
+        f"are still loading; they are left out, which can flatter results. {cov['ended_within_a_year']} priced names stopped trading within a year "
+        f"of their cluster. "
+    )
+    if x is None:
+        note += "The total-loss stress could not be measured."
+    else:
+        note += f"With every delisting as a total loss the holdout {'beats' if x > 0 else 'trails'} the benchmark by {abs(x):.2f} points a year."
+    return cov | {"missing_share": round(share, 4), "coverage_ok": ok, "stress_excess_pts": x, "note": note}
 
 
 def _close(conn, spec: Spec, status: str):

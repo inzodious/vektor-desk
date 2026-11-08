@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 from bisect import bisect_right
@@ -98,6 +99,10 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
             "SELECT value FROM metric_values WHERE metric_id='tax.marginal_rate' AND scope='portfolio' AND value IS NOT NULL ORDER BY as_of DESC LIMIT 1"
         ).fetchone()
         settings = {"exported_at": now.isoformat(timespec="seconds"), "marginal_rate_pct": str(rate[0]) if rate else None}
+        if small and _has(desk, "insider_buys"):
+            from desk.engine.insider import coverage
+
+            settings["insider_coverage"] = json.dumps(coverage(desk))
         out.executemany("INSERT INTO settings VALUES (?, ?)", list(settings.items()))
         out.commit()
     finally:
@@ -156,6 +161,13 @@ class LabData:
     french_sets: dict[str, list[str]] = field(default_factory=dict)
     insider: dict[str, tuple[list[str], list[int], list[float]]] = field(default_factory=dict)
     smallcap: dict[str, set[str]] = field(default_factory=dict)
+
+    def coverage(self) -> dict | None:
+        raw = self.settings.get("insider_coverage")
+        try:
+            return json.loads(raw) if raw else None
+        except ValueError:
+            return None
 
     @property
     def end(self) -> str:

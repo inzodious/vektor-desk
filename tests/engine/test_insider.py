@@ -328,3 +328,80 @@ def test_nightly_job_without_alpaca_keys_still_loads_sec_data(cfg, monkeypatch):
     assert conn.execute("SELECT count(*) FROM sec_shares").fetchone()[0] == 1
     conn.close()
     assert "insider" in engine_main.JOBS and ("20 23 * * *", "python -m desk.engine insider") in JOBS
+
+
+# ---- Survivorship ----
+
+
+def test_coverage_counts_cluster_names_without_prices(cfg):
+    conn = desk(cfg)
+    with conn:
+        for sym in ("GOOD", "GONE", "WAIT", "LATE", "DIED"):
+            buy(conn, f"{sym}1", 1, sym, "2024-03-01")
+            buy(conn, f"{sym}2", 2, sym, "2024-03-04")
+        conn.executemany("INSERT INTO alpaca_history VALUES (?, '2016-01-01', ?, 'x')", [("GOOD", 300), ("GONE", 0), ("LATE", 10), ("DIED", 20)])
+        rows = [("GOOD", d) for d in sessions("2024-02-01", 300)] + [("LATE", d) for d in sessions("2024-06-03", 10)]
+        rows += [("DIED", d) for d in sessions("2024-02-20", 40)]
+        conn.executemany("INSERT INTO alpaca_bars VALUES (?, ?, 1, 1, 1, 1, 1, 1, 1)", rows)
+    cov = insider.coverage(conn)
+    assert cov == {"clusters": 5, "priced": 2, "unpriced": 2, "pending": 1, "ended_within_a_year": 1, "unpriced_symbols": ["GONE", "LATE"]}
+    conn.close()
+
+
+def test_survivorship_holds_the_verdict_until_prices_are_complete():
+    from desk.engine.lab.runner import _survivorship
+
+    stress = {"excess_vs_bench_pts": 1.5}
+    full = {"clusters": 100, "priced": 98, "unpriced": 2, "pending": 0, "ended_within_a_year": 7, "unpriced_symbols": ["GONE"]}
+    ok = _survivorship(full, stress)
+    assert ok["coverage_ok"] is True and ok["missing_share"] == 0.02 and "2 of 100" in ok["note"] and "beats the benchmark by 1.50 points" in ok["note"]
+    assert _survivorship(full | {"unpriced": 9}, stress)["coverage_ok"] is None
+    assert _survivorship(full | {"pending": 1}, stress)["coverage_ok"] is None
+    assert _survivorship(None, stress)["coverage_ok"] is None
+
+
+def test_delistings_can_count_as_a_total_loss(cfg):
+    conn, days = lab_desk(cfg)
+    with conn:
+        conn.execute("DELETE FROM alpaca_bars WHERE symbol='SMOL' AND date > '2024-02-15'")
+        buy(conn, "a3", 4, "SMOL", "2024-02-01")
+        buy(conn, "a4", 5, "SMOL", "2024-02-02")
+    export(cfg, conn, {}, {})
+    data = load(data_path(cfg))
+    spec = parse(SPEC, data, model="test")
+    v = resolve(spec, {})
+    soft = simulate(data, spec, v, "2023-12-01", "2024-03-29")
+    hard = simulate(data, spec, v, "2023-12-01", "2024-03-29", delist_haircut=1.0)
+    assert "SMOL" in soft.delisted and hard.values[-1] < soft.values[-1]
+    conn.close()
+
+
+def test_finalize_shows_survivorship_in_the_verdict(cfg):
+    import json
+
+    from desk.engine.lab.runner import finalize, ledger
+
+    conn, _ = lab_desk(cfg)
+    export(cfg, conn, {}, {})
+    conn.close()
+    data = load(data_path(cfg))
+    led = ledger(cfg)
+    spec = parse(SPEC, data, model="test")
+    with led:
+        led.execute(
+            "INSERT INTO strategies VALUES (?, 1, ?, NULL, ?, 'lab', '2024-04-01T00:00:00', 'test', NULL, ?)",
+            (spec.id, spec.hash, spec.title, json.dumps(SPEC)),
+        )
+        exp = {
+            "deploy_params": {"seed": 0},
+            "windows": {"start": "2023-12-01", "end": "2024-01-31", "holdout_start": "2024-02-01"},
+            "walk_forward": {},
+            "caveats": [],
+        }
+        led.execute("INSERT INTO lab_results VALUES (?, 1, 'experiment', '2024-04-01T00:00:00', ?)", (spec.id, json.dumps(exp)))
+    body = finalize(cfg, led, data, {"strategy_id": spec.id, "version": 1}, now=NOW)
+    led.close()
+    assert body["verdict"] == "fail" and body["paper_start"] is None
+    assert body["bars"]["price_coverage"] is None and body["bars"]["delist_total_loss"] is False
+    assert "trails the benchmark" in body["survivorship"]["note"]
+    assert body["survivorship"]["clusters"] == 1 and body["survivorship"]["pending"] == 1 and "still loading" in body["caveats"][-1]

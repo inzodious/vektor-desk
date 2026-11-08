@@ -176,7 +176,9 @@ def _index(data: LabData, weights: dict[str, float], cal: list[str]) -> list[flo
 # ---- Run ----
 
 
-def simulate(data: LabData, spec: Spec, v: Variant, start: str, end: str, *, cost_mult: float = 1.0, rate: float | None = None) -> Result:
+def simulate(
+    data: LabData, spec: Spec, v: Variant, start: str, end: str, *, cost_mult: float = 1.0, rate: float | None = None, delist_haircut: float = DELIST_HAIRCUT
+) -> Result:
     kind = spec.universe.get("kind")
     last_day = data.end_for(kind)
     cal = [d for d in data.calendar_for(kind) if start <= d <= end]
@@ -195,7 +197,7 @@ def simulate(data: LabData, spec: Spec, v: Variant, start: str, end: str, *, cos
         for sym in list(shares):
             s = data.series[sym]
             if s.dates[-1] < day and s.dates[-1] < last_day:
-                px = s.adj[-1] * (1 - DELIST_HAIRCUT)
+                px = s.adj[-1] * (1 - delist_haircut)
                 cash += _sell(lots, sym, shares.pop(sym), px, day, realized)
                 out.delisted.append(sym)
         if pending is not None:

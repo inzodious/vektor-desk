@@ -477,6 +477,15 @@ Backtestable small-cap family: directors and officers buying their own stock on 
 
 A cluster rule is `{"metric_id": "insider.buyers", "window": "21d", "transform": "raw"}` with `{"min_signal": 1}` (two or more buyers). Names come from SEC filings, not today's listings, so companies that later vanished stay in; a delisted name sells at its last close less the lab's haircut. Before the first history load a `small_caps` spec is refused with "the engine's insider job builds it".
 
+**Survivorship.** Free bars can miss names that died. `lab-export` writes `insider.coverage(conn)` into the lab settings: cluster names that are priced, unpriced (history fetched but no bars within a week of the first cluster), still pending, and priced names that stopped trading within a year. Finalize on a `small_caps` spec adds two bars and a `survivorship` block with the counts:
+
+| Bar | Passes when |
+|---|---|
+| `price_coverage` | Nothing pending and at most 5% of cluster names unpriced; otherwise `null`, so the verdict is at best inconclusive |
+| `delist_total_loss` | The holdout, rerun with every delisting sold at zero instead of the usual 30% haircut, still beats the benchmark |
+
+The counts and the stressed excess also go into the verdict's caveats.
+
 ## Paper trading: lanes, sub-ledgers, leaderboard
 
 Every strategy on paper shares the one Alpaca **paper** account. The URL comes only from `desk.paper_check.paper_base()`; the account number must start with `PA` or nothing is sent.
