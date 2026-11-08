@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
 import { useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
-import { boardHead, boardRows, boardStatus, edgeText, edgeTone, statLine, trackText } from '../lib/leaderboard.js';
+import { accountText, boardHead, boardRows, boardStatus, edgeText, edgeTone, statLine, trackText } from '../lib/leaderboard.js';
 import { plural } from '../lib/format.js';
 
 function Rank({ r }) {
@@ -47,7 +47,14 @@ function Row({ r, bench }) {
         <small>vs {bench}</small>
         <span className={`chip ${st.tone}`}>{st.t}</span>
       </span>
-      <small className="lb-stats">{statLine(r, bench)}</small>
+      <small className="lb-stats">
+        {statLine(r, bench)}
+        {accountText(r) ? (
+          <span className="lb-acct" data-testid="lb-account">
+            {accountText(r)}
+          </span>
+        ) : null}
+      </small>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { dayLabel } from './charts.js';
+import { usd } from './format.js';
 import { signedPct, signedPts } from './strategy.js';
 
 const STATUS = {
@@ -54,4 +55,10 @@ export function boardHead(board) {
   const eligible = rows.filter((r) => r.status === 'eligible').length;
   const leader = racing.find((r) => r.excess_pts != null);
   return { racing: racing.length, eligible, leader };
+}
+
+export function accountText(r) {
+  const a = r?.account;
+  if (!a || a.value == null) return null;
+  return `Paper account ${usd(a.value)}${a.sleeve != null ? ` of ${usd(a.sleeve)}` : ''}${a.return_pct != null ? ` (${signedPct(a.return_pct)})` : ''}${a.cash ? ` · ${usd(a.cash)} cash` : ''}`;
 }
