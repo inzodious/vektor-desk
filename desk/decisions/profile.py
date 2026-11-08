@@ -11,7 +11,7 @@ import yaml
 from desk.config import Config
 from desk.decisions.store import dumps, now_iso, session
 
-DESKS = ("plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy")
+DESKS = ("plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings")
 LOT_METHODS = ("highest_cost", "lowest_cost", "fifo", "lifo", "tax_efficient")
 TILTS = ("growth", "balanced", "income")
 

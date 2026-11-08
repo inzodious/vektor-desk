@@ -1,5 +1,4 @@
 import calendar
-import json
 import re
 import secrets
 from datetime import UTC, date, datetime, timedelta
@@ -9,7 +8,8 @@ from desk.config import Config
 from desk.decisions.detect import schedule as detect_schedule
 from desk.decisions.profile import active_profile
 from desk.decisions.records import DecisionError, _account_ok
-from desk.decisions.store import has_mirror, loads, now_iso, session
+from desk.decisions.store import loads, now_iso, session
+from desk.engine.broker import decision_rows
 
 CADENCES = ("weekly", "biweekly", "semimonthly", "monthly")
 LAND_WINDOW_DAYS = 3
@@ -150,21 +150,11 @@ def cash_in(rows) -> list[dict]:
 
 
 def mirror_deposits(conn, since: str) -> list[dict]:
-    if not has_mirror(conn):
-        return []
     try:
-        rows = conn.execute("SELECT id, json FROM mirror.rows WHERE tbl='activity'").fetchall()
+        rows = decision_rows(conn, since)
     except Exception:  # noqa: BLE001
         return []
-    parsed = []
-    for r in rows:
-        try:
-            a = json.loads(r["json"])
-        except (TypeError, ValueError):
-            continue
-        if isinstance(a, dict) and str(a.get("date", "")) >= since:
-            parsed.append((r["id"], a))
-    return [{k: v for k, v in x.items() if k != "source"} for x in cash_in(parsed)]
+    return [{k: v for k, v in x.items() if k != "source"} for x in cash_in(rows)]
 
 
 def _today(cfg: Config, now: datetime | None) -> date:
