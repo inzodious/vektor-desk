@@ -168,7 +168,7 @@ Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the 
 | Filings desk: scores each filing (direction, confidence, event) | Agents | ✅ |
 | Filings strategy family, forward paper only, 182-day graduation | Statistics | ✅ |
 | Alpaca paper executor (paper URL only) and keys | Statistics + Infra | ✅ |
-| Filings lane card in the Lab, filing chip on the Symbol sheet | Design | ⏳ Lab row done, Symbol chip next |
+| Filings lane card in the Lab, filing chip on the Symbol sheet | Design | ✅ |
 | Insider-buying clusters and post-earnings drift families, backtested from 2016 with survivorship checks, then paper | Statistics | ✅ history loads over the first nights |
 | Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
 
@@ -178,14 +178,14 @@ There is no single target plan. Each strategy is measured against his risk profi
 
 | Item | Owner | Status |
 |---|---|---|
-| Risk profile: questionnaire plus capacity, giving bands 1–5 (replaces `risk_level`) | Concept + Design | ⏳ |
+| Risk profile: questionnaire plus capacity, giving bands 1–5 (replaces `risk_level`) | Concept + Design | ✅ |
 | Held-conviction positions with their own band (ASTS); never buy single stocks on margin | Concept | ⏳ |
 | One-off actions on the calendar: ASTS tax-loss sale Dec 7–15 with a rebuy after 31 days; margin repaid 11-18 | Concept | ⏳ |
-| Strategy catalog racing side by side: Safe mix, As held, Aggressive tech tilt, Dip-buy, plus the filings, insider and drift families | Statistics | ⏳ |
-| Probability bands: Monte Carlo p10–p90 at 1–40 years, chance of loss, drawdown, CVaR, chance of FI, fit to his risk band | Statistics + Design | ⏳ |
-| Reward-to-risk on the leaderboard (Sharpe, Sortino, max drawdown, Calmar) | Statistics + Design | ⏳ |
-| Discount-day scanner with a research case per hit | Statistics + Agents + Design | ⏳ |
-| Briefs measure against the risk band and the catalog, not one plan | Agents | ⏳ |
+| Strategy catalog racing side by side: Safe mix, As held, Aggressive tech tilt, Dip-buy, plus the filings, insider and drift families | Statistics | ✅ |
+| Probability bands: Monte Carlo p10–p90 at 1–40 years, chance of loss, drawdown, CVaR, chance of FI, fit to his risk band | Statistics + Design | ✅ |
+| Reward-to-risk on the leaderboard (Sharpe, Sortino, max drawdown, Calmar) | Statistics + Design | ✅ |
+| Discount-day scanner with a research case per hit | Statistics + Agents + Design | ✅ |
+| Briefs measure against the risk band and the catalog, not one plan | Agents | ✅ |
 
 ## Next: No more SSH
 
@@ -195,13 +195,13 @@ Every box chore becomes a button in the app. SSH stays only for true one-time in
 |---|---|---|---|
 | `engine daily`, `backfill` | Run now in Settings → Jobs | Infra + Design | ✅ (#102, #107) |
 | `sed` on desk.yaml for agents and desks | Settings → Desks toggles | Agents + Design | ✅ |
-| `profile init`, profile edits | Settings → Profile and Risk editor | Concept + Design | ⏳ |
-| `scp` into the inbox | Upload button for broker exports and lot CSVs | Infra + Design | ⏳ |
-| `deploy.sh redeploy / status / check / backup / restore-test / logs` | Settings → Box buttons with last result, through a host-side request queue | Infra + Design | ⏳ |
-| `setup-truenas.sh set KEY` | Masked, write-only Keys form, or stays one-time | Infra | ⏳ decide |
-| Re-pinning deploy.sh | deploy.sh pins itself | Infra | ⏳ |
-| Compose paste after compose changes | Applied by the host, or one banner with a copy button | Infra | ⏳ |
-| Command lists in docs | First-run checklist page | Design | ⏳ |
+| `profile init`, profile edits | Settings → Profile and Risk editor | Concept + Design | ⏳ risk check done (#137), profile editor next |
+| `scp` into the inbox | Upload button for broker exports and lot CSVs | Infra + Design | ✅ |
+| `deploy.sh redeploy / status / check / backup / restore-test / logs` | Settings → Box buttons with last result, through a host-side request queue | Infra + Design | ✅ |
+| `setup-truenas.sh set KEY` | Masked, write-only Keys form, or stays one-time | Infra | ✅ Keys form |
+| Re-pinning deploy.sh | Update box script button | Infra | ✅ |
+| Compose paste after compose changes | Applied by the host, or one banner with a copy button | Infra | ✅ |
+| Command lists in docs | First-run checklist page | Design | ✅ |
 
 ## Key dates
 
