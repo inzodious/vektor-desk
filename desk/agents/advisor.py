@@ -52,7 +52,9 @@ def items(view: dict) -> list[dict]:
 def summary(view: dict) -> dict:
     risk = view.get("risk_profile")
     return {
-        "risk_band": {k: risk.get(k) for k in ("band", "label", "limited_by", "version", "taken_at") if k in risk} if risk else None,
+        "risk_band": {k: risk.get(k) for k in ("band", "label", "limited_by", "tolerance_band", "capacity_band", "version", "answered_at") if k in risk}
+        if risk
+        else None,
         "catalog": [{k: r.get(k) for k in CATALOG_LABELS if k in r} for r in view.get("catalog") or ()],
         "convictions": view.get("convictions") or [],
         "planned_actions": view.get("planned_actions") or [],
