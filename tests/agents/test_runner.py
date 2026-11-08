@@ -29,9 +29,9 @@ OK_JSON = {
 
 
 def test_registry_is_all_opus_and_jobs_only_for_live_desks():
-    assert set(DESKS) == {"plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings"}
+    assert set(DESKS) == {"plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts"}
     assert {d.model for d in DESKS.values()} == {"opus"}
-    assert {d.name for d in DESKS.values() if d.tools} == {"research", "scout", "strategy"}
+    assert {d.name for d in DESKS.values() if d.tools} == {"research", "scout", "strategy", "discounts"}
     assert all(line.endswith(f"run {d.name}") for d in DESKS.values() if d.live for line in JOBS if d.name in line)
     with pytest.raises(KeyError):
         get("nope")
