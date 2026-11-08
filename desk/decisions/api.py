@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from desk.config import Config
-from desk.decisions import plan, records, starter, tickets
+from desk.decisions import plan, records, starter, targets, tickets
 from desk.decisions import profile as profiles
 from desk.decisions import rules as ruleset
 from desk.decisions.store import session
@@ -33,6 +33,33 @@ def get_profile(cfg: Cfg) -> JSONResponse:
     mode, series = plan.deposit_series(cfg)
     body["profile"] = {**body["profile"], "deposits": series}
     return fresh(body | {"deposits_mode": mode})
+
+
+class PlanPreset(BaseModel):
+    preset: str
+
+
+@router.get("/plan")
+def get_plan(cfg: Cfg) -> JSONResponse:
+    mine = targets.profile_plan(profiles.active_profile(cfg))
+    return fresh({"plan": mine, "source": "profile" if mine else None, "presets": sorted(targets.PRESETS), "actions": targets.planned_actions(cfg)})
+
+
+@router.get("/actions")
+def get_actions(cfg: Cfg) -> JSONResponse:
+    items = targets.planned_actions(cfg)
+    return fresh({"actions": items, "lines": targets.describe(items)})
+
+
+@router.put("/profile/plan")
+def put_profile_plan(body: PlanPreset, cfg: Cfg) -> JSONResponse:
+    try:
+        changed, message = targets.set_plan(profiles.profile_path(cfg), body.preset)
+    except targets.TargetsError as e:
+        raise HTTPException(422, str(e)) from e
+    except profiles.ProfileError as e:
+        raise HTTPException(409, f"desk.yaml doesn't validate right now ({e}); fix it first.") from e
+    return fresh({"changed": changed, "message": message, "profile": profiles.active_profile(cfg).as_dict()})
 
 
 @router.get("/profile/status")

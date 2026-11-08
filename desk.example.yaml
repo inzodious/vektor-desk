@@ -82,3 +82,15 @@ rules:
   - id: cash-floor
     kind: cash_floor_pct
     params: {pct: 2}
+
+# targets: set with `python -m desk.decisions.profile set-plan --preset v3`, or by hand:
+# targets:
+#   funds:
+#     - {ticker: AAAA, weight_pct: 60, sleeve: Core}
+#     - {ticker: BBBB, weight_pct: 40, sleeve: Bonds}
+#   hold: [CCCC]
+#   steer_drift_pts: 5
+
+# actions: one-off trades with a window, added with `profile add-action`:
+# actions:
+#   - {id: trim, side: sell, symbol: DDDD, shares: 10, from: "2026-12-07", to: "2026-12-15", lots: highest_cost, no_buy_days: 31}

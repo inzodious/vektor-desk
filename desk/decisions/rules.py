@@ -12,6 +12,10 @@ KINDS: dict[str, dict[str, tuple[float, float]]] = {
     "cash_floor_pct": {"pct": (0, 100)},
 }
 
+OPTIONAL: dict[str, dict[str, tuple[float, float]]] = {
+    "single_stock_band": {"trim_to_pct": (0, 100)},
+}
+
 LABELS = {
     "no_margin_buys": "No buying on margin",
     "no_new_single_stocks": "No new single stocks",
@@ -52,8 +56,14 @@ def validate_rules(rules) -> tuple[list[str], list[str]]:
                 errors.append(f"{where}.params.{name} is required for {kind}")
             elif isinstance(value, bool) or not isinstance(value, int | float) or not low <= value <= high:
                 errors.append(f"{where}.params.{name} must be a number from {low} to {high}")
+        for name, (low, high) in OPTIONAL.get(kind, {}).items():
+            value = params.get(name)
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int | float) or not low <= value <= high):
+                errors.append(f"{where}.params.{name} must be a number from {low} to {high}")
         if kind == "single_stock_band" and not errors and params["min_pct"] > params["max_pct"]:
             errors.append(f"{where}: min_pct is above max_pct")
+        if kind == "single_stock_band" and not errors and params.get("trim_to_pct") is not None and params["trim_to_pct"] > params["max_pct"]:
+            errors.append(f"{where}: trim_to_pct is above max_pct")
         if "enabled" in rule and not isinstance(rule["enabled"], bool):
             errors.append(f"{where}.enabled must be true or false")
         if "symbols" in rule and (not isinstance(rule["symbols"], list) or not all(isinstance(s, str) for s in rule["symbols"])):
@@ -77,7 +87,10 @@ def describe(rule: dict) -> str:
     p = rule.get("params", {})
     label = LABELS.get(rule["kind"], rule["kind"])
     if rule["kind"] == "single_stock_band":
-        return f"{label} {p['min_pct']:g} to {p['max_pct']:g}%"
+        trim = f", trim back to {p['trim_to_pct']:g}% when over" if p.get("trim_to_pct") is not None else ""
+        if not p.get("min_pct"):
+            return f"Single stocks up to {p['max_pct']:g}%{trim}"
+        return f"{label} {p['min_pct']:g} to {p['max_pct']:g}%{trim}"
     if rule["kind"] == "drift_max_pts":
         return f"{label} {p['pts']:g} points"
     if rule["kind"] == "cash_floor_pct":

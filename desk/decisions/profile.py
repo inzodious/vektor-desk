@@ -24,6 +24,8 @@ DEFAULTS: dict = {
     "usage": {"overnight_window": "01:00-05:00", "weekly_runs": {}},
     "agents": {"enabled": False, "desks": {d: False for d in DESKS}},
     "deposits": "auto",
+    "targets": {},
+    "actions": [],
     "alerts": {"min_priority": "default"},
     "rules": [
         {"id": "no-margin-buys", "kind": "no_margin_buys"},
@@ -181,6 +183,11 @@ def validate(data) -> list[str]:
         dep_errors, dep_warnings = validate_deposits(data["deposits"])
         errors += dep_errors
         warnings += dep_warnings
+    if "targets" in data or "actions" in data:
+        from desk.decisions.targets import validate_actions, validate_targets
+
+        errors += validate_targets(data.get("targets"))
+        errors += validate_actions(data.get("actions"))
     if "rules" in data:
         rule_errors, rule_warnings = validate_rules(data["rules"])
         errors += rule_errors
@@ -309,6 +316,22 @@ def main(argv: list[str] | None = None) -> int:
     init.add_argument("--print", dest="dry_run", action="store_true", help="print the draft instead of writing it")
     init.add_argument("--deposits", action="store_true", help="print only the detected deposits block, to paste into an existing desk.yaml")
     sub.add_parser("status", help="show the active version and which settings are still defaults")
+    plan = sub.add_parser("set-plan", help="write a preset target mix and its rules into desk.yaml (keeps a .bak); safe to run twice")
+    plan.add_argument("--preset", required=True, help="preset name, e.g. v3")
+    plan.add_argument("--path", type=Path, help="which file (default $DESK_PROFILE or /data/desk.yaml)")
+    act = sub.add_parser("add-action", help="plan a one-off trade with a date window (keeps a .bak); same id replaces it")
+    act.add_argument("--id", required=True)
+    act.add_argument("--side", choices=["sell", "buy"], required=True)
+    act.add_argument("--symbol", required=True, help="one ticker, or several joined by commas when selling all of each")
+    act.add_argument("--shares", default="all", help="a share count, or all (the default)")
+    act.add_argument("--account", help="which account, e.g. Individual")
+    act.add_argument("--from", dest="start", help="first day, e.g. 2026-12-07 (default today)")
+    act.add_argument("--to", dest="end", required=True, help="last day, e.g. 2026-12-15")
+    act.add_argument("--lots", choices=list(LOT_METHODS), help="which lots to pick")
+    act.add_argument("--no-buy-days", type=int, default=0, help="days after the trade with no buys of the symbol")
+    act.add_argument("--note", help="why, in a sentence")
+    act.add_argument("--path", type=Path, help="which file (default $DESK_PROFILE or /data/desk.yaml)")
+    sub.add_parser("actions", help="list planned one-off actions and where they stand")
     auto = sub.add_parser("deposits-auto", help="switch an existing desk.yaml to deposits: auto (keeps a .bak); safe to run twice")
     auto.add_argument("--path", type=Path, help="which file (default $DESK_PROFILE or /data/desk.yaml)")
     args = parser.parse_args(argv)
@@ -317,6 +340,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(starter.status(cfg), indent=2))
         return 0
     try:
+        if args.command in ("set-plan", "add-action", "actions"):
+            return _plan_command(cfg, args)
         if args.command == "deposits-auto":
             changed, message = starter.switch_to_auto(args.path or profile_path(cfg))
             print(message)
@@ -332,6 +357,46 @@ def main(argv: list[str] | None = None) -> int:
         print(text)
     else:
         print(f"Wrote {path}. Check it, then the next sync (or any page load) picks it up as a new profile version.")
+    return 0
+
+
+def _shares(raw: str):
+    if str(raw).lower() == "all":
+        return "all"
+    try:
+        n = float(raw)
+    except ValueError:
+        return raw
+    return int(n) if n.is_integer() else n
+
+
+def _plan_command(cfg: Config, args) -> int:
+    import sys
+
+    from desk.decisions import targets
+
+    try:
+        if args.command == "actions":
+            items = targets.planned_actions(cfg)
+            print("\n".join(targets.describe(items)) or "No planned actions.")
+            return 0
+        path = args.path or profile_path(cfg)
+        if args.command == "set-plan":
+            _, message = targets.set_plan(path, args.preset)
+        else:
+            from desk.decisions.plan import _today
+
+            symbols = [x.strip().upper() for x in args.symbol.split(",") if x.strip()]
+            action = {"id": args.id, "side": args.side, **({"symbol": symbols[0]} if len(symbols) == 1 else {"symbols": symbols})}
+            action["shares"] = _shares(args.shares)
+            action |= {"from": args.start or _today(cfg, None).isoformat(), "to": args.end}
+            extra = (("account", args.account), ("lots", args.lots), ("no_buy_days", args.no_buy_days), ("note", args.note))
+            action |= {k: v for k, v in extra if v}
+            _, message = targets.add_action(path, action)
+    except (targets.TargetsError, ProfileError) as e:
+        print(e, file=sys.stderr)
+        return 1
+    print(message)
     return 0
 
 
