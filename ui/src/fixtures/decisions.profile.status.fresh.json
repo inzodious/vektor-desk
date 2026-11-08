@@ -32,6 +32,7 @@
  "agents_enabled": false,
  "desks_on": [],
  "deposits": 0,
+ "deposits_mode": "auto",
  "rules": 3,
  "starter": "docker exec vektor-desk-cron python -m desk.decisions.profile init"
 }

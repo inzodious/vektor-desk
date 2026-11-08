@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { groupLive } from '../src/live/context.js';
 import { chunkIds } from '../src/lib/lab.js';
+import { moneyInFixtures } from './money-in.mjs';
 
 const API = process.env.DESK_API || 'http://127.0.0.1:8000';
 const OUT = fileURLToPath(new URL('../src/fixtures/', import.meta.url));
@@ -94,7 +95,8 @@ for (const [scope, id] of [
   save(`engine.series.${id}`, await get(`/api/engine/series?id=value&scope=${scope}&scope_id=${id}`));
 }
 
-for (const p of ['profile', 'rules', 'deposits']) save(`decisions.${p}`, await get(`/api/decisions/${p}`));
+save('decisions.rules', await get('/api/decisions/rules'));
+for (const [name, body] of Object.entries(moneyInFixtures(await get('/api/decisions/profile'), await get('/api/decisions/deposits')))) save(name, body);
 
 // ---------- decisions ----------
 const queue = await get('/api/decisions/queue');

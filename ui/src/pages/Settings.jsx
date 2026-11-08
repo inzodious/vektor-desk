@@ -292,7 +292,7 @@ function Profile({ api }) {
         <div>
           <small>Rules</small>
           <b>{p.rules}</b>
-          <span>{p.deposits ? plural(p.deposits, 'deposit') + ' scheduled' : 'No deposit schedule'}</span>
+          <span>{p.deposits_mode === 'auto' ? (p.deposits ? `${plural(p.deposits, 'deposit')} read from activity` : 'Read from your activity') : p.deposits ? `${plural(p.deposits, 'deposit')} scheduled` : 'No deposit schedule'}</span>
         </div>
         <div>
           <small>Loaded</small>

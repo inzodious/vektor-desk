@@ -1,0 +1,90 @@
+{
+ "deposits": [
+  {
+   "id": "individual",
+   "date": "2026-10-20",
+   "account": "individual-0001",
+   "amount_usd": 500,
+   "status": "late",
+   "landed": null,
+   "scheduled": true,
+   "mode": "listed"
+  },
+  {
+   "id": "hsa",
+   "date": "2026-11-02",
+   "account": "hsa-0002",
+   "amount_usd": 100,
+   "status": "landed",
+   "landed": {
+    "activity_id": "%222026-11-02-deposit-hsa-0002-cash-1%22",
+    "date": "2026-11-02",
+    "accountKey": "hsa-0002",
+    "amount": 100,
+    "activity_ids": [
+     "%222026-11-02-deposit-hsa-0002-cash-1%22"
+    ]
+   },
+   "scheduled": true,
+   "mode": "listed"
+  },
+  {
+   "id": "individual",
+   "date": "2026-11-02",
+   "account": "individual-0001",
+   "amount_usd": 500,
+   "status": "landed",
+   "landed": {
+    "activity_id": "%222026-11-02-deposit-individual-0001-cash-1%22",
+    "date": "2026-11-02",
+    "accountKey": "individual-0001",
+    "amount": 500,
+    "activity_ids": [
+     "%222026-11-02-deposit-individual-0001-cash-1%22"
+    ]
+   },
+   "scheduled": true,
+   "mode": "listed"
+  },
+  {
+   "id": "hsa",
+   "date": "2026-12-01",
+   "account": "hsa-0002",
+   "amount_usd": 100,
+   "status": "expected",
+   "landed": null,
+   "scheduled": true,
+   "mode": "listed"
+  },
+  {
+   "id": "individual",
+   "date": "2026-12-01",
+   "account": "individual-0001",
+   "amount_usd": 500,
+   "status": "expected",
+   "landed": null,
+   "scheduled": true,
+   "mode": "listed"
+  },
+  {
+   "id": "hsa",
+   "date": "2027-01-01",
+   "account": "hsa-0002",
+   "amount_usd": 100,
+   "status": "expected",
+   "landed": null,
+   "scheduled": true,
+   "mode": "listed"
+  },
+  {
+   "id": "individual",
+   "date": "2027-01-01",
+   "account": "individual-0001",
+   "amount_usd": 500,
+   "status": "expected",
+   "landed": null,
+   "scheduled": true,
+   "mode": "listed"
+  }
+ ]
+}
