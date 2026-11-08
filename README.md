@@ -34,7 +34,7 @@ Docs land through their own pull requests; a link above may 404 until its PR mer
 
 ## Ground rules
 
-- Advisory only. Nothing in this repo or on the box holds broker credentials or can place a trade.
+- Advisory for real money. Fidelity is never traded. The Strategy lab may trade an Alpaca **paper** account; live trading needs a strategy that graduated paper and a new decision.
 - One-way data. The desk reads Escape Vektor's Firestore with a read-only account and never writes back.
 - No personal figures, account numbers or statements in the repo. Real data lives on the TrueNAS box only.
 - Free services only beyond what is already paid for.

@@ -1,4 +1,5 @@
 import argparse
+import os
 import re
 import shlex
 import signal
@@ -10,8 +11,10 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from desk import jobrun
 from desk.config import Config
 from desk.packages import seams
+from desk.runlock import BUSY
 
 RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
 
@@ -42,7 +45,13 @@ class Job:
     spec: tuple[frozenset[int], ...]
     command: list[str]
     any_day: tuple[bool, bool]
+    name: str = ""
+    title: str = ""
+    package: str = ""
+    timing: str = ""
+    lock: str = ""
     proc: subprocess.Popen | None = field(default=None, repr=False)
+    run: dict | None = field(default=None, repr=False)
 
     def due(self, t: datetime) -> bool:
         minute, hour, dom, month, dow = self.spec
@@ -56,14 +65,25 @@ class Job:
         return day_ok or dow_ok
 
 
-def make_job(label: str, timing: str, command: list[str]) -> Job:
+def make_job(label: str, timing: str, command: list[str], *, name: str = "", package: str = "", lock: str = "") -> Job:
     parts = timing.split()
     if len(parts) != 5:
         raise ValueError(f"{label}: need five time fields, got {timing!r}")
     spec = tuple(_field(p, lo, hi) for p, (lo, hi) in zip(parts, RANGES, strict=True))
     if not command:
         raise ValueError(f"{label}: no command")
-    return Job(line=label, spec=spec, command=command, any_day=(parts[2] == "*", parts[4] == "*"))
+    name = name or re.sub(r"[^a-z0-9_-]+", "-", label.lower()).strip("-")
+    return Job(
+        line=label,
+        spec=spec,
+        command=command,
+        any_day=(parts[2] == "*", parts[4] == "*"),
+        name=name,
+        title=jobrun.job_title(name),
+        package=package,
+        timing=" ".join(parts),
+        lock=lock,
+    )
 
 
 def parse(text: str) -> list[Job]:
@@ -75,7 +95,7 @@ def parse(text: str) -> list[Job]:
         parts = line.split(None, 5)
         if len(parts) < 6:
             raise ValueError(f"line {n}: need five time fields and a command")
-        jobs.append(make_job(f"line {n}", " ".join(parts[:5]), shlex.split(parts[5])))
+        jobs.append(make_job(f"line {n}", " ".join(parts[:5]), shlex.split(parts[5]), name=f"crontab-{n}", package="crontab"))
     return jobs
 
 
@@ -96,27 +116,87 @@ def package_jobs(only: list[str] | None = None) -> list[Job]:
             cmd = shlex.split(command) if isinstance(command, str) else list(command)
             lock = re.sub(r"[^A-Za-z0-9_-]+", "-", f"{pkg}-{name}")[:60] if name else lock_name(pkg, cmd)
             held = ["python", "-m", "desk.runlock", "--hold", lock, "--", *cmd]
-            jobs.append(make_job(f"{pkg}.jobs[{i}]", timing, held))
+            jobs.append(make_job(f"{pkg}.jobs[{i}]", timing, held, name=jobrun.job_name(pkg, cmd, name), package=pkg, lock=lock))
     return jobs
+
+
+def all_jobs(only: list[str] | None = None, crontab: str | None = None) -> list[Job]:
+    path = Path(crontab or os.environ.get("DESK_CRONTAB", "/app/deploy/crontab"))
+    extra = parse(path.read_text()) if path.exists() else []
+    return extra + package_jobs(only)
 
 
 def log(msg: str) -> None:
     print(f"{datetime.now().astimezone().isoformat(timespec='seconds')} scheduler {msg}", flush=True)
 
 
-def tick(jobs: list[Job], t: datetime) -> list[Job]:
+def _record(cfg: Config | None, job: Job) -> None:
+    if cfg is not None and job.run is not None:
+        jobrun.record(cfg, job.name, job.run)
+
+
+def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = None) -> None:
+    log(f"{job.line} start ({trigger}): {shlex.join(job.command)}")
+    job.proc = subprocess.Popen(job.command)  # noqa: S603
+    job.run = {
+        "trigger": trigger,
+        "request_id": request_id,
+        "started": jobrun.stamp(jobrun.now_utc()),
+        "finished": None,
+        "result": None,
+        "exit_code": None,
+        "detail": None,
+    }
+    _record(cfg, job)
+
+
+def reap(jobs: list[Job], cfg: Config | None = None) -> None:
+    for job in jobs:
+        if job.proc is None or job.proc.poll() is None:
+            continue
+        rc = job.proc.returncode
+        log(f"{job.line} exited {rc}")
+        if job.run is not None:
+            result = "ok" if rc == 0 else "skipped" if rc == BUSY else "failed"
+            detail = None if rc == 0 else "another run held the lock" if rc == BUSY else f"exit {rc}; see docker logs vektor-desk-cron"
+            job.run.update(finished=jobrun.stamp(jobrun.now_utc()), result=result, exit_code=rc, detail=detail)
+            _record(cfg, job)
+        job.proc = None
+        job.run = None
+
+
+def _busy(jobs: list[Job], name: str) -> bool:
+    return any(j.name == name and j.proc is not None for j in jobs)
+
+
+def tick(jobs: list[Job], t: datetime, cfg: Config | None = None) -> list[Job]:
+    reap(jobs, cfg)
     started = []
     for job in jobs:
-        if job.proc is not None and job.proc.poll() is not None:
-            log(f"{job.line} exited {job.proc.returncode}")
-            job.proc = None
         if not job.due(t):
             continue
-        if job.proc is not None:
+        if _busy(jobs, job.name):
             log(f"{job.line} skipped: still running from last time")
             continue
-        log(f"{job.line} start: {shlex.join(job.command)}")
-        job.proc = subprocess.Popen(job.command)  # noqa: S603
+        start(job, cfg, "schedule")
+        started.append(job)
+    return started
+
+
+def serve_requests(jobs: list[Job], cfg: Config) -> list[Job]:
+    started = []
+    by_name: dict[str, Job] = {}
+    for job in jobs:
+        by_name.setdefault(job.name, job)
+    for name, req in jobrun.take_requests(cfg):
+        job = by_name.get(name)
+        if job is None:
+            log(f"run request for unknown job {name!r} dropped")
+            continue
+        if _busy(jobs, name):
+            log(f"run request for {name} dropped: it's running")
+            continue
+        start(job, cfg, "request", str(req.get("id") or "")[:32] or None)
         started.append(job)
     return started
 
@@ -129,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
     jobs = parse(Path(args.crontab).read_text()) + package_jobs()
     if args.check:
         for job in jobs:
-            print(f"{job.line}: {shlex.join(job.command)}")
+            print(f"{job.line} [{job.name}]: {shlex.join(job.command)}")
         print(f"{len(jobs)} jobs ok")
         return 0
     from desk.db import apply_schemas
@@ -146,12 +226,16 @@ def main(argv: list[str] | None = None) -> int:
     signal.signal(signal.SIGINT, stop)
     log(f"{len(jobs)} jobs, time zone {zone.key}")
     t = datetime.now(zone).replace(second=0, microsecond=0) + timedelta(minutes=1)
+    cfg = Config.from_env()
     while not stopping:
+        jobrun.heartbeat(cfg)
+        reap(jobs, cfg)
+        serve_requests(jobs, cfg)
         wait = (t - datetime.now(zone)).total_seconds()
         if wait > 0:
-            time.sleep(min(wait, 5))
+            time.sleep(min(wait, jobrun.PICKUP_SECONDS))
             continue
-        tick(jobs, t)
+        tick(jobs, t, cfg)
         t += timedelta(minutes=1)
     for job in jobs:
         if job.proc is not None and job.proc.poll() is None:

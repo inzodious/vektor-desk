@@ -12,6 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from desk import __version__
 from desk.config import Config
 from desk.db import apply_schemas, connect
+from desk.jobrun import router as jobs_router
 from desk.packages import seams
 from desk.status import status
 
@@ -98,6 +99,8 @@ def create_app(cfg: Config | None = None, *, packages: list[str] | None = None, 
     def get_positions() -> JSONResponse:
         return JSONResponse(latest_positions(cfg), headers={"Cache-Control": "no-store"})
 
+    app.state.packages = packages
+    app.include_router(jobs_router)
     app.state.routers = []
     for pkg, mod in seams("api", packages).items():
         router = getattr(mod, "router", None)

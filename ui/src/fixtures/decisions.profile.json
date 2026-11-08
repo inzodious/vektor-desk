@@ -1,8 +1,8 @@
 {
- "version": 1,
+ "version": 2,
  "rules_version": 1,
  "source": "defaults",
- "loaded_at": "2026-11-07T13:07:24+00:00",
+ "loaded_at": "2026-11-08T00:52:19+00:00",
  "warnings": [],
  "error": null,
  "profile": {
@@ -21,7 +21,32 @@
   "alerts": {
    "min_priority": "default"
   },
-  "deposits": [],
+  "deposits": [
+   {
+    "id": "hsa",
+    "account": "hsa-0002",
+    "cadence": "monthly",
+    "days": [
+     1
+    ],
+    "weekend": "after",
+    "amount_usd": 100,
+    "observed": 6,
+    "last": "2026-11-02"
+   },
+   {
+    "id": "individual",
+    "account": "individual-0001",
+    "cadence": "monthly",
+    "days": [
+     1
+    ],
+    "weekend": "after",
+    "amount_usd": 500,
+    "observed": 6,
+    "last": "2026-11-02"
+   }
+  ],
   "growth": {
    "fi_target_from_plan": true,
    "horizon_years": 10,
@@ -64,5 +89,6 @@
    "overnight_window": "01:00-05:00",
    "weekly_runs": {}
   }
- }
+ },
+ "deposits_mode": "auto"
 }

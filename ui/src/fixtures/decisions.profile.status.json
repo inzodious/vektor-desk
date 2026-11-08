@@ -38,6 +38,7 @@
   "tax"
  ],
  "deposits": 2,
+ "deposits_mode": "auto",
  "rules": 4,
  "starter": null
 }
