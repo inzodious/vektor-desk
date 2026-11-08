@@ -13,7 +13,7 @@ import requests
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, core, french, schema, triggers
+from desk.engine import ENGINE_VERSION, broker, core, french, schema, triggers
 from desk.engine.backfill import run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.lab import data as lab_data
@@ -27,7 +27,7 @@ from desk.notify import publish
 from desk.runlock import BUSY, Busy, job_lock
 
 DRY_RUN = "DESK_ENGINE_DRY_RUN"
-DRY_JOBS = ("holdings", "core", "daily")
+DRY_JOBS = ("holdings", "core", "daily", "history")
 
 
 def now_iso() -> str:
@@ -72,10 +72,20 @@ def _core(cfg: Config, mirror, desk) -> dict:
 
 
 def run_daily(cfg: Config) -> dict:
+    history = run_history(cfg)
     held = run_holdings(cfg)
     if not held.get("ok"):
         return held
-    return {"ok": True, "holdings": held, "core": run_core(cfg)}
+    return {"ok": True, "history": history, "holdings": held, "core": run_core(cfg)}
+
+
+def run_history(cfg: Config) -> dict:
+    mirror = open_mirror(cfg)
+    try:
+        return _with_desk(cfg, "history", lambda desk: broker.import_inbox(cfg, desk, mirror))
+    finally:
+        if mirror is not None:
+            mirror.close()
 
 
 def run_lots(cfg: Config) -> dict:
@@ -84,6 +94,13 @@ def run_lots(cfg: Config) -> dict:
 
 def _lots(cfg: Config, desk) -> dict:
     result = import_inbox(cfg, desk)
+    mirror = open_mirror(cfg)
+    try:
+        result["history"] = broker.import_inbox(cfg, desk, mirror)
+    finally:
+        if mirror is not None:
+            mirror.close()
+    result["ok"] = result["ok"] and result["history"]["ok"]
     if result["imported"]:
         triggers.record(cfg, desk, triggers.lot_export(cfg, desk, result["imported"]))
     return result
@@ -180,6 +197,7 @@ JOBS = {
     "core": run_core,
     "daily": run_daily,
     "lots": run_lots,
+    "history": run_history,
     "quotes": run_quotes,
     "backfill": run_market_backfill,
     "lookthrough": run_lookthrough,

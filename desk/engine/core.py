@@ -9,12 +9,12 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION, SET_KEY, fi, lookthrough, patterns, risk, scoring
+from desk.engine import ENGINE_VERSION, SET_KEY, broker, fi, lookthrough, patterns, risk, scoring
 from desk.engine.backfill import NO_PRICES
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
-from desk.engine.holdings import matching_close, price_series
-from desk.engine.lots import current_lots
+from desk.engine.holdings import Prices, matching_close, price_series
+from desk.engine.lots import current_lots, realized_rows
 from desk.engine.market import BENCHMARKS, last_trading_day
 from desk.engine.research import macro, research_symbols, signals
 from desk.engine.returns import WINDOWS, annualize, base_index, daily_returns, drawdowns, period_mwr, twr_index, volatility, window_start
@@ -55,6 +55,8 @@ class Out:
     signals: list[tuple] | None = None
     views: dict[str, dict] = field(default_factory=dict)
     implied: dict[tuple[str, str], float] = field(default_factory=dict)
+    book: broker.Book | None = None
+    history: broker.History | None = None
 
     def m(
         self,
@@ -216,7 +218,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     holdings = load_holdings(desk)
     days = sorted(holdings)
     out = Out(as_of=days[-1] if days else now.date().isoformat())
-    activity = list(current_rows(mirror, "activity"))
+    activity, out.history = broker.history(mirror, desk)
     flows = classify(activity)
     with desk:
         store_flows(desk, flows)
@@ -263,7 +265,10 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
             out.s("twr_index", "account", acct, d, ix, quality_by_day[d])
         accounts.append((acct, days[first:], a_values[first:], a_index))
 
-    tr = TotalReturn(price_series(mirror, desk))
+    series = price_series(mirror, desk)
+    tr = TotalReturn(series)
+    if out.history.rows:
+        out.book = broker.build_book(activity, out.history, Prices(series).close)
     _shadow_metrics(out, days, values, flows_on, targets, tr)
     facts = profile_facts(mirror)
 
@@ -272,6 +277,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     amount, when = next_deposit(cfg, plan, as_of, now)
     _plan_metrics(out, cfg, plan, targets, kinds, now_rows, total, holdings, days, activity, q_now, amount)
     _margin_metrics(out, now_rows, total)
+    _margin_paid(out, activity, as_of)
     _risk_metrics(out, now_rows, total, index, days, values, flows_on, q_now)
     risk.metrics(out, desk, tr, days=days, values=values, flows_on=flows_on, rows=now_rows, total=total, kinds=kinds, targets=targets, q=q_now)
     lookthrough.metrics(out, desk, kinds, {s: f["sector"] for s, f in facts.items()})
@@ -502,6 +508,16 @@ def _margin_metrics(out: Out, rows, total):
         out.m("margin.cost_month", 0.0, "usd")
 
 
+def _margin_paid(out: Out, activity, as_of):
+    paid = [(str(r.get("date") or "")[:10], -float(r.get("amount") or 0)) for r in activity if r.get("kind") == "margin_interest"]
+    if not paid:
+        return
+    end = date.fromisoformat(as_of)
+    for w, lo in (("YTD", f"{as_of[:4]}-01-01"), ("1Y", (end - timedelta(days=365)).isoformat())):
+        picked = [usd for d, usd in paid if lo <= d <= as_of]
+        out.m("margin.interest_paid", round(sum(picked), 2), "usd", window=w, n_obs=len(picked))
+
+
 def _risk_metrics(out: Out, rows, total, index, days, values, flows_on, q):
     w = sorted(symbol_weights(rows, total).values(), reverse=True)
     invested = sum(w)
@@ -563,7 +579,7 @@ def _after_tax(out: Out, cfg, mirror, desk, accounts, income_rows):
     federal, state, _ = marginal_rate(cfg, mirror)
     rate = None if federal is None else (federal + state) / 100
     ltcg = (env_float("DESK_LTCG_RATE_PCT") or 15.0) / 100
-    sold = [dict(r) for r in desk.execute("SELECT account, sold, gain, term FROM realized_lots")]
+    sold = realized_rows(desk, out.book.realized if out.book else None)
     for acct, a_days, a_values, a_index in accounts:
         sheltered = account_sheltered(acct)
         end, first = date.fromisoformat(a_days[-1]), date.fromisoformat(a_days[0])
@@ -613,12 +629,14 @@ def marginal_rate(cfg: Config, mirror: sqlite3.Connection | None) -> tuple[float
 
 def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datetime):
     as_of = out.as_of
-    files = {r["kind"] for r in desk.execute("SELECT DISTINCT kind FROM lot_files")}
-    r = realized(desk, int(as_of[:4]))
-    rq = "ok" if "realized" in files else "insufficient_history"
+    sold = realized_rows(desk, out.book.realized if out.book else None)
+    r = realized(sold, int(as_of[:4]))
+    rq = "modelled" if r["modelled"] else "ok"
+    if not sold:
+        rq = "insufficient_history"
     for metric_id, key in (("tax.realized_st", "st"), ("tax.realized_lt", "lt"), ("tax.wash_disallowed", "wash_disallowed")):
-        out.m(metric_id, r[key] if "realized" in files else None, "usd", window="YTD", n_obs=r["rows"], quality=rq)
-    lots = current_lots(desk) if "lots" in files else []
+        out.m(metric_id, r[key] if sold else None, "usd", window="YTD", n_obs=r["rows"], quality=rq)
+    lots = current_lots(desk, out.book.lots if out.book else None)
     prices = {h["symbol"]: h["close"] for h in rows if not h["is_cash"] and h["close"]}
     st = lt = 0.0
     losses: dict[tuple[str, str], float] = defaultdict(float)
@@ -633,12 +651,11 @@ def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datet
             st += gain
         if gain < 0:
             losses[(lot["account"], lot["symbol"])] += gain
-    lq = "ok" if lots else "insufficient_history"
+    lq = ("modelled" if any(lot.get("quality") == "modelled" for lot in lots) else "ok") if lots else "insufficient_history"
     out.m("tax.unrealized_st", st if lots else None, "usd", quality=lq)
     out.m("tax.unrealized_lt", lt if lots else None, "usd", quality=lq)
-    realized_rows = [dict(x) for x in desk.execute("SELECT * FROM realized_lots")]
     today = max(as_of, now.date().isoformat())
-    windows = wash_windows(activity, realized_rows, lots, today)
+    windows = wash_windows(activity, sold, lots, today)
     out.wash = [(as_of, w["symbol"], w["kind"], w["date"], w["clears"], w["account"], w["amount"]) for w in windows]
     clears: dict[str, str] = {}
     for w in windows:
@@ -777,6 +794,53 @@ def _value_check(rows, day: str, series=None) -> tuple[str, str, str]:
     return "value", "warn", f"{'; '.join(bad)}.{why} Fix: the broker priced at a different time than the close; it clears with the next snapshot."
 
 
+LOT_METHOD = "FIFO for stocks and ETFs, average cost for mutual funds"
+
+
+def _history_check(h: broker.History | None) -> tuple[str, str, str]:
+    if h is None or not h.rows:
+        return "history", "ok", "No Fidelity history imported, so Escape Vektor's activity is used as is."
+    info = broker.summary(h)
+    span = f"{info['start']} to {info['end']}"
+    detail = f"Fidelity history {span}: {info['rows']} rows over {', '.join(info['accounts'])}; {info['matched']} Escape Vektor rows replaced."
+    problems = []
+    if h.kept:
+        shown = ", ".join(
+            f"{r.get('date')} {r.get('accountKey')} {r.get('kind')} {r.get('symbol') or 'cash'} {float(r.get('amount') or 0):+,.2f}" for r in h.kept[:3]
+        )
+        problems.append(f"{len(h.kept)} Escape Vektor rows inside those dates have no broker match and are kept ({shown})")
+    if h.unmapped:
+        problems.append(f"no Escape Vektor account ends with the same 4 digits as {', '.join(h.unmapped)}")
+    if not problems:
+        return "history", "ok", detail
+    return (
+        "history",
+        "warn",
+        f"{detail} But {'; '.join(problems)}. Fix: drop a fresh Fidelity history JSON in the inbox's fidelity folder and check the account names.",
+    )
+
+
+def _modelled_check(out: Out, lots: list[dict], rows: list[dict]) -> tuple[str, str, str]:
+    accounts = {lot["account"] for lot in lots}
+    held = defaultdict(float)
+    for h in rows:
+        if not h["is_cash"] and h["account"] in accounts:
+            held[(h["account"], h["symbol"])] += h["shares"]
+    lot_sh = defaultdict(float)
+    for lot in lots:
+        lot_sh[(lot["account"], lot["symbol"])] += lot["shares"]
+    keys = sorted(set(held) | set(lot_sh))
+    diffs = [
+        f"{a} {s}: lots {lot_sh.get((a, s), 0):g} vs held {held.get((a, s), 0):g}" for a, s in keys if abs(lot_sh.get((a, s), 0) - held.get((a, s), 0)) > 1e-3
+    ]
+    notes = [f"{a} {s} {text}" for (a, s), text in sorted((out.book.notes if out.book else {}).items())]
+    head = f"Lots rebuilt from the Fidelity history ({LOT_METHOD})"
+    if not diffs and not notes:
+        return "shares", "ok", f"{head} match holdings."
+    body = "; ".join(diffs[:8] + notes[:5])
+    return "shares", "warn", f"{head}: {body}. Fix: drop a lot export CSV in the inbox's fidelity folder; it wins over the rebuilt lots."
+
+
 def _flows_check(implied: dict[tuple[str, str], float], holdings) -> tuple[str, str, str]:
     snaps = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
     if not snaps:
@@ -826,10 +890,12 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
     if snap_days:
         out.h(*_value_check(holdings[max(snap_days)], max(snap_days), price_series(mirror, desk)))
     out.h(*_market_keys())
-    lots = []
-    if desk.execute("SELECT 1 FROM sqlite_master WHERE name='lots'").fetchone():
-        lots = current_lots(desk)
-    if lots:
+    out.h(*_history_check(out.history))
+    lots = current_lots(desk, out.book.lots if out.book else None)
+    modelled = any(lot.get("quality") == "modelled" for lot in lots)
+    if lots and modelled:
+        out.h(*_modelled_check(out, lots, rows))
+    elif lots:
         held = defaultdict(float)
         for h in rows:
             if not h["is_cash"]:
@@ -847,7 +913,11 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
             detail = "; ".join(diffs[:10]) + ". Fix: drop a fresh lot export in the inbox's fidelity folder."
         out.h("shares", status, detail)
     else:
-        out.h("shares", "warn", "No lot export yet, so tax lots and wash-sale checks are off. Fix: drop the export CSV in the inbox's fidelity folder.")
+        out.h(
+            "shares",
+            "warn",
+            "No lots yet, so tax lots and wash-sale checks are off. Fix: drop the Fidelity history JSON or a lot export CSV in the inbox's fidelity folder.",
+        )
 
 
 # ---- Store ----
@@ -871,6 +941,8 @@ def store(desk: sqlite3.Connection, out: Out) -> dict:
             desk.executemany("INSERT OR REPLACE INTO signals VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", out.signals)
         for name, body in out.views.items():
             desk.execute("INSERT OR REPLACE INTO engine_views VALUES (?, ?, ?)", (name, out.as_of, json.dumps(body)))
+        if out.book is not None:
+            broker.store(desk, out.book, out.as_of)
         if out.wash is not None:
             desk.execute("DELETE FROM wash_windows")
             desk.executemany("INSERT OR REPLACE INTO wash_windows VALUES (?, ?, ?, ?, ?, ?, ?)", out.wash)

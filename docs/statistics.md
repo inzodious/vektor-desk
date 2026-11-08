@@ -18,6 +18,7 @@ Siblings: [architecture.md](architecture.md) (mirror, compose app), [agents.md](
 |---|---|---|---|
 | **Escape Vektor mirror** (read-only service account, `/data/mirror.db`, see [architecture.md](architecture.md)) | Every collection under `lockIn/{uid}`; the engine uses `positions`, `snapshots`, `activity`, `plans`, `transactions`, `paystubs`, `prices/board`, `priceCloses/{SYM}_{YEAR}`, `priceProfiles/{SYM}` | One-way, never writes back | 8:00 and 17:00 ET |
 | **Fidelity lot export** (CSV dropped in `/data/inbox/fidelity/`) | Tax lots: acquired date, shares, cost per lot, term; realized gain/loss export for the year | Manual. SimpleFIN only gives average cost | Monthly, and before any sale |
+| **Fidelity history** (activity-and-orders JSON dropped in `/data/inbox/fidelity/`) | Every transaction with real quantities, prices, deposits, dividends, splits and margin rows (see [Fidelity history](#fidelity-history)) | Manual. Last 4 digits of each account only | Whenever you export it; the `lots` job (every 15 min) and `daily` import it |
 | **Tiingo** (existing key) | Daily OHLC, `adjClose`, `divCash`, `splitFactor` for benchmarks and comparison symbols not already in the mirror | Free tier is personal use; request and unique-symbol caps apply ([docs](https://api.tiingo.com/documentation)) | Nightly, incremental |
 | **Finnhub** (existing key) | Live quotes in market hours, earnings calendar, basic financials, insider transactions where the free tier allows | 60 calls a minute; some endpoints are premium, checked at build time | Every 5 min in market hours |
 | **SEC EDGAR** | Filings index, XBRL company facts (revenue, margins, share count), Form 4 insider trades, N-PORT fund holdings | Free; a `User-Agent` with contact details is required (`DESK_SEC_USER_AGENT`), at most 10 requests a second | Nightly for holdings and watchlist |
@@ -80,7 +81,8 @@ Before metrics are published for a day, the engine checks:
 | Check | Pass when |
 |---|---|
 | Value | Shares × close per account is within $1 or 0.05% of SimpleFIN's account value. A price-only gap is `warn` and names the biggest gaps; positions that don't add up are `fail` |
-| Shares | The lot export's shares per symbol equal the positions' shares exactly |
+| Shares | The lot export's shares per symbol equal the positions' shares exactly. Rebuilt lots name the method, and warn per symbol where they differ from holdings or the history misses opening shares |
+| History | Shows the Fidelity history's dates, rows and accounts, and how many Escape Vektor rows it replaced. Warns when Escape Vektor rows inside those dates have no broker match, or a broker account has no Escape Vektor account with the same last 4 digits |
 | Cash | Change in cash equals flows plus trades plus income, within $0.01 |
 | Freshness | Mirror pull under 14 hours old |
 | Closes | Every held symbol has a close for the last trading day, or is a code nothing prices |
@@ -98,9 +100,40 @@ Every non-ok detail ends with `Fix:` and the one step that clears it.
 
 **Holding moves.** The per-holding `daily_move` trigger uses market closes only (Tiingo bars or the mirror's), dated on the run day, against a close at most 5 days older. Symbols valued at the broker's snapshot price, such as plan codes, never fire it.
 
-**Dry run.** `python -m desk.engine daily --dry-run` (also `holdings`, `core`) runs on a throwaway copy of the data, sends no alerts, and prints the result plus `health_detail` for every check. Nothing in `/data` changes.
+**Dry run.** `python -m desk.engine daily --dry-run` (also `holdings`, `core`, `history`) runs on a throwaway copy of the data, sends no alerts, and prints the result plus `health_detail` for every check. Nothing in `/data` changes.
 
 A failed check marks the day `stale`, keeps the last good values on screen with their date, and writes the reason to `data_health`. Agents read `data_health` first and stop if it is not green. The Phase 1 exit test ("numbers match Fidelity to the cent on a test day") is this table passing.
+
+## Fidelity history
+
+`broker.import_inbox` reads `inbox/fidelity/*.json` into `broker_txns`. A file imports once (sha-256), a row once (last 4, `txnNum`, date, type, symbol, quantity, amount and text), and `isCancelled` rows are skipped. Only the last 4 digits of the account number are stored; the account id is the Escape Vektor account ending in those digits, else `individual-NNNN` (`hsa-NNNN` when HSA wording appears). Long digit runs in descriptions are masked.
+
+| Fidelity sub-category | Kind | Cash |
+|---|---|---|
+| Buy, Sell, Dividend reinvest | `buy`, `sell`, `reinvest` with quantity and price | `depositWithdrawalCode` D is money in, W money out; size is `net` |
+| Deposit, Withdrawal | `deposit`, `withdrawal` | External flows |
+| Other Cash | `margin_interest` (MARGIN INTEREST), `deposit` (HSA contributions), else a journal | Journals that pair with the same amount in another account within 3 days become a withdrawal and a deposit (internal to the portfolio); other journals (cash/margin sub-accounts) are dropped |
+| Dividend Paid, Other Interest | `dividend`, `interest`; IN LIEU rows are `in_lieu` | Income; a core fund's dividend credits cash |
+| Taxes | `tax` | A cost, not a flow |
+| Reverse Split | `split`, the old shares out and the new shares in, paired by account and date | None |
+| Distribution/Split spin-off | `distribution`, shares in | None |
+
+Symbols come from `securityDetail.symbol`, else another row with the same CUSIP, else the ticker in the description, else the other side of the split.
+
+**Broker rows win.** Inside a history's dates (from the fetch window start to its end, per account), an Escape Vektor activity row that matches a broker row (same account and symbol, within 3 days, amount within $0.02 or 0.5%, same sign) is dropped and the broker row used. Unmatched Escape Vektor rows are kept and listed in the History check. Outside those dates Escape Vektor's rows are used as before. Roll-forward, flows, income, the FI deposit average, adherence, wash windows and Preflight all read this merged stream.
+
+**Lots, rebuilt.** `quality` is `modelled`.
+
+| Item | Rule |
+|---|---|
+| Method | Fidelity's defaults: FIFO for stocks and ETFs, average cost for mutual funds (`sec_type` Mutual Fund, or a 5-letter symbol ending in X). Average cost re-averages the pool at each sale; the holding period is still first in, first out |
+| Reverse split | The old symbol's lots move to the new one, shares × new ÷ old, cost and dates unchanged. Cash in lieu is a sale of the fraction with $0 basis |
+| Distribution | Of a held symbol: a split (shares scale, cost unchanged). Otherwise new shares at $0 cost, noted in the Shares check |
+| Sold before the history | A sale with no lots left books shares with unknown basis; it counts as `unknown` and is left out of realized totals, and the Shares check names the symbol |
+| Wash sales | A loss sale with buys of the same symbol within 30 days either side (any account, not the sold lot itself): the loss is disallowed in proportion to the shares bought, and added to that buy's lot cost |
+| Precedence | A lot-export CSV wins for its accounts; a realized export wins for its account and year |
+
+Tables: `broker_files`, `broker_txns`, `broker_lots`, `broker_realized` (rewritten by each core run). `desk.decisions` reads the same merged stream with `desk.engine.broker.decision_rows(conn, since)` (`conn` is `desk.db` with the mirror attached), which returns `(id, row)` pairs in the activity shape with `source` set to `broker` on broker rows.
 
 ## Metrics catalog
 
@@ -177,6 +210,7 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 | `margin.call_drop` | Price drop to a maintenance call | `1 − debit / ((1 − m) × value)`, with `m` the maintenance requirement (per security where the export gives it, otherwise `DESK_MARGIN_MAINT_PCT`, default 30) |
 | `margin.call_price` | Call price for the largest single stock | The price at which that holding alone, with everything else flat, triggers a call |
 | `margin.breakeven` | Return a margin-funded position needs to beat its interest | Annual rate × days held / 360 |
+| `margin.interest_paid` | Margin interest charged | From the Fidelity history's MARGIN INTEREST rows; windows `YTD`, `1Y` |
 
 ### Plan and drift
 
@@ -190,14 +224,14 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 | `plan.adherence` | Plan adherence | Share of buy dollars (activity, core sweeps excluded) that went to plan funds; windows `MTD`, `QTD`, `YTD`, `1Y`, `ITD` |
 | `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points. Each a pass or fail with the evidence |
 
-### Tax (needs the lot export)
+### Tax (needs the lot export or the Fidelity history)
 
 | Id | Metric | Notes |
 |---|---|---|
 | `tax.lots` | Lots with unrealized gain or loss | Short or long term, days to long term. Totals ship as `tax.unrealized_st` and `tax.unrealized_lt` |
 | `tax.harvestable` | Harvestable loss | Total and per holding: losses at or over `tax.harvest_threshold_usd` (default $250) with no buy in the last 30 days |
 | `tax.wash_window` | Wash-sale calendar | Days until each symbol's window clears (scope `holding`). Windows open on every loss sale and every buy (activity, reinvests and lots acquired in the last 30 days), across all accounts unless `tax.wash_sale_accounts` narrows them. S&P 500 and total-market trackers that could be substantially identical are flagged for review rather than decided. Served by `GET /api/engine/wash` |
-| `tax.realized_st`, `tax.realized_lt`, `tax.wash_disallowed` | Realized short- and long-term gains this year, and disallowed wash losses | From the realized gain/loss export, window `YTD` |
+| `tax.realized_st`, `tax.realized_lt`, `tax.wash_disallowed` | Realized short- and long-term gains this year, and disallowed wash losses | From the realized gain/loss export, else the lots rebuilt from the Fidelity history (`modelled`), window `YTD` |
 | `tax.offset` | Ordinary-income offset used and carryforward | The $3,000 annual limit |
 | `tax.harvest_value` | Tax value of a harvest | Loss × `tax.marginal_rate` |
 | `tax.marginal_rate` | Marginal federal and state rate | Escape Vektor's PolicyEngine estimate (`prefs.taxEngine`, tax on $1,000 more pay), else `tax.marginal_rate_pct` in `desk.yaml`, else `DESK_MARGINAL_RATE_PCT`; scope `tax` splits `federal` and `state`; quality `modelled` |
@@ -659,7 +693,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | `GET /api/engine/holdings?date=` | Holdings for a day |
 | `GET /api/engine/value?start=&end=&account=&symbol=` | Value over time, optionally one account or one position |
 | `GET /api/engine/prices?symbol=&start=&end=` | Daily closes `[{date, close}]` |
-| `GET /api/engine/lots?symbol=&account=` | Current tax lots and recent lot files |
+| `GET /api/engine/lots?symbol=&account=` | Current tax lots (each with `method` and `quality`), recent lot files, and imported Fidelity history files (`history`) |
 | `GET /api/compare?ids=&window=` | Aligned, rebased series plus the comparison table; 400 on bad input |
 | `GET /api/engine/lookthrough?fund=&limit=` | Look-through exposure, sectors, funds covered, one fund's holdings |
 | `GET /api/live` | Latest quotes, live value, day change (market hours) |

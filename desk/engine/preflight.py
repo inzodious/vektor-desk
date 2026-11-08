@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from desk.config import Config
 from desk.db import connect
 from desk.decisions.profile import active_profile
-from desk.engine import ENGINE_VERSION, schema
+from desk.engine import ENGINE_VERSION, broker, schema
 from desk.engine.core import (
     PROFILE_ERRORS,
     deposit_split,
@@ -19,9 +19,9 @@ from desk.engine.core import (
     symbol_kinds,
     symbol_weights,
 )
-from desk.engine.lots import current_lots
+from desk.engine.lots import current_lots, realized_rows
 from desk.engine.market import latest_close
-from desk.engine.source import closes, current_rows, open_mirror
+from desk.engine.source import closes, open_mirror
 from desk.engine.tax import LOT_METHODS, pick_lots, shared, split_gain, wash_check, wash_windows
 
 LAMPS = (
@@ -394,13 +394,13 @@ def load_context(cfg: Config, mirror: sqlite3.Connection | None, desk: sqlite3.C
         cap = profile.get("opportunity", "satellite_cap_pct")
     except PROFILE_ERRORS:
         tax, cap = {}, None
-    has_lots = desk.execute("SELECT 1 FROM lot_files WHERE kind='lots' LIMIT 1").fetchone() is not None
-    lots = current_lots(desk) if has_lots else []
-    realized_rows = [dict(r) for r in desk.execute("SELECT * FROM realized_lots")]
-    activity = list(current_rows(mirror, "activity")) if mirror else []
+    lots = current_lots(desk)
+    has_lots = bool(lots)
+    sold = realized_rows(desk)
+    activity = broker.activity(mirror, desk)
     today = max(day, now.date().isoformat())
     ctx = Context(as_of=day, rows=rows, targets=targets, kinds=kinds, rules=rules, lots=lots, has_lots=has_lots)
-    ctx.windows = wash_windows(activity, realized_rows, lots, today)
+    ctx.windows = wash_windows(activity, sold, lots, today)
     ctx.wash_accounts = list(tax.get("wash_sale_accounts") or [])
     ctx.lot_method = tax.get("lot_method") or "highest_cost"
     ctx.margin_rate = env_float("DESK_MARGIN_RATE_PCT")

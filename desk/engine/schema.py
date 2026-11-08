@@ -88,6 +88,64 @@ CREATE TABLE IF NOT EXISTS realized_lots (
   wash_disallowed REAL NOT NULL DEFAULT 0,
   UNIQUE (account, symbol, acquired, sold, shares, proceeds)
 );
+CREATE TABLE IF NOT EXISTS broker_files (
+  id INTEGER PRIMARY KEY,
+  sha256 TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  imported_at TEXT NOT NULL,
+  window_start TEXT,
+  window_end TEXT,
+  rows INTEGER NOT NULL,
+  added INTEGER NOT NULL,
+  cancelled INTEGER NOT NULL,
+  accounts TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS broker_txns (
+  id TEXT PRIMARY KEY,
+  file_id INTEGER NOT NULL REFERENCES broker_files (id),
+  seq INTEGER NOT NULL,
+  last4 TEXT NOT NULL,
+  account TEXT NOT NULL,
+  date TEXT NOT NULL,
+  settle TEXT,
+  kind TEXT NOT NULL,
+  sub TEXT,
+  symbol TEXT,
+  cusip TEXT,
+  sec_type TEXT,
+  quantity REAL,
+  price REAL,
+  amount REAL NOT NULL,
+  fees REAL,
+  funding TEXT,
+  description TEXT
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS broker_txns_date ON broker_txns (date, account);
+CREATE TABLE IF NOT EXISTS broker_lots (
+  id INTEGER PRIMARY KEY,
+  as_of TEXT,
+  account TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  acquired TEXT,
+  shares REAL NOT NULL,
+  cost REAL,
+  cost_per_share REAL,
+  method TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS broker_realized (
+  id INTEGER PRIMARY KEY,
+  account TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  acquired TEXT,
+  sold TEXT NOT NULL,
+  shares REAL NOT NULL,
+  proceeds REAL,
+  cost REAL,
+  gain REAL,
+  term TEXT,
+  wash_disallowed REAL NOT NULL DEFAULT 0,
+  method TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS quotes_live (
   symbol TEXT NOT NULL,
   at TEXT NOT NULL,
