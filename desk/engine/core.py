@@ -202,6 +202,16 @@ def rules_in_force(cfg: Config, plan: dict) -> tuple[list[dict], str]:
         return rules, "plan"
 
 
+def convictions(rules: list[dict]) -> dict[str, tuple[float, float]]:
+    out = {}
+    for r in rules:
+        if r.get("kind") != "conviction_hold" or not r.get("enabled", True) or not r.get("symbols"):
+            continue
+        p = r.get("params") or {}
+        out[str(r["symbols"][0]).upper()] = (float(p.get("band_min_pct") or 0.0), float(p.get("band_max_pct") or 100.0))
+    return out
+
+
 def next_deposit(cfg: Config, plan: dict, as_of: str, now: datetime | None = None) -> tuple[float | None, str | None]:
     try:
         ahead = [d for d in upcoming_deposits(cfg, 45, now=now) if d["status"] == "expected" and d["date"] >= as_of and d.get("amount_usd")]
@@ -458,17 +468,24 @@ def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, da
             + ("the nightly research job loads SEC's ticker lists." if os.environ.get("DESK_SEC_USER_AGENT") else env_fix(["DESK_SEC_USER_AGENT"])),
         )
     rules, source = rules_in_force(cfg, plan)
+    conv = convictions(rules)
     debit = -sum(h["value"] for h in rows if h["is_cash"] and h["value"] < 0)
     for rule in rules:
-        ok = _rule_ok(rule, weights, singles, targets, debit, holdings, days, activity, kinds)
+        ok = _rule_ok(rule, weights, singles, targets, debit, holdings, days, activity, kinds, conv)
         if ok is not None:
             out.m("plan.rules", 1 if ok else 0, "count", scope="rule", scope_id=rule["id"], quality=q if source == "profile" else "modelled")
 
 
-def _rule_ok(rule, weights, singles, targets, debit, holdings, days, activity, kinds) -> bool | None:
+def _rule_ok(rule, weights, singles, targets, debit, holdings, days, activity, kinds, conv=None) -> bool | None:
     kind, p = rule.get("kind"), rule.get("params") or {}
+    conv = conv or {}
+    if kind == "conviction_hold":
+        sym = str((rule.get("symbols") or [""])[0]).upper()
+        if not sym or not rule.get("enabled", True):
+            return None
+        return p.get("band_min_pct", 0) <= weights.get(sym, 0.0) <= p.get("band_max_pct", 100)
     if kind == "single_stock_band":
-        names = rule.get("symbols") or list(singles)
+        names = [s for s in (rule.get("symbols") or list(singles)) if s not in conv]
         return all(p.get("min_pct", 0) <= singles.get(s, 0.0) <= p.get("max_pct", 100) for s in names) if names else True
     if kind == "drift_max_pts":
         return all(abs(weights.get(s, 0.0) - t * 100) <= p.get("pts", 5) for s, t in targets.items()) if targets else None
@@ -491,7 +508,7 @@ def _rule_ok(rule, weights, singles, targets, debit, holdings, days, activity, k
         if old is None:
             return None
         held_then = {h["symbol"] for h in holdings[old]}
-        return all(s in held_then for s in singles)
+        return all(s in held_then or s in conv for s in singles)
     return None
 
 

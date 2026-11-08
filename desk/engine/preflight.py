@@ -9,6 +9,7 @@ from desk.decisions.profile import active_profile
 from desk.engine import ENGINE_VERSION, broker, schema
 from desk.engine.core import (
     PROFILE_ERRORS,
+    convictions,
     deposit_split,
     env_float,
     latest_plan,
@@ -145,6 +146,14 @@ def apply_trade(rows: list[dict], t: dict) -> list[dict]:
 # ---- Lamps ----
 
 
+def _conv(ctx: Context) -> dict[str, tuple[float, float]]:
+    return convictions(ctx.rules)
+
+
+def _on_margin(t: dict, before: dict, after: dict) -> bool:
+    return t["side"] == "buy" and (t["funding"] == "margin" or after["debit"] > before["debit"] + 0.005)
+
+
 def _band(ctx: Context, symbol: str) -> float | None:
     caps = [r.get("params", {}).get("max_pct") for r in ctx.rules if r.get("kind") == "single_stock_band" and (not r.get("symbols") or symbol in r["symbols"])]
     caps = [c for c in caps if isinstance(c, int | float)]
@@ -159,10 +168,20 @@ def lamp_concentration(ctx, t, before, after):
     s, side = t["symbol"], t["side"]
     b, a = before["weights"].get(s, 0.0), after["weights"].get(s, 0.0)
     kind = ctx.kinds.get(s, "unknown")
+    conv = _conv(ctx)
+    if s in conv:
+        lo, hi = conv[s]
+        if _on_margin(t, before, after):
+            return "act", f"{s} is a conviction hold, and it is never bought on margin.", b, a
+        if side == "buy" and a > hi and a > b:
+            return "act", f"{s} would be {a:.1f}% of the portfolio, past its {hi:g}% conviction band.", b, a
+        where = "inside" if lo <= a <= hi else ("under" if a < lo else "over")
+        return "ok", f"{s} goes from {b:.1f}% to {a:.1f}%, {where} its {lo:g}–{hi:g}% conviction band.", b, a
     if kind == "stock" and s not in ctx.targets:
         if side == "buy" and b == 0 and _has_rule(ctx, "no_new_single_stocks"):
             return "act", f"{s} would be a new single stock, and the rules say no new ones.", b, a
-        total_b, total_a = before["single_stock"], after["single_stock"]
+        held = sum(before["singles"].get(c, 0.0) for c in conv), sum(after["singles"].get(c, 0.0) for c in conv)
+        total_b, total_a = before["single_stock"] - held[0], after["single_stock"] - held[1]
         if side == "buy" and ctx.satellite_cap is not None and total_a > ctx.satellite_cap and total_a > total_b:
             return "act", f"Single stocks would be {total_a:.1f}% of the portfolio, past the {ctx.satellite_cap:g}% satellite cap.", b, a
         cap = _band(ctx, s)
@@ -230,8 +249,17 @@ def _usd(v: float) -> str:
 
 def rule_state(rule: dict, pic: dict, t: dict | None, ctx: Context, before: dict) -> tuple[bool | None, float | None]:
     kind, p = rule.get("kind"), rule.get("params") or {}
+    conv = _conv(ctx)
+    if kind == "conviction_hold":
+        sym = str((rule.get("symbols") or [""])[0]).upper()
+        if not sym or not rule.get("enabled", True):
+            return None, None
+        w = pic["weights"].get(sym, 0.0)
+        if t is not None and t["symbol"] == sym and t["side"] == "buy" and (t["funding"] == "margin" or pic["debit"] > before["debit"] + 0.005):
+            return False, w
+        return p.get("band_min_pct", 0) <= w <= p.get("band_max_pct", 100), w
     if kind == "single_stock_band":
-        names = rule.get("symbols") or list(pic["singles"])
+        names = [s for s in (rule.get("symbols") or list(pic["singles"])) if s not in conv]
         worst = max((pic["singles"].get(s, 0.0) for s in names), default=0.0)
         return all(p.get("min_pct", 0) <= pic["singles"].get(s, 0.0) <= p.get("max_pct", 100) for s in names), worst
     if kind == "drift_max_pts":
@@ -246,7 +274,7 @@ def rule_state(rule: dict, pic: dict, t: dict | None, ctx: Context, before: dict
         if t is None or t["side"] != "buy":
             return True, None
         s = t["symbol"]
-        return not (ctx.kinds.get(s) == "stock" and s not in ctx.targets and before["weights"].get(s, 0.0) == 0), None
+        return not (ctx.kinds.get(s) == "stock" and s not in ctx.targets and s not in conv and before["weights"].get(s, 0.0) == 0), None
     return None, None
 
 
@@ -261,6 +289,8 @@ def lamp_rules(ctx, t, before, after):
         if a_ok:
             continue
         worse = b_ok or (a_m is not None and b_m is not None and a_m > b_m + 1e-6) or rule.get("kind") in ("no_margin_buys", "no_new_single_stocks")
+        if rule.get("kind") == "conviction_hold" and t["side"] == "buy" and t["symbol"] in [str(x).upper() for x in rule.get("symbols") or []]:
+            worse = True
         (broke if worse else stale).append(rule["id"])
     if broke:
         return ("act" if t["side"] == "buy" else "watch"), f"Breaks {', '.join(broke)}.", checked - len(broke) - len(stale), checked - len(broke) - len(stale)
