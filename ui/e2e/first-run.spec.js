@@ -11,11 +11,12 @@ test('the first-run checklist ticks off what is done and points at the next step
   await page.getByTestId('first-run-link').click();
   await expect(page).toHaveURL(/\/settings\/first-run$/);
   const fr = page.getByTestId('first-run');
-  await expect(fr).toHaveAttribute('data-done', '7');
+  await expect(fr).toHaveAttribute('data-done', '8');
   await expect(page.getByText('T-minus 2 steps')).toBeVisible();
   await expect(page.getByText('Next: Bring in your tax lots')).toBeVisible();
   await expect(fr.locator('[data-step="lots"]')).toHaveAttribute('data-state', 'todo');
-  await expect(fr.locator('[data-step="risk"]')).toContainText('Coming soon');
+  await expect(fr.locator('[data-step="risk"]')).toHaveAttribute('data-state', 'done');
+  await expect(fr.locator('[data-step="risk"]').getByRole('link', { name: /Band 4/ })).toHaveAttribute('href', '/settings/risk');
   await expect(fr.locator('[data-step="crew"]').getByRole('link', { name: /Open Desks/ })).toHaveAttribute('href', '/settings');
   await expect(fr.locator('code')).toHaveCount(0);
   const o = await overflow(page);

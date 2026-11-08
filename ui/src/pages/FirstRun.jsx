@@ -64,6 +64,7 @@ export default function FirstRun() {
   const profile = useApi('/api/decisions/profile/status');
   const agents = useApi('/api/agents/status');
   const board = useApi('/api/engine/lab/leaderboard');
+  const risk = useApi('/api/decisions/risk');
   const [run, setRun] = useState({});
   const ctl = useRef(null);
   useEffect(() => {
@@ -71,7 +72,7 @@ export default function FirstRun() {
     return () => ctl.current.abort();
   }, []);
 
-  const steps = firstRunSteps({ status, jobs, health, profile, agents, board });
+  const steps = firstRunSteps({ status, jobs, health, profile, agents, board, risk });
   const score = firstRunScore(steps);
   const alive = !!jobs.data?.scheduler_alive;
 

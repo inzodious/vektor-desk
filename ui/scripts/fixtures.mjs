@@ -6,6 +6,7 @@ import { moneyInFixtures } from './money-in.mjs';
 import { jobsFixtures } from './jobs.mjs';
 import { boxFixtures } from './box.mjs';
 import { inboxFixtures } from './inbox.mjs';
+import { riskFixtures } from './risk.mjs';
 import { desksFixtures } from './desks.mjs';
 import { leaderboardFixtures } from './leaderboard.mjs';
 import { withFilingSignals } from './filing-signals.mjs';
@@ -211,6 +212,9 @@ for (const [name, body] of Object.entries(boxFixtures(await get('/api/box')))) s
 
 // ---------- inbox ----------
 for (const [name, body] of Object.entries(inboxFixtures())) save(name, body);
+
+// ---------- risk check ----------
+for (const [name, body] of Object.entries(riskFixtures(await get('/api/decisions/risk'), await get('/api/decisions/risk/versions')))) save(name, body);
 
 // ---------- desk profile status ----------
 const profileStatus = await get('/api/decisions/profile/status');

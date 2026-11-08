@@ -1,0 +1,96 @@
+{
+ "versions": [
+  {
+   "version": 2,
+   "created_at": "2026-11-08T03:02:18+00:00",
+   "answers": {
+    "max_drawdown": 50,
+    "drop_reaction": "buy_lots",
+    "one_year_range": "r5",
+    "goal": "max_growth",
+    "experience": "active",
+    "horizon": "12to20",
+    "income_stability": "steady",
+    "emergency_months": "3to5"
+   },
+   "band": 4,
+   "label": "Moderately aggressive",
+   "equity_min_pct": 75,
+   "equity_max_pct": 90,
+   "speculative_max_pct": 10,
+   "worst_year_loss_pct": 33,
+   "single_stock_max_pct": 10,
+   "tolerance": {
+    "score": 4.8,
+    "band": 5,
+    "parts": {
+     "max_drawdown": 5,
+     "drop_reaction": 5,
+     "one_year_range": 5,
+     "goal": 5,
+     "experience": 4
+    }
+   },
+   "capacity": {
+    "score": 4,
+    "band": 4,
+    "parts": {
+     "horizon": 4,
+     "income_stability": 4,
+     "emergency_months": 3,
+     "savings_rate": 5
+    },
+    "horizon_years": 15,
+    "horizon_source": "answer",
+    "savings_rate_pct": 55.8
+   },
+   "limited_by": "capacity"
+  },
+  {
+   "version": 1,
+   "created_at": "2026-11-08T03:01:54+00:00",
+   "answers": {
+    "max_drawdown": 40,
+    "drop_reaction": "buy_some",
+    "one_year_range": "r4",
+    "goal": "growth",
+    "experience": "active",
+    "horizon": "12to20",
+    "income_stability": "steady",
+    "emergency_months": "3to5"
+   },
+   "band": 4,
+   "label": "Moderately aggressive",
+   "equity_min_pct": 75,
+   "equity_max_pct": 90,
+   "speculative_max_pct": 10,
+   "worst_year_loss_pct": 33,
+   "single_stock_max_pct": 10,
+   "tolerance": {
+    "score": 4,
+    "band": 4,
+    "parts": {
+     "max_drawdown": 4,
+     "drop_reaction": 4,
+     "one_year_range": 4,
+     "goal": 4,
+     "experience": 4
+    }
+   },
+   "capacity": {
+    "score": 4,
+    "band": 4,
+    "parts": {
+     "horizon": 4,
+     "income_stability": 4,
+     "emergency_months": 3,
+     "savings_rate": 5
+    },
+    "horizon_years": 15,
+    "horizon_source": "answer",
+    "savings_rate_pct": 55.8
+   },
+   "limited_by": "both"
+  }
+ ]
+}
