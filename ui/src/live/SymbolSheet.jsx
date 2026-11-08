@@ -8,7 +8,7 @@ import { useApi } from '../lib/api.js';
 import { count, etStamp, pct, px, usd } from '../lib/format.js';
 import { dayLabel, periodStart } from '../lib/charts.js';
 import { useConsole } from '../research/consoleContext.js';
-import { freshness, verdictOf } from '../lib/research.js';
+import { filingChip, freshness, verdictOf } from '../lib/research.js';
 
 function PriceHistory({ symbol, row, lots }) {
   const last = new Date().toISOString().slice(0, 10);
@@ -44,6 +44,42 @@ function PriceHistory({ symbol, row, lots }) {
 }
 
 // ---------- dossier ----------
+function FilingBit({ symbol }) {
+  const api = useApi(`/api/engine/research?symbol=${encodeURIComponent(symbol)}`);
+  const f = filingChip(api.data);
+  if (!f) return null;
+  return (
+    <div data-testid="sheet-filing" data-direction={f.direction} data-lane={f.lane_open ? 'open' : 'none'}>
+      <div className="card-head" style={{ marginBottom: 4 }}>
+        <span className="kicker">Latest filing read</span>
+        <span className="acts">
+          <span className={`chip ${f.dir.tone}`} data-testid="filing-chip">
+            {f.dir.t}
+            {f.sure ? ` · ${f.sure}` : ''}
+          </span>
+          {f.lane_open ? (
+            <span className="chip lilac" data-testid="filing-lane">
+              On the filings lane’s paper book
+            </span>
+          ) : null}
+        </span>
+      </div>
+      <div className="sheet-filing">
+        <b>
+          {f.form}
+          {f.event ? ` · ${f.event}` : ''}
+        </b>
+        {f.rationale ? <span>{f.rationale}</span> : null}
+        <small className="muted">
+          Filed {f.filed_at ? dayLabel(f.filed_at.slice(0, 10), true) : '—'}
+          {f.horizon_days ? ` · read over ${f.horizon_days} days` : ''}
+          {f.more > 0 ? ` · ${f.more} earlier ${f.more === 1 ? 'read' : 'reads'} in Research` : ''}
+        </small>
+      </div>
+    </div>
+  );
+}
+
 function DossierBit({ symbol, onClose }) {
   const api = useApi(`/api/agents/dossiers/${encodeURIComponent(symbol)}`);
   const { openConsole } = useConsole();
@@ -119,6 +155,7 @@ function SheetBody({ symbol, onClose }) {
           <span className="kicker">Price, 1 year</span>
           <PriceHistory symbol={symbol} row={null} lots={[]} />
         </div>
+        <FilingBit symbol={symbol} />
         <DossierBit symbol={symbol} onClose={onClose} />
       </>
     );
@@ -240,6 +277,7 @@ function SheetBody({ symbol, onClose }) {
           <p className="empty-hint">No lot export yet. Drop one in the desk inbox and lots show here.</p>
         )}
       </div>
+      <FilingBit symbol={symbol} />
       <DossierBit symbol={symbol} onClose={onClose} />
       {ctx.live?.as_of ? <p className="muted" style={{ fontSize: 11.5 }}>Quotes as of {etStamp(ctx.live.as_of)}</p> : null}
     </>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Hero } from '../components/Hero.jsx';
 import { Jobs } from '../settings/Jobs.jsx';
 import { Icon } from '../components/Icon.jsx';
@@ -362,6 +363,9 @@ export default function Settings() {
           <>
             <span className={`chip ${mt.tone}`}>Mirror · {mt.chip}</span>
             <span className={`chip ${tt.tone}`}>Token · {tt.chip}</span>
+            <Link className="chip info" to="/settings/first-run" data-testid="first-run-link">
+              First-run checklist
+            </Link>
             {s.demo ? <span className="sample">Demo data</span> : null}
             {status.error ? <span className="chip watch">Last check failed · showing {etTime(checkedAt)}</span> : null}
           </>

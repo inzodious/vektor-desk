@@ -23,6 +23,16 @@ const SHOTS = [
   { name: 'console', path: '/research', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('console-open').click() },
   { name: 'console-refresh', path: '/research', fixtures: true, clock: MONDAY, act: async (p) => p.getByRole('button', { name: 'Refresh now' }).click() },
   { name: 'search', path: '/', fixtures: true, clock: MONDAY, act: async (p) => { await p.getByTestId('search-open').click(); await p.waitForTimeout(100); await p.keyboard.type('n'); } },
+  {
+    name: 'sheet-acme',
+    path: '/',
+    fixtures: true,
+    clock: MONDAY,
+    act: async (p) => {
+      await p.locator('.board-row[data-sym="ACME"]').click();
+      await p.getByTestId('sheet-filing').scrollIntoViewIfNeeded();
+    },
+  },
   { name: 'sheet-nova', path: '/research/watchlist', fixtures: true, clock: MONDAY, act: async (p) => p.locator('tr[data-watch="NOVA"] [data-sym]').click() },
   { name: 'decisions', path: '/decisions', fixtures: true, clock: MONDAY },
   { name: 'decisions-blocked', path: '/decisions', fixtures: true, clock: MONDAY, full: true, act: async (p) => p.locator('.prop', { hasText: 'ACME' }).first().click() },
@@ -105,6 +115,9 @@ const SHOTS = [
   { name: 'settings-desks', path: '/settings', fixtures: true, clock: MONDAY, el: 'crew' },
   { name: 'settings-desks-ask', path: '/settings', fixtures: true, clock: MONDAY, el: 'crew', act: async (p) => p.getByTestId('guard').getByRole('button', { name: 'Lift the guard' }).click() },
   { name: 'settings-desks-lifted', path: '/settings?scenario=lifted', fixtures: true, clock: MONDAY, el: 'crew' },
+  { name: 'first-run', path: '/settings/first-run', fixtures: true, clock: MONDAY, full: true },
+  { name: 'first-run-fresh', path: '/settings/first-run?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
+  { name: 'first-run-demo', path: '/settings/first-run', full: true },
 ];
 
 // ---------- contrast ----------
