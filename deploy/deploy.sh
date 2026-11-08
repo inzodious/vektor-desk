@@ -14,6 +14,8 @@
 #                      (docs/eval-access.md); auto does this every 5 minutes
 #   deploy.sh redeploy recreate the containers on the images already live, so an edited *.env file takes effect (a
 #                      docker restart doesn't re-read env files); refuses while a desk job is running
+#   deploy.sh box      run the box actions the app asked for (Settings → Box): redeploy, status, check, backup,
+#                      restore-test, logs; auto does this every 5 minutes
 #   deploy.sh card     the app's icon and Web UI button in TrueNAS Apps; TrueNAS drops them when the YAML is edited, so
 #                      now and auto put them back
 # Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
@@ -38,6 +40,9 @@ HEALTH_WAIT=${DESK_HEALTH_WAIT:-120}
 LOG=$ROOT/deploy.log
 BUILD_LOG=$ROOT/deploy-build.log
 DEBUG_MAX=${DESK_DEBUG_MAX:-104857600}
+SELF=${DESK_SELF:-$(readlink -f "${BASH_SOURCE[0]}")}
+BOX_ACTIONS="redeploy status check backup restore-test logs"
+BOX_TIMEOUT=${DESK_BOX_TIMEOUT:-1800}
 LOCK=/run/vektor-desk-deploy.lock
 AUTO_FAILED=$ROOT/deploy-auto.failed
 AUTO_NOTE=$ROOT/deploy-auto.note
@@ -345,6 +350,72 @@ check() {
   docker logs vektor-desk-caddy 2>&1 | grep -E 'certificate obtained|could not get certificate|obtain' | tail -n 2 | sed 's/^/  /' || true
 }
 
+# ---- Box actions from the app ----
+
+box_dir() {
+  local base want
+  base="$(realpath -m "$ROOT")/data/run"
+  [ -d "$base" ] && [ ! -L "$base" ] && [ "$(realpath "$base")" = "$base" ] || return 1
+  want=$base/box
+  if [ -L "$want" ] || [ -L "$want/requests" ]; then return 1; fi
+  [ -d "$want" ] || mkdir "$want"
+  [ -d "$want/requests" ] || mkdir "$want/requests"
+  [ "$(realpath "$want")" = "$want" ] && [ "$(realpath "$want/requests")" = "$want/requests" ] || return 1
+  chown 568:568 "$want" "$want/requests" 2>/dev/null || true
+  printf '%s\n' "$want"
+}
+
+box_put() {
+  local dir=$1 name=$2 tmp
+  tmp=$(mktemp "$dir/.$name.XXXXXX")
+  cat >"$tmp"
+  chown 568:568 "$tmp" 2>/dev/null || true
+  chmod 644 "$tmp"
+  mv -f "$tmp" "$dir/$name"
+}
+
+box_run() {
+  local dir=$1 action=$2 id=$3 started out rc=0 result list
+  started=$(date -u +%FT%TZ)
+  jq -n --arg a "$action" --arg id "$id" --arg s "$started" \
+    '{action: $a, request_id: ($id | select(. != "")), started: $s, finished: null, result: null, exit_code: null, output: null}' | box_put "$dir" "$action.json"
+  log "Box action from the app: $action${id:+ ($id)}"
+  out=$(timeout "$BOX_TIMEOUT" bash "$SELF" "$action" 2>&1 </dev/null) || rc=$?
+  case $rc in
+    0) result=ok ;;
+    "$BUSY") result=skipped ;;
+    *) result=failed ;;
+  esac
+  list=$(mktemp)
+  chmod 600 "$list"
+  secret_values >"$list"
+  out=$(printf '%s\n' "$out" | tail -n 300 | redact "$list")
+  rm -f "$list"
+  jq -n --arg a "$action" --arg id "$id" --arg s "$started" --arg f "$(date -u +%FT%TZ)" --arg r "$result" --argjson rc "$rc" --arg o "$out" \
+    '{action: $a, request_id: ($id | select(. != "")), started: $s, finished: $f, result: $r, exit_code: $rc, output: $o}' | box_put "$dir" "$action.json"
+}
+
+box_requests() {
+  local dir action file id
+  dir=$(box_dir) || {
+    log "Box actions: $ROOT/data/run/box isn't a plain folder; skipped"
+    return 0
+  }
+  date -u +%FT%TZ | box_put "$dir" host.alive
+  for action in $BOX_ACTIONS; do
+    file=$dir/requests/$action.json
+    if [ -L "$file" ]; then
+      rm -f "$file"
+      continue
+    fi
+    [ -f "$file" ] || continue
+    id=$(head -c 512 "$file" | jq -r '.id // empty' 2>/dev/null | tr -cd 'a-f0-9' | head -c 32 || true)
+    rm -f "$file"
+    box_run "$dir" "$action" "$id"
+  done
+  find "$dir/requests" -maxdepth 1 \( -type f -o -type l \) -name '*.json' -delete 2>/dev/null || true
+}
+
 # ---- Compose on the box vs the checkout ----
 
 compose_drift() {
@@ -534,9 +605,12 @@ main() {
       ;;
     auto)
       auto
+      exec 9>&-
       app_card >/dev/null 2>&1 || true
       logs_export || true
+      box_requests || true
       ;;
+    box) box_requests ;;
     redeploy)
       exec 9>"$LOCK"
       flock -n 9 || die "a deploy is already running: tail -f $LOG"
@@ -548,7 +622,7 @@ main() {
     restore-test) restore_test ;;
     check) check ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box]" >&2
       exit 2
       ;;
   esac

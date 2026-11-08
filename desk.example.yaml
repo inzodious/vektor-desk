@@ -39,6 +39,7 @@ usage:
     scout: 1
     strategy: 12
   filings_per_night: 40
+  discount_cases_per_day: 3
 
 agents:
   enabled: false
@@ -51,6 +52,7 @@ agents:
     scout: false
     strategy: false
     filings: false
+    discounts: false
 
 alerts:
   min_priority: default

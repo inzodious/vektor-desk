@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from desk.config import Config
-from desk.decisions import plan, records, starter, tickets
+from desk.decisions import plan, records, risk, starter, tickets
 from desk.decisions import profile as profiles
 from desk.decisions import rules as ruleset
 from desk.decisions.store import session
@@ -33,6 +33,39 @@ def get_profile(cfg: Cfg) -> JSONResponse:
     mode, series = plan.deposit_series(cfg)
     body["profile"] = {**body["profile"], "deposits": series}
     return fresh(body | {"deposits_mode": mode})
+
+
+class Answers(BaseModel):
+    answers: dict
+
+
+@router.get("/risk")
+def get_risk(cfg: Cfg) -> JSONResponse:
+    return fresh({"questions": risk.questions(cfg), "current": risk.current(cfg), "bands": risk.BANDS, "inputs": risk.inputs(cfg)})
+
+
+@router.put("/risk")
+def put_risk(body: Answers, cfg: Cfg) -> JSONResponse:
+    try:
+        saved, changed = risk.save(cfg, body.answers)
+    except risk.RiskError as e:
+        raise HTTPException(422, str(e)) from e
+    return fresh({"changed": changed, "result": saved, "current": risk.current(cfg)})
+
+
+@router.get("/risk/versions")
+def get_risk_versions(cfg: Cfg) -> JSONResponse:
+    return fresh({"versions": risk.history(cfg)})
+
+
+@router.post("/profile/init")
+def post_profile_init(cfg: Cfg) -> JSONResponse:
+    try:
+        path, _ = starter.init(cfg)
+    except starter.StarterError as e:
+        raise HTTPException(409 if "already exists" in str(e) else 422, str(e)) from e
+    message = f"Wrote {path}. The next page load picks it up as a new profile version."
+    return fresh({"changed": True, "path": str(path), "message": message, "status": starter.status(cfg)})
 
 
 @router.get("/profile/status")

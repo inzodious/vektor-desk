@@ -3,7 +3,7 @@ import hashlib
 import json
 import os
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import yaml
@@ -11,7 +11,7 @@ import yaml
 from desk.config import Config
 from desk.decisions.store import dumps, now_iso, session
 
-DESKS = ("plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings")
+DESKS = ("plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts")
 LOT_METHODS = ("highest_cost", "lowest_cost", "fifo", "lifo", "tax_efficient")
 TILTS = ("growth", "balanced", "income")
 
@@ -280,7 +280,11 @@ def sync(conn: sqlite3.Connection, path: Path) -> Profile:
 def active_profile(cfg: Config | None = None) -> Profile:
     cfg = cfg or Config.from_env()
     with session(cfg) as conn:
-        return sync(conn, profile_path(cfg))
+        profile = sync(conn, profile_path(cfg))
+        from desk.decisions.risk import overlay
+
+        data = overlay(conn, profile.data)
+    return profile if data is profile.data else replace(profile, data=data)
 
 
 def versions(conn: sqlite3.Connection, limit: int = 50) -> list[dict]:

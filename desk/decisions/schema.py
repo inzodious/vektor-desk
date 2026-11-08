@@ -1,4 +1,11 @@
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS risk_profiles (
+  version INTEGER PRIMARY KEY,
+  hash TEXT NOT NULL,
+  answers TEXT NOT NULL,
+  result TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS profile_versions (
   version INTEGER PRIMARY KEY,
   hash TEXT NOT NULL,
