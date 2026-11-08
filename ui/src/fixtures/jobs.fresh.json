@@ -1,0 +1,343 @@
+{
+ "now": "2026-11-09T16:42:00Z",
+ "scheduler_alive": true,
+ "cooldown_seconds": 300,
+ "pickup_seconds": 5,
+ "jobs": [
+  {
+   "name": "agents-run-plan_keeper",
+   "title": "Agents run plan keeper",
+   "package": "agents",
+   "schedules": [
+    "30 17 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-run-tax",
+   "title": "Agents run tax",
+   "package": "agents",
+   "schedules": [
+    "0 2 * 1-11 0",
+    "0 2 * 12 *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-run-risk",
+   "title": "Agents run risk",
+   "package": "agents",
+   "schedules": [
+    "0 2 * * 6"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-run-research",
+   "title": "Agents run research",
+   "package": "agents",
+   "schedules": [
+    "0 1 * * 3"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-run-scout",
+   "title": "Agents run scout",
+   "package": "agents",
+   "schedules": [
+    "0 3 * * 0"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-triggers",
+   "title": "Agents triggers",
+   "package": "agents",
+   "schedules": [
+    "45 17 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-queue-now-only",
+   "title": "Agents queue now only",
+   "package": "agents",
+   "schedules": [
+    "* * * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-queue",
+   "title": "Agents queue",
+   "package": "agents",
+   "schedules": [
+    "30 1-5 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-lab-reviews",
+   "title": "Agents lab reviews",
+   "package": "agents",
+   "schedules": [
+    "30 6 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "decisions-sync",
+   "title": "Decisions sync",
+   "package": "decisions",
+   "schedules": [
+    "10 8,17 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-daily",
+   "title": "Engine daily",
+   "package": "engine",
+   "schedules": [
+    "20 8,17 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [
+    "holdings",
+    "value",
+    "closes"
+   ]
+  },
+  {
+   "name": "engine-lots",
+   "title": "Engine lots",
+   "package": "engine",
+   "schedules": [
+    "*/15 * * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [
+    "shares"
+   ]
+  },
+  {
+   "name": "engine-quotes",
+   "title": "Engine quotes",
+   "package": "engine",
+   "schedules": [
+    "*/5 4-20 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-backfill",
+   "title": "Engine backfill",
+   "package": "engine",
+   "schedules": [
+    "10 1-6 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [
+    "closes"
+   ]
+  },
+  {
+   "name": "engine-research",
+   "title": "Engine research",
+   "package": "engine",
+   "schedules": [
+    "40 0 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [
+    "research"
+   ]
+  },
+  {
+   "name": "engine-lookthrough",
+   "title": "Engine lookthrough",
+   "package": "engine",
+   "schedules": [
+    "10 2 * * 0"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-lab-export",
+   "title": "Engine lab export",
+   "package": "engine",
+   "schedules": [
+    "55 0 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-french",
+   "title": "Engine french",
+   "package": "engine",
+   "schedules": [
+    "30 3 2 * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "mirror",
+   "title": "Mirror",
+   "package": "mirror",
+   "schedules": [
+    "0 8,17 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [
+    "freshness",
+    "holdings",
+    "value"
+   ]
+  },
+  {
+   "name": "notify-ops",
+   "title": "Notify ops",
+   "package": "notify",
+   "schedules": [
+    "20 9,18 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  }
+ ]
+}

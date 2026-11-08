@@ -93,6 +93,12 @@ const SHOTS = [
   { name: 'fresh-lab-strategies', path: '/lab/strategies?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
   { name: 'fresh-settings', path: '/settings?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
   { name: 'settings-profile-error', path: '/settings?scenario=failing', fixtures: true, clock: MONDAY, el: 'profile' },
+  { name: 'settings-jobs', path: '/settings', fixtures: true, clock: MONDAY, el: 'jobs' },
+  { name: 'settings-jobs-more', path: '/settings', fixtures: true, clock: MONDAY, el: 'jobs', act: async (p) => p.getByTestId('jobs').getByText(/Agents and housekeeping/).click() },
+  { name: 'settings-jobs-down', path: '/settings?scenario=down', fixtures: true, clock: MONDAY, el: 'jobs' },
+  { name: 'settings-jobs-demo', path: '/settings', el: 'jobs' },
+  { name: 'health-refresh', path: '/?scenario=fail', fixtures: true, clock: MONDAY, el: 'health-banner' },
+  { name: 'health-refresh-warn', path: '/plan?scenario=warn', fixtures: true, clock: MONDAY, el: 'health-banner' },
 ];
 
 // ---------- contrast ----------

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Hero } from '../components/Hero.jsx';
+import { Jobs } from '../settings/Jobs.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
 import { Panel } from '../components/Panel.jsx';
@@ -7,7 +8,7 @@ import { useApi } from '../lib/api.js';
 import { Crew, Usage } from '../agents/Crew.jsx';
 import { useTheme } from '../lib/theme.js';
 import { ago, count, etStamp, etTime, plural } from '../lib/format.js';
-import { JOBS, MIRROR, THEMES, TOKEN, daysLabel, mirrorLine, summary, tokenLine } from '../lib/status.js';
+import { MIRROR, THEMES, TOKEN, daysLabel, mirrorLine, summary, tokenLine } from '../lib/status.js';
 import { originName } from '../lib/decisions.js';
 import { defaultsText, keyWord, profileSource } from '../lib/profile.js';
 
@@ -98,38 +99,6 @@ function Token({ token }) {
           </span>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Running({ jobs }) {
-  return (
-    <div className="card c6" style={{ '--i': 3 }}>
-      <div className="card-head">
-        <span className="tag mint">Running now</span>
-        <span className="chip">{jobs.length ? plural(jobs.length, 'job') : 'Idle'}</span>
-      </div>
-      {jobs.length ? (
-        <div className="rows">
-          {jobs.map((j) => (
-            <div className="rule" key={`${j.job}-${j.pid}`}>
-              <span style={{ color: 'var(--teal-ink)' }}>
-                <Icon name="play" />
-              </span>
-              <span>
-                <b>{JOBS[j.job] || j.job}</b>
-                <small>{j.since ? `Since ${etStamp(j.since)}` : 'Started just now'}</small>
-              </span>
-              <span className="chip ok">
-                <i className="pulse" style={{ width: 6, height: 6 }} />
-                Running
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="empty-hint">Nothing running right now. Scheduled jobs show here while they work.</p>
-      )}
     </div>
   );
 }
@@ -401,8 +370,8 @@ export default function Settings() {
       <section className="grid">
         <Freshness mirror={s.mirror} onOpen={() => setDrawer(true)} />
         <Token token={s.claude_token} />
-        <Running jobs={s.running || []} />
         <About status={s} health={health.data} checkedAt={checkedAt} onRefresh={refresh} refreshing={status.loading} />
+        <Jobs />
         <Profile api={profile} />
         <Crew
           status={agents}
