@@ -1050,6 +1050,40 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .box-needs { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--ink); }
 .box-script > small { font-size: 12px; color: var(--ink-2); }
 
+/* ---------- mixes ---------- */
+.mix { display: grid; gap: 10px; align-content: start; }
+.mix.not-ready { opacity: 1; background: var(--card-2); }
+.mix-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0; }
+.mix-name b { font-size: 16px; color: var(--ink); }
+.mix-rank { display: inline-flex; align-items: center; gap: 3px; }
+.mix-rank i { width: 9px; height: 14px; border-radius: 3px; background: var(--track); }
+.mix-rank i.on { background: var(--teal); }
+.mix-rank i.on.r4 { background: var(--mustard); }
+.mix-rank i.on.r5 { background: var(--coral); }
+.mix-rank small { margin-left: 6px; font-size: 11.5px; font-weight: 700; color: var(--ink-2); }
+.mix-line { margin: 0; font-size: 12.5px; overflow-wrap: anywhere; }
+.mix-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.mix-kpis b { display: block; font-size: 16px; color: var(--ink); }
+.mix-sub { display: block; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.mix-foot { margin: 0; font-size: 11.5px; }
+.mix-race { display: inline-flex; align-items: center; gap: 6px; width: fit-content; font-size: 12px; font-weight: 600; color: var(--teal-ink); text-decoration: none; }
+.mix-race svg { width: 14px; height: 14px; }
+.mix-assume { margin: 0; font-size: 13px; color: var(--ink); }
+.mix-best { margin: 6px 0 0; font-size: 12.5px; }
+.mix-method summary { cursor: pointer; font-weight: 700; color: var(--ink); }
+.mix-method p, .mix-method ul { font-size: 12.5px; color: var(--ink-2); }
+.range-bars svg { width: 100%; height: auto; max-width: 100%; display: block; }
+.rb-tick { font-size: 11px; fill: var(--ink-3); font-family: var(--f-body); }
+.rb-key { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: 11px; color: var(--ink-3); }
+.rb-key i { display: inline-block; margin-left: 6px; }
+.rb-key i:first-child { margin-left: 0; }
+.rb-k-range { width: 8px; height: 14px; border-radius: 4px; background: var(--s1); opacity: .55; }
+.rb-k-mid { width: 9px; height: 9px; border-radius: 50%; background: var(--ink); }
+.rb-k-in { width: 14px; border-top: 2px dashed var(--mustard-ink); }
+.rb-k-fi { width: 14px; border-top: 2px dashed var(--coral); }
+@media (max-width: 1100px) { .mix.c6 { grid-column: span 12; } }
+@media (max-width: 640px) { .mix-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
 /* ---------- discount days ---------- */
 .disc-lede { margin: 0 0 6px; font-size: 13px; color: var(--ink); }
 .disc-rows { list-style: none; margin: 0; padding: 0; display: grid; }

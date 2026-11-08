@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
 import { useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
-import { accountText, boardHead, boardRows, boardStatus, edgeText, edgeTone, statLine, trackText } from '../lib/leaderboard.js';
+import { accountText, rewardLine, boardHead, boardRows, boardStatus, edgeText, edgeTone, statLine, trackText } from '../lib/leaderboard.js';
 import { plural } from '../lib/format.js';
 
 function Rank({ r }) {
@@ -31,14 +31,14 @@ function Row({ r, bench }) {
   const name = (
     <>
       <b>{r.name || r.id}</b>
-      {r.kind === 'lane' ? <span className="chip lilac">Lane</span> : null}
+      {r.kind === 'lane' ? <span className="chip lilac">Lane</span> : r.kind === 'mix' ? <span className="chip info">Mix</span> : null}
     </>
   );
   return (
     <div className={`lb-row ${r.status}`} data-row={r.id} data-status={r.status}>
       <Rank r={r} />
       <span className="lb-main">
-        <span className="lb-name">{r.kind === 'strategy' ? <Link to={`/lab/strategies/${encodeURIComponent(r.id)}`}>{name}</Link> : name}</span>
+        <span className="lb-name">{r.kind === 'strategy' ? <Link to={`/lab/strategies/${encodeURIComponent(r.id)}`}>{name}</Link> : r.kind === 'mix' ? <Link to="/lab/mixes">{name}</Link> : name}</span>
         <Track r={r} />
         <small>{trackText(r)}</small>
       </span>
@@ -49,6 +49,11 @@ function Row({ r, bench }) {
       </span>
       <small className="lb-stats">
         {statLine(r, bench)}
+        {rewardLine(r) ? (
+          <span className="lb-acct" data-testid="lb-reward">
+            {rewardLine(r)}
+          </span>
+        ) : null}
         {accountText(r) ? (
           <span className="lb-acct" data-testid="lb-account">
             {accountText(r)}

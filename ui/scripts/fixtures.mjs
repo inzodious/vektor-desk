@@ -10,6 +10,7 @@ import { inboxFixtures } from './inbox.mjs';
 import { riskFixtures } from './risk.mjs';
 import { desksFixtures } from './desks.mjs';
 import { leaderboardFixtures } from './leaderboard.mjs';
+import { bandsFixtures } from './bands.mjs';
 import { discountsFixtures } from './discounts.mjs';
 import { withFilingSignals } from './filing-signals.mjs';
 
@@ -205,6 +206,9 @@ save('engine.health.fail', {
 
 // ---------- leaderboard ----------
 for (const [name, body] of Object.entries(leaderboardFixtures())) save(name, body);
+
+// ---------- bands ----------
+for (const [name, body] of Object.entries(bandsFixtures(await get('/api/engine/bands')))) save(name, body);
 
 // ---------- discounts ----------
 for (const [name, body] of Object.entries(discountsFixtures(await get('/api/engine/discounts')))) save(name, body);

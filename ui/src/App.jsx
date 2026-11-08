@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { Shell } from './components/Shell.jsx';
 import Settings from './pages/Settings.jsx';
 import FirstRun from './pages/FirstRun.jsx';
+import Mixes from './pages/Mixes.jsx';
 import RiskCheck from './pages/RiskCheck.jsx';
 import Bridge from './pages/Bridge.jsx';
 import Plan from './pages/Plan.jsx';
@@ -45,6 +46,7 @@ export default function App() {
               <Route path="plan/*" element={<Plan />} />
               <Route path="lab" element={<Compare />} />
               <Route path="lab/risk" element={<Risk />} />
+              <Route path="lab/mixes" element={<Mixes />} />
               <Route path="lab/strategies" element={<Strategies />} />
               <Route path="lab/strategies/:id" element={<Strategy />} />
               <Route path="lab/patterns" element={<Patterns />} />
