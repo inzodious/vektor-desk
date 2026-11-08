@@ -9,7 +9,7 @@ from desk.agents import briefs, store, switches
 from desk.agents.adapter import Adapter
 from desk.agents.desks import get
 from desk.agents.runner import Outcome, run_desk
-from desk.agents.sources import Decisions, Lab, NotReady, RealDecisions, RealLab
+from desk.agents.sources import Decisions, Lab, Lane, NotReady, RealDecisions, RealLab, RealLane
 from desk.config import Config
 
 NAME = "strategy"
@@ -47,9 +47,17 @@ FAMILIES = {
         "features": (),
         "universe": "lane",
         "benchmark": "IWM",
+        "limits": "min_direction 1-2, min_confidence 0.5-0.95, hold_sessions 5-60, max_names 3-20, event_types from the filing event list; "
+        "at most 12 variants run at once, a variant with the same params as a running one is refused, and each starts at registration",
     },
 }
 NO_FAMILY = "The lab can't express the insider, drift or filings families yet."
+NIGHTLY_LANE = (
+    'Nightly variant for the {title} family ({key}). Propose exactly one new lane variant with `action: "lane"` and an id starting "filings-". '
+    "It paper-trades forward from registration against {benchmark}; there is no backtest. Read `family.prior` (the lanes already running) "
+    "and `family.limits`, and change the idea itself: which event types, how strong a score, how long to hold. "
+    'If nothing new is worth a slot, answer `action: "none"` and say why in `memo`.'
+)
 NIGHTLY = (
     'Nightly variant for the {title} family ({key}). Propose exactly one new experiment with a spec id starting "{key}-" '
     "on the `{universe}` universe from `grammar`, benchmarked to {benchmark}. "
@@ -65,6 +73,7 @@ class StrategyReport:
     summary: str = ""
     memo: str = ""
     queued: Path | None = None
+    lane: dict | None = None
     note: str | None = None
 
     @property
@@ -116,6 +125,7 @@ def run_strategy_desk(
     wait: float = 0.0,
     extra: dict | None = None,
     max_trials: int | None = None,
+    lane: Lane | None = None,
 ) -> StrategyReport:
     lab = lab or RealLab()
     desk = get(NAME)
@@ -165,6 +175,12 @@ def run_strategy_desk(
     elif action == "rule" and isinstance(answer.get("rule"), dict):
         rule = {k: v for k, v in answer["rule"].items() if k in RULE_FIELDS and v is not None}
         report.queued = _write(cfg, {"request": "rule", **rule, **provenance}, str(rule["id"]), None, "rule")
+    elif action == "lane" and isinstance(answer.get("lane"), dict):
+        variant = answer["lane"]
+        try:
+            report.lane = (lane or RealLane()).register(cfg, str(variant["id"]), str(variant["title"]), dict(variant["params"]), variant.get("hypothesis"))
+        except (ValueError, NotReady) as e:
+            report.note = f"Lane variant {variant.get('id')} not registered: {e}"
     elif action == "finalize" and isinstance(answer.get("finalize"), dict):
         fin = answer["finalize"]
         if strategy_id and fin.get("strategy_id") != strategy_id:
@@ -181,18 +197,28 @@ def grid_points(grid: object) -> int:
     return prod(len(v) if isinstance(v, list) and v else 1 for v in grid.values())
 
 
-def available(key: str, features: list[dict], grammar: dict, strategies: list[dict]) -> bool:
+def available(key: str, features: list[dict], grammar: dict, strategies: list[dict], ready: bool = True) -> bool:
     fam = FAMILIES[key]
-    if fam["universe"] not in (grammar.get("universe") or {}):
-        return False
     if key == "filings":
         return any(r.get("kind") == "lane" for r in strategies)
+    if fam["universe"] not in (grammar.get("universe") or {}) or not ready:
+        return False
     return any(str(f.get("metric_id") or "").startswith(fam["features"]) for f in features)
 
 
-def pick_family(day: date, features: list[dict], grammar: dict, strategies: list[dict]) -> str | None:
-    keys = [k for k in FAMILIES if available(k, features, grammar, strategies)]
+def pick_family(day: date, features: list[dict], grammar: dict, strategies: list[dict], ready: bool = True) -> str | None:
+    keys = [k for k in FAMILIES if available(k, features, grammar, strategies, ready)]
     return keys[day.toordinal() % len(keys)] if keys else None
+
+
+def _ready(lab: Lab, cfg: Config) -> bool:
+    check = getattr(lab, "universe_ready", None)
+    if check is None:
+        return True
+    try:
+        return bool(check(cfg, "small_caps"))
+    except NotReady:
+        return False
 
 
 def _strategies(lab: Lab, cfg: Config) -> list[dict]:
@@ -207,19 +233,24 @@ def _strategies(lab: Lab, cfg: Config) -> list[dict]:
 
 def prior(strategies: list[dict], key: str) -> list[dict]:
     keep = ("id", "version", "title", "status", "hypothesis", "kind")
-    mine = [r for r in strategies if str(r.get("id") or "").startswith(f"{key}-") or (key == "filings" and r.get("kind") == "lane")]
+    if key == "filings":
+        keep = (*keep, "params")
+        mine = [r for r in strategies if r.get("kind") == "lane"]
+    else:
+        mine = [r for r in strategies if str(r.get("id") or "").startswith(f"{key}-") and r.get("kind") != "lane"]
     return [{k: r.get(k) for k in keep if k in r} for r in mine][:PRIOR_LIMIT]
 
 
 def nightly_inputs(cfg: Config, lab: Lab, day: date | None = None) -> tuple[str, dict] | None:
     features, grammar = lab.features(cfg), lab.grammar()
     strategies = _strategies(lab, cfg)
-    key = pick_family(day or datetime.now(UTC).date(), features, grammar, strategies)
+    key = pick_family(day or datetime.now(UTC).date(), features, grammar, strategies, _ready(lab, cfg))
     if key is None:
         return None
     fam = FAMILIES[key]
-    family = {k: fam[k] for k in ("title", "idea", "universe", "benchmark")} | {"key": key, "prior": prior(strategies, key)}
-    question = NIGHTLY.format(title=fam["title"], key=key, universe=fam["universe"], benchmark=fam["benchmark"], trials=NIGHTLY_TRIALS)
+    family = {k: fam[k] for k in ("title", "idea", "universe", "benchmark", "limits") if k in fam} | {"key": key, "prior": prior(strategies, key)}
+    template = NIGHTLY_LANE if key == "filings" else NIGHTLY
+    question = template.format(title=fam["title"], key=key, universe=fam["universe"], benchmark=fam["benchmark"], trials=NIGHTLY_TRIALS)
     return question, {"family": family}
 
 
@@ -231,6 +262,7 @@ def run_nightly(
     adapter: Adapter | None = None,
     day: date | None = None,
     wait: float = 0.0,
+    lane: Lane | None = None,
 ) -> StrategyReport:
     lab = lab or RealLab()
     try:
@@ -241,7 +273,16 @@ def run_nightly(
         return _skip(cfg, "not_ready", NO_FAMILY, "schedule")
     question, extra = inputs
     return run_strategy_desk(
-        cfg, question=question, lab=lab, decisions=decisions, adapter=adapter, trigger="schedule", wait=wait, extra=extra, max_trials=NIGHTLY_TRIALS
+        cfg,
+        question=question,
+        lab=lab,
+        decisions=decisions,
+        adapter=adapter,
+        trigger="schedule",
+        wait=wait,
+        extra=extra,
+        max_trials=NIGHTLY_TRIALS,
+        lane=lane,
     )
 
 

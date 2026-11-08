@@ -152,9 +152,9 @@ The lab tests trading strategies over 3, 5 and 10 year windows as paper trading,
 
 | Family | Lab needs | Universe | Benchmark |
 |---|---|---|---|
-| Insider buying clusters | `insider.` features (`insider.buyers`, `insider.buy_usd`) | `small_caps` | IWM |
-| Post-earnings drift | `earnings.` features (`earnings.surprise`, `earnings.days_since`) | `small_caps` | IWM |
-| Filings signal | a `lane` strategy and a `lane` universe in the grammar; variants are lane parameters, never a backtest | `lane` | IWM |
+| Insider buying clusters | `insider.` features (`insider.buyers`, `insider.buy_usd`) and the small-cap history loaded | `small_caps` | IWM |
+| Post-earnings drift | `earnings.` features (`earnings.surprise`, `earnings.days_since`) and the small-cap history loaded | `small_caps` | IWM |
+| Filings signal | a running lane in `lab.strategies`; the desk answers `action: "lane"` and the runner calls `desk.engine.lane.register_variant` (at most 12, forward paper only, no backtest) | lane | IWM |
 
 The prompt carries the family's earlier specs (`lab.strategies`, ids start with the family key) and asks for a different hypothesis, not a parameter sweep. A nightly experiment gets at most 24 grid points and a trial budget of 24; a wider grid is not queued. Console requests keep the normal budget. `dry-run strategy --trigger schedule` shows tonight's prompt.
 

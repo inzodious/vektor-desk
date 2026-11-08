@@ -163,3 +163,94 @@ def test_cli_dry_run_strategy_schedule_shows_the_nightly_prompt(cfg, monkeypatch
     assert cli.main(["dry-run", "strategy", "--trigger", "schedule"]) == 0
     out = capsys.readouterr().out
     assert "nightly family" in out and "Nightly variant" in out and "small_caps" in out
+
+
+# ---- Data readiness and the filings lane ----
+
+
+@dataclass
+class FakeLane:
+    registered: list = field(default_factory=list)
+    refuse: str | None = None
+
+    def register(self, cfg, strategy_id, title, params, hypothesis):
+        if self.refuse:
+            raise ValueError(self.refuse)
+        self.registered.append((strategy_id, title, params, hypothesis))
+        return {"id": strategy_id, "version": 1, "registered_at": "2026-11-08T05:45:00+00:00", "params": params}
+
+
+@dataclass
+class LoadingLab(NightLab):
+    loaded: bool = False
+
+    def universe_ready(self, cfg, kind):
+        return self.loaded
+
+
+LANES = [{"id": "filings-lane", "version": 1, "kind": "lane", "status": "paper", "title": "Filings lane", "params": {"min_direction": 1}}]
+
+
+def lane_answer(**params):
+    variant = {
+        "id": "filings-dilution-short-hold",
+        "title": "Strong scores only, short hold",
+        "hypothesis": "Strong positive scores pay off within two weeks.",
+        "params": {"min_direction": 2, "min_confidence": 0.7, "hold_sessions": 10} | params,
+    }
+    return {"summary": "New lane variant.", "memo": "Testing a shorter hold on strong scores.", "action": "lane", "lane": variant}
+
+
+def test_small_cap_families_wait_for_the_history_to_load(cfg):
+    report, fake = night(cfg, lab=LoadingLab(loaded=False))
+    assert report.status == "not_ready" and not fake.calls
+    report, fake = night(cfg, lab=LoadingLab(loaded=True))
+    assert report.status == "ok" and fake.calls
+
+
+def test_filings_family_needs_a_running_lane():
+    assert not strategy.available("filings", PRICE, GRAMMAR, [])
+    assert strategy.available("filings", PRICE, GRAMMAR, LANES)
+    assert strategy.pick_family(date(2026, 11, 1), PRICE, GRAMMAR, LANES, ready=False) == "filings"
+
+
+def test_filings_night_registers_a_lane_variant(cfg):
+    lane = FakeLane()
+    fake = FakeAdapter({"strategy": lane_answer()})
+    lab = NightLab(feats=PRICE, rows=LANES)
+    report = strategy.run_nightly(cfg, lab=lab, decisions=FakeDecisions(profile_data=ON), adapter=fake, day=date(2026, 11, 9), lane=lane)
+    assert report.status == "ok" and report.lane["id"] == "filings-dilution-short-hold" and report.queued is None
+    assert lane.registered[0][2] == {"min_direction": 2, "min_confidence": 0.7, "hold_sessions": 10}
+    payload = json.loads(fake.calls[0]["prompt"].split("\n\n", 1)[1])
+    assert payload["family"]["key"] == "filings" and "at most 12" in payload["family"]["limits"]
+    assert payload["family"]["prior"][0]["params"] == {"min_direction": 1}
+    assert 'action: "lane"' in payload["question"]
+
+
+def test_refused_lane_variant_is_noted(cfg):
+    lane = FakeLane(refuse="a lane with the same params already runs")
+    fake = FakeAdapter({"strategy": lane_answer()})
+    lab = NightLab(feats=PRICE, rows=LANES)
+    report = strategy.run_nightly(cfg, lab=lab, decisions=FakeDecisions(profile_data=ON), adapter=fake, day=date(2026, 11, 9), lane=lane)
+    assert report.lane is None and "same params" in report.note
+
+
+def test_lane_schema_matches_the_lane_limits():
+    from desk.agents import briefs
+
+    lane = briefs.schema_file("strategy")["properties"]["lane"]
+    props = lane["properties"]["params"]["properties"]
+    assert (props["hold_sessions"]["minimum"], props["hold_sessions"]["maximum"]) == (5, 60)
+    assert (props["min_confidence"]["minimum"], props["min_confidence"]["maximum"]) == (0.5, 0.95)
+    assert lane["properties"]["id"]["pattern"].startswith("^filings-")
+    assert "lane" in briefs.schema_file("strategy")["properties"]["action"]["enum"]
+
+
+def test_real_lane_and_lab_round_trip(cfg):
+    from desk.agents.sources import RealLab, RealLane
+
+    assert RealLab().universe_ready(cfg, "small_caps") is False
+    out = RealLane().register(cfg, "filings-strong-only", "Strong scores only", {"min_direction": 2}, "Only +2 scores.")
+    assert out["id"] == "filings-strong-only" and out["version"] == 1
+    lanes = [r for r in RealLab().strategies(cfg) if r.get("kind") == "lane"]
+    assert any(r["id"] == "filings-strong-only" for r in lanes)
