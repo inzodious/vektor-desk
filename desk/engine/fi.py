@@ -10,6 +10,7 @@ BLOCK = 12
 SEED = 0xF1F1F1
 MAX_MONTHS = 600
 EXTRA_MONTHS = 120
+DEPOSIT_MONTHS = 12
 FACTOR_DAYS = 756
 BOND_WORDS = ("bond", "fixed", "income", "treasury", "aggregate")
 BOND_FUNDS = {"AGG", "BND", "BNDX", "FXNAX", "VBTLX", "VBMFX", "SCHZ", "IUSB", "FBND", "TLT", "IEF", "SHY", "VGIT", "VGSH", "GOVT", "SGOV", "BIL", "FUAMX"}
@@ -43,14 +44,15 @@ def fi_prefs(rows) -> dict | None:
     return None
 
 
-def monthly_deposit(plan: dict) -> tuple[float | None, str]:
-    amounts = [float(m["contribution"]) for m in plan.get("monthly_plan") or [] if isinstance(m.get("contribution"), int | float)]
-    if amounts:
-        return sum(amounts) / len(amounts), "plan"
-    acct = (plan.get("accounts") or {}).get("individual") or {}
-    if isinstance(acct.get("monthly_contribution"), int | float):
-        return float(acct["monthly_contribution"]), "plan"
-    return None, "none"
+def monthly_deposit(deposits: list[tuple[str, float]], as_of: str) -> tuple[float | None, str, int]:
+    start = add_months(as_of, -DEPOSIT_MONTHS)
+    seen = sorted((d, a) for d, a in deposits if a > 0 and d <= as_of)
+    if not seen:
+        return None, "none", 0
+    first = max(seen[0][0], start)
+    months = max(1, min(DEPOSIT_MONTHS, months_between(first, as_of) + 1))
+    total = sum(a for d, a in seen if d > start)
+    return total / months, "activity", months
 
 
 def bond_share(plan: dict, targets: dict[str, float]) -> float:
@@ -145,7 +147,16 @@ def pct(xs: list[float], p: float) -> float:
     return s[min(len(s) - 1, int(p * (len(s) - 1)))]
 
 
-def run(out, plan: dict, targets: dict[str, float], fees: dict[str, float], prefs: dict | None, desk: sqlite3.Connection, value: float | None) -> dict:
+def run(
+    out,
+    plan: dict,
+    targets: dict[str, float],
+    fees: dict[str, float],
+    prefs: dict | None,
+    desk: sqlite3.Connection,
+    value: float | None,
+    deposits: list[tuple[str, float]] | None = None,
+) -> dict:
     view = {"as_of": out.as_of, "status": "not_ready"}
     if prefs is None:
         view["note"] = "No FI goal in Escape Vektor yet; set yearly spend and target age there."
@@ -154,12 +165,13 @@ def run(out, plan: dict, targets: dict[str, float], fees: dict[str, float], pref
     out.m("fi.number", goal, "usd", quality="ok")
     if value is not None:
         out.m("fi.progress", value / goal * 100, "pct", quality="modelled")
-    deposit, source = monthly_deposit(plan)
+    deposit, source, months = monthly_deposit(deposits or [], out.as_of)
     months_left = months_between(out.as_of, prefs["target_date"]) if prefs["target_date"] else None
     req = required_return(value or 0.0, deposit or 0.0, months_left, goal) if months_left else None
     out.m("fi.required_return", req * 100 if req is not None else None, "pct", quality="modelled")
     history = monthly_history(desk)
     view |= {"fi_number": goal, "target_date": prefs["target_date"], "start_value": value, "monthly_deposit": deposit, "deposit_source": source}
+    view["deposit_note"] = f"from your last {months} month{'s' if months != 1 else ''} of deposits" if months else "no deposits seen yet"
     view["required_return_pct"] = round(req * 100, 4) if req is not None else None
     if len(history) < 10 * 12 or value is None:
         view["note"] = "The Monte Carlo needs the French monthly market history; the engine's monthly french job fetches it."
@@ -206,7 +218,9 @@ def run(out, plan: dict, targets: dict[str, float], fees: dict[str, float], pref
         "Only the accounts the desk sees count toward the start value.",
     ]
     if source == "none":
-        caveats.append("No deposit schedule in the plan, so the paths add nothing each month.")
+        caveats.append("No deposits in your activity yet, so the paths add nothing each month.")
+    else:
+        caveats.append(f"Each path adds {deposit:,.0f} a month, the average {view['deposit_note']}.")
     view |= {
         "status": "ok",
         "quality": quality,

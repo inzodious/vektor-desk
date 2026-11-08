@@ -246,7 +246,7 @@ Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamen
 | FI number, target date | Escape Vektor pref `fi`: `fiYearlySpend × fiMultiple`, birth date plus `fiTargetAge` |
 | Real or nominal | The same pref's `inflationAdjusted` and `inflation`; real paths deflate each month at that rate |
 | Start value | `value.market` (the desk's accounts only) |
-| Deposits | Mean of the plan's `monthly_plan` contributions, else `accounts.individual.monthly_contribution`, else none (caveat) |
+| Deposits | Your detected cash-in (external deposits and EFT/ACH transfers in) over the trailing 12 months ÷ 12, or ÷ the months since your first deposit when there are fewer; the view says "from your last N months of deposits". None seen: no deposits (caveat). The plan is not used |
 | Mix and fees | Plan targets; bond funds (a known list, `DESK_BOND_FUNDS`, or a sleeve named bond or fixed income) earn the French T-bill rate, the rest the French US market; weighted expense ratios come off monthly |
 | History | `F-F_Research_Data_Factors` monthly (`mkt_rf_m`, `rf_m`, July 1926 on), fetched by the `french` job |
 
