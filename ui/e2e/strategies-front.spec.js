@@ -11,7 +11,7 @@ test('the leaderboard ranks paper strategies against IWM with the filings lane a
   await page.goto('/lab/strategies');
   const board = page.getByTestId('leaderboard');
   await expect(board.getByTestId('lb-lede')).toContainText('Calm sectors leads at +3.7 pts against IWM.');
-  await expect(board.locator('.lb-row')).toHaveCount(5);
+  await expect(board.locator('.lb-row')).toHaveCount(6);
   await expect(board.locator('[data-row="filings-lane-strong"]')).toContainText('Lane');
   const lane = board.locator('[data-row="filings-lane"]');
   await expect(lane).toContainText('Lane');

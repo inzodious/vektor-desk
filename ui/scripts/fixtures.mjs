@@ -9,6 +9,7 @@ import { inboxFixtures } from './inbox.mjs';
 import { riskFixtures } from './risk.mjs';
 import { desksFixtures } from './desks.mjs';
 import { leaderboardFixtures } from './leaderboard.mjs';
+import { bandsFixtures } from './bands.mjs';
 import { withFilingSignals } from './filing-signals.mjs';
 
 const API = process.env.DESK_API || 'http://127.0.0.1:8000';
@@ -203,6 +204,9 @@ save('engine.health.fail', {
 
 // ---------- leaderboard ----------
 for (const [name, body] of Object.entries(leaderboardFixtures())) save(name, body);
+
+// ---------- bands ----------
+for (const [name, body] of Object.entries(bandsFixtures(await get('/api/engine/bands')))) save(name, body);
 
 // ---------- jobs ----------
 for (const [name, body] of Object.entries(jobsFixtures(await get('/api/jobs')))) save(name, body);
