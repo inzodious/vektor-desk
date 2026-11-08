@@ -56,8 +56,7 @@ export function firstRunSteps({ status, jobs, health, profile, agents, board } =
       title: 'Bring in your tax lots',
       line: 'A Fidelity lot export unlocks tax-loss and wash-sale checks.',
       state: !ready(health) ? 'loading' : shares?.status === 'ok' && !/No lot export/i.test(shares?.detail || '') ? 'done' : 'todo',
-      action: { kind: 'job', job: 'engine-lots', label: 'Read the inbox' },
-      note: 'Upload from the browser is on its way. Until then the file goes in the desk’s inbox folder.',
+      action: { kind: 'link', to: '/settings#inbox', label: 'Upload it' },
     },
     {
       id: 'research',

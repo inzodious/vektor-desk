@@ -1,0 +1,92 @@
+{
+ "now": "2026-11-09T16:42:00Z",
+ "host_alive": false,
+ "pickup_seconds": 300,
+ "script": null,
+ "actions": [
+  {
+   "name": "redeploy",
+   "title": "Redeploy",
+   "what": "Recreates the containers on the live images, so edited settings take effect",
+   "cooldown_seconds": 300,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "status",
+   "title": "Status",
+   "what": "What's live, what's on GitHub, container health, backups",
+   "cooldown_seconds": 60,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "check",
+   "title": "Check",
+   "what": "Claude sign-in, Firestore, addresses, Alpaca paper, a test phone alert",
+   "cooldown_seconds": 120,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "backup",
+   "title": "Back up now",
+   "what": "Copies every database and the inbox to the backup pool",
+   "cooldown_seconds": 1800,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "restore-test",
+   "title": "Restore drill",
+   "what": "Unpacks the newest backup into a scratch folder and checks every database",
+   "cooldown_seconds": 1800,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "logs",
+   "title": "Export logs",
+   "what": "Redacted service logs into data/run/logs",
+   "cooldown_seconds": 60,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "update-script",
+   "title": "Update box script",
+   "what": "Copies main's deploy.sh over the one the cron jobs run, once the checkout is clean, at main and the script parses",
+   "cooldown_seconds": 300,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  }
+ ]
+}

@@ -1,0 +1,13 @@
+{
+ "max_bytes": 26214400,
+ "suffixes": [
+  ".json",
+  ".csv"
+ ],
+ "brokers": {
+  "fidelity": {
+   "import_job": "engine-lots",
+   "files": []
+  }
+ }
+}

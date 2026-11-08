@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Hero } from '../components/Hero.jsx';
 import { Jobs } from '../settings/Jobs.jsx';
+import { Box } from '../settings/Box.jsx';
+import { Inbox } from '../settings/Inbox.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
 import { Panel } from '../components/Panel.jsx';
@@ -376,6 +378,8 @@ export default function Settings() {
         <Token token={s.claude_token} />
         <About status={s} health={health.data} checkedAt={checkedAt} onRefresh={refresh} refreshing={status.loading} />
         <Jobs />
+        <Box />
+        <Inbox />
         <Profile api={profile} />
         <Crew
           status={agents}

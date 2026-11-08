@@ -28,20 +28,20 @@ test('a step runs its job from the page', async ({ page }) => {
   let polls = 0;
   await page.route('**/api/jobs/*/run', (route) => {
     asked = route.request().url().split('/').slice(-2)[0];
-    route.fulfill({ status: 202, json: { ok: true, job: asked, request_id: 'req-lots' } });
+    route.fulfill({ status: 202, json: { ok: true, job: asked, request_id: 'req-research' } });
   });
   await page.route(/\/api\/jobs(\?.*)?$/, async (route) => {
     const res = await route.fetch();
     const body = await res.json();
     polls += 1;
-    if (asked && polls > 2) body.jobs = body.jobs.map((j) => (j.name === asked ? { ...j, last_run: { ...j.last_run, request_id: 'req-lots', result: 'ok', finished: '2026-11-09T16:43:00Z' } } : j));
+    if (asked && polls > 2) body.jobs = body.jobs.map((j) => (j.name === asked ? { ...j, last_run: { ...j.last_run, request_id: 'req-research', result: 'ok', finished: '2026-11-09T16:43:00Z' } } : j));
     route.fulfill({ json: body });
   });
   await page.goto('/start');
-  const step = page.getByTestId('first-run').locator('[data-step="lots"]');
-  await step.getByRole('button', { name: 'Read the inbox' }).click();
-  await expect(step).toContainText('Lots done.', { timeout: 15000 });
-  expect(asked).toBe('engine-lots');
+  const step = page.getByTestId('first-run').locator('[data-step="research"]');
+  await step.getByRole('button', { name: 'Run again' }).click();
+  await expect(step).toContainText('Research done.', { timeout: 15000 });
+  expect(asked).toBe('engine-research');
 });
 
 test('a fresh desk starts at step one', async ({ page }) => {
