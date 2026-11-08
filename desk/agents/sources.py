@@ -119,3 +119,28 @@ class RealLab:
 
     def eligible(self, cfg: Config) -> list[dict]:
         return list(self._call("eligible", cfg))
+
+
+class Filings(Protocol):
+    def pending(self, cfg: Config, limit: int) -> list[dict]: ...
+
+    def record(self, cfg: Config, accession: str, result: dict) -> object: ...
+
+
+@dataclass
+class RealFilings:
+    def _call(self, fn: str, *args):
+        mod = _module("desk.engine.filings")
+        if not hasattr(mod, fn):
+            raise NotReady(f"desk.engine.filings.{fn} isn't built yet")
+        not_ready = getattr(mod, "NotReady", NotReady)
+        try:
+            return getattr(mod, fn)(*args)
+        except not_ready as e:
+            raise NotReady(str(e) or "filings not ready") from None
+
+    def pending(self, cfg: Config, limit: int) -> list[dict]:
+        return list(self._call("pending", cfg, limit))
+
+    def record(self, cfg: Config, accession: str, result: dict) -> object:
+        return self._call("record", cfg, accession, result)

@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 from desk.agents import briefs, store
 from desk.agents.console import process_queue, process_triggers, queue_retry
 from desk.agents.desks import DESKS, Desk, get
+from desk.agents.filings import preview as preview_filings
+from desk.agents.filings import run_filings_desk
 from desk.agents.pipeline import prepare, run_proposal_desk
 from desk.agents.runner import FIRST_RUN, GUARD_NOTE, LOCK, run_desk
 from desk.agents.sources import NotReady, RealLab
@@ -33,7 +35,17 @@ def _dry_run(cfg: Config, name: str, args) -> int:
         print("The Skeptic only runs on a proposal; dry-run research or scout instead.")
         return 2
     print(f"# Dry run: {get(name).title} (no model call, nothing written)")
-    if name == "strategy":
+    if name == "filings":
+        report, prompt = preview_filings(cfg)
+        print(report.note)
+        if report.status == "disabled":
+            print("Would skip (disabled): Off in desk.yaml: set agents.desks.filings to true.")
+        elif report.status == "ok" and store.guard_on(cfg):
+            print(f"Would skip (guarded): {GUARD_NOTE}")
+        if not prompt:
+            return 0
+        schema = briefs.schema_file("filings")
+    elif name == "strategy":
         try:
             _, prompt = build_strategy_prompt(cfg, RealLab(), question=args.question, strategy_id=args.symbol)
         except NotReady as e:
@@ -59,7 +71,7 @@ def _dry_run(cfg: Config, name: str, args) -> int:
         prompt, schema = prep.prompt, prep.schema
     if args.system:
         print("\n## System prompt\n")
-        print(briefs.system_prompt(name))
+        print(briefs.prompt_file(name) if name == "filings" else briefs.system_prompt(name))
     print(f"\n## Prompt ({len(prompt):,} characters, about {len(prompt) // 4:,} tokens)\n")
     print(prompt)
     if args.schema:
@@ -74,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run one desk now")
     run.add_argument("desk", choices=sorted(DESKS))
     run.add_argument("--trigger", default="schedule")
+    run.add_argument("--limit", type=int, help="filings desk only: score at most this many tonight")
     queue = sub.add_parser("queue", help="work through Console and trigger requests")
     queue.add_argument("--now-only", action="store_true", help="only requests marked Run now")
     sub.add_parser("triggers", help="turn today's engine triggers into requests")
@@ -129,6 +142,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.trigger == "schedule" and not desk.due_on(datetime.now(ZoneInfo(cfg.timezone)).date()):
         print(f"{desk.title}: not due today.")
         return 0
+    if desk.name == "filings":
+        night = run_filings_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
+        extra = f", {len(night.rejected)} refused" if night.rejected else ""
+        print(f"{desk.title}: {night.status}, {len(night.scored)} scored, {len(night.failed)} failed{extra} of {night.pending}. {night.note or ''}".strip())
+        return EXIT.get(night.status, 1)
     report = run_proposal_desk(cfg, desk.name, trigger=args.trigger, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
     if report.status in ("deferred", "busy") and args.trigger == "schedule":
         queue_retry(cfg, desk.name)

@@ -29,7 +29,7 @@ OK_JSON = {
 
 
 def test_registry_is_all_opus_and_jobs_only_for_live_desks():
-    assert set(DESKS) == {"plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy"}
+    assert set(DESKS) == {"plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings"}
     assert {d.model for d in DESKS.values()} == {"opus"}
     assert {d.name for d in DESKS.values() if d.tools} == {"research", "scout", "strategy"}
     assert all(line.endswith(f"run {d.name}") for d in DESKS.values() if d.live for line in JOBS if d.name in line)
