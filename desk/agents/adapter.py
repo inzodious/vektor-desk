@@ -83,6 +83,18 @@ def parse_output(stdout: str, *, model: str = "") -> AgentResult:
     )
 
 
+CLI_DROPS = ("$schema", "$id")
+
+
+def cli_schema(node: object, parent: str | None = None) -> object:
+    if isinstance(node, dict):
+        keep = parent in ("properties", "$defs", "definitions")
+        return {k: cli_schema(v, k) for k, v in node.items() if keep or k not in CLI_DROPS}
+    if isinstance(node, list):
+        return [cli_schema(v) for v in node]
+    return node
+
+
 @dataclass
 class ClaudeCli:
     binary: str = field(default_factory=lambda: os.environ.get("DESK_CLAUDE_BIN", "claude"))
@@ -119,7 +131,7 @@ class ClaudeCli:
         if tools:
             cmd += ["--allowedTools", tools]
         if schema is not None:
-            cmd += ["--json-schema", json.dumps(schema, separators=(",", ":"))]
+            cmd += ["--json-schema", json.dumps(cli_schema(schema), separators=(",", ":"))]
         return cmd
 
     def _once(self, cmd: list[str], prompt: str, cwd: Path) -> tuple[int, str, str]:
