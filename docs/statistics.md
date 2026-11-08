@@ -256,7 +256,7 @@ Single stocks only (held, `market_symbols` role `watch`, or `DESK_WATCHLIST`); f
 | `fund.revenue_growth`, `fund.gross_margin`, `fund.operating_margin`, `fund.net_margin` | Latest fiscal year, window `FY` | XBRL company facts, full-year periods only |
 | `macro.rf_3m`, `macro.y2`, `macro.y10`, `macro.curve_10y2y`, `macro.hy_spread`, `macro.vix`, `macro.cpi_yoy` | Latest values, scope `macro` | FRED |
 
-Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamentals` (one row per concept and period), `macro_daily`, `earnings`, `insider_trades`. The `research` job runs at 00:40, refreshes each symbol at most every 20 hours, keeps SEC at about 8 requests a second, and skips any source whose key is missing. `GET /api/engine/research?symbol=` serves filings, facts, earnings, insiders and signals; `GET /api/engine/macro?start=` serves the FRED series.
+Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamentals` (one row per concept and period), `macro_daily`, `earnings`, `insider_trades`. The `research` job runs at 00:40, refreshes each symbol at most every 20 hours, keeps SEC at about 8 requests a second, and skips any source whose key is missing. `GET /api/engine/research?symbol=` serves filings, facts, earnings, insiders, signals and `filing_signals` (the last 3 scored filings, newest first; `in_lane` when a filings lane bought on that score, `lane_open` while it still holds it); `GET /api/engine/macro?start=` serves the FRED series.
 
 ### Costs
 

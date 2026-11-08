@@ -370,3 +370,17 @@ def test_leaderboard_orders_and_carries_the_account(cfg, paper_keys):
     assert lane_row["account"]["sleeve"] == 1000.0 and lane_row["account"]["as_of"] == "2026-11-06" and lane_row["open_positions"] == 1
     assert next(r for r in board["rows"] if r["id"] == "winner")["max_drawdown_pct"] == -3.5
     conn.close()
+
+
+def test_research_lists_scored_filings_and_whether_the_lane_bought(cfg, app_client, paper_keys):
+    conn = seed(cfg, SIGNALS)
+    lane.rebuild(conn)
+    conn.close()
+    client = app_client(packages=["engine"])
+    smol = client.get("/api/engine/research", params={"symbol": "smol"}).json()["filing_signals"]
+    assert [s["accession"] for s in smol] == ["a1"] and smol[0]["in_lane"] is True and smol[0]["direction"] == 2
+    keys = {"accession", "form", "filed_at", "scored_at", "direction", "confidence", "event_type", "horizon_days", "rationale", "in_lane", "lane_open"}
+    assert set(smol[0]) == keys and smol[0]["lane_open"] is False
+    midz = client.get("/api/engine/research", params={"symbol": "MIDZ"}).json()["filing_signals"]
+    assert [(s["accession"], s["in_lane"], s["lane_open"]) for s in midz] == [("a4", True, True), ("a3", False, False), ("a2", False, False)]
+    assert client.get("/api/engine/research", params={"symbol": "NONE"}).json()["filing_signals"] == []
