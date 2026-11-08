@@ -84,6 +84,7 @@ Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change 
 | When | Do |
 |---|---|
 | `deploy.sh` changed | Read the change (`git -C /mnt/Manifest/apps/vektor-desk-src log -p -1 -- deploy/deploy.sh`), then copy it again for the cron jobs: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`. The cron jobs run this pinned copy, so a push to `main` can't run new code as root |
+| Settings → Box says the box isn't checking in | The cron copy of `deploy.sh` predates box actions: copy it again (row above). Box actions then run within 5 minutes of a tap |
 | `deploy/compose.yaml` changed | Run the setup script again (it keeps what's there and adds any new folder). Then go to Apps → `vektor-desk` → Edit and paste the new file. `deploy.sh status` says so on its `Compose:` line, naming each service that differs from the checkout |
 
 ## Home network
@@ -114,6 +115,6 @@ Open the desk at home without Tailscale, the way Hemline has its own address. Ca
 |---|---|
 | RAM goes to 32 GB | In Apps → `vektor-desk` → Edit, raise cron to `2g`. When the lab is switched on, raise it to `8g`, `cpus: 8` and `DESK_LAB_WORKERS` 8 (the notes in `compose.yaml` say where) |
 | 30 days before the Claude token expires | Settings and a `desk-ops` alert flag it. Run `claude setup-token`, then `setup-truenas.sh set CLAUDE_CODE_OAUTH_TOKEN` and `setup-truenas.sh set DESK_CLAUDE_TOKEN_EXPIRES` |
-| The morning after the first nightly backup | `bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh restore-test`: it should end with "Restore drill passed" |
+| The morning after the first nightly backup | Settings → Box → Restore drill (or `deploy.sh restore-test`): it should end with "Restore drill passed" |
 | A market key arrives | `setup-truenas.sh set TIINGO_API_KEY` (or `FINNHUB_API_KEY`, `FRED_API_KEY`; Alpaca paper: `ALPACA_API_KEY_ID` and `ALPACA_API_SECRET_KEY`) |
 | Any one setting changes | `bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set KEY`, e.g. `DESK_SEC_USER_AGENT` or `DESK_MARGIN_RATE_PCT`. It asks for the value (spaces kept; keys hidden), changes that one line in the right `*.env` file and redeploys. After editing an env file by hand, run `deploy.sh redeploy`: a `docker restart` or `deploy.sh now` with nothing new to build doesn't re-read env files |
