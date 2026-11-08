@@ -186,7 +186,7 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 | `plan.in_mix` | Share of value in plan funds | |
 | `plan.drift_max` | Largest drift, in points, and which fund | The Bridge headline |
 | `plan.single_stock` | Single-stock share vs its band | |
-| `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling |
+| `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling. Only when a deposit is expected from your activity (auto-detected series or a schedule); the plan's contributions never predict one |
 | `plan.adherence` | Plan adherence | Share of buy dollars (activity, core sweeps excluded) that went to plan funds; windows `MTD`, `QTD`, `YTD`, `1Y`, `ITD` |
 | `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points. Each a pass or fail with the evidence |
 

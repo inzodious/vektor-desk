@@ -359,3 +359,12 @@ def test_market_keys_warn_for_any_missing_key(cfg, mirror, monkeypatch):
     status, detail = checks["market_keys"]
     assert status == "warn" and detail.endswith("Fix: set DESK_SEC_USER_AGENT in desk.env, then redeploy the app.")
     assert all("answer n" not in d for _, d in checks.values())
+
+
+def test_money_in_without_a_schedule_reads_as_money_landed():
+    from desk.engine.triggers import _words
+
+    base = {"kind": "deposit_landed", "scope_id": "x", "as_of": FRI}
+    planned = _words(base | {"detail": {"date": FRI, "account": IND, "expected": THU, "scheduled": True}})
+    loose = _words(base | {"detail": {"date": FRI, "account": IND, "expected": FRI, "scheduled": False}})
+    assert planned == f"The deposit expected {THU} landed on {FRI}." and loose == f"Money landed in {IND} on {FRI}."

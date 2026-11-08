@@ -205,19 +205,6 @@ def next_deposit(cfg: Config, plan: dict, as_of: str, now: datetime | None = Non
         ahead = []
     if ahead:
         return float(ahead[0]["amount_usd"]), ahead[0]["date"]
-    return plan_deposit(plan, as_of)
-
-
-def plan_deposit(plan: dict, as_of: str) -> tuple[float | None, str | None]:
-    month = as_of[:7]
-    for m in sorted(plan.get("monthly_plan") or [], key=lambda m: str(m.get("month"))):
-        if str(m.get("month")) > month and isinstance(m.get("contribution"), int | float):
-            return float(m["contribution"]), f"{m['month']}-01"
-    acct = (plan.get("accounts") or {}).get("individual") or {}
-    if isinstance(acct.get("monthly_contribution"), int | float):
-        d = date.fromisoformat(as_of)
-        nxt = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
-        return float(acct["monthly_contribution"]), nxt.isoformat()
     return None, None
 
 
