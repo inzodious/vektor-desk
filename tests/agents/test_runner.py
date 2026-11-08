@@ -162,7 +162,8 @@ def test_next_run_respects_schedule_and_first_week():
     now = datetime(2026, 11, 7, 12, 0, tzinfo=UTC)
     assert next_run(get("plan_keeper"), now, zone) == "2026-11-07T17:30:00-05:00"
     assert next_run(get("scout"), now, zone) == "2026-12-06T03:00:00-05:00"
-    assert next_run(get("strategy"), now, zone) is None
+    assert next_run(get("strategy"), now, zone) == "2026-11-08T05:45:00-05:00"
+    assert next_run(get("skeptic"), now, zone) is None
 
 
 def test_status_api(cfg, app_client):
@@ -170,7 +171,9 @@ def test_status_api(cfg, app_client):
     run_desk(get("plan_keeper"), "s", "p", cfg=cfg, adapter=FakeAdapter())
     body = client.get("/api/agents/status").json()
     tiles = {d["desk"]: d for d in body["desks"]}
-    assert body["enabled"] is True and list(tiles)[0] == "plan_keeper"
+    assert (body["enabled"], body["enabled_source"]) == (False, "desk.yaml") and list(tiles)[0] == "plan_keeper"
+    assert (tiles["plan_keeper"]["source"], tiles["plan_keeper"]["yaml"], tiles["plan_keeper"]["app"]) == ("desk.yaml", False, None)
+    assert body["guard"] | {"allowed": None} == {"on": False, "allowed": None, "ready": False, "why": "The Tax desk hasn't finished a run yet."}
     assert tiles["plan_keeper"]["last_run"]["status"] == "ok"
     assert tiles["plan_keeper"]["week"] == {"runs": 1, "turns": 1, "tokens": tiles["plan_keeper"]["last_run"]["tokens"], "cap": 10}
     assert client.put("/api/agents/tax/enabled", json={"enabled": False}).json() == {"desk": "tax", "enabled": False}

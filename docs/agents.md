@@ -74,7 +74,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Research desk** | Wednesday 01:00 (one holding a week, in rotation); on request; day after a holding reports earnings | Holding fundamentals from the brief, plus the web and SEC EDGAR | Dossier per holding (or any symbol asked for in the Console), written and refreshed: thesis, bear case, valuation range with today's value on the same basis, a verdict (add, hold, trim, avoid, watch), what would change the call, dated sources | xhigh; WebSearch, WebFetch |
 | **Scout** | First Sunday of the month, 03:00 | Industry focus, growth tilt, satellite room left | Up to N ideas inside the satellite cap, each with its bear case | xhigh; WebSearch, WebFetch |
 | **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | high; no tools |
-| **Strategy desk** | On request from the Console; at most two new strategies a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
+| **Strategy desk** | Nightly 05:45, one variant in a rotating family (below); on request from the Console; when a lab result lands; 12 runs a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
 | **Filings desk** | Daily 04:15, one call per new filing, up to 40 a night | One small-cap SEC filing from the statistics queue: form, 8-K items, excerpt (first 12,000 characters) | A score per filing in the signal table (see [Filings desk](#filings-desk)); never a proposal or a trade | high; no tools |
 
 **Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
@@ -148,6 +148,16 @@ The lab tests trading strategies over 3, 5 and 10 year windows as paper trading,
 | `success_criteria`, `horizons` | Pre-registered bars; any of 3, 5, 10 years |
 | `written_at`, `desk`, `model`, `effort` | Provenance |
 
+**Nightly variants.** `python -m desk.agents run strategy` picks one family a night, rotating among those the lab can express today, and asks for one new idea in it. It skips with `not_ready` (no model call) when none can be expressed.
+
+| Family | Lab needs | Universe | Benchmark |
+|---|---|---|---|
+| Insider buying clusters | `insider.` features (`insider.buyers`, `insider.buy_usd`) | `small_caps` | IWM |
+| Post-earnings drift | `earnings.` features (`earnings.surprise`, `earnings.days_since`) | `small_caps` | IWM |
+| Filings signal | a `lane` strategy and a `lane` universe in the grammar; variants are lane parameters, never a backtest | `lane` | IWM |
+
+The prompt carries the family's earlier specs (`lab.strategies`, ids start with the family key) and asks for a different hypothesis, not a parameter sweep. A nightly experiment gets at most 24 grid points and a trial budget of 24; a wider grid is not queued. Console requests keep the normal budget. `dry-run strategy --trigger schedule` shows tonight's prompt.
+
 **The loop.** Desks have no file tools, so the Strategy desk returns an experiment in its structured output (spec, param grid inside `params`, date range, seed, trial budget, default 200 per spec, and optional analysis requests). The runner writes it to `/data/lab/queue/`, and `desk.lab` runs it with no network. The next Strategy run gets the results in its prompt as `lab_result`, and every run gets the lab's spec `grammar` so fewer specs bounce. A question about one of Joshua's own rules (rebalance band, deposit steering, harvest, margin) becomes a `rule` request instead of a spec, tested against the plan with deposits. `python -m desk.agents lab-reviews` queues one Strategy request per new lab result (experiment, finalize, rule or rejected). `model` in the queue file is the model the CLI actually served, so the lab can look up its training cutoff.
 
 **No peeking.** The lab freezes and hashes each spec version on registration. While tuning, the desk sees only walk-forward fold summaries and the analyses it asked for, never simulated days mid-run. Holdout and post-cutoff results open only through one `finalize` request per spec version, and finalizing closes that version: any change after it is a new version, a new trial in the lab's ledger, and counted against the idea. A strategy that clears the backtest bars and six months of forward paper trading may then be cited only by Scout proposals inside the satellite cap, through Preflight.
@@ -218,7 +228,7 @@ A blocked proposal still appears, labelled with its cost, because the decision i
 - No MCP servers before Phase 11. A read-only `desk-data` MCP server (SELECT on whitelisted views) is optional there.
 - Web pages are untrusted data. An injected instruction can at worst bias a memo's text, because the agent has nothing to act with. The Skeptic never sees web text, the runner drops any URL not listed in `sources`, and the UI renders agent text as plain text.
 - Agents never edit their own prompts, dials or history. Prompt changes are pull requests in this repo.
-- Kill switch: `agents.enabled: false` in `desk.yaml`, or the per-desk toggle in the UI, stops all scheduling at once.
+- Kill switch: the all-desks switch in Settings (`PUT /api/agents/*/enabled {"enabled": false}`) stops every desk at once. `agents.enabled: false` in `desk.yaml` does the same while Settings has no switch of its own set.
 
 ## Usage budget
 
@@ -292,9 +302,10 @@ Numbering follows `ROADMAP.md`.
 
 | Safety | What it does | How to use it |
 |---|---|---|
+| Switches | Settings (`PUT /api/agents/{desk}/enabled`, `*` for all) overrides `desk.yaml`; `DELETE` the same path to follow `desk.yaml` again. Status shows each desk's `source` (`app`, `desk.yaml` or `default`); the Filings desk defaults to off | Settings, Desks panel |
 | Health gate | A desk logs `unhealthy` and stays quiet while any engine health check is `fail`, or the engine's last run finished over 36 hours ago. Warnings don't block. | Fix the failing check; the next run goes ahead |
 | Dry run | `python -m desk.agents dry-run <desk>` builds the real brief and prompt from live data and prints them with the health checks and any skip reason. It calls no model and writes nothing. | Add `--symbol`, `--question`, `--system` or `--schema` as needed |
-| First-run guard | On by default: only the Plan keeper and Tax desk run, whatever `desk.yaml` enables. Status shows the other desks as guarded. | `python -m desk.agents guard off` once their first runs look right (or `PUT /api/agents/guard`) |
+| First-run guard | On by default: only the Plan keeper and Tax desk run, whatever `desk.yaml` enables. Status shows the other desks as guarded, and `guard.ready` turns true once both have finished an ok run (`guard.why` says which is missing). | `python -m desk.agents guard off` once their first runs look right (or `PUT /api/agents/guard`) |
 | Recovery | A run or request left `running` by a stopped process is closed or queued again at the next `run` or `queue`, but only while no desk holds the run lock. A request interrupted twice fails. | Automatic |
 
 ## Before you start

@@ -207,14 +207,9 @@ def test_not_ready_queue(cfg):
     assert report.status == "not_ready" and "schema missing" in report.note
 
 
-def test_real_filings_is_not_ready_until_statistics_ships_it(cfg):
-    try:
-        import desk.engine.filings  # noqa: F401
-    except ModuleNotFoundError:
-        with pytest.raises(NotReady):
-            RealFilings().pending(cfg, 40)
-    else:
-        pytest.skip("desk.engine.filings exists")
+def test_real_filings_is_not_ready_before_the_first_fetch(cfg):
+    with pytest.raises(NotReady):
+        RealFilings().pending(cfg, 40)
 
 
 # ---- Schema and prompt ----

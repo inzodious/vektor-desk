@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from desk.agents import console, store
+from desk.agents import console, store, switches
 from desk.agents.desks import DESKS
 from desk.agents.runner import FIRST_RUN
+from desk.agents.sources import NotReady, RealDecisions
 from desk.agents.status import crew
 from desk.api.deps import get_cfg
 from desk.config import Config
@@ -38,6 +39,18 @@ def put_enabled(desk: str, body: Switch, cfg: CfgDep) -> dict:
         raise HTTPException(404, f"unknown desk {desk}")
     store.set_enabled(cfg, desk, body.enabled)
     return {"desk": desk, "enabled": body.enabled}
+
+
+@router.delete("/{desk}/enabled")
+def delete_enabled(desk: str, cfg: CfgDep) -> dict:
+    if desk != store.ALL and desk not in DESKS:
+        raise HTTPException(404, f"unknown desk {desk}")
+    store.clear_enabled(cfg, desk)
+    try:
+        profile = RealDecisions().profile(cfg)[1]
+    except NotReady:
+        profile = {}
+    return {"desk": desk} | switches.resolve(cfg, desk, profile)
 
 
 @router.put("/guard")

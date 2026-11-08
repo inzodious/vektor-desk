@@ -123,6 +123,25 @@ def recover(cfg: Config, lock_free: bool, now: datetime | None = None) -> dict:
     return {"runs": runs, "requests": requests}
 
 
+def app_switch(cfg: Config, desk: str) -> bool | None:
+    with db(cfg) as conn:
+        row = conn.execute("SELECT enabled FROM agent_settings WHERE desk=?", (desk,)).fetchone()
+    return None if row is None else bool(row["enabled"])
+
+
+def clear_enabled(cfg: Config, desk: str) -> None:
+    with db(cfg) as conn:
+        conn.execute("DELETE FROM agent_settings WHERE desk=?", (desk,))
+
+
+def ok_runs(cfg: Config, desks: tuple[str, ...]) -> dict[str, int]:
+    marks = ",".join("?" * len(desks))
+    with db(cfg) as conn:
+        rows = conn.execute(f"SELECT desk, count(*) AS n FROM agent_runs WHERE status='ok' AND desk IN ({marks}) GROUP BY desk", desks).fetchall()
+    found = {r["desk"]: r["n"] for r in rows}
+    return {d: found.get(d, 0) for d in desks}
+
+
 def set_enabled(cfg: Config, desk: str, enabled: bool) -> None:
     with db(cfg) as conn:
         conn.execute(

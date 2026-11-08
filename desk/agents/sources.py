@@ -120,6 +120,9 @@ class RealLab:
     def eligible(self, cfg: Config) -> list[dict]:
         return list(self._call("eligible", cfg))
 
+    def strategies(self, cfg: Config) -> list[dict]:
+        return list(self._call("strategies", cfg))
+
 
 class Filings(Protocol):
     def pending(self, cfg: Config, limit: int) -> list[dict]: ...

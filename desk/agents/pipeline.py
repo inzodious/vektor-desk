@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
-from desk.agents import alerts, briefs, store
+from desk.agents import alerts, briefs, store, switches
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.runner import Outcome, run_desk
@@ -145,13 +145,13 @@ def prepare(
     decisions = decisions or RealDecisions()
     desk = get(name)
     version, profile = _profile(cfg, decisions)
-    agents = profile.get("agents") or {}
     cap = ((profile.get("usage") or {}).get("weekly_runs") or {}).get(name)
     if isinstance(cap, int):
         desk = replace(desk, weekly_runs=cap)
     prep = Prepared(desk, version)
-    if agents.get("enabled", True) is False or (agents.get("desks") or {}).get(name, True) is False:
-        prep.skip = ("disabled", "Switched off in desk.yaml.")
+    off = switches.blocked(cfg, name, profile)
+    if off:
+        prep.skip = ("disabled", off)
     try:
         prep.slice_ = engine.desk_slice(cfg, name)
     except NotReady as e:

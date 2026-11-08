@@ -3,7 +3,7 @@ import re
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
-from desk.agents import briefs, store
+from desk.agents import briefs, store, switches
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.runner import run_desk
@@ -43,11 +43,6 @@ def per_night(profile: dict) -> int:
     if isinstance(n, bool) or not isinstance(n, int) or n < 0:
         return PER_NIGHT
     return min(n, MAX_PER_NIGHT)
-
-
-def switched_on(profile: dict) -> bool:
-    agents = profile.get("agents") or {}
-    return agents.get("enabled", True) is not False and (agents.get("desks") or {}).get(NAME) is True
 
 
 def desk_for(profile: dict) -> Desk:
@@ -118,8 +113,9 @@ def run_filings_desk(
     filings = filings or RealFilings()
     profile = _profile(cfg, decisions or RealDecisions())
     desk = desk_for(profile)
-    if not switched_on(profile):
-        return _skip(cfg, desk, "disabled", "Off in desk.yaml: set agents.desks.filings to true.", trigger)
+    off = switches.blocked(cfg, NAME, profile)
+    if off:
+        return _skip(cfg, desk, "disabled", off, trigger)
     cap = per_night(profile) if limit is None else max(0, min(limit, MAX_PER_NIGHT))
     try:
         queue = filings.pending(cfg, cap)[:cap]
@@ -170,7 +166,8 @@ def preview(cfg: Config, *, filings: Filings | None = None, decisions: Decisions
     filings = filings or RealFilings()
     profile = _profile(cfg, decisions or RealDecisions())
     cap = per_night(profile)
-    status = "ok" if switched_on(profile) else "disabled"
+    off = switches.blocked(cfg, NAME, profile)
+    status = "disabled" if off else "ok"
     try:
         queue = filings.pending(cfg, cap)[:cap]
     except NotReady as e:

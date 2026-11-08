@@ -1,9 +1,10 @@
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from desk.agents import store
+from desk.agents import store, switches
 from desk.agents.desks import DESKS, Desk
 from desk.agents.runner import FIRST_RUN
+from desk.agents.sources import Decisions, NotReady, RealDecisions
 from desk.config import Config
 from desk.runlock import running
 from desk.scheduler import parse
@@ -31,15 +32,26 @@ def _last(run: dict | None) -> dict | None:
     return {k: run[k] for k in keys} | {"tokens": run["input_tokens"] + run["output_tokens"] + run["cache_tokens"]}
 
 
-def crew(cfg: Config, now: datetime | None = None) -> dict:
+def _profile(cfg: Config, decisions: Decisions | None) -> dict:
+    try:
+        return (decisions or RealDecisions()).profile(cfg)[1]
+    except NotReady:
+        return {}
+
+
+def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None = None) -> dict:
     now = now or datetime.now(UTC)
     zone = ZoneInfo(cfg.timezone)
-    on = store.is_enabled(cfg, store.ALL)
+    profile = _profile(cfg, decisions)
+    master = switches.resolve(cfg, store.ALL, profile)
+    on = master["enabled"]
     guard = store.guard_on(cfg)
+    ready, why = switches.guard_ready(cfg, FIRST_RUN)
     busy = any(j["job"] == "agents" for j in running(cfg))
     desks = []
     for d in sorted(DESKS.values(), key=lambda d: (d.priority, d.name)):
-        enabled = store.is_enabled(cfg, d.name)
+        switch = switches.resolve(cfg, d.name, profile)
+        enabled = switch["enabled"]
         guarded = guard and d.name not in FIRST_RUN
         week = store.week_usage(cfg, d.name, now)
         desks.append(
@@ -50,10 +62,19 @@ def crew(cfg: Config, now: datetime | None = None) -> dict:
                 "effort": d.effort,
                 "live": d.live,
                 "enabled": enabled,
+                "source": switch["source"],
+                "app": switch["app"],
+                "yaml": switch["yaml"],
                 "guarded": guarded,
                 "last_run": _last(store.last_run(cfg, d.name)),
                 "next_run": next_run(d, now, zone) if d.live and enabled and on and not guarded else None,
                 "week": week | {"cap": d.weekly_runs},
             }
         )
-    return {"enabled": on, "busy": busy, "guard": {"on": guard, "allowed": list(FIRST_RUN)}, "desks": desks}
+    return {
+        "enabled": on,
+        "enabled_source": master["source"],
+        "busy": busy,
+        "guard": {"on": guard, "allowed": list(FIRST_RUN), "ready": ready, "why": why},
+        "desks": desks,
+    }

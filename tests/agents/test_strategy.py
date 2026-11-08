@@ -152,7 +152,7 @@ def test_scout_sees_eligible_strategies_and_gets_a_skeptic(cfg):
 def test_all_desks_live_and_lab_job():
     assert ("30 6 * * *", "python -m desk.agents lab-reviews") in JOBS
     assert ("0 3 * * 0", "python -m desk.agents run scout") in JOBS
-    assert not any(c.endswith("run strategy") for _, c in JOBS)
+    assert ("45 5 * * *", "python -m desk.agents run strategy") in JOBS
 
 
 def test_rule_requests_are_queued_without_a_version(cfg):
