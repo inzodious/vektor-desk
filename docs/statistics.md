@@ -256,7 +256,7 @@ Single stocks only (held, `market_symbols` role `watch`, or `DESK_WATCHLIST`); f
 | `fund.revenue_growth`, `fund.gross_margin`, `fund.operating_margin`, `fund.net_margin` | Latest fiscal year, window `FY` | XBRL company facts, full-year periods only |
 | `macro.rf_3m`, `macro.y2`, `macro.y10`, `macro.curve_10y2y`, `macro.hy_spread`, `macro.vix`, `macro.cpi_yoy` | Latest values, scope `macro` | FRED |
 
-Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamentals` (one row per concept and period), `macro_daily`, `earnings`, `insider_trades`. The `research` job runs at 00:40, refreshes each symbol at most every 20 hours, keeps SEC at about 8 requests a second, and skips any source whose key is missing. `GET /api/engine/research?symbol=` serves filings, facts, earnings, insiders and signals; `GET /api/engine/macro?start=` serves the FRED series.
+Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamentals` (one row per concept and period), `macro_daily`, `earnings`, `insider_trades`. The `research` job runs at 00:40, refreshes each symbol at most every 20 hours, keeps SEC at about 8 requests a second, and skips any source whose key is missing. `GET /api/engine/research?symbol=` serves filings, facts, earnings, insiders, signals and `filing_signals` (the last 3 scored filings, newest first; `in_lane` when a filings lane bought on that score, `lane_open` while it still holds it); `GET /api/engine/macro?start=` serves the FRED series.
 
 ### Costs
 
@@ -518,7 +518,47 @@ Every strategy on paper shares the one Alpaca **paper** account. The URL comes o
 | Fills | `paper_exec.allocate` | Filled quantity goes to same-side legs pro rata at the average fill price; crossed quantity fills at that price too, or at the day's open when the symbol netted to zero. Rejected orders leave the books alone |
 | Limits | env | `DESK_PAPER_EXECUTE=0` stops orders (reconciling continues); `DESK_PAPER_MAX_STRATEGIES` (default 20) |
 
-**`/api/engine/lab/leaderboard`.** `{as_of, benchmark: "IWM", gate_days: 182, rows, note}`. Each row: `id, version, name, kind ("lane" | "strategy"), status, started, as_of, days_live, days_to_eligible, eligible_on, waiting_on ("time" | "benchmark" | null), return_pct, bench_return_pct, excess_pts, max_drawdown_pct` (negative), `trades, open_positions, account` (`{as_of, sleeve, cash, value, return_pct}` from the sub-ledger, or null). Order: eligible, paper, retired; then excess desc (nulls last), then days live desc. Empty: `rows: []` and a note. Returns and the gate use the forward record; `account` shows what the paper fills did.
+**`/api/engine/lab/leaderboard`.** `{as_of, benchmark: "IWM", gate_days: 182, rows, note}`. Each row: `id, version, name, kind ("lane" | "mix" | "strategy"), benchmark, status, started, as_of, days_live, days_to_eligible, eligible_on, waiting_on ("time" | "benchmark" | null), return_pct, bench_return_pct, excess_pts, max_drawdown_pct` (negative), `trades, open_positions, account` (`{as_of, sleeve, cash, value, return_pct}` from the sub-ledger, or null). Order: eligible, paper, retired; then excess desc (nulls last), then days live desc. Empty: `rows: []` and a note. Returns and the gate use the forward record; `account` shows what the paper fills did.
+
+## Strategy catalog and probability bands
+
+There is no single target. Four named mixes run side by side on paper and in the bands, and each is scored against his risk band and against the others. `desk.engine.catalog` defines them; `desk.engine.bands` measures them.
+
+| id | Name | Mix | Paper |
+|---|---|---|---|
+| `safe-mix` | Safe mix | The plan's fund weights (v3 today), ETF proxies | Rebalances when a name moves $25 or 10% |
+| `as-held` | As held | His book today, ASTS kept, cash share kept, margin debit left out | Follows his weights each day (same version) |
+| `tech-tilt` | Aggressive tech tilt | 50% IVV, 30% FTEC, 10% SMH, 10% VXUS (proposal) | As safe mix |
+| `dip-buy` | Dip-buy | Safe mix with 20% cash; a third goes in at each 5, 10, 20% drop of IVV from its high; back to 20% cash at a new high | Cash target from IVV's closes |
+
+| Piece | Rule |
+|---|---|
+| Proxies | Mutual funds trade as ETFs on Alpaca: FXAIX → IVV, FSKAX/FZROX → ITOT, FTIHX/FZILX → VXUS, FXNAX → AGG, VFIAX → VOO, VTSAX → VTI, VBTLX → BND, and a few more in `catalog.PROXIES`. A fund or 401(k) code with no twin trades as IVV, and the row says so in `proxy_note` |
+| Registry | `catalog_strategies` (id, version, title, mix, registered_at, retired_at). The daily engine syncs it. A fixed mix whose weights move more than 0.5 points gets a new version; the old one retires and flattens. Each mix's symbols join the price backfill |
+| Paper | `catalog.rebuild` runs in each paper job before orders. It writes targets to `paper_positions` and the record to `paper_portfolios` (kind `mix`, benchmark IVV) from the sub-ledger's values. The 182-day gate applies |
+| Price history | For each proxy, whichever of the proxy and the funds it stands for has the longest prices. The record starts in the first month where 80% of the weight has real prices; missing months use the US market, noted per symbol |
+| Model | Monthly excess return regressed on the US market over that record: beta plus leftover swings. Alpha is dropped (reported as `alpha_dropped_pct`) |
+| Simulation | `DESK_BANDS_PATHS` paths (default 2,000), fixed seed. 12-month blocks of French monthly market history since 1926; each month adds a leftover swing drawn from the fit. The start is his market value; each month adds his trailing net deposit (the FI rule); his plan's fees for the safe mix; today's dollars when his FI goal says so |
+| Risk rank | 1–5: the first band whose `worst_year_loss_pct` covers the mix's 1-year p10. Ladder from `desk.decisions.risk.BANDS` when present, else 10/18/25/33/45 |
+| Fit | Against `desk.decisions.risk.current(cfg)`: `above` when the 1-year p10 loses more than his band allows, `below` when it fits the band under his, else `fits`. Null until he answers |
+
+**`GET /api/engine/bands`.** `{as_of, status, book: "as-held", rows, start_value, monthly_deposit, deposit_source, deposit_note, fi_number, target_date, real, horizons: [1, 5, 10, 20, 40], paths, history, ladder, ladder_source, profile, method, caveats}`. Rows run safe → risky. Each row:
+
+| Field | Meaning |
+|---|---|
+| `id, name, weights, cash, priced_from, status` | `status` `not_ready` with a note when under 36 months of prices |
+| `risk_rank, fit` | Above |
+| `bands[]` | Per horizon: `years, p10, p50, p90` (dollars), `contributed`, `chance_loss` (time-weighted return below zero), `chance_below_contributed`, `return_p50_pct` (a year) |
+| `worst_year_p10_pct, cvar95_1y_pct` | p10 and the mean of the worst 5% of 1-year returns over each path's first 10 years |
+| `drawdown_10y, max_drawdown_pct` | p10/p50/p90 of each path's worst 10-year drawdown; `max_drawdown_pct` is the p50 |
+| `p50_value_10y, chance_fi` | Median 10-year value; share of paths at the FI number by his target date (null without a goal) |
+| `backtest` | On real prices: `start, end, months, cagr_pct, vol_pct, sharpe, sortino, max_drawdown_pct, calmar, worst_year_pct, hit_rate` |
+| `long_history` | Beta replayed since 1926 without leftover swings: `cagr_pct, max_drawdown_pct, worst_year_pct` |
+| `model, fee_pct, proxy_note, notes` | Fit details and every substitution |
+
+Metrics `bands.worst_year_p10`, `bands.p50_10y`, `bands.chance_fi` (scope `strategy`). For the agents, `bands.catalog(cfg)` returns `{id, name, risk_rank, fit, worst_year_p10_pct, p50_value_10y, chance_fi, sharpe, max_drawdown_pct, proxy_note}` per ready row, and raises `bands.NotReady` before the first build.
+
+Limits: leftover swings are drawn month by month, so a fund's own long slumps are understated. Bond and international funds enter only through their link to the US market. The margin debit is not modelled.
 
 ## Strategy lab
 

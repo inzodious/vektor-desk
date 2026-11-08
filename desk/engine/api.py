@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import lab, leaderboard, paper_exec, schema, watchlist
+from desk.engine import lab, lane, leaderboard, paper_exec, schema, watchlist
 from desk.engine.compare import CompareError, compare
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
@@ -275,10 +275,15 @@ def wash(request: Request) -> JSONResponse:
 @router.get("/api/engine/research")
 def research(request: Request, symbol: str) -> JSONResponse:
     sym = symbol.upper()
-    empty = {"symbol": sym, "filings": [], "fundamentals": {}, "earnings": [], "insiders": [], "signals": []}
+    empty = {"symbol": sym, "filings": [], "fundamentals": {}, "earnings": [], "insiders": [], "signals": [], "filing_signals": []}
     conn = _open(get_cfg(request))
-    if conn is None or not _has(conn, "filings"):
+    if conn is None:
         return _json(empty)
+    if not _has(conn, "filings"):
+        try:
+            return _json(empty | {"filing_signals": filing_signals(conn, sym)})
+        finally:
+            conn.close()
     try:
         filings = [
             dict(r) for r in conn.execute("SELECT form, filed, report_date, description, url FROM filings WHERE symbol=? ORDER BY filed DESC LIMIT 40", (sym,))
@@ -306,9 +311,33 @@ def research(request: Request, symbol: str) -> JSONResponse:
                 (day, sym),
             )
         ]
+        scored = filing_signals(conn, sym)
     finally:
         conn.close()
-    return _json({"symbol": sym, "filings": filings, "fundamentals": facts, "earnings": earnings, "insiders": insiders, "signals": sigs})
+    return _json(
+        {"symbol": sym, "filings": filings, "fundamentals": facts, "earnings": earnings, "insiders": insiders, "signals": sigs, "filing_signals": scored}
+    )
+
+
+FILING_SIGNALS = 3
+
+
+def filing_signals(conn: sqlite3.Connection, sym: str, limit: int = FILING_SIGNALS) -> list[dict]:
+    if not _has(conn, "filing_signals"):
+        return []
+    cols = "accession, form, filed_at, scored_at, direction, confidence, event_type, horizon_days, rationale"
+    rows = [dict(r) for r in conn.execute(f"SELECT {cols} FROM filing_signals WHERE symbol=? ORDER BY filed_at DESC, accession LIMIT ?", (sym, limit))]
+    lanes = {v.id for v in lane.variants(conn)}
+    bought: set[str] = set()
+    held = False
+    if _has(conn, "paper_trades"):
+        bought = {r[0] for r in conn.execute("SELECT date, strategy_id FROM paper_trades WHERE symbol=? AND side='buy'", (sym,)) if r[1] in lanes}
+    if _has(conn, "paper_positions"):
+        held = any(r[0] in lanes for r in conn.execute("SELECT strategy_id FROM paper_positions WHERE symbol=? AND shares > 0", (sym,)))
+    for r in rows:
+        r["in_lane"] = lane.entry_session(lane._stamp(r["scored_at"])).isoformat() in bought
+        r["lane_open"] = r["in_lane"] and held
+    return rows
 
 
 @router.get("/api/engine/macro")
@@ -491,3 +520,8 @@ def fi_view(request: Request) -> JSONResponse:
 @router.get("/api/engine/factors")
 def factors_view(request: Request) -> JSONResponse:
     return _view(request, "factors", {"as_of": None, "holdings": {}, "portfolio": {}, "coverage_pct": 0.0})
+
+
+@router.get("/api/engine/bands")
+def bands_view(request: Request) -> JSONResponse:
+    return _view(request, "bands", {"as_of": None, "status": "not_ready", "rows": [], "book": "as-held"})
