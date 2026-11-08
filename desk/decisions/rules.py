@@ -10,6 +10,7 @@ KINDS: dict[str, dict[str, tuple[float, float]]] = {
     "single_stock_band": {"min_pct": (0, 100), "max_pct": (0, 100)},
     "drift_max_pts": {"pts": (0, 100)},
     "cash_floor_pct": {"pct": (0, 100)},
+    "conviction_hold": {"band_min_pct": (0, 100), "band_max_pct": (0, 100)},
 }
 
 LABELS = {
@@ -18,6 +19,7 @@ LABELS = {
     "single_stock_band": "Single-stock band",
     "drift_max_pts": "Drift limit",
     "cash_floor_pct": "Cash floor",
+    "conviction_hold": "Conviction hold",
 }
 
 
@@ -27,6 +29,7 @@ def validate_rules(rules) -> tuple[list[str], list[str]]:
     if not isinstance(rules, list):
         return ["rules must be a list"], warnings
     seen: set[str] = set()
+    held: set[str] = set()
     for i, rule in enumerate(rules):
         where = f"rules[{i}]"
         if not isinstance(rule, dict):
@@ -54,11 +57,32 @@ def validate_rules(rules) -> tuple[list[str], list[str]]:
                 errors.append(f"{where}.params.{name} must be a number from {low} to {high}")
         if kind == "single_stock_band" and not errors and params["min_pct"] > params["max_pct"]:
             errors.append(f"{where}: min_pct is above max_pct")
+        if kind == "conviction_hold":
+            errors += _conviction_errors(where, rule, params, held)
         if "enabled" in rule and not isinstance(rule["enabled"], bool):
             errors.append(f"{where}.enabled must be true or false")
         if "symbols" in rule and (not isinstance(rule["symbols"], list) or not all(isinstance(s, str) for s in rule["symbols"])):
             errors.append(f"{where}.symbols must be a list of tickers")
     return errors, warnings
+
+
+def _conviction_errors(where: str, rule: dict, params: dict, held: set[str]) -> list[str]:
+    out = []
+    symbols = rule.get("symbols")
+    if not isinstance(symbols, list) or len(symbols) != 1 or not isinstance(symbols[0], str) or not symbols[0].strip():
+        return [f"{where}: conviction_hold needs exactly one ticker in symbols"]
+    symbol = symbols[0].strip().upper()
+    if symbol in held:
+        out.append(f"{where}: {symbol} already has a conviction hold")
+    held.add(symbol)
+    low, high = params.get("band_min_pct"), params.get("band_max_pct")
+    if all(isinstance(v, int | float) and not isinstance(v, bool) for v in (low, high)) and low > high:
+        out.append(f"{where}: band_min_pct is above band_max_pct")
+    return out
+
+
+def conviction_symbols(rules: list[dict]) -> set[str]:
+    return {r["symbols"][0].upper() for r in rules if r.get("kind") == "conviction_hold" and r.get("symbols") and r.get("enabled", True)}
 
 
 def normalize(rules: list[dict]) -> list[dict]:
@@ -80,6 +104,8 @@ def describe(rule: dict) -> str:
         return f"{label} {p['min_pct']:g} to {p['max_pct']:g}%"
     if rule["kind"] == "drift_max_pts":
         return f"{label} {p['pts']:g} points"
+    if rule["kind"] == "conviction_hold":
+        return f"{rule['symbols'][0].upper()} {label.lower()} {p['band_min_pct']:g} to {p['band_max_pct']:g}%"
     if rule["kind"] == "cash_floor_pct":
         return f"{label} {p['pct']:g}%"
     return label
