@@ -332,5 +332,20 @@
    "quality": "ok",
    "engine_version": "0.1.0"
   }
+ ],
+ "filing_signals": [
+  {
+   "accession": "0000000000-26-000402",
+   "form": "8-K",
+   "filed_at": "2026-11-04",
+   "scored_at": "2026-11-04T21:15:00Z",
+   "direction": -1,
+   "confidence": 0.61,
+   "event_type": "dilution",
+   "horizon_days": 10,
+   "rationale": "At-the-market share program announced.",
+   "in_lane": false,
+   "lane_open": false
+  }
  ]
 }

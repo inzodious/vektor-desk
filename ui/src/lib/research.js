@@ -261,3 +261,37 @@ export function cleanSymbol(s) {
     .toUpperCase();
   return /^[A-Z][A-Z0-9.-]{0,9}$/.test(v) ? v : null;
 }
+
+// ---------- filing chip ----------
+const DIRECTION = {
+  '-2': { t: 'Reads clearly bad', tone: 'watch' },
+  '-1': { t: 'Leans bad', tone: 'watch' },
+  0: { t: 'Reads neutral', tone: '' },
+  1: { t: 'Leans good', tone: 'ok' },
+  2: { t: 'Reads clearly good', tone: 'ok' },
+};
+
+export function directionWord(d) {
+  return DIRECTION[Math.max(-2, Math.min(2, Math.round(Number(d) || 0)))];
+}
+
+export function eventWord(e) {
+  if (!e) return null;
+  const s = String(e).replace(/_/g, ' ').replace('merger acquisition', 'merger or acquisition');
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function filingChip(research) {
+  const rows = Array.isArray(research?.filing_signals) ? research.filing_signals : [];
+  const r = rows[0];
+  if (!r) return null;
+  const dir = directionWord(r.direction);
+  return {
+    ...r,
+    dir,
+    sure: r.confidence == null ? null : `${Math.round(r.confidence * 100)}% sure`,
+    event: eventWord(r.event_type),
+    form: formWord(r.form),
+    more: rows.length - 1,
+  };
+}

@@ -6,6 +6,7 @@ import { moneyInFixtures } from './money-in.mjs';
 import { jobsFixtures } from './jobs.mjs';
 import { desksFixtures } from './desks.mjs';
 import { leaderboardFixtures } from './leaderboard.mjs';
+import { withFilingSignals } from './filing-signals.mjs';
 
 const API = process.env.DESK_API || 'http://127.0.0.1:8000';
 const OUT = fileURLToPath(new URL('../src/fixtures/', import.meta.url));
@@ -136,11 +137,11 @@ save('engine.watchlist.empty', { symbols: [] });
 
 const researched = [...new Set([...dossiers.map((d) => d.symbol), ...watch.symbols.map((w) => w.symbol), ...symbols])];
 for (const sym of researched) {
-  save(`engine.research.${sym}`, await get(`/api/engine/research?symbol=${sym}`));
+  save(`engine.research.${sym}`, withFilingSignals(sym, await get(`/api/engine/research?symbol=${sym}`)));
   save(`engine.prices.${sym}`, await get(`/api/engine/prices?symbol=${sym}&start=2025-11-07`));
   save(`engine.metrics.${sym}`, await get(`/api/engine/metrics?ids=*&scope=holding&scope_id=${sym}`));
 }
-save('engine.research.any', { symbol: null, filings: [], fundamentals: {}, earnings: [], insiders: [], signals: [] });
+save('engine.research.any', { symbol: null, filings: [], fundamentals: {}, earnings: [], insiders: [], signals: [], filing_signals: [] });
 
 // ---------- lab ----------
 const slug = (ids) => ids.join(',').replace(/[^A-Za-z0-9]+/g, '_');
