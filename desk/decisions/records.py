@@ -8,6 +8,7 @@ from desk.config import Config
 from desk.decisions.profile import DESKS, sync
 from desk.decisions.profile import profile_path as _profile_path
 from desk.decisions.store import dumps, has_mirror, loads, log_event, new_id, now_iso, session
+from desk.engine.broker import decision_rows
 
 TRADE_KINDS = ("buy", "sell", "trim", "rebalance", "harvest", "deposit_route")
 ADVICE_KINDS = ("hold_off", "alert", "memo")
@@ -616,22 +617,50 @@ def scoring_rows(cfg: Config, since: str | None = None) -> list[dict]:
 
 
 def mirror_trades(conn: sqlite3.Connection, since: str) -> list[dict]:
-    if not has_mirror(conn):
-        return []
     try:
-        rows = conn.execute("SELECT id, json FROM mirror.rows WHERE tbl='activity'").fetchall()
-    except sqlite3.Error:
+        rows = decision_rows(conn, since or None)
+    except Exception:  # noqa: BLE001
         return []
     out = []
-    for r in rows:
-        try:
-            a = json.loads(r["json"])
-        except (TypeError, ValueError):
-            continue
+    for rid, a in rows:
         if a.get("kind") not in ("buy", "sell") or a.get("core") or not a.get("symbol") or str(a.get("date", "")) < since:
             continue
-        out.append({"activity_id": r["id"], **a, "symbol": str(a["symbol"]).upper()})
+        out.append({"activity_id": rid, **a, "symbol": str(a["symbol"]).upper()})
     return out
+
+
+def _taken(conn: sqlite3.Connection, trades: list[dict]) -> set[str]:
+    linked = {r[0] for r in conn.execute("SELECT activity_id FROM decisions WHERE activity_id IS NOT NULL")}
+    missing = linked - {a["activity_id"] for a in trades}
+    if not missing or not has_mirror(conn):
+        return linked
+    taken = set(linked)
+    for rid in sorted(missing):
+        row = conn.execute("SELECT json FROM mirror.rows WHERE tbl='activity' AND id=?", (rid,)).fetchone()
+        try:
+            m = json.loads(row["json"]) if row else None
+        except (TypeError, ValueError):
+            m = None
+        if not isinstance(m, dict) or not m.get("date"):
+            continue
+        day, amount = date.fromisoformat(str(m["date"])[:10]), abs(m.get("amount") or 0)
+        twin = next(
+            (
+                a
+                for a in trades
+                if a["activity_id"] not in taken
+                and a.get("source") == "broker"
+                and a["symbol"] == str(m.get("symbol") or "").upper()
+                and a["kind"] == m.get("kind")
+                and a.get("accountKey") == m.get("accountKey")
+                and abs((date.fromisoformat(str(a["date"])[:10]) - day).days) <= 3
+                and abs(abs(a.get("amount") or 0) - amount) <= max(0.02, 0.005 * amount)
+            ),
+            None,
+        )
+        if twin:
+            taken.add(twin["activity_id"])
+    return taken
 
 
 def _account_ok(want: str | None, key: str | None) -> bool:
@@ -677,7 +706,7 @@ def confirm_fills(cfg: Config, *, now: datetime | None = None) -> list[str]:
             return []
         earliest = min(local_day(d["placed_at"], cfg.timezone) for d in pending)
         trades = mirror_trades(conn, (date.fromisoformat(earliest) - timedelta(days=1)).isoformat())
-        taken = {r[0] for r in conn.execute("SELECT activity_id FROM decisions WHERE activity_id IS NOT NULL")}
+        taken = _taken(conn, trades)
         for d in pending:
             hit = match_fill(d, trades, taken, cfg.timezone)
             if hit is None:
@@ -702,7 +731,7 @@ def unmatched(cfg: Config, *, days: int = UNMATCHED_DAYS, now: datetime | None =
     since = (_now(now).astimezone(ZoneInfo(cfg.timezone)).date() - timedelta(days=days)).isoformat()
     with session(cfg) as conn:
         trades = mirror_trades(conn, since)
-        taken = {r[0] for r in conn.execute("SELECT activity_id FROM decisions WHERE activity_id IS NOT NULL")}
+        taken = _taken(conn, trades)
     keep = ("activity_id", "date", "accountKey", "kind", "symbol", "quantity", "price", "amount")
     return sorted(({k: a.get(k) for k in keep} for a in trades if a["activity_id"] not in taken), key=lambda a: str(a["date"]), reverse=True)
 

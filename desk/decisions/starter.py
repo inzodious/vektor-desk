@@ -15,6 +15,8 @@ from desk.db import connect
 from desk.decisions.detect import STALE_DAYS, cadence, series, slug
 from desk.decisions.plan import cash_in, deposit_series
 from desk.decisions.profile import DEFAULTS, ProfileError, active_profile, parse, profile_path
+from desk.decisions.store import session
+from desk.engine.broker import decision_rows
 
 WINDOW_DAYS = 180
 PAYS_PER_MONTH = {"weekly": 52 / 12, "biweekly": 26 / 12, "semimonthly": 2, "monthly": 1}
@@ -82,20 +84,12 @@ def accounts(conn: sqlite3.Connection) -> list[dict]:
 # ---- Cadence ----
 
 
-def _activity(conn: sqlite3.Connection, since: date) -> list[tuple[str, dict]]:
-    try:
-        cursor = conn.execute("SELECT id, json FROM rows WHERE tbl='activity'")
-    except sqlite3.Error:
-        return []
-    out = []
-    for r in cursor:
+def _activity(cfg: Config, since: date) -> list[tuple[str, dict]]:
+    with session(cfg) as conn:
         try:
-            a = json.loads(r["json"])
-        except (TypeError, ValueError):
-            continue
-        if isinstance(a, dict) and (d := _day(a.get("date"))) is not None and d >= since:
-            out.append((r["id"], a))
-    return out
+            return decision_rows(conn, since.isoformat())
+        except sqlite3.Error:
+            return []
 
 
 def _inbound_hint(rows: list[tuple[str, dict]], key: str) -> str:
@@ -107,9 +101,9 @@ def _inbound_hint(rows: list[tuple[str, dict]], key: str) -> str:
     return ", ".join(f"{label} x{n}" for label, n in seen.most_common(3)) or "none"
 
 
-def deposit_schedule(conn: sqlite3.Connection, plan: dict, accts: list[dict], today: date) -> tuple[list[dict], list[str]]:
+def deposit_schedule(cfg: Config, conn: sqlite3.Connection, plan: dict, accts: list[dict], today: date) -> tuple[list[dict], list[str]]:
     since = today - timedelta(days=WINDOW_DAYS)
-    rows = _activity(conn, since)
+    rows = _activity(cfg, since)
     by_account: dict[str, list[tuple[date, float]]] = {}
     for x in cash_in(rows):
         by_account.setdefault(x["accountKey"], []).append((date.fromisoformat(x["date"]), x["amount"]))
@@ -278,7 +272,7 @@ def deposits_block(cfg: Config, *, today: date | None = None) -> str:
     today = today or _local_today(cfg)
     conn = connect(cfg.mirror_db, readonly=True)
     try:
-        deposits, notes = deposit_schedule(conn, latest_plan(conn), accounts(conn), today)
+        deposits, notes = deposit_schedule(cfg, conn, latest_plan(conn), accounts(conn), today)
     finally:
         conn.close()
     current = active_profile(cfg)

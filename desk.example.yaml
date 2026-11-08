@@ -49,6 +49,7 @@ agents:
     skeptic: true
     scout: false
     strategy: false
+    filings: false
 
 alerts:
   min_priority: default
