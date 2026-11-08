@@ -12,11 +12,25 @@ SAVINGS_DAYS = 180
 # ---- Bands ----
 
 BANDS: dict[int, dict] = {
-    1: {"name": "Conservative", "equity_pct": [20, 40], "speculative_max_pct": 0, "worst_year_pct": -10, "single_stock_max_pct": 2},
-    2: {"name": "Moderately conservative", "equity_pct": [40, 60], "speculative_max_pct": 2, "worst_year_pct": -18, "single_stock_max_pct": 3},
-    3: {"name": "Moderate", "equity_pct": [60, 75], "speculative_max_pct": 5, "worst_year_pct": -25, "single_stock_max_pct": 5},
-    4: {"name": "Moderately aggressive", "equity_pct": [75, 90], "speculative_max_pct": 10, "worst_year_pct": -33, "single_stock_max_pct": 10},
-    5: {"name": "Aggressive", "equity_pct": [90, 100], "speculative_max_pct": 20, "worst_year_pct": -45, "single_stock_max_pct": 15},
+    1: {"label": "Conservative", "equity_min_pct": 20, "equity_max_pct": 40, "speculative_max_pct": 0, "worst_year_loss_pct": 10, "single_stock_max_pct": 2},
+    2: {
+        "label": "Moderately conservative",
+        "equity_min_pct": 40,
+        "equity_max_pct": 60,
+        "speculative_max_pct": 2,
+        "worst_year_loss_pct": 18,
+        "single_stock_max_pct": 3,
+    },
+    3: {"label": "Moderate", "equity_min_pct": 60, "equity_max_pct": 75, "speculative_max_pct": 5, "worst_year_loss_pct": 25, "single_stock_max_pct": 5},
+    4: {
+        "label": "Moderately aggressive",
+        "equity_min_pct": 75,
+        "equity_max_pct": 90,
+        "speculative_max_pct": 10,
+        "worst_year_loss_pct": 33,
+        "single_stock_max_pct": 10,
+    },
+    5: {"label": "Aggressive", "equity_min_pct": 90, "equity_max_pct": 100, "speculative_max_pct": 20, "worst_year_loss_pct": 45, "single_stock_max_pct": 15},
 }
 
 # ---- Questions ----
@@ -310,7 +324,7 @@ def overlay(conn: sqlite3.Connection, data: dict) -> dict:
         return data
     if current is None:
         return data
-    risk = {k: current[k] for k in ("band", "name", "equity_pct", "speculative_max_pct", "worst_year_pct", "single_stock_max_pct", "version", "limited_by")}
+    risk = {k: current[k] for k in ("band", *BANDS[1], "version", "limited_by")}
     return {**data, "risk_level": current["band"], "risk": risk | {"source": "questionnaire"}}
 
 
@@ -322,12 +336,10 @@ def current(cfg: Config) -> dict | None:
     return {
         "version": row["version"],
         "band": row["band"],
-        "label": row["name"],
-        "equity_min_pct": row["equity_pct"][0],
-        "equity_max_pct": row["equity_pct"][1],
-        "speculative_max_pct": row["speculative_max_pct"],
-        "single_stock_max_pct": row["single_stock_max_pct"],
-        "worst_year_loss_pct": row["worst_year_pct"],
+        **{k: row[k] for k in BANDS[1]},
+        "tolerance_band": row["tolerance"]["band"],
+        "capacity_band": row["capacity"]["band"],
         "limited_by": row["limited_by"],
+        "answered_at": row["created_at"],
         "taken_at": row["created_at"],
     }
