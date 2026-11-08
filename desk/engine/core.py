@@ -13,7 +13,7 @@ from desk.engine import ENGINE_VERSION, fi, lookthrough, patterns, risk, scoring
 from desk.engine.backfill import NO_PRICES
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
-from desk.engine.holdings import price_series
+from desk.engine.holdings import matching_close, price_series
 from desk.engine.lots import current_lots
 from desk.engine.market import BENCHMARKS, last_trading_day
 from desk.engine.research import macro, research_symbols, signals
@@ -449,7 +449,8 @@ def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, da
         out.h(
             "symbol_kinds",
             "warn",
-            f"Not sure whether {', '.join(unknown)} are funds or single stocks. Fix: set DESK_SEC_USER_AGENT so the research job can load SEC's ticker lists.",
+            f"Not sure whether {', '.join(unknown)} are funds or single stocks. Fix: "
+            + ("the nightly research job loads SEC's ticker lists." if os.environ.get("DESK_SEC_USER_AGENT") else env_fix(["DESK_SEC_USER_AGENT"])),
         )
     rules, source = rules_in_force(cfg, plan)
     debit = -sum(h["value"] for h in rows if h["is_cash"] and h["value"] < 0)
@@ -706,7 +707,7 @@ def _research_metrics(out: Out, desk, kinds):
     covered = {r[0] for r in desk.execute("SELECT DISTINCT symbol FROM fundamentals")}
     bare = [s for s in symbols if s not in covered]
     if bare:
-        fix = "the nightly research job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else "set DESK_SEC_USER_AGENT in desk.env"
+        fix = "the nightly research job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else env_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
         out.h("research", "warn", f"No SEC company facts yet for {', '.join(bare[:10])}. Fix: {fix}.")
     elif symbols:
         out.h("research", "ok", f"SEC company facts for {len(symbols)} stocks.")
@@ -731,7 +732,7 @@ def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
     stale = [s for s in held if s in newest and newest[s] < session and s not in snap]
     broker = [s for s in held if s not in newest and s in no_source]
     notes = []
-    fix = "the overnight backfill fills them" if os.environ.get("TIINGO_API_KEY") else "set TIINGO_API_KEY in desk.env"
+    fix = "the overnight backfill fills them" if os.environ.get("TIINGO_API_KEY") else env_fix(["TIINGO_API_KEY"]).rstrip(".")
     if missing:
         notes.append(f"No close for {', '.join(missing)} on {as_of}. Fix: {fix}.")
     if stale:
@@ -742,7 +743,18 @@ def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
     return "closes", status, " ".join(notes) or f"Every holding has a close on {as_of}."
 
 
-def _value_check(rows, day: str) -> tuple[str, str, str]:
+def _snapshot_age(rows, day: str, series) -> str | None:
+    session = last_trading_day(date.fromisoformat(day)).isoformat()
+    priced = [h for h in rows if not h["is_cash"] and h["shares"] and h["reported_value"] and series.get(h["symbol"])]
+    newest = {h["symbol"]: max(d for d in series[h["symbol"]] if d <= day) for h in priced if any(d <= day for d in series[h["symbol"]])}
+    hits = [matching_close(series[h["symbol"]], h["reported_value"] / h["shares"], newest[h["symbol"]]) for h in priced if h["symbol"] in newest]
+    hits = [d for d in hits if d and d < session]
+    if not priced or len(hits) * 2 < len(priced):
+        return None
+    return max(set(hits), key=hits.count)
+
+
+def _value_check(rows, day: str, series=None) -> tuple[str, str, str]:
     mism = [h for h in rows if h["quality"] == "mismatch"]
     if mism:
         return (
@@ -766,7 +778,15 @@ def _value_check(rows, day: str) -> tuple[str, str, str]:
         return "value", "ok", f"Values match the broker on {day}."
     top = ", ".join(g for _, g in sorted(gaps, reverse=True)[:3])
     why = f" Biggest price gaps (close vs broker): {top}." if top else ""
-    return "value", "warn", f"{'; '.join(bad)}.{why} Fix: usually the broker priced at a different time; it clears once the day's official closes land."
+    age = _snapshot_age(rows, day, series or {})
+    if age:
+        return (
+            "value",
+            "warn",
+            f"{'; '.join(bad)}. The {day} snapshot carries {age} closes, so the broker figures are older than the desk's.{why} "
+            "Fix: nothing to do; the desk values at the newer closes and the next sync catches up.",
+        )
+    return "value", "warn", f"{'; '.join(bad)}.{why} Fix: the broker priced at a different time than the close; it clears with the next snapshot."
 
 
 def _flows_check(implied: dict[tuple[str, str], float], holdings) -> tuple[str, str, str]:
@@ -786,13 +806,16 @@ def _flows_check(implied: dict[tuple[str, str], float], holdings) -> tuple[str, 
     )
 
 
+def env_fix(keys: list[str]) -> str:
+    return f"set {', '.join(keys)} in desk.env, then redeploy the app."
+
+
 def _market_keys() -> tuple[str, str, str]:
     need = [(k, why) for k, why in MARKET_KEYS if not os.environ.get(k)]
     if not need:
         return "market_keys", "ok", "Tiingo, Finnhub, FRED and SEC are all set."
     gaps = "; ".join(f"{k} ({why})" for k, why in need)
-    status = "warn" if any(k == "TIINGO_API_KEY" for k, _ in need) else "ok"
-    return "market_keys", status, f"Missing {gaps}. Fix: run the setup script again and answer n to keeping desk.env."
+    return "market_keys", "warn", f"Missing {gaps}. Fix: {env_fix([k for k, _ in need])}"
 
 
 def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
@@ -811,7 +834,7 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
     out.h(*_flows_check(out.implied, holdings))
     snap_days = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
     if snap_days:
-        out.h(*_value_check(holdings[max(snap_days)], max(snap_days)))
+        out.h(*_value_check(holdings[max(snap_days)], max(snap_days), price_series(mirror, desk)))
     out.h(*_market_keys())
     lots = []
     if desk.execute("SELECT 1 FROM sqlite_master WHERE name='lots'").fetchone():

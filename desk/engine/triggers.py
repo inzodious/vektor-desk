@@ -13,6 +13,7 @@ from desk.notify import publish
 MOVE_BY_RISK = {1: 1.0, 2: 1.5, 3: 2.0, 4: 3.0, 5: 4.0}
 HOLDING_MOVE_X = 2.5
 MAX_GAP_DAYS = 5
+DETECTED = {"margin_debit", "daily_move", "concentration", "rule_breach", "earnings", "deposit_landed"}
 ALERTS = {
     "margin_debit": ("Margin debit on the desk", "high"),
     "daily_move": ("Big move today", "default"),
@@ -141,9 +142,28 @@ def _words(t: dict) -> str:
     return ""
 
 
+def refresh(conn: sqlite3.Connection, as_of: str, found: list[tuple[str, str, str, dict]]) -> int:
+    keep = {(kind, scope_id): detail for _, kind, scope_id, detail in found}
+    gone = 0
+    with conn:
+        rows = conn.execute("SELECT kind, scope_id FROM triggers WHERE as_of=?", (as_of,)).fetchall()
+        for r in rows:
+            if r["kind"] not in DETECTED:
+                continue
+            key = (r["kind"], r["scope_id"])
+            if key in keep:
+                conn.execute("UPDATE triggers SET detail=? WHERE as_of=? AND kind=? AND scope_id=?", (json.dumps(keep[key]), as_of, *key))
+            else:
+                conn.execute("DELETE FROM triggers WHERE as_of=? AND kind=? AND scope_id=?", (as_of, *key))
+                gone += 1
+    return gone
+
+
 def run(cfg: Config, conn: sqlite3.Connection, as_of: str, *, now: datetime | None = None) -> dict:
-    new = record(cfg, conn, detect(cfg, conn, as_of, now=now), now=now)
-    return {"new": len(new), "kinds": sorted({t["kind"] for t in new})}
+    found = detect(cfg, conn, as_of, now=now)
+    gone = refresh(conn, as_of, found)
+    new = record(cfg, conn, found, now=now)
+    return {"new": len(new), "kinds": sorted({t["kind"] for t in new}), "withdrawn": gone}
 
 
 def today(cfg: Config) -> list[dict]:

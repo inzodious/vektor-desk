@@ -114,7 +114,7 @@ def activity_by_date(rows) -> dict[str, list[dict]]:
     return out
 
 
-def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict]) -> bool:
+def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict], price=None) -> bool:
     moved = False
     for r in rows:
         account = str(r.get("accountKey") or "account")
@@ -123,6 +123,11 @@ def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict]) -> bool:
         qty = _num(r.get("quantity"))
         amount = _num(r.get("amount")) or 0.0
         core = bool(r.get("core")) or symbol in CASH_SYMBOLS
+        if kind in SHARE_KINDS and symbol and not core and not qty:
+            px = price(symbol) if price and amount else None
+            if not px:
+                continue
+            qty = -amount / px
         if kind in SHARE_KINDS and symbol and not core and qty:
             cur = held.setdefault((account, symbol), {"shares": 0.0, "value": 0.0, "cost": None, "is_cash": False})
             cur["shares"] += qty
@@ -137,6 +142,15 @@ def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict]) -> bool:
 
 
 # ---- Daily holdings ----
+
+
+def matching_close(series: dict[str, tuple], price: float, before: str, lookback: int = 10) -> str | None:
+    days = sorted(d for d in series if d < before)[-lookback:]
+    for d in reversed(days):
+        c = series[d][0]
+        if c and abs(c - price) <= max(0.005, abs(price) * 0.0002):
+            return d
+    return None
 
 
 class Prices:
@@ -154,6 +168,9 @@ class Prices:
             return None
         i = bisect_right(dates, day)
         return (dates[i - 1], self.series[symbol][dates[i - 1]][0]) if i else None
+
+    def older_match(self, symbol: str, price: float, before: str) -> str | None:
+        return matching_close(self.series.get(symbol, {}), price, before)
 
     def calendar(self) -> set[str]:
         return {d for ds in self.dates.values() for d in ds}
@@ -187,6 +204,13 @@ def build_days(anchor_list: list[Anchor], prices: Prices, through: str | None = 
     return sorted(d for d in days if start <= d <= end)
 
 
+def _anchor_price(a: Anchor, symbol: str) -> float | None:
+    for (_, sym), h in a.rows.items():
+        if sym == symbol and h["shares"] and not h["is_cash"]:
+            return h["value"] / h["shares"]
+    return None
+
+
 def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str, list[dict]], days: list[str]) -> list[tuple]:
     out = []
     anchor_dates = [a.date for a in anchor_list]
@@ -199,7 +223,7 @@ def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str,
             source, quality = "rolled", "pro_forma"
             lo, hi = bisect_right(act_dates, a.date), bisect_right(act_dates, day)
             for d in act_dates[lo:hi]:
-                apply_activity(held, activity[d])
+                apply_activity(held, activity[d], lambda sym, d=d, a=a: prices.close(sym, d) or _anchor_price(a, sym))
         for (account, symbol), h in sorted(held.items()):
             row_quality = quality
             if h["is_cash"]:
@@ -209,7 +233,8 @@ def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str,
                 base = a.rows.get((account, symbol))
                 implied = base["value"] / base["shares"] if base and base["shares"] else None
                 close = found[1] if found else None
-                if source == "snapshot" and implied is not None and found is not None and found[0] < last_trading_day(date.fromisoformat(day)).isoformat():
+                lagging = found is not None and found[0] < last_trading_day(date.fromisoformat(day)).isoformat()
+                if source == "snapshot" and implied is not None and lagging and not prices.older_match(symbol, implied, found[0]):
                     close = implied
                 elif close is None:
                     close = implied

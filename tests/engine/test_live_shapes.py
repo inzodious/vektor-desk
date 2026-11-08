@@ -296,3 +296,66 @@ def test_a_transfer_on_a_rolled_day_is_not_return(cfg, mirror):
     assert rows_on(cfg, FRI)[(IND, "SPAXX")]["value"] == 1500.0
     out, _, day = stored_run(cfg)
     assert out.implied == {} and day == pytest.approx(30 / 3500 * 100, abs=1e-3)
+
+
+# ---- QA pass on real shapes ----
+
+WED = "2026-11-04"
+
+
+def one_snapshot(m, day, rows, stamp="21:30"):
+    m.put("snapshots", 1, snapshot(1, f"{day}T{stamp}", sum(r[3] for r in rows), len(rows)))
+    for pid, (acct, sym, qty, value, cash) in enumerate(rows, start=1):
+        m.put("positions", pid, position(pid, 1, acct, sym, qty, value, value, cash=cash))
+
+
+def test_buys_without_quantity_move_shares_at_the_days_close(cfg, mirror):
+    one_snapshot(mirror, THU, [(IND, "ROKT", 100.0, 3000.0, False), (IND, "SPAXX", 3000.0, 3000.0, True)])
+    mirror.put("priceCloses", "ROKT_2026", closes_doc("ROKT", 2026, [[THU, 30.0, 30.0], [FRI, 30.3, 30.3]]))
+    mirror.put("activity", "b1", {"date": FRI, "accountKey": IND, "kind": "buy", "symbol": "ROKT", "quantity": None, "amount": -1515.0})
+    mirror.put("activity", "b2", {"date": FRI, "accountKey": IND, "kind": "buy", "symbol": "Z9999", "amount": -100.0})
+    mirror.pull(f"{SAT}T14:00:00+00:00")
+    run_holdings(cfg)
+    fri = rows_on(cfg, FRI)
+    assert fri[(IND, "ROKT")]["shares"] == pytest.approx(150.0) and fri[(IND, "SPAXX")]["value"] == 1485.0
+    assert (IND, "Z9999") not in fri
+    _, _, day = stored_run(cfg)
+    assert day == pytest.approx(30 / 6000 * 100, abs=1e-3)
+
+
+def test_recomputing_a_day_withdraws_triggers_that_no_longer_hold(cfg, mirror):
+    from desk.engine import triggers
+
+    seed_two_snapshots(mirror)
+    run_holdings(cfg)
+    stored_run(cfg)
+    desk = connect(cfg.desk_db)
+    with desk:
+        desk.execute("INSERT INTO triggers VALUES (?, 'daily_move', 'Q20002', '{\"ret_pct\": -12.5}', 'x')", (FRI,))
+        desk.execute("INSERT INTO triggers VALUES (?, 'lot_export', 'lots', '{}', 'x')", (FRI,))
+    result = triggers.run(cfg, desk, FRI, now=SAT_NOW)
+    left = {(r[0], r[1]) for r in desk.execute("SELECT kind, scope_id FROM triggers WHERE as_of=?", (FRI,))}
+    desk.close()
+    assert result["withdrawn"] == 1 and ("daily_move", "Q20002") not in left and ("lot_export", "lots") in left
+
+
+def test_a_snapshot_carrying_older_closes_is_called_stale(cfg, mirror):
+    one_snapshot(mirror, FRI, [(IND, "ROKT", 100.0, 2900.0, False), (IND, "SPAXX", 100.0, 100.0, True)], stamp="08:00")
+    mirror.put("priceCloses", "ROKT_2026", closes_doc("ROKT", 2026, [["2026-11-03", 28.0, 28.0], [WED, 29.0, 29.0], [THU, 30.0, 30.0]]))
+    mirror.pull(f"{SAT}T14:00:00+00:00")
+    run_holdings(cfg)
+    assert rows_on(cfg, FRI)[(IND, "ROKT")]["close"] == 30.0
+    status, detail = health(cfg)["value"]
+    assert status == "warn" and f"carries {WED} closes" in detail and "Fix: nothing to do" in detail
+
+
+def test_market_keys_warn_for_any_missing_key(cfg, mirror, monkeypatch):
+    for key in ("TIINGO_API_KEY", "FINNHUB_API_KEY", "FRED_API_KEY"):
+        monkeypatch.setenv(key, "k")
+    monkeypatch.delenv("DESK_SEC_USER_AGENT", raising=False)
+    seed_like_the_box(mirror)
+    run_holdings(cfg)
+    checks = health(cfg)
+    status, detail = checks["market_keys"]
+    assert status == "warn" and detail.endswith("Fix: set DESK_SEC_USER_AGENT in desk.env, then redeploy the app.")
+    assert all("answer n" not in d for _, d in checks.values())

@@ -427,7 +427,9 @@ def metrics(out, desk: sqlite3.Connection, kinds: dict[str, str], profiles: dict
     ]
     missing = sorted(f for f, v in view["funds"].items() if not v["holdings"] and f not in SECTOR_FUNDS)
     if missing:
-        fix = "the weekly look-through job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else "set DESK_SEC_USER_AGENT in desk.env"
+        fix = (
+            "the weekly look-through job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else "set DESK_SEC_USER_AGENT in desk.env, then redeploy the app"
+        )
         out.h("lookthrough", "warn", f"No N-PORT holdings yet for {', '.join(missing)}. Fix: {fix}.")
     elif stale:
         out.h(
