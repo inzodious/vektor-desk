@@ -4,6 +4,24 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.4 - 2026-11-08
+
+### Added
+
+- `deploy.sh status` says when the installed compose is older than the checkout ([#92])
+
+### Changed
+
+- Deposits default to auto: the desk reads deposits from activity at each sync, predicts dates only for a clear pattern, and treats irregular cash as money-in that never reads as late or missed; `profile deposits-auto` switches an existing desk.yaml ([#95])
+
+### Fixed
+
+- Synced buys and sells without quantities roll forward correctly, so trades no longer show as losses, fake deposits or margin buys ([#94])
+- Recomputed days drop triggers that no longer hold, stale broker snapshots are called out, and every missing key warns with one fix ([#94])
+- Agent runs no longer fail on the Claude CLI rejecting the output schema ([#93])
+- Transfers with EFT/ACH wording count as deposits or withdrawals in returns ([#90])
+- The eval container takes sessions started from Claude projects and exports its redacted debug log ([#91])
+
 ## 1.0.3 - 2026-11-07
 
 ### Added
@@ -264,3 +282,9 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#86]: https://github.com/inzodious/vektor-desk/pull/86
 [#87]: https://github.com/inzodious/vektor-desk/pull/87
 [#88]: https://github.com/inzodious/vektor-desk/pull/88
+[#90]: https://github.com/inzodious/vektor-desk/pull/90
+[#91]: https://github.com/inzodious/vektor-desk/pull/91
+[#92]: https://github.com/inzodious/vektor-desk/pull/92
+[#93]: https://github.com/inzodious/vektor-desk/pull/93
+[#94]: https://github.com/inzodious/vektor-desk/pull/94
+[#95]: https://github.com/inzodious/vektor-desk/pull/95
