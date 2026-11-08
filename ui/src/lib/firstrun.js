@@ -28,7 +28,7 @@ export function firstRunSteps({ status, jobs, health, profile, agents, board } =
       title: 'Connect Claude',
       line: 'The desks think through the Claude Code CLI on your subscription.',
       state: !ready(status) ? 'loading' : token === 'ok' || token === 'renew' ? 'done' : 'todo',
-      action: { kind: 'link', to: '/settings', label: 'See the token' },
+      action: { kind: 'link', to: '/settings#keys', label: token === 'ok' || token === 'renew' ? 'See the token' : 'Add the token' },
     },
     {
       id: 'backfill',

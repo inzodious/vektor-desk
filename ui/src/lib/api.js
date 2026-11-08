@@ -81,6 +81,18 @@ export async function postJson(path, body = {}, { method = 'POST' } = {}) {
   return data;
 }
 
+export async function getText(path, { signal } = {}) {
+  let res;
+  try {
+    res = await fetch(path, { signal, cache: 'no-store' });
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    throw new ApiError(0, 'offline');
+  }
+  if (!res.ok) throw new ApiError(res.status, `HTTP ${res.status}`);
+  return res.text();
+}
+
 export async function putFile(path, file) {
   let res;
   try {
