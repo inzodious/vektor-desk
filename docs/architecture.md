@@ -130,6 +130,14 @@ Never in the repo, a chat or an issue. Everything lives in root-only files besid
 
 Alpaca keys are paper keys only (CLAUDE.md). `desk.paper_check.paper_base()` returns the one allowed base URL, `https://paper-api.alpaca.markets`, and raises `NotPaper` for anything else, including an `ALPACA_BASE_URL` override. Code that calls Alpaca builds its URLs from it. The lab container has no network, so paper orders go out from `cron`.
 
+**Keys from the app** (Settings → Keys) are write-only. `PUT /api/box/keys/{NAME}` with `{"value": "..."}` seals the value to the box's own RSA-3072 key (OAEP-SHA256) and drops `data/run/box/keys/{NAME}.req`, mode 600. The private key, `/mnt/Manifest/apps/vektor-desk/box-keys.pem`, is root-only and outside `/data`, so neither the API nor any container that shares `data/run` can open a pending request. On its next run (within 5 minutes), the pinned `deploy.sh` decrypts the value, checks it again, writes that one line into the right env file (the same mapping as `setup-truenas.sh set`; a test keeps the two in step), and queues a redeploy. No call ever returns a value.
+
+| Call | Answer |
+|---|---|
+| `GET /api/box/keys` | `{now, host_alive, ready, keys: [{name, file, secret, what, set, pending, last}]}`; `last` is `null` or `{name, request_id, result: saved\|refused\|failed, message, at}` |
+| `PUT /api/box/keys/{NAME}` | `202 {ok: true, name, request_id, requested_at, message}` |
+| Refusals | `{ok: false, error, message}`: `400 bad_body`; `404 refused` for a name that isn't a desk key (listed above, or already in an env file); `400 refused` for `PATH`, `HOME`, `LD_*`, `PYTHON*` and the like, an empty value, more than 1024 characters, a line break or `'`, an `ALPACA_API_KEY_ID` not starting `PK` (live keys never), or an `ALPACA_*URL*` that isn't the paper API; `503 host_down` until the box has checked in with its key |
+
 The service account can also read life-stack's `users/` data in the same Firebase project. That's acceptable for a personal box, but keep its only copy on the NAS and in your password manager.
 
 ## Backups
@@ -173,6 +181,7 @@ The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free.
 | Status | `deploy.sh status`, or `https://desk.escape-vektor.com/api/status` |
 | Pull Escape Vektor now | Settings → Jobs → Run now, or `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
 | Run any scheduled job now | Settings → Jobs (Run now, below); no SSH needed |
+| A key or setting changes | Settings → Keys (Secrets, above); saved and redeployed within 5 minutes |
 | Redeploy, status, check, backup, restore drill, logs, update box script, apply compose | Settings → Box (Box actions, below); picked up within 5 minutes |
 | Drop a Fidelity export in the inbox | Settings → Upload (Inbox upload, below) |
 | Logs | `docker logs -f vektor-desk-cron`, `docker logs vektor-desk-api`, `docker logs vektor-desk-caddy`, `tail -f /mnt/Manifest/apps/vektor-desk/deploy.log`; redacted copies in `data/run/logs` every 5 minutes (`deploy.sh logs` now) |
@@ -243,7 +252,7 @@ Each package under `desk/` plugs in through three optional modules, found on the
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
 | `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command"}` dicts | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
 
-Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/box/...`, `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
+Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
 ## Web app
 
