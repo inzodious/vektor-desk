@@ -270,6 +270,20 @@ def test_unpriced_plan_codes_never_fire_a_daily_move(cfg, mirror):
     assert moves.get("ROKT") == 20.0 and "Q20002" not in moves
 
 
+def test_unpriced_plan_funds_move_in_a_line_between_snapshots(cfg, mirror):
+    days = ["2026-11-02", "2026-11-03", WED, THU]
+    for sid, (day, unit) in enumerate([(days[0], 10.0), (THU, 13.0)], start=1):
+        mirror.put("snapshots", sid, snapshot(sid, f"{day}T21:30", 100 * unit + 3000.0, 2))
+        mirror.put("positions", sid * 10 + 1, position(sid * 10 + 1, sid, "k401-0009", "Q20002", 100.0, 100 * unit, 100 * unit))
+        mirror.put("positions", sid * 10 + 2, position(sid * 10 + 2, sid, IND, "ROKT", 100.0, 3000.0, 3000.0))
+    mirror.put("priceCloses", "ROKT_2026", closes_doc("ROKT", 2026, [[d, 30.0, 30.0] for d in days]))
+    mirror.pull(f"{SAT}T14:00:00+00:00")
+    run_holdings(cfg)
+    closes = [rows_on(cfg, d)[("k401-0009", "Q20002")]["close"] for d in days]
+    assert closes == [10.0, 11.0, 12.0, 13.0]
+    assert rows_on(cfg, WED)[("k401-0009", "Q20002")]["quality"] == "pro_forma"
+
+
 def test_eft_and_ach_transfers_are_external_flows():
     from desk.engine.flows import classify
 
@@ -341,14 +355,33 @@ def test_recomputing_a_day_withdraws_triggers_that_no_longer_hold(cfg, mirror):
     assert result["withdrawn"] == 1 and ("daily_move", "Q20002") not in left and ("lot_export", "lots") in left
 
 
-def test_a_snapshot_carrying_older_closes_is_called_stale(cfg, mirror):
+def test_a_snapshot_carrying_older_closes_counts_as_of_those_closes(cfg, mirror):
     one_snapshot(mirror, FRI, [(IND, "ROKT", 100.0, 2900.0, False), (IND, "SPAXX", 100.0, 100.0, True)], stamp="08:00")
     mirror.put("priceCloses", "ROKT_2026", closes_doc("ROKT", 2026, [["2026-11-03", 28.0, 28.0], [WED, 29.0, 29.0], [THU, 30.0, 30.0]]))
     mirror.pull(f"{SAT}T14:00:00+00:00")
     run_holdings(cfg)
-    assert rows_on(cfg, FRI)[(IND, "ROKT")]["close"] == 30.0
-    status, detail = health(cfg)["value"]
-    assert status == "warn" and f"carries {WED} closes" in detail and "Fix: nothing to do" in detail
+    assert rows_on(cfg, WED)[(IND, "ROKT")]["source"] == "snapshot"
+    assert rows_on(cfg, THU)[(IND, "ROKT")]["close"] == 30.0 and rows_on(cfg, THU)[(IND, "ROKT")]["source"] == "rolled"
+    assert health(cfg)["value"][0] == "ok"
+
+
+def test_a_stale_snapshot_never_undoes_later_trades(cfg, mirror):
+    wed = [(IND, "ROKT", 100.0, 2900.0, False), (IND, "SPAXX", 2000.0, 2000.0, True)]
+    mirror.put("snapshots", 1, snapshot(1, f"{WED}T21:30", 4900.0, 2))
+    mirror.put("snapshots", 2, snapshot(2, f"{FRI}T08:00", 4900.0, 2))
+    pid = 0
+    for sid in (1, 2):
+        for acct, sym, qty, value, cash in wed:
+            pid += 1
+            mirror.put("positions", pid, position(pid, sid, acct, sym, qty, value, value, cash=cash))
+    mirror.put("priceCloses", "ROKT_2026", closes_doc("ROKT", 2026, [["2026-11-03", 28.0, 28.0], [WED, 29.0, 29.0], [THU, 30.0, 30.0], [FRI, 31.0, 31.0]]))
+    mirror.put("activity", "b1", {"date": THU, "accountKey": IND, "kind": "buy", "symbol": "ROKT", "quantity": 50.0, "amount": -1500.0})
+    mirror.pull(f"{SAT}T14:00:00+00:00")
+    run_holdings(cfg)
+    fri = rows_on(cfg, FRI)
+    assert fri[(IND, "ROKT")]["shares"] == 150.0 and fri[(IND, "SPAXX")]["value"] == 500.0
+    out_flows = health(cfg)["flows"]
+    assert out_flows[0] == "ok" and "matches prices plus recorded activity" in out_flows[1]
 
 
 def test_market_keys_warn_for_any_missing_key(cfg, mirror, monkeypatch):
@@ -370,3 +403,23 @@ def test_money_in_without_a_schedule_reads_as_money_landed():
     planned = _words(base | {"detail": {"date": FRI, "account": IND, "expected": THU, "scheduled": True}})
     loose = _words(base | {"detail": {"date": FRI, "account": IND, "expected": FRI, "scheduled": False}})
     assert planned == f"The deposit expected {THU} landed on {FRI}." and loose == f"Money landed in {IND} on {FRI}."
+
+
+def test_flow_gaps_on_a_broker_covered_account_are_called_out():
+    holdings = {FRI: [{"source": "snapshot"}]}
+    implied = {(IND, FRI): -812.5}
+    assert core._flows_check(implied, holdings)[1] == "ok"
+    _, status, detail = core._flows_check(implied, holdings, {IND: ("2026-09-01", SAT)})
+    assert status == "warn" and "missing or misread row" in detail and "-812.50" in detail
+    assert core._flows_check(implied, holdings, {IND: ("2026-09-01", THU)})[1] == "ok"
+
+
+def test_unmatched_mirror_rows_are_info_and_unmapped_accounts_warn():
+    from desk.engine.broker import History
+
+    rows = [{"date": THU, "accountKey": IND, "kind": "buy", "symbol": "ROKT", "amount": -10.0}]
+    kept = History(rows=rows, cover={IND: ("2026-09-01", FRI)}, kept=rows)
+    _, status, detail = core._history_check(kept)
+    assert status == "ok" and "1 Escape Vektor rows inside those dates had no broker match" in detail
+    _, status, detail = core._history_check(History(rows=rows, cover={IND: ("2026-09-01", FRI)}, unmapped=["X1234"]))
+    assert status == "warn" and "X1234" in detail and "Fix:" in detail
