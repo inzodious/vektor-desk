@@ -280,6 +280,12 @@ def clusters(conn: sqlite3.Connection, days: int = CLUSTER_DAYS, buyers: int = C
     return out
 
 
+def history_names(conn: sqlite3.Connection) -> list[str]:
+    first = sorted(set(clusters(conn)) | {BENCHMARK})
+    rest = [r[0] for r in conn.execute("SELECT symbol FROM insider_buys WHERE filed_date >= ? GROUP BY symbol ORDER BY min(filed_date)", (HISTORY_START,))]
+    return first + [s for s in rest if s not in set(first)]
+
+
 def fetch_history(conn: sqlite3.Connection, http, symbols: list[str], *, now: datetime, sleep=time.sleep) -> dict:
     done = {r[0] for r in conn.execute("SELECT symbol FROM alpaca_history")}
     todo = [s for s in symbols if s not in done][:HISTORY_PER_RUN]
@@ -383,7 +389,7 @@ def run(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> d
         out["live"] = fetch_form4(conn, http, agent, sleep=sleep)
         out["frames"] = fetch_frames(conn, http, agent, now=now, sleep=sleep)
         if alpaca.headers() is not None:
-            names = sorted(set(clusters(conn)) | {BENCHMARK})
+            names = history_names(conn)
             out["history"] = fetch_history(conn, http, names, now=now, sleep=sleep)
         else:
             out["history"] = {"skipped": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"}

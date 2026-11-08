@@ -264,6 +264,40 @@ CREATE TABLE IF NOT EXISTS smallcap_months (
   dollar_volume REAL NOT NULL,
   PRIMARY KEY (symbol, month)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS eps_facts (
+  cik INTEGER NOT NULL,
+  start TEXT NOT NULL,
+  end TEXT NOT NULL,
+  val REAL NOT NULL,
+  filed TEXT NOT NULL,
+  form TEXT NOT NULL,
+  accn TEXT,
+  PRIMARY KEY (cik, start, end)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS earnings_releases (
+  cik INTEGER NOT NULL,
+  accepted TEXT NOT NULL,
+  PRIMARY KEY (cik, accepted)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS earnings_ciks (
+  cik INTEGER PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  fetched_at TEXT NOT NULL,
+  facts INTEGER NOT NULL,
+  releases INTEGER NOT NULL
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS earnings_events (
+  symbol TEXT NOT NULL,
+  cik INTEGER NOT NULL,
+  period_end TEXT NOT NULL,
+  known TEXT NOT NULL,
+  source TEXT NOT NULL,
+  eps REAL NOT NULL,
+  eps_prior REAL NOT NULL,
+  price REAL NOT NULL,
+  surprise REAL NOT NULL,
+  PRIMARY KEY (cik, period_end)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS lane_variants (
   id TEXT NOT NULL,
   version INTEGER NOT NULL,

@@ -464,7 +464,7 @@ Backtestable small-cap family: directors and officers buying their own stock on 
 | Bulk history | `insider_buys`, `insider_quarters` | SEC Insider Transactions data sets, one zip per quarter from 2016 Q1 (Alpaca bars start 2016), 8 quarters a night until caught up. Form 4 and 4/A, transaction code P, acquired, shares and price above 0, owner is a director or officer (10% owners alone are left out). One row per filing and owner: shares, dollars, latest trade date, filing date |
 | Live | `insider_buys` (`source` form4), `insider_form4_seen` | Form 4s in `filings_feed` (universe names) after the last bulk quarter: the raw XML, same rules, 200 a night. Bulk rows replace them when the quarter is published |
 | Known date | | The session after the filing date. Nothing counts before then |
-| Prices | `alpaca_bars`, `alpaca_history` | Names that ever had 2 or more insiders buying within 30 days, plus IWM: daily bars since 2016-01-01 (raw and adjusted), 300 names a night |
+| Prices | `alpaca_bars`, `alpaca_history` | Names with any director or officer buy since 2016, cluster names (2+ insiders within 30 days) and IWM first: daily bars since 2016-01-01 (raw and adjusted), 300 names a night. Roughly 2,500 rows a name |
 | Share counts | `sec_shares`, `sec_frames` | SEC `dei:EntityCommonStockSharesOutstanding` frames since late 2014, each quarter once (the last two refresh) |
 | Membership | `smallcap_months` | At each month's first session: shares from a period ending 45+ days earlier (under 400 days old) × raw close between $50M and $2B, and median dollar volume over the prior 20 sessions at least $500K. The whole month uses that answer |
 
@@ -485,6 +485,24 @@ A cluster rule is `{"metric_id": "insider.buyers", "window": "21d", "transform":
 | `delist_total_loss` | The holdout, rerun with every delisting sold at zero instead of the usual 30% haircut, still beats the benchmark |
 
 The counts and the stressed excess also go into the verdict's caveats.
+
+## Post-earnings drift: data
+
+Second small-cap family: prices keep drifting after a big earnings change. Module `desk.engine.earnings`, job `earnings` nightly 23:50 ET, same `small_caps` universe and survivorship bars.
+
+| Piece | Table | Rule |
+|---|---|---|
+| EPS | `eps_facts` | SEC `companyconcept` `us-gaap/EarningsPerShareDiluted` (basic if none) per company, from 10-Q and 10-K only, the first-filed value for each period (restatements ignored). Quarters are 80–100 day facts; Q4 = the fiscal year less its three quarters |
+| News time | `earnings_releases` | 8-K item 2.02 acceptance times from the submissions JSON (recent plus older files since 2015). The quarter is known at the first 2.02 release after the period end and within 50 days before the 10-Q/10-K, else the filing date; then the next open (before 9:30 ET counts that day) |
+| Companies | `earnings_ciks` | Insider names that have price history, plus today's universe; 300 a night; refreshed every 30 days |
+| Events | `earnings_events` | Since 2015: (EPS − EPS of the quarter ending about a year earlier) ÷ the close before the known day; closes under $1 skipped |
+
+| Feature | Value on day d |
+|---|---|
+| `earnings.surprise` | The latest event's surprise, if it was known inside the window |
+| `earnings.days_since` | Sessions since that event, if inside the window |
+
+A drift rule is `{"metric_id": "earnings.surprise", "window": "63d", "transform": "rank"}` with `top_n` and `min_signal: 0`. `lab-export` adds table `earnings(symbol, known, surprise)` and `earnings_coverage` (companies wanted, priced, unpriced, pending, ended within a year, events); a drift spec's verdict uses that count for `price_coverage`.
 
 ## Paper trading: lanes, sub-ledgers, leaderboard
 
@@ -630,7 +648,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 | Field | Accepted |
 |---|---|
 | `universe` | `{"type": "fund_list", "set": "sector_etfs" \| "core_etfs" \| "benchmarks"}`, `{"type": "fund_list", "symbols": [funds only]}`, a `rule` naming a set, or `{"type": "screen", "min_history_days", "min_price"}` for single stocks (survivorship caveat), or `{"type": "small_caps", "min_price"}` (default 2) for point-in-time small caps, benchmark IWM. A hand-picked stock list is rejected |
-| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `range_52w`, `dd`, `insider.buyers`, `insider.buy_usd`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
+| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `range_52w`, `dd`, `insider.buyers`, `insider.buy_usd`, `earnings.surprise`, `earnings.days_since`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
 | `entry` | `{"top_n": 3 \| "param:top_n", "min_signal": 0}` or "top 3 by rank". `min_signal` applies to the first signal's raw value; slots it leaves empty stay in cash |
 | `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
 | `rebalance`, `sizing` | Weekly, monthly or quarterly; `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash |
@@ -791,6 +809,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekdays 19:30 ET | `universe`: Alpaca assets, SEC share counts, daily bars, then that day's universe |
 | Nightly 03:35 ET | `filings`: yesterday's EDGAR index for universe names, then excerpts (before the scorer at 04:15) |
 | Nightly 23:20 ET | `insider`: SEC insider quarters, live Form 4s, share frames, price history for cluster names, small-cap months (before `lab-export` at 00:55) |
+| Nightly 23:50 ET | `earnings`: EPS facts and release times for 300 companies, then every surprise event |
 | Weekdays 08:45 and 16:45 ET | `paper`: lanes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 

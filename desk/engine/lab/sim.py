@@ -99,6 +99,12 @@ def _price(data: LabData, sym: str, day: str, field_: str = "adj") -> float | No
     return s.open_adj[i] if field_ == "open" else s.adj[i]
 
 
+def _events(data: LabData, metric: str, sym: str):
+    if metric in features.EARNINGS_FEATURES:
+        return data.earnings.get(sym)
+    return data.insider.get(sym)
+
+
 def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dict[str, float]:
     raw: dict[str, list[float]] = {}
     for sym in universe(data, spec, day):
@@ -106,7 +112,7 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         i = s.index.get(day)
         if i is None:
             continue
-        vals = [features.value(m, s, i, w, data.insider.get(sym)) for (m, _, _), w in zip(spec.signals, v.windows, strict=True)]
+        vals = [features.value(m, s, i, w, _events(data, m, sym)) for (m, _, _), w in zip(spec.signals, v.windows, strict=True)]
         if any(x is None for x in vals):
             continue
         raw[sym] = vals
