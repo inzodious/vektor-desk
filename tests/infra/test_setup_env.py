@@ -75,3 +75,12 @@ def test_redeploy_waits_for_a_running_desk_job(tmp_path):
     assert res.returncode == 75
     assert "mirror (since 09:00)" in res.stdout + res.stderr
     assert "app.redeploy" not in (tmp_path / "calls").read_text()
+
+
+def test_set_puts_alpaca_paper_keys_in_desk_env_hidden(tmp_path):
+    (tmp_path / "desk.env").write_text("TIINGO_API_KEY=t1\n")
+    res = set_key(tmp_path, "ALPACA_API_KEY_ID", "PKTESTONLY ")
+    assert res.returncode == 0, res.stderr
+    assert "PKTESTONLY" not in res.stdout + res.stderr
+    assert (tmp_path / "desk.env").read_text().splitlines() == ["TIINGO_API_KEY=t1", "ALPACA_API_KEY_ID=PKTESTONLY"]
+    assert not (tmp_path / "settings.env").exists()

@@ -123,10 +123,12 @@ Never in the repo, a chat or an issue. Everything lives in root-only files besid
 | File in `/mnt/Manifest/apps/vektor-desk/` | Names | Read by |
 |---|---|---|
 | `settings.env` | `DESK_FIREBASE_PROJECT`, `DESK_UID`, `DESK_CLAUDE_TOKEN_EXPIRES` (settings, not secret) | api, cron |
-| `desk.env` | `CLAUDE_CODE_OAUTH_TOKEN`, `TIINGO_API_KEY`, `FINNHUB_API_KEY`, `FRED_API_KEY`, `DESK_SEC_USER_AGENT` | cron |
+| `desk.env` | `CLAUDE_CODE_OAUTH_TOKEN`, `TIINGO_API_KEY`, `FINNHUB_API_KEY`, `FRED_API_KEY`, `DESK_SEC_USER_AGENT`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY` (Alpaca **paper** only) | cron |
 | `caddy.env` | `PORKBUN_API_KEY`, `PORKBUN_API_SECRET_KEY` | caddy |
 | `tailscale.env` | `TS_AUTHKEY` (first sign-in only) | tailscale |
 | `firestore-reader.json` | the service account key, owned by `apps`, mode 400 | cron |
+
+Alpaca keys are paper keys only (CLAUDE.md). `desk.paper_check.paper_base()` returns the one allowed base URL, `https://paper-api.alpaca.markets`, and raises `NotPaper` for anything else, including an `ALPACA_BASE_URL` override. Code that calls Alpaca builds its URLs from it. The lab container has no network, so paper orders go out from `cron`.
 
 The service account can also read life-stack's `users/` data in the same Firebase project. That's acceptable for a personal box, but keep its only copy on the NAS and in your password manager.
 

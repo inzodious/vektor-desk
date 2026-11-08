@@ -65,7 +65,7 @@ env_file_for() {
   local key=$1 f
   case $key in
     DESK_FIREBASE_PROJECT | DESK_UID | DESK_CLAUDE_TOKEN_EXPIRES) echo settings.env ;;
-    CLAUDE_CODE_OAUTH_TOKEN | TIINGO_API_KEY | FINNHUB_API_KEY | FRED_API_KEY | DESK_SEC_USER_AGENT) echo desk.env ;;
+    CLAUDE_CODE_OAUTH_TOKEN | TIINGO_API_KEY | FINNHUB_API_KEY | FRED_API_KEY | DESK_SEC_USER_AGENT | ALPACA_API_KEY_ID | ALPACA_API_SECRET_KEY) echo desk.env ;;
     PORKBUN_API_KEY | PORKBUN_API_SECRET_KEY) echo caddy.env ;;
     TS_AUTHKEY) echo tailscale.env ;;
     *)
@@ -173,8 +173,11 @@ if ! keep "$ROOT/desk.env"; then
   finnhub=$(ask "Finnhub key" secret)
   fred=$(ask "FRED key (free, fred.stlouisfed.org)" secret)
   sec=$(ask "SEC contact for its User-Agent, e.g. 'Vektor Desk you@example.com'")
-  write_env "$ROOT/desk.env" "CLAUDE_CODE_OAUTH_TOKEN=$claude" "TIINGO_API_KEY=$tiingo" "FINNHUB_API_KEY=$finnhub" "FRED_API_KEY=$fred" "$(env_line DESK_SEC_USER_AGENT "$sec")"
-  unset claude tiingo finnhub fred
+  alpaca_id=$(ask "Alpaca PAPER key ID (Paper Trading dashboard; never live keys)" secret)
+  alpaca_secret=$(ask "Alpaca PAPER secret key" secret)
+  write_env "$ROOT/desk.env" "CLAUDE_CODE_OAUTH_TOKEN=$claude" "TIINGO_API_KEY=$tiingo" "FINNHUB_API_KEY=$finnhub" "FRED_API_KEY=$fred" "$(env_line DESK_SEC_USER_AGENT "$sec")" \
+    "ALPACA_API_KEY_ID=$alpaca_id" "ALPACA_API_SECRET_KEY=$alpaca_secret"
+  unset claude tiingo finnhub fred alpaca_id alpaca_secret
 fi
 if ! keep "$ROOT/caddy.env"; then
   key=$(ask "Porkbun API key (pk1_…)" secret)

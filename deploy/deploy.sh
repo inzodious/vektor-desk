@@ -9,7 +9,7 @@
 #   deploy.sh restore-test  restore drill: unpacks the newest backup into a scratch folder and checks every database
 #                      opens, passes its integrity check and has the expected tables; the live data isn't touched
 #   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS records against the tailnet and
-#                      home-network addresses, a test phone alert
+#                      home-network addresses, the Alpaca paper account (read-only), a test phone alert
 #   deploy.sh logs     redacted tails of every desk service's log into data/run/logs, for the eval container
 #                      (docs/eval-access.md); auto does this every 5 minutes
 #   deploy.sh redeploy recreate the containers on the images already live, so an edited *.env file takes effect (a
@@ -336,6 +336,8 @@ check() {
     echo "  published on $lan, desk-lan.escape-vektor.com resolves to ${dns:-nothing}"
     if [ "$lan" = "$dns" ]; then echo "  match"; else echo "  set the Porkbun A record for desk-lan to $lan (docs/setup.md, Home network)"; fi
   fi
+  echo "Alpaca paper:"
+  docker exec vektor-desk-cron python -m desk.paper_check 2>&1 | sed 's/^/  /' || true
   echo "Phone alerts:"
   docker exec vektor-desk-cron python -m desk.notify test ops 2>&1 | sed 's/^/  /' || true
   echo "  subscribe in the ntfy app: server https://desk.escape-vektor.com:8443, topics desk-alerts, desk-research, desk-ops"
