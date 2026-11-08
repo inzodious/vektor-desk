@@ -11,6 +11,21 @@
   "to": "f9e8d7c6b5a49382716051f4e3d2c1b0a9876543",
   "off": true
  },
+ "compose": {
+  "checked_at": "2026-11-09T16:40:00Z",
+  "state": "drift",
+  "drift": [
+   "cron: cap_add, volumes"
+  ],
+  "escalations": [
+   "cron: new cap_add SYS_ADMIN",
+   "cron: bind mount /mnt/Other/share is outside the app folder"
+  ],
+  "missing_dirs": [],
+  "missing_files": [],
+  "can_apply": false,
+  "copy_available": true
+ },
  "actions": [
   {
    "name": "redeploy",
@@ -133,6 +148,18 @@
     "exit_code": 75,
     "output": "The checkout is still catching up to main; trying again on the next pass"
    },
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "apply-compose",
+   "title": "Apply compose",
+   "what": "Backs up, then gives TrueNAS main's compose.yaml, unless the change widens what containers can do",
+   "cooldown_seconds": 600,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
    "cooldown_until": null,
    "can_run": true
   }

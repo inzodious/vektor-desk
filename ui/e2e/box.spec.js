@@ -114,3 +114,38 @@ test('a quiet box shows the one-time step and holds the buttons', async ({ page 
   await expect(card.getByTestId('box-hand').locator('code')).toContainText('deploy.sh');
   await expect(card.locator('.job-list').getByRole('button', { disabled: false })).toHaveCount(0);
 });
+
+// ---------- compose ----------
+test('a safe compose change offers Apply compose', async ({ page }) => {
+  let asked = null;
+  await page.route('**/api/box/*/run', (route) => {
+    asked = route.request().url().split('/').slice(-2)[0];
+    route.fulfill({ status: 202, json: { ok: true, action: asked, request_id: 'req-c', requested_at: '2026-11-09T16:42:00Z', message: 'Starts within 5 minutes.' } });
+  });
+  await page.goto('/settings');
+  const c = page.getByTestId('box-compose');
+  await expect(c).toHaveAttribute('data-state', 'apply');
+  await expect(c).toContainText('What changed: cron: environment; api: healthcheck');
+  await c.getByRole('button', { name: 'Apply compose now' }).click();
+  await expect(c.locator('[data-box="apply-compose"]')).toContainText('Queued, runs within 5 min');
+  expect(asked).toBe('apply-compose');
+});
+
+test('a compose change that widens access asks for eyes and copies the file', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.route('**/api/box/compose.yaml', (route) => route.fulfill({ status: 200, contentType: 'text/yaml', body: 'services:\n  cron:\n    image: synthetic\n' }));
+  await page.goto('/settings?scenario=off');
+  const c = page.getByTestId('box-compose');
+  await expect(c).toHaveAttribute('data-state', 'eyes');
+  await expect(c.getByTestId('compose-needs').locator('li')).toHaveCount(2);
+  await expect(c.locator('[data-box="apply-compose"]')).toHaveCount(0);
+  await c.getByTestId('compose-copy').click();
+  await expect(c.getByTestId('compose-copy')).toHaveText('Copied');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain('image: synthetic');
+});
+
+test('no compose banner when the box matches main', async ({ page }) => {
+  await page.goto('/settings?scenario=current');
+  await expect(page.getByTestId('box')).toBeVisible();
+  await expect(page.getByTestId('box-compose')).toHaveCount(0);
+});
