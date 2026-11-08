@@ -5,7 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from desk.engine import alpaca, lane
+from desk.engine import alpaca, catalog, lane
 from desk.engine.market import ProviderError, session
 from desk.paper_check import NotPaper, paper_base
 
@@ -140,8 +140,9 @@ class Book:
 def books(conn: sqlite3.Connection, sleeve: float) -> dict[tuple[str, int], Book]:
     out: dict[tuple[str, int], Book] = {}
     lanes = {v.id for v in lane.variants(conn)}
+    mixes = {r[0] for r in conn.execute("SELECT DISTINCT id FROM catalog_strategies")}
     for r in conn.execute("SELECT strategy_id, version, status FROM paper_portfolios ORDER BY started, strategy_id"):
-        kind = "lane" if r["strategy_id"] in lanes else "strategy"
+        kind = "lane" if r["strategy_id"] in lanes else ("mix" if r["strategy_id"] in mixes else "strategy")
         out[(r["strategy_id"], r["version"])] = Book(r["strategy_id"], r["version"], kind, r["status"], sleeve, sleeve)
     for r in conn.execute("SELECT strategy_id, version, symbol, filled_qty, price FROM paper_legs WHERE filled_qty IS NOT NULL AND price IS NOT NULL"):
         b = out.get((r["strategy_id"], r["version"]))
@@ -366,6 +367,8 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None) -> dict:
                 cache[sym] = price(conn, sym)
             return cache[sym]
 
+        mixes = catalog.rebuild(conn, budget(), px, now=now)
+
         placed: list[dict] = []
         info: dict = {}
         already = conn.execute("SELECT 1 FROM paper_legs WHERE date=? LIMIT 1", (s.day,)).fetchone() is not None
@@ -385,6 +388,7 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None) -> dict:
         "ok": True,
         "session": s.state,
         "lane": built,
+        "catalog": mixes,
         "orders": placed,
         "reconciled": synced,
         "budget": budget(),

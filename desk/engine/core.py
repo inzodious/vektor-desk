@@ -9,7 +9,7 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION, SET_KEY, broker, fi, lookthrough, patterns, risk, scoring
+from desk.engine import ENGINE_VERSION, SET_KEY, bands, broker, catalog, fi, lookthrough, patterns, risk, scoring
 from desk.engine.backfill import NO_PRICES
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
@@ -295,6 +295,15 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     market = next((m[5] for m in out.metrics if m[0] == "value.market" and m[1] == "portfolio"), total)
     cash_in = [(f["date"], f["amount"]) for f in flows if f["external_portfolio"]]
     out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), fi.fi_prefs(current_rows(mirror, "prefs")), desk, market, cash_in)
+    held, cash_share, held_notes = catalog.held_mix(now_rows)
+    wanted = catalog.mixes(targets, held, cash_share, kinds)
+    if "as-held" in wanted:
+        wanted["as-held"]["notes"] = held_notes + wanted["as-held"]["notes"]
+    with desk:
+        catalog.sync(desk, wanted, now=now)
+    out.views["bands"] = bands.run(
+        out, cfg, desk, tr, wanted, value=market, deposits=cash_in, prefs=fi.fi_prefs(current_rows(mirror, "prefs")), fees=expense_ratios(plan)
+    )
     out.views["factors"] = fi.exposure(out, tr, desk, {s: w / 100 for s, w in symbol_weights(now_rows, total).items()})
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:

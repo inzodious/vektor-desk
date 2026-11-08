@@ -520,3 +520,8 @@ def fi_view(request: Request) -> JSONResponse:
 @router.get("/api/engine/factors")
 def factors_view(request: Request) -> JSONResponse:
     return _view(request, "factors", {"as_of": None, "holdings": {}, "portfolio": {}, "coverage_pct": 0.0})
+
+
+@router.get("/api/engine/bands")
+def bands_view(request: Request) -> JSONResponse:
+    return _view(request, "bands", {"as_of": None, "status": "not_ready", "rows": [], "book": "as-held"})

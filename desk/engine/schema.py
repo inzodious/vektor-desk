@@ -307,6 +307,15 @@ CREATE TABLE IF NOT EXISTS lane_variants (
   registered_at TEXT NOT NULL,
   PRIMARY KEY (id, version)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS catalog_strategies (
+  id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  mix TEXT NOT NULL,
+  registered_at TEXT NOT NULL,
+  retired_at TEXT,
+  PRIMARY KEY (id, version)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS paper_legs (
   date TEXT NOT NULL,
   strategy_id TEXT NOT NULL,
