@@ -1,5 +1,6 @@
 import json
 from datetime import UTC, date, datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -210,3 +211,55 @@ def test_review_redoes_closed_packs_the_backcast_reaches(cfg, mirror):
     assert month["value"]["net_flows"] == 350.0 and month["value"]["gain_usd"] == pytest.approx(month["value"]["end"] - 428.0 - 350.0)
     assert new[("day", "2026-10-30")] == old[("day", "2026-10-30")][1] and after["kept"] == sum(1 for k, (final, _) in old.items() if final and k[0] == "day")
     assert after["kinds"]["week"] == before["kinds"]["week"] + 3 and ("day", "2026-10-06") in new and after["kinds"]["day"] == 18 + 1
+
+
+def test_daily_fetches_missing_backcast_prices_once(cfg, mirror, monkeypatch):
+    seed(mirror)
+    drop(cfg, "history.json", export(history(), start=START, end=FRI))
+    drop(cfg, "hsa.json", hsa_file())
+    calls = []
+
+    def fake_backfill(c, carried=True):
+        calls.append(1)
+        desk = connect(c.desk_db)
+        sync_roles(desk, NOW)
+        with desk:
+            if carried:
+                desk.executemany(
+                    "INSERT INTO price_bars (symbol, date, open, high, low, close, adj_close) VALUES ('OLDY', ?, 21, 21, 21, 21, 21)",
+                    [(d,) for d in weekdays(START, "2026-10-12")],
+                )
+            desk.execute("UPDATE market_symbols SET fetched_at=? WHERE symbol='OLDY'", (NOW.isoformat(),))
+        desk.close()
+        return {"ok": True, "fetched": ["OLDY"] if carried else [], "unpriced": [] if carried else ["OLDY"]}
+
+    monkeypatch.setattr(engine_main, "run_core", lambda c: {"ok": True})
+    monkeypatch.setattr(engine_main, "run_market_backfill", lambda c: fake_backfill(c, carried=False))
+    first = engine_main.run_daily(cfg)
+    assert first["backfill"]["fetched"] == [] and first["holdings"]["backcast"]["unpriced"] == ["OLDY"] and len(calls) == 1
+    assert "backfill" not in engine_main.run_daily(cfg) and len(calls) == 1
+    desk = connect(cfg.desk_db)
+    with desk:
+        desk.execute("DELETE FROM market_symbols WHERE symbol='OLDY'")
+    desk.close()
+    monkeypatch.setattr(engine_main, "run_market_backfill", fake_backfill)
+    second = engine_main.run_daily(cfg)
+    assert second["backfill"]["fetched"] == ["OLDY"] and second["holdings"]["backcast"]["unpriced"] == [] and len(calls) == 2
+    conn = connect(cfg.desk_db, readonly=True)
+    row = conn.execute("SELECT close, value, quality FROM holdings_daily WHERE date='2026-10-09' AND symbol='OLDY'").fetchone()
+    conn.close()
+    assert row[:] == (21.0, 105.0, "pro_forma")
+    assert "backfill" not in engine_main.run_daily(cfg) and len(calls) == 2
+    monkeypatch.setenv(engine_main.DRY_RUN, "1")
+    assert engine_main._fill_backcast(cfg, {"backcast": {"unpriced": ["NEWY"]}}) is None
+
+
+def test_a_frozen_pack_is_redone_only_when_the_backcast_moves_it():
+    data = SimpleNamespace(days=["2026-10-05", "2026-10-30"], value={"2026-10-23": 808.0, "2026-10-30": 830.0}, index={"2026-10-23": 1.0, "2026-10-30": 1.05})
+    old = {"base": "2026-10-23", "as_of": "2026-10-30", "full": 1, "v0": 808.0, "v1": 830.0, "pct": 5.0}
+    assert review._revised(old, data, "2026-10-28") is False
+    assert review._revised(old | {"v0": 800.0}, data, "2026-10-28") is True
+    assert review._revised(old | {"pct": 4.2}, data, "2026-10-28") is True
+    assert review._revised(old | {"pct": 4.2}, data, "2026-10-22") is False and review._revised(old | {"pct": 4.2}, data, None) is False
+    assert review._revised(old | {"full": 0}, data, None) is True and review._revised(old | {"full": 0, "base": "2026-10-05"}, data, None) is False
+    assert review._revised(old | {"base": None}, data, "2026-10-28") is False

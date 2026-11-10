@@ -71,6 +71,11 @@ def past_gaps(conn: sqlite3.Connection) -> list[str]:
     return sorted(sym for sym, first in rows if sym not in first_bar or first_bar[sym] > first)
 
 
+def never_fetched(conn: sqlite3.Connection, symbols) -> list[str]:
+    tried = {r[0] for r in conn.execute("SELECT symbol FROM market_symbols WHERE fetched_at IS NOT NULL")}
+    return sorted(s for s in symbols if s not in tried)
+
+
 def usage(conn: sqlite3.Connection, now: datetime) -> dict[str, int]:
     hour = (now - timedelta(hours=1)).isoformat(timespec="seconds")
     day = (now - timedelta(days=1)).isoformat(timespec="seconds")
