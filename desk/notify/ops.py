@@ -12,6 +12,10 @@ MIRROR_TITLES = {
     "failing": "Mirror is failing",
     "error": "Mirror has no good pull yet",
 }
+REVIEW_TITLES = {
+    "stale": "Today's review hasn't run",
+    "failing": "Today's review didn't finish",
+}
 
 
 def ops_check(cfg: Config | None = None, now: datetime | None = None, session: requests.Session | None = None) -> list[str]:
@@ -39,6 +43,21 @@ def ops_check(cfg: Config | None = None, now: datetime | None = None, session: r
             session=session,
         ):
             sent.append(f"mirror-{mirror['state']}")
+
+    reviews = report["reviews"]
+    if reviews["state"] in REVIEW_TITLES:
+        if publish(
+            "ops",
+            REVIEW_TITLES[reviews["state"]],
+            "The day, week, month and year results aren't in yet. Open Settings, Jobs and tap Run now on Review.",
+            "default",
+            tags=["bar_chart"],
+            click="/settings",
+            key=f"reviews-{reviews['state']}-{local.isoformat()}",
+            cfg=cfg,
+            session=session,
+        ):
+            sent.append(f"reviews-{reviews['state']}")
 
     token = report["claude_token"]
     if token["state"] in ("renew", "expired"):

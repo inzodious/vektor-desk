@@ -72,6 +72,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
     | Address | `match` | Redo step 7 with the printed address, then wait up to 10 minutes |
     | Home network | `not published` until you do [Home network](#home-network), then `match` | Steps 1–5 of that section |
     | Alpaca paper | `paper account ok, status ACTIVE` once the Filings lane is in use; `not set` until then | `setup-truenas.sh set ALPACA_API_KEY_ID`, then `set ALPACA_API_SECRET_KEY`, with the keys from Alpaca's **Paper Trading** dashboard. `rejected` means they're live keys or mistyped |
+    | Reviews | `fresh: last run 17:36`, then each stage of today's run. `No reviews yet` until the first 17:35 weekday run | `stale` or `failing`: Settings → Jobs → Review → Run now. A stage that says `failed`: Settings → Box → Export logs, then read `cron.log` |
     | Phone alerts | `ops: sent`, and the alert arrives in `desk-ops` | Check that Tailscale is on and the server in step 9 has `:8443` |
     | Certificate | `certificate obtained` | Check that Porkbun API Access is on for the domain (step 2) |
 
