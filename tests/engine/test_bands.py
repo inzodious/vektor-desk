@@ -87,6 +87,37 @@ def test_sync_versions_fixed_mixes_and_follows_the_book(cfg):
     conn.close()
 
 
+def test_a_mix_is_judged_at_its_checkpoint_not_every_night(cfg):
+    conn = desk(cfg)
+    tilt = {"weights": dict(catalog.TECH_TILT), "cash": 0.0, "notes": [], "source": dict(catalog.TECH_TILT)}
+    catalog.sync(conn, {"tech-tilt": tilt, "safe-mix": tilt}, now=REG)
+    closes = [100.0 + 0.05 * i + (0.4 if i % 2 else -0.4) for i in range(150)]
+    bars(conn, "IVV", closes, start=(2026, 11, 5))
+    days = [r[0] for r in conn.execute("SELECT date FROM price_bars WHERE symbol='IVV' ORDER BY date")]
+    rows = []
+    for i, (d, px) in enumerate(zip(days, closes, strict=True)):
+        near = 1000.0 * px / closes[0] * (1 + (0.002 if i % 3 else -0.004)) - 0.03 * i
+        far = 1000.0 * px / closes[0] * (1 + (0.002 if i % 3 else -0.004)) - 1.6 * i
+        rows += [("tech-tilt", 1, d, 0.0, near, near), ("safe-mix", 1, d, 0.0, far, far)]
+    with conn:
+        conn.executemany("INSERT INTO paper_ledger_daily VALUES (?, ?, ?, ?, ?, ?)", [r for r in rows if r[2] > days[0]])
+    prices = {"IVV": 100.0, "VXUS": 50.0, "FTEC": 200.0, "SMH": 250.0}
+    out = {r["strategy_id"]: r for r in catalog.rebuild(conn, 1000.0, prices.get, now=datetime(2027, 6, 2, 13, 0, tzinfo=UTC))}
+    near = dict(conn.execute("SELECT * FROM paper_portfolios WHERE strategy_id='tech-tilt'").fetchone())
+    gate = json.loads(near["summary"])["gate"]
+    assert near["days"] > 182 and near["excess_pts"] < 0
+    assert out["tech-tilt"]["status"] == "paper" and out["tech-tilt"]["targets"] == 4
+    assert gate["verdict"]["verdict"] == "unproven" and gate["verdict"]["reason"] == "noise" and gate["verdict"]["as_of"] == "2027-05-06"
+    assert gate["min_events"] is None and gate["next_checkpoint"] == {"day": 273, "on": "2027-08-05"}
+    assert out["safe-mix"]["status"] == "retired" and out["safe-mix"]["targets"] == 0
+    with conn:
+        conn.execute("UPDATE paper_ledger_daily SET value = value * 2 WHERE strategy_id='safe-mix' AND date=?", (days[-1],))
+    again = {r["strategy_id"]: r for r in catalog.rebuild(conn, 1000.0, prices.get, now=datetime(2027, 6, 3, 13, 0, tzinfo=UTC))}
+    assert again["safe-mix"]["status"] == "retired" and again["tech-tilt"]["status"] == "paper"
+    assert conn.execute("SELECT count(*) FROM paper_verdicts").fetchone()[0] == 2
+    conn.close()
+
+
 def test_rebuild_writes_targets_and_retires_old_versions(cfg):
     conn = desk(cfg)
     catalog.sync(conn, catalog.mixes({}, 0.0, safe={"FXAIX": 0.8, "VXUS": 0.2}), now=REG)

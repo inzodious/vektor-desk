@@ -7,10 +7,10 @@ import pytest
 
 from desk.agents.sources import RealLab
 from desk.db import connect
-from desk.engine import lab, schema
+from desk.engine import gate, lab, schema
 from desk.engine.__main__ import run_holdings, run_lab_export
 from desk.engine.lab import library as features
-from desk.engine.lab import paper, stats
+from desk.engine.lab import paper, runner, stats
 from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, ledger_path, load
 from desk.engine.lab.runner import ledger, process_queue
 from desk.engine.lab.sim import _year_tax, simulate
@@ -258,11 +258,56 @@ def test_paper_portfolio_steps_and_graduates(cfg, monkeypatch):
     schema.apply(desk)
     first = paper.run(cfg, desk)["paper"][0]
     rows = desk.execute("SELECT count(*) FROM paper_trades").fetchone()[0]
-    desk.close()
-    assert first["days"] == 212 and first["status"] in ("eligible", "retired") and rows > 0
+    stored = [dict(r) for r in desk.execute("SELECT * FROM paper_verdicts")]
+    assert first["days"] == 212 and rows > 0
+    assert [(v["checkpoint"], v["as_of"]) for v in stored] == [(182, "2025-07-01")] and stored[0]["events"] == paper._buys(
+        [tuple(r)[2:] for r in desk.execute("SELECT * FROM paper_trades")], "2025-07-01"
+    )
+    assert first["status"] == gate.STATUS[stored[0]["verdict"]]
     view = lab.desk_view(cfg, "sector-momentum")
-    assert view["paper"]["status"] == first["status"]
+    summary = json.loads(view["paper"]["summary"])
+    assert view["paper"]["status"] == first["status"] and summary["benchmark"] == "SPY"
+    upcoming = None if first["status"] == "retired" else {"day": 273, "on": "2025-09-30"}
+    assert summary["gate"]["verdict"]["checkpoint"] == 182 and summary["gate"]["next_checkpoint"] == upcoming
+    assert summary["gate"]["min_events"] == 30 and summary["gate"]["family_size"] == 1 and summary["gate"]["bars"] is (body["verdict"] == "pass")
     assert [e["strategy_id"] for e in lab.eligible(cfg)] == (["sector-momentum"] if first["status"] == "eligible" else [])
+    write_lab_db(cfg, end="2025-08-29")
+    again = paper.run(cfg, desk)["paper"][0]
+    assert again["days"] == 241 and again["status"] == first["status"]
+    assert [dict(r) for r in desk.execute("SELECT * FROM paper_verdicts")] == stored
+    desk.close()
+
+
+def test_trials_count_across_a_family_and_across_nights(cfg):
+    write_lab_db(cfg)
+    grid = {"top_n": [1, 3], "lookback": [63, 126]}
+    queue(cfg, experiment(spec=SPEC | {"id": "drift-one"}, grid=grid), "001-drift-one.json")
+    queue(cfg, experiment(), "002-sector-momentum.json")
+    process_queue(cfg, now=NOW)
+    queue(cfg, experiment(spec=SPEC | {"id": "drift-two", "rebalance": "quarterly"}, grid=grid), "003-drift-two.json")
+    queue(
+        cfg,
+        experiment(spec=SPEC | {"id": "slow-drift", "parent_id": "drift-two", "rebalance": "weekly"}, grid={"top_n": [3], "lookback": [126]}),
+        "004-slow.json",
+    )
+    process_queue(cfg, now=NOW + timedelta(days=1))
+    sheets = {sid: lab.desk_view(cfg, sid)["tear_sheet"] for sid in ("drift-one", "drift-two", "slow-drift", "sector-momentum")}
+    assert [sheets[sid]["trials_family"] for sid in ("drift-one", "drift-two", "slow-drift", "sector-momentum")] == [4, 8, 9, 4]
+    conn = ledger(cfg)
+    parents = {r["id"]: r["parent_id"] for r in conn.execute("SELECT id, parent_id FROM strategies")}
+    assert parents == {"drift-one": None, "drift-two": "drift-one", "slow-drift": "drift-two", "sector-momentum": None}
+    assert runner.family_ids(conn, "drift-one") == ["drift-one", "drift-two", "slow-drift"] and runner.family_ids(conn, "sector-momentum") == [
+        "sector-momentum"
+    ]
+    assert runner.family_trials(conn, "insider-new") == 0 and runner.family_parent(conn, "insider-new") is None
+    wide = runner.family_sharpe_var(conn, "drift-two")
+    conn.close()
+    assert wide > 0
+    alone = SPEC | {"id": "solo-two", "rebalance": "quarterly"}
+    queue(cfg, experiment(spec=alone, grid=grid), "005-solo.json")
+    process_queue(cfg, now=NOW + timedelta(days=2))
+    solo = lab.desk_view(cfg, "solo-two")["tear_sheet"]
+    assert solo["trials_family"] == 4 and solo["deflated_sharpe"] >= sheets["drift-two"]["deflated_sharpe"]
 
 
 def test_engine_export_writes_the_lab_copy(cfg, mirror):

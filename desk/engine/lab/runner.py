@@ -8,6 +8,7 @@ from pathlib import Path
 
 from desk.config import Config
 from desk.db import connect
+from desk.engine import gate
 from desk.engine.lab import factors, rulebook, stats
 from desk.engine.lab.data import FRENCH_KIND, SMALL_CAPS, LabData, data_path, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
@@ -128,8 +129,9 @@ def _trial(conn, spec: Spec, v: Variant, window: str, kind: str, metrics: dict, 
     )
 
 
-def family_trials(conn, strategy_id: str) -> int:
+def family_ids(conn, strategy_id: str) -> list[str]:
     parents = {r["id"]: r["parent_id"] for r in conn.execute("SELECT id, parent_id FROM strategies")}
+    parents.setdefault(strategy_id, None)
 
     def root(sid):
         seen = set()
@@ -138,11 +140,38 @@ def family_trials(conn, strategy_id: str) -> int:
             sid = parents[sid]
         return sid
 
-    mine = root(strategy_id)
-    ids = [sid for sid in parents if root(sid) == mine] or [strategy_id]
+    def group(sid):
+        return gate.family(sid) or gate.family(root(sid)) or root(sid)
+
+    mine = group(strategy_id)
+    return sorted(sid for sid in parents if group(sid) == mine)
+
+
+def family_parent(conn, strategy_id: str) -> str | None:
+    key = gate.family(strategy_id)
+    if key is None:
+        return None
+    rows = conn.execute("SELECT id FROM strategies WHERE id != ? ORDER BY registered_at, id", (strategy_id,)).fetchall()
+    return next((r["id"] for r in rows if gate.family(r["id"]) == key), None)
+
+
+def _family_full(conn, strategy_id: str) -> list[float | None]:
+    ids = family_ids(conn, strategy_id)
     marks = ",".join("?" * len(ids))
-    q = f"SELECT count(*) FROM (SELECT DISTINCT strategy_id, version, params FROM strategy_trials WHERE strategy_id IN ({marks}) AND kind='full')"
-    return conn.execute(q, ids).fetchone()[0]
+    seen: dict[tuple, float | None] = {}
+    q = f"SELECT strategy_id, version, params, metrics FROM strategy_trials WHERE strategy_id IN ({marks}) AND kind='full' ORDER BY id"
+    for r in conn.execute(q, ids):
+        seen[(r["strategy_id"], r["version"], r["params"])] = json.loads(r["metrics"]).get("sharpe")
+    return list(seen.values())
+
+
+def family_trials(conn, strategy_id: str) -> int:
+    return len(_family_full(conn, strategy_id))
+
+
+def family_sharpe_var(conn, strategy_id: str) -> float:
+    daily = [s / 252**0.5 for s in _family_full(conn, strategy_id) if s is not None]
+    return stats._sd(daily) ** 2 if len(daily) > 1 else 0.0
 
 
 # ---- Walk-forward ----
@@ -239,7 +268,17 @@ def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: date
         with conn:
             conn.execute(
                 "INSERT INTO strategies VALUES (?, ?, ?, ?, ?, 'lab', ?, ?, ?, ?)",
-                (spec.id, spec.version, spec.hash, spec.parent_id, spec.title, _stamp(now), spec.model, request.get("written_at"), json.dumps(raw)),
+                (
+                    spec.id,
+                    spec.version,
+                    spec.hash,
+                    spec.parent_id or family_parent(conn, spec.id),
+                    spec.title,
+                    _stamp(now),
+                    spec.model,
+                    request.get("written_at"),
+                    json.dumps(raw),
+                ),
             )
     params = [v.params for v in grid_variants]
     folds, pieces, chosen = [], [], []
@@ -268,7 +307,7 @@ def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: date
     oos_r = [x for x in stats.rets(oos_vals) if x is not None]
     trials = family_trials(conn, spec.id)
     srs = [s for s in (stats.sharpe_daily([x for x in run.rets if x is not None]) for run in full) if s is not None]
-    var_sr = stats._sd(srs) ** 2 if len(srs) > 1 else 0.0
+    var_sr = max(stats._sd(srs) ** 2 if len(srs) > 1 else 0.0, family_sharpe_var(conn, spec.id))
     skew, kurt = stats.moments(oos_r)
     sr = stats.sharpe_daily(oos_r)
     dsr = stats.deflated_sharpe(sr, max(trials, len(params)), var_sr, len(oos_r), skew, kurt) if sr is not None else None

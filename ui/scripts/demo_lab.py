@@ -16,6 +16,8 @@ NOW = datetime(2026, 1, 5, 7, 0, tzinfo=UTC)
 LAB_END = "2025-12-31"
 END = "2026-11-06"
 PLAN = {"FXAIX": 0.8, "BND": 0.2}
+CLEAR_PBO = 0.119
+CLEAR_DSR = 0.9553
 
 
 def weekdays(start: str, end: str) -> list[str]:
@@ -157,6 +159,13 @@ def main() -> None:
             body = json.loads(row["body"])
             body |= {"paper_start": "2026-06-30", "verdict": "pass", "bars": {k: (None if v is None else True) for k, v in body["bars"].items()}}
             led.execute("UPDATE lab_results SET body=? WHERE kind='finalize' AND strategy_id='sector-momentum'", (json.dumps(body),))
+            shown = led.execute("SELECT result_at, body FROM lab_results WHERE kind='experiment' AND strategy_id='sector-momentum'").fetchone()
+            sheet = json.loads(shown["body"])
+            sheet |= {"pbo": min(sheet["pbo"], CLEAR_PBO), "deflated_sharpe": max(sheet["deflated_sharpe"], CLEAR_DSR)}
+            led.execute(
+                "UPDATE lab_results SET body=? WHERE kind='experiment' AND strategy_id='sector-momentum' AND result_at=?",
+                (json.dumps(sheet), shown["result_at"]),
+            )
     led.close()
     write_data(cfg, END)
     desk = connect(cfg.desk_db)
