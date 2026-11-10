@@ -443,6 +443,8 @@ check() {
   fi
   echo "Alpaca paper:"
   docker exec vektor-desk-cron python -m desk.paper_check 2>&1 | sed 's/^/  /' || true
+  echo "Reviews:"
+  docker exec vektor-desk-cron python -m desk.review_health 2>&1 | sed 's/^/  /' || true
   echo "Phone alerts:"
   docker exec vektor-desk-cron python -m desk.notify test ops 2>&1 | sed 's/^/  /' || true
   echo "  subscribe in the ntfy app: server https://desk.escape-vektor.com:8443, topics desk-alerts, desk-research, desk-ops"

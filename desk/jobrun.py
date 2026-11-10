@@ -23,6 +23,19 @@ REFRESHES = {
     "engine-backfill": ["closes"],
     "engine-research": ["research"],
     "engine-lots": ["shares"],
+    "engine-review": ["reviews"],
+    "agents-run-debrief": ["debrief"],
+    "agents-run-plans": ["plans"],
+}
+STAGE_ORDER = ("mirror", "engine", "review", "desks", "paper")
+STAGES = {
+    "mirror": "mirror",
+    "engine-daily": "engine",
+    "engine-review": "review",
+    "agents-run-plan_keeper": "desks",
+    "agents-run-debrief": "desks",
+    "agents-run-plans": "desks",
+    "engine-paper": "paper",
 }
 
 
@@ -151,6 +164,8 @@ class Entry:
     package: str
     schedules: list[str] = field(default_factory=list)
     locks: set[str] = field(default_factory=set)
+    refreshes: list[str] = field(default_factory=list)
+    stage: str | None = None
 
 
 def catalogue(jobs: list) -> dict[str, Entry]:
@@ -160,6 +175,12 @@ def catalogue(jobs: list) -> dict[str, Entry]:
         if job.timing not in entry.schedules:
             entry.schedules.append(job.timing)
         entry.locks.update({job.lock, job.name} - {""})
+        for check in getattr(job, "refreshes", None) or REFRESHES.get(job.name, []):
+            if check not in entry.refreshes:
+                entry.refreshes.append(check)
+        stage = getattr(job, "stage", "") or STAGES.get(job.name)
+        if stage in STAGE_ORDER:
+            entry.stage = stage
     return out
 
 
@@ -186,7 +207,8 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None) -> dict:
                 "last_run": last_run(cfg, entry.name),
                 "cooldown_until": stamp(until) if cooling else None,
                 "can_run": not is_running and pending is None and not cooling,
-                "refreshes": REFRESHES.get(entry.name, []),
+                "refreshes": entry.refreshes,
+                "stage": entry.stage,
             }
         )
     return {
@@ -194,6 +216,7 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None) -> dict:
         "scheduler_alive": scheduler_alive(cfg, now),
         "cooldown_seconds": int(COOLDOWN.total_seconds()),
         "pickup_seconds": PICKUP_SECONDS,
+        "stages": list(STAGE_ORDER),
         "jobs": rows,
     }
 

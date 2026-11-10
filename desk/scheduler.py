@@ -50,6 +50,8 @@ class Job:
     package: str = ""
     timing: str = ""
     lock: str = ""
+    refreshes: tuple[str, ...] = ()
+    stage: str = ""
     proc: subprocess.Popen | None = field(default=None, repr=False)
     run: dict | None = field(default=None, repr=False)
 
@@ -65,7 +67,9 @@ class Job:
         return day_ok or dow_ok
 
 
-def make_job(label: str, timing: str, command: list[str], *, name: str = "", package: str = "", lock: str = "") -> Job:
+def make_job(
+    label: str, timing: str, command: list[str], *, name: str = "", package: str = "", lock: str = "", refreshes: tuple[str, ...] = (), stage: str = ""
+) -> Job:
     parts = timing.split()
     if len(parts) != 5:
         raise ValueError(f"{label}: need five time fields, got {timing!r}")
@@ -83,6 +87,8 @@ def make_job(label: str, timing: str, command: list[str], *, name: str = "", pac
         package=package,
         timing=" ".join(parts),
         lock=lock,
+        refreshes=refreshes,
+        stage=stage,
     )
 
 
@@ -111,12 +117,14 @@ def package_jobs(only: list[str] | None = None) -> list[Job]:
         for i, entry in enumerate(getattr(mod, "JOBS", [])):
             if isinstance(entry, dict):
                 timing, command, name = entry["schedule"], entry["command"], entry.get("name")
+                refreshes, stage = tuple(str(c) for c in entry.get("refreshes") or ()), str(entry.get("stage") or "")
             else:
-                timing, command, name = entry[0], entry[1], None
+                timing, command, name, refreshes, stage = entry[0], entry[1], None, (), ""
             cmd = shlex.split(command) if isinstance(command, str) else list(command)
             lock = re.sub(r"[^A-Za-z0-9_-]+", "-", f"{pkg}-{name}")[:60] if name else lock_name(pkg, cmd)
             held = ["python", "-m", "desk.runlock", "--hold", lock, "--", *cmd]
-            jobs.append(make_job(f"{pkg}.jobs[{i}]", timing, held, name=jobrun.job_name(pkg, cmd, name), package=pkg, lock=lock))
+            job_id = jobrun.job_name(pkg, cmd, name)
+            jobs.append(make_job(f"{pkg}.jobs[{i}]", timing, held, name=job_id, package=pkg, lock=lock, refreshes=refreshes, stage=stage))
     return jobs
 
 
