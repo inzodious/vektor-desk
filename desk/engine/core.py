@@ -9,7 +9,7 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION, SET_KEY, bands, broker, catalog, fi, lookthrough, patterns, risk, scoring
+from desk.engine import ENGINE_VERSION, SET_KEY, bands, broker, catalog, fi, lookthrough, patterns, replay, risk, scoring
 from desk.engine.backfill import NO_PRICES
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
@@ -302,6 +302,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _after_tax(out, cfg, mirror, desk, accounts, income(activity))
     _research_metrics(out, desk, kinds)
     _flight_record(out, cfg, desk, tr, targets, kinds, now_rows)
+    out.views["replay"] = _replay(out, activity, series, targets, now_rows)
     market = next((m[5] for m in out.metrics if m[0] == "value.market" and m[1] == "portfolio"), total)
     cash_in = [(f["date"], f["amount"]) for f in flows if f["external_portfolio"]]
     out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), fi.fi_prefs(current_rows(mirror, "prefs")), desk, market, cash_in)
@@ -712,6 +713,29 @@ def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datet
     out.m("tax.harvest_value", total * rate / 100 if lots and rate is not None else None, "usd", quality="modelled")
     if source != "none":
         out.h("marginal_rate", "ok", "Marginal rate from Escape Vektor's tax estimate." if source == "escape_vektor" else "Marginal rate from desk.yaml.")
+
+
+# ---- Rule replays ----
+
+
+def _replay(out: Out, activity, series, targets, rows) -> dict:
+    cover = out.history.cover if out.history else {}
+
+    def rate(scope: str, scope_id: str) -> float | None:
+        return next((m[5] for m in out.metrics if m[0] == "tax.marginal_rate" and m[1] == scope and m[2] == scope_id), None)
+
+    return replay.run(
+        out.as_of,
+        activity,
+        cover,
+        series,
+        broad=LISTED_FUNDS | set(targets),
+        mutual=out.history.mutual if out.history else set(),
+        sheltered=account_sheltered,
+        held_value=round(sum(h["value"] for h in rows if h["account"] in cover), 2) if cover else None,
+        short_rate=rate("portfolio", "all"),
+        state_rate=rate("tax", "state") or 0.0,
+    )
 
 
 # ---- Research signals and macro ----

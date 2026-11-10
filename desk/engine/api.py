@@ -512,6 +512,11 @@ def patterns_view(request: Request) -> JSONResponse:
     return _view(request, "patterns", empty)
 
 
+@router.get("/api/engine/replay")
+def replay_view(request: Request) -> JSONResponse:
+    return _view(request, "replay", {"as_of": None, "status": "not_ready", "quality": "insufficient_history", "variants": []})
+
+
 @router.get("/api/engine/fi")
 def fi_view(request: Request) -> JSONResponse:
     return _view(request, "fi", {"as_of": None, "status": "not_ready", "lines": [], "fi_date": {}})

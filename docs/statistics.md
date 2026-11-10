@@ -323,6 +323,37 @@ Patterns are descriptive context with a base rate attached, never a trigger. Eac
 
 **Left out on purpose as signals:** day-of-week and calendar effects (seasonality is shown, never acted on), chart patterns, and anything found by searching many rules on the same data. They test well and trade badly.
 
+## Rule replays
+
+`desk.engine.replay` replays the imported Fidelity history under a different rule and reports "you versus the capped you". It runs inside the daily core pass and is stored as the `replay` view (`GET /api/engine/replay`). It needs the history import and S&P 500 prices; traded names join the nightly price backfill under the `history` role.
+
+| Family | Variants | What changes |
+|---|---|---|
+| `house` (headline) | No single name over 10% of the account, nothing on margin | Position cap plus no margin |
+| `buy_cap` | 5, 10, 15, 20% | A single-name buy larger than the cap is cut to it |
+| `position_cap` | 5, 10, 15, 20% | A buy is cut so the name stays under the cap, counting what is already held |
+| `stop` | 15, 20, 25, 30% | The name is sold at the first close that far under the average price paid; later buys start a new position |
+| `trend` | 200 days | A single name is sold at the first close under its 200-day average and not bought while under it |
+| `no_margin` | one | The part of any buy that cash could not cover is not bought; margin interest falls with the debit |
+| `long_term` | one | A sale of shares held under a year waits until a year and a day after the buy, then sells at that close |
+
+| Convention | Detail |
+|---|---|
+| Same dollars, same dates | Deposits, withdrawals and every other trade stay as they were. One replay changes one rule |
+| The index is the other side | Every dollar a rule moves goes into, or comes out of, the S&P 500 (first of `SPY`, `FXAIX`, `VOO`, `IVV` with prices, total return). A rule that leaves you short of what you really had carries that gap at the index's return |
+| Later sales scale | When you sold a share of a position, the replay sells the same share of whatever it holds, and dividends follow the shares held |
+| Single names | Everything except mutual funds, plan funds and the broad index and sector ETFs the desk benchmarks against. Commodity, leveraged and thematic ETFs count as single names. Funds are never capped or stopped |
+| The account | Cap percentages are of everything in the history's accounts on the day of the buy, after that day's deposits and sales |
+| Margin | Per account. Same-day sales and deposits count before buys, so a swap is not a margin buy |
+| Prices | Raw closes with the history's own splits; the 200-day average uses adjusted closes. A name without prices sits at its last trade price and no rule touches it (`pro_forma`, `status: partial`) |
+| Old positions | Shares sold but never bought inside the history are seeded on the first day at no cost and left out of the tax lines (`modelled`) |
+| Tax lines | Short and long-term realized gains on the stock legs in taxable accounts, FIFO, times the marginal rate and 15% federal plus state. Index trades are not taxed. End values are before tax |
+| Check | The replayed "you" is compared with today's holdings in the same accounts; a gap over 1% marks the view `modelled` |
+
+View shape: `{as_of, status, quality, start, end, index, accounts, headline, dates, you{end_value, values, realized, tax_usd, holdings_value, gap_usd}, index_only{end_value, values}, sizing{buys, median_pct, over_10, on_margin, largest}, margin{days, peak_usd, interest_usd}, tax_rates, variants[], unpriced, notes, note}`. Each variant: `{id, family, label, params, end_value, change_usd, change_pct, helped_usd, hurt_usd, by_symbol[{symbol, usd}], actions, moved_usd, events[{date, symbol, what, usd}], realized, tax_usd, tax_change_usd, values}`. `values` line up with `dates` (weekly plus the last day). `by_symbol` adds up to `change_usd`. `events.what` is `cap`, `margin`, `stop`, `trend` or `wait`.
+
+Selection against size: `variant.end_value - index_only.end_value` is what the picks earned at the capped size; `you.end_value - variant.end_value` is what the extra size added or cost.
+
 ## Comparative analysis
 
 One comparison engine (`desk.engine.compare`) serves every "this vs that" view: `GET /api/compare?ids=&window=`.
@@ -816,7 +847,7 @@ What agents and dashboards build against. Owned by this doc; changes go through 
 metric_values(metric_id, scope, scope_id, window, as_of, value, unit, n_obs, quality, engine_version)
 series_daily(series_id, scope, scope_id, date, value, quality)
 signals(signal_id, scope_id, as_of, value, base_rate, ci_low, ci_high, n_obs, note)
-engine_views(name, as_of, body)   (latest scorecard, patterns, fi and factors JSON)
+engine_views(name, as_of, body)   (latest scorecard, patterns, replay, fi and factors JSON)
 data_health(as_of, check, status, detail)
 preflight(ticket_id, metric_id, before, after, flag)
 triggers(as_of, kind, scope_id, detail)
@@ -874,6 +905,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status, feature catalog and grammar; one strategy's tear sheet, verdict and paper trades |
 | `GET /api/engine/scorecard?origin=` | Flight record: groups, desks, saves, off-plan gap, per-decision scores |
 | `GET /api/engine/patterns` | Patterns: market, holdings, drawdown tables, seasonality, correlation shifts, behavior |
+| `GET /api/engine/replay` | Rule replays: you, the index, and each rule's end value, by-symbol effect and weekly path |
 | `GET /api/engine/fi` | FI Monte Carlo: dates, percentile lines, inputs, caveats |
 | `GET /api/engine/factors` | Factor loadings per holding and weighted |
 | `GET`, `POST /api/engine/watchlist`, `DELETE /api/engine/watchlist/{symbol}` | Watchlist rows; desk rows editable, `DESK_WATCHLIST` rows read-only |
