@@ -40,6 +40,7 @@ ACTIONS = {
             timedelta(minutes=5),
             "Copies main's deploy.sh over the one the cron jobs run, once the checkout is clean, at main and the script parses",
         ),
+        Action("deploy-now", "Deploy now", timedelta(minutes=5), "Pulls main, backs up and restarts on it; also retries a commit auto-deploy is holding back"),
         Action(
             "apply-compose",
             "Apply compose",

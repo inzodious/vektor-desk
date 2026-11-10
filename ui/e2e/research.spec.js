@@ -110,6 +110,27 @@ test('the console refuses an empty question and shows server errors', async ({ p
   await expect(dlg.getByRole('alert')).toHaveText("skeptic can't take Console questions");
 });
 
+test('the Plan desk takes one holding at a time', async ({ page }) => {
+  let sent = null;
+  await page.route('**/api/agents/console', async (r) => {
+    if (r.request().method() !== 'POST') return r.fallback();
+    sent = r.request().postDataJSON();
+    return r.fulfill({ status: 201, json: { id: 10, status: 'queued', desk: sent.desk } });
+  });
+  await page.goto('/?open=console');
+  const dlg = page.getByRole('dialog', { name: 'Console' });
+  await dlg.getByRole('button', { name: /^Desk/ }).click();
+  await dlg.getByRole('option', { name: 'Plan desk' }).click();
+  await dlg.getByLabel('Ask a desk').fill('Trim above 12% of the portfolio');
+  await dlg.getByRole('button', { name: 'Tonight' }).click();
+  await expect(dlg.getByRole('alert')).toHaveText('The Plan desk works one holding at a time. Add its symbol.');
+  expect(sent).toBeNull();
+  await dlg.getByLabel('Symbol, optional').fill('acme');
+  await dlg.getByRole('button', { name: 'Tonight' }).click();
+  await expect(dlg.locator('.act-note')).toContainText('Queued for the Plan desk tonight');
+  expect(sent).toEqual({ desk: 'plans', question: 'Trim above 12% of the portfolio', symbol: 'ACME', run_now: false });
+});
+
 test('slash opens symbol search and Enter opens the sheet', async ({ page, isMobile }) => {
   test.skip(isMobile, 'keyboard shortcut is a desktop affordance');
   await page.goto('/');

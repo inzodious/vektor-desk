@@ -56,6 +56,8 @@ Two SQLite files on the TrueNAS dataset, both WAL mode, each with one writer. Ni
 
 Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deploy waits for them. Engine code builds on the shared scaffold: `desk/config.py`, `desk/db.py`, `desk/runlock.py`, and schedule lines in `deploy/crontab`.
 
+**Table shape.** A `WITHOUT ROWID` table must not end on a primary-key column unless every column is in the key. SQLite 3.40.1 (the image's library) reports false NOT NULL errors from `quick_check` on that shape, which fails the backup check and blocks a deploy. `quotes_live` is a rowid table for this reason; `schema.apply` rebuilds an older copy in place, and `tests/engine/test_schema.py` holds the rule.
+
 **Late deletes.** Current holdings always come from the latest snapshot (by `asOf`), so a deleted older snapshot that lingers for a week changes nothing. A lingering deleted activity or transaction row could double a flow; the cash check below catches it, marks the day `stale` and names the row, and the weekly full pass clears it.
 
 | Layer | Where | Tables | Rule |
@@ -76,6 +78,18 @@ Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deplo
 | Any row with a non-core symbol | Never (share transfers are holdings moves) |
 
 Same-amount opposite moves between two of your accounts within 3 days are internal at the portfolio level.
+
+**Unsettled and margin-funded buys.** Escape Vektor's sync drops pending and margin lines, so a snapshot can show new shares while its cash is unchanged. Left alone, the engine would book the gap as money in and show no margin debit. `holdings.settle` runs over each pair of snapshots:
+
+| Step | Rule |
+|---|---|
+| Expected cash | The earlier snapshot's cash (after any earlier adjustment) plus every cash move in the activity between the two |
+| Gap | Reported cash − expected cash |
+| Room | The debit already carried, plus buys in the window whose shares show up in the later snapshot. New buys count only when the Fidelity history covers the whole window, since only then is a missing deposit ruled out |
+| Adjustment | The smaller of gap and room, when over $1. The account's cash row is lowered by it and marked `modelled`; `reported_value` keeps what the snapshot said |
+| Ends | A deposit or sale in the activity pays it down. A snapshot that carries its own negative cash line is trusted as it stands |
+
+`margin.debit` is `modelled` while it rests on such a row. A gap with no matching buys is still counted as money in or out, as before.
 
 ## Reconciliation and data health
 
@@ -270,7 +284,7 @@ Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamen
 
 | Id | Metric | Notes |
 |---|---|---|
-| `fi.progress` | Progress to the FI number | The FI number comes from Escape Vektor's plan, never retyped |
+| `fi.progress` | Progress to the FI number | The FI number comes from Escape Vektor's `fi` pref; when that is missing, from the desk profile's `fi` section (`desk.decisions.profile.fi_goal`) |
 | `fi.required_return` | Return needed to hit the target date at the current deposit rate | |
 | `fi.date_pctl` | FI date at the 10th, 50th and 90th percentile | Monte Carlo, below |
 
@@ -280,7 +294,7 @@ Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamen
 
 | Input | From |
 |---|---|
-| FI number, target date | Escape Vektor pref `fi`: `fiYearlySpend × fiMultiple`, birth date plus `fiTargetAge` |
+| FI number, target date | Escape Vektor pref `fi`: `fiYearlySpend × fiMultiple`, birth date plus `fiTargetAge`. Fallback: the desk profile's `fi` section |
 | Real or nominal | The same pref's `inflationAdjusted` and `inflation`; real paths deflate each month at that rate |
 | Start value | `value.market` (the desk's accounts only) |
 | Deposits | Your net external cash flow (deposits and transfers in, minus withdrawals and transfers out) over the trailing 12 months ÷ 12, or ÷ the months since your first deposit when there are fewer, floored at 0; the view says "from your last N months of deposits, net of withdrawals". None seen: no deposits (caveat). The plan is not used |
@@ -497,6 +511,7 @@ Backtestable small-cap family: directors and officers buying their own stock on 
 | Live | `insider_buys` (`source` form4), `insider_form4_seen` | Form 4s in `filings_feed` (universe names) after the last bulk quarter: the raw XML, same rules, 200 a night. Bulk rows replace them when the quarter is published |
 | Known date | | The session after the filing date. Nothing counts before then |
 | Prices | `alpaca_bars`, `alpaca_history` | Names with any director or officer buy since 2016, cluster names (2+ insiders within 30 days) and IWM first: daily bars since 2016-01-01 (raw and adjusted), 300 names a night. Roughly 2,500 rows a name |
+| Symbols | | `insider.clean_symbol`: quotes and exchange prefixes stripped, a ticker in brackets used, class shares written `BRK.B`; anything else (names, numbers, `--`) is dropped, at parse time and from stored rows at the start of each run. A batch Alpaca refuses is split until the one bad name is found; that name is skipped and listed in the job result with Alpaca's path and message |
 | Share counts | `sec_shares`, `sec_frames` | SEC `dei:EntityCommonStockSharesOutstanding` frames since late 2014, each quarter once (the last two refresh) |
 | Membership | `smallcap_months` | At each month's first session: shares from a period ending 45+ days earlier (under 400 days old) × raw close between $50M and $2B, and median dollar volume over the prior 20 sessions at least $500K. The whole month uses that answer |
 
@@ -558,7 +573,7 @@ There is no single target. Four named mixes run side by side on paper and in the
 
 | id | Name | Mix | Paper |
 |---|---|---|---|
-| `safe-mix` | Safe mix | The plan's fund weights (v3 today), ETF proxies | Rebalances when a name moves $25 or 10% |
+| `safe-mix` | Safe mix | Built in (`catalog.SAFE_MIX`), his October index plan: FXAIX 40, SCHD 20, FTIHX 10, FTEC 10, and NLR, GRID, ICLN, UFO 5 each. FXAIX trades as IVV and FTIHX as VXUS. It does not read the Escape Vektor plan | Rebalances when a name moves $25 or 10% |
 | `as-held` | As held | His book today, ASTS kept, cash share kept, margin debit left out | Follows his weights each day (same version) |
 | `tech-tilt` | Aggressive tech tilt | 50% IVV, 30% FTEC, 10% SMH, 10% VXUS (proposal) | As safe mix |
 | `dip-buy` | Dip-buy | Safe mix with 20% cash; a third goes in at each 5, 10, 20% drop of IVV from its high; back to 20% cash at a new high | Cash target from IVV's closes |
@@ -621,7 +636,7 @@ Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. On
 | Final | Closed and a later data day exists. Final packs freeze; a closed pack may be restated once before that (mutual fund prices post late). `review.run(..., rebuild=True)` recomputes all |
 | Change | `change_pct` is time-weighted (the `twr_index` series). `net_flows` is every flow the return already nets out, derived per day as value − prior value × (1 + day return). `gain_usd` = change − flows |
 | Versus | SPY, then each live catalog mix, on the same starting dollars with the same flows on the same days. A mix is rebalanced daily, cash earns nothing, Dip buy carries its cash state from the index path. A comparator is left out when under 80% of it has prices |
-| Movers | Per holding: yesterday's shares × today's price change, summed over the period (splits handled). Top 5 up and down. `other_usd` is the rest of the gain: dividends, interest, cash and same-day trades |
+| Movers | Per holding: yesterday's shares × today's price change, summed over the period (splits handled). Top 5 up and down. A mover's `return_pct` is chained from the same daily holdings prices, so it always agrees in sign with its contribution. `other_usd` is the rest of the gain: dividends, interest, cash and same-day trades. A day's flow under 5 cents is rounding and counts as zero |
 | Risk | Max drawdown and best and worst day on the return index; volatility annualised from daily returns (5 or more days). `band` (your risk band and the as-held fit) only on the latest pack. `convictions` is each conviction hold's weight against its band |
 | Events | Discount days, scored filings and earnings dates for names held in the period |
 | Tables | `period_reviews(kind, start, end, as_of, closed, final, version, digest, pack, computed_at)`, `period_debriefs(kind, end, pack_digest, body, written_at, model, run_id)`, `review_runs` |
@@ -633,6 +648,29 @@ Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. On
 **`GET /api/engine/reviews/index`.** `{as_of, kinds {day, week, month, year}, note}`, newest first, rows `{start, end, as_of, label, closed, final, change_usd, change_pct, has_debrief}`.
 
 For the debrief desk: `review.pending(cfg)` returns the latest period of each kind whose pack has no debrief or changed since it (`{kind, start, end, closed, digest, debrief_digest, pack}`), and raises `review.NotReady` before the first run. `review.record(cfg, kind, end, result)` checks a debrief (headline ≤ 120, what_happened and why ≤ 700, against_decisions ≤ 500, up to 4 watch lines ≤ 160, up to 3 next steps ≤ 200, numbers_cited from the pack's `numbers`, pack_digest equal to the current digest, model, written_at), raises `ValueError` on bad values and replaces any earlier debrief for that period.
+
+## Plan facts
+
+Module `desk.engine.planfacts`. The numbers a stock plan is written from, one row per holding, computed on request from the latest engine run (no table, no job).
+
+| Piece | Rule |
+|---|---|
+| Rows | Every non-cash holding on the latest holdings day, summed across accounts. Ask for one symbol and it is returned even when not held (price facts only) |
+| Prices | `price_bars` (adjusted), else `alpaca_bars`, extended with `prices_daily`; else the mirror's closes (mutual funds) |
+| Cost | The lot export when every lot has a cost, else the snapshot's cost. `unrealized_usd` = value − cost |
+| Lots | `acquired, shares, cost, cost_per_share, value, gain, term, long_term_on` (the first day a sale is long term), `days_to_long_term`, `quality` (`modelled` when rebuilt from history) |
+| Range and trend | 52-week high and low (252 sessions), drop from the high, 50 and 200-session averages and the distance to each, 1-year return |
+| Zones | A monthly swing is the 63-session daily volatility × √21 (capped at 45%). Add zone: one to two swings under the last close. Trim zone: one to two above. `zones.levels` lists the reference prices: last close, 52-week high and low, both averages, cost per share, and 10, 20 and 30% under the high |
+| Valuation | As the discount scanner: `pe_annual` against its own 5 years when SEC EPS allows, else `price_vs_5y_avg` |
+| Share of risk | Weight × covariance with the book ÷ the book's variance, on 126 sessions of daily returns at today's weights. Sums to 100 across priced holdings |
+| Band | First that applies: the approved plan's `weight_band`, the conviction hold's band, the single-stock rule (stocks only), the risk band's single-stock cap (stocks only). `status` is `inside`, `over` or `under`; funds with no band are `inside` |
+| Discount | `active` when the scanner flagged the name in the last 5 days |
+
+**Row.** `symbol, name, kind, as_of, price_as_of, held, accounts, numbers, lots, wash_windows [{kind, date, clears, account, amount}], zones {method, sigma_month_pct, add {low, high}, trim {low, high}, levels}, discount {active, signal_id, reason, as_of}, next_earnings {date, hour, eps_estimate, days}, filing_signals, valuation {metric, value, pctile_own}, band {source, min_pct, max_pct, weight_pct, status, room_pct, risk_band}`. `numbers` is flat and numeric: `price, shares, value, weight_pct, cost_basis, cost_per_share, unrealized_usd, unrealized_pct, long_term_shares, short_term_shares, long_term_gain, short_term_gain, risk_share_pct, valuation_value, valuation_pctile, day_move_pct, high_52w, low_52w, drop_from_high_pct, above_low_pct, vol_annual_pct, sigma_month_pct, sma_50, sma_200, vs_sma_50_pct, vs_sma_200_pct, ret_1y_pct, add_low, add_high, trim_low, trim_high`; a key is left out when its input is missing.
+
+**`GET /api/engine/planfacts[?symbol=]`.** `{as_of, rows, note}`.
+
+For the plans desk: `planfacts.facts(cfg, symbol=None)` returns the rows and raises `planfacts.NotReady` before the first engine run. Every price a plan may name as a zone is in `zones` or `numbers`.
 
 ## Strategy lab
 
@@ -928,7 +966,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekdays 08:45 and 16:45 ET | `paper`: lanes and catalog mixes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
-| Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
+| Nightly 03:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Stack and tests
 

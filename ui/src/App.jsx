@@ -1,4 +1,4 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { Shell } from './components/Shell.jsx';
 import Settings from './pages/Settings.jsx';
 import FirstRun from './pages/FirstRun.jsx';
@@ -6,6 +6,7 @@ import Mixes from './pages/Mixes.jsx';
 import RiskCheck from './pages/RiskCheck.jsx';
 import Bridge from './pages/Bridge.jsx';
 import Plan from './pages/Plan.jsx';
+import Results from './pages/Results.jsx';
 import Decisions from './pages/Decisions.jsx';
 import Journal from './pages/Journal.jsx';
 import Research from './pages/Research.jsx';
@@ -35,6 +36,8 @@ export default function App() {
           <Routes>
             <Route element={<Shell />}>
               <Route index element={<Bridge />} />
+              <Route path="results" element={<Navigate to="/results/day" replace />} />
+              <Route path="results/:kind" element={<Results />} />
               <Route path="research" element={<Research />} />
               <Route path="research/sources" element={<ResearchSources />} />
               <Route path="research/watchlist" element={<Watchlist />} />
