@@ -641,7 +641,7 @@ def _settled(latest: str, now: datetime) -> str:
     return (date.fromisoformat(latest) - timedelta(days=1)).isoformat()
 
 
-SEEN_PATHS = {"full": "coverage.full", "base": "coverage.base", "v0": "value.start", "v1": "value.end"}
+SEEN_PATHS = {"full": "coverage.full", "base": "coverage.base", "v0": "value.start", "v1": "value.end", "pct": "value.change_pct"}
 SEEN = ", ".join(["as_of"] + [f"json_extract(pack, '$.{path}') AS {name}" for name, path in SEEN_PATHS.items()])
 
 
@@ -657,7 +657,10 @@ def _revised(old: sqlite3.Row, data: Data, cast: str | None) -> bool:
         return True
     if cast is None or base > cast:
         return False
-    return any(abs((data.value.get(d) or 0.0) - (v or 0.0)) > 0.005 for d, v in ((base, old["v0"]), (old["as_of"], old["v1"])))
+    if any(abs((data.value.get(d) or 0.0) - (v or 0.0)) > 0.005 for d, v in ((base, old["v0"]), (old["as_of"], old["v1"]))):
+        return True
+    i0, i1 = data.index.get(base), data.index.get(old["as_of"])
+    return bool(i0 and i1) and old["pct"] is not None and abs((i1 / i0 - 1) * 100 - old["pct"]) > 0.0001
 
 
 def run(cfg: Config | None, mirror: sqlite3.Connection | None, desk: sqlite3.Connection, *, now: datetime | None = None, rebuild: bool = False) -> dict:

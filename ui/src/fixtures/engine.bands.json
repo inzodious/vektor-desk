@@ -1,6 +1,91 @@
 {
+ "ladder": [
+  {
+   "band": 1,
+   "label": "Conservative",
+   "worst_year_loss_pct": 10
+  },
+  {
+   "band": 2,
+   "label": "Moderately conservative",
+   "worst_year_loss_pct": 18
+  },
+  {
+   "band": 3,
+   "label": "Moderate",
+   "worst_year_loss_pct": 25
+  },
+  {
+   "band": 4,
+   "label": "Moderately aggressive",
+   "worst_year_loss_pct": 33
+  },
+  {
+   "band": 5,
+   "label": "Aggressive",
+   "worst_year_loss_pct": 45
+  }
+ ],
+ "ladder_source": "profile",
  "as_of": "2026-11-06",
  "status": "ok",
+ "book": "as-held",
+ "start_value": 16770,
+ "monthly_deposit": 600,
+ "deposit_source": "activity",
+ "deposit_note": "from your last 12 months of deposits, net of withdrawals",
+ "deposit_ladder": [
+  500,
+  600,
+  1000,
+  1500,
+  2000,
+  3000,
+  4000,
+  5000,
+  6000,
+  8000,
+  10000
+ ],
+ "fi_number": 1000000,
+ "target_date": "2035-01-01",
+ "fi_years_max": 40,
+ "real": false,
+ "horizons": [
+  1,
+  5,
+  10,
+  20,
+  40
+ ],
+ "policy_years": [
+  1,
+  5,
+  10,
+  20
+ ],
+ "premium_cut_pts": 2,
+ "paths": 2000,
+ "history": {
+  "start": "1926-07",
+  "end": "2026-10",
+  "months": 1203
+ },
+ "method": "Each mix is fitted to the US market on its own price history (beta plus leftover swings, alpha set to zero), then replayed in 12-month blocks of market history since 1926. As held is fitted holding by holding and left to drift",
+ "caveats": [
+  "Alpha is set to zero: no mix gets credit for beating the market in its own history.",
+  "Leftover swings are drawn month by month and holding by holding, so a fund’s own long slumps and stocks that fall together are understated.",
+  "International and bond funds are modelled through their link to the US market since 1926.",
+  "As held is left to drift: nothing is sold or topped up, and new money goes to the safe mix.",
+  "The lower-return case takes 2 points a year off what stocks earn over cash.",
+  "Every mix pays its funds’ yearly fees. Taxes and the margin debit are not modelled."
+ ],
+ "profile": {
+  "band": 4,
+  "label": "Moderately aggressive",
+  "worst_year_loss_pct": 33,
+  "version": 2
+ },
  "rows": [
   {
    "id": "dip-buy",
@@ -19,74 +104,307 @@
     "BND": "BND"
    },
    "status": "ok",
-   "risk_rank": 2,
    "fit": "below",
+   "risk_rank": 2,
    "worst_year_p10_pct": -12.4,
    "cvar95_1y_pct": -19.8,
-   "p50_value_10y": 127889,
-   "chance_fi": 0.31,
-   "sharpe": 0.58,
    "max_drawdown_pct": -16.1,
    "drawdown_10y": {
     "p10": -24.8,
     "p50": -16.1,
     "p90": -9.9
    },
+   "p50_value_10y": 130156,
+   "chance_fi": 0.0007,
+   "fi_years": {
+    "p10": 28.67,
+    "p50": 33.75,
+    "p90": null
+   },
    "bands": [
     {
      "years": 1,
-     "p10": 21750,
-     "p50": 25043,
-     "p90": 28835,
+     "p10": 21794,
+     "p50": 25094,
+     "p90": 28893,
      "contributed": 23970,
      "chance_loss": 0.42,
      "chance_below_contributed": 0.4,
-     "return_p50_pct": 6.4
+     "return_p50_pct": 6.7
     },
     {
      "years": 5,
-     "p10": 46536,
-     "p50": 63781,
-     "p90": 87417,
+     "p10": 46952,
+     "p50": 64351,
+     "p90": 88198,
      "contributed": 52770,
      "chance_loss": 0.188,
      "chance_below_contributed": 0.179,
-     "return_p50_pct": 6.4
+     "return_p50_pct": 6.7
     },
     {
      "years": 10,
-     "p10": 81888,
-     "p50": 127889,
-     "p90": 199730,
+     "p10": 83340,
+     "p50": 130156,
+     "p90": 203270,
      "contributed": 88770,
      "chance_loss": 0.133,
      "chance_below_contributed": 0.126,
-     "return_p50_pct": 6.4
+     "return_p50_pct": 6.7
     },
     {
      "years": 20,
-     "p10": 178082,
-     "p50": 334523,
-     "p90": 628396,
+     "p10": 184738,
+     "p50": 347027,
+     "p90": 651884,
      "contributed": 160770,
      "chance_loss": 0.094,
      "chance_below_contributed": 0.089,
-     "return_p50_pct": 6.4
+     "return_p50_pct": 6.7
     },
     {
      "years": 40,
-     "p10": 587660,
-     "p50": 1433334,
-     "p90": 3495980,
+     "p10": 637637,
+     "p50": 1555233,
+     "p90": 3793297,
      "contributed": 304770,
      "chance_loss": 0.066,
      "chance_below_contributed": 0.063,
-     "return_p50_pct": 6.4
+     "return_p50_pct": 6.7
     }
    ],
+   "fi_time": [
+    {
+     "deposit": 500,
+     "years_p10": 30.33,
+     "years_p50": 35.92,
+     "years_p90": null,
+     "chance_by_target": 0.0006
+    },
+    {
+     "deposit": 600,
+     "years_p10": 28.67,
+     "years_p50": 33.75,
+     "years_p90": null,
+     "chance_by_target": 0.0007
+    },
+    {
+     "deposit": 1000,
+     "years_p10": 24,
+     "years_p50": 27.75,
+     "years_p90": 33.25,
+     "chance_by_target": 0.0011
+    },
+    {
+     "deposit": 1500,
+     "years_p10": 20.25,
+     "years_p50": 23.08,
+     "years_p90": 27,
+     "chance_by_target": 0.002
+    },
+    {
+     "deposit": 2000,
+     "years_p10": 17.75,
+     "years_p50": 19.92,
+     "years_p90": 22.92,
+     "chance_by_target": 0.0034
+    },
+    {
+     "deposit": 3000,
+     "years_p10": 14.33,
+     "years_p50": 15.75,
+     "years_p90": 17.75,
+     "chance_by_target": 0.0097
+    },
+    {
+     "deposit": 4000,
+     "years_p10": 12.08,
+     "years_p50": 13.17,
+     "years_p90": 14.5,
+     "chance_by_target": 0.0255
+    },
+    {
+     "deposit": 5000,
+     "years_p10": 10.5,
+     "years_p50": 11.33,
+     "years_p90": 12.33,
+     "chance_by_target": 0.0649
+    },
+    {
+     "deposit": 6000,
+     "years_p10": 9.33,
+     "years_p50": 9.92,
+     "years_p90": 10.75,
+     "chance_by_target": 0.1578
+    },
+    {
+     "deposit": 8000,
+     "years_p10": 7.58,
+     "years_p50": 8,
+     "years_p90": 8.5,
+     "chance_by_target": 0.5601
+    },
+    {
+     "deposit": 10000,
+     "years_p10": 6.42,
+     "years_p50": 6.75,
+     "years_p90": 7.08,
+     "chance_by_target": 0.8884
+    }
+   ],
+   "lower": {
+    "risk_rank": 2,
+    "worst_year_p10_pct": -13.5,
+    "cvar95_1y_pct": -21.6,
+    "max_drawdown_pct": -17.6,
+    "drawdown_10y": {
+     "p10": -27,
+     "p50": -17.6,
+     "p90": -10.8
+    },
+    "p50_value_10y": 121010,
+    "chance_fi": 0.0005,
+    "fi_years": {
+     "p10": 31.67,
+     "p50": 38.25,
+     "p90": null
+    },
+    "bands": [
+     {
+      "years": 1,
+      "p10": 21612,
+      "p50": 24884,
+      "p90": 28652,
+      "contributed": 23970,
+      "chance_loss": 0.42,
+      "chance_below_contributed": 0.4,
+      "return_p50_pct": 5.45
+     },
+     {
+      "years": 5,
+      "p10": 45246,
+      "p50": 62013,
+      "p90": 84994,
+      "contributed": 52770,
+      "chance_loss": 0.188,
+      "chance_below_contributed": 0.179,
+      "return_p50_pct": 5.45
+     },
+     {
+      "years": 10,
+      "p10": 77484,
+      "p50": 121010,
+      "p90": 188987,
+      "contributed": 88770,
+      "chance_loss": 0.133,
+      "chance_below_contributed": 0.126,
+      "return_p50_pct": 5.45
+     },
+     {
+      "years": 20,
+      "p10": 158776,
+      "p50": 298258,
+      "p90": 560273,
+      "contributed": 160770,
+      "chance_loss": 0.094,
+      "chance_below_contributed": 0.089,
+      "return_p50_pct": 5.45
+     },
+     {
+      "years": 40,
+      "p10": 455969,
+      "p50": 1112132,
+      "p90": 2712551,
+      "contributed": 304770,
+      "chance_loss": 0.066,
+      "chance_below_contributed": 0.063,
+      "return_p50_pct": 5.45
+     }
+    ],
+    "fi_time": [
+     {
+      "deposit": 500,
+      "years_p10": 33.58,
+      "years_p50": null,
+      "years_p90": null,
+      "chance_by_target": 0
+     },
+     {
+      "deposit": 600,
+      "years_p10": 31.67,
+      "years_p50": 38.25,
+      "years_p90": null,
+      "chance_by_target": 0.0005
+     },
+     {
+      "deposit": 1000,
+      "years_p10": 26.17,
+      "years_p50": 30.92,
+      "years_p90": 38.5,
+      "chance_by_target": 0.0008
+     },
+     {
+      "deposit": 1500,
+      "years_p10": 21.92,
+      "years_p50": 25.33,
+      "years_p90": 30.58,
+      "chance_by_target": 0.0015
+     },
+     {
+      "deposit": 2000,
+      "years_p10": 19,
+      "years_p50": 21.67,
+      "years_p90": 25.58,
+      "chance_by_target": 0.0025
+     },
+     {
+      "deposit": 3000,
+      "years_p10": 15.17,
+      "years_p50": 16.92,
+      "years_p90": 19.33,
+      "chance_by_target": 0.0068
+     },
+     {
+      "deposit": 4000,
+      "years_p10": 12.75,
+      "years_p50": 14,
+      "years_p90": 15.67,
+      "chance_by_target": 0.018
+     },
+     {
+      "deposit": 5000,
+      "years_p10": 11,
+      "years_p50": 11.92,
+      "years_p90": 13.17,
+      "chance_by_target": 0.0468
+     },
+     {
+      "deposit": 6000,
+      "years_p10": 9.67,
+      "years_p50": 10.42,
+      "years_p90": 11.33,
+      "chance_by_target": 0.1133
+     },
+     {
+      "deposit": 8000,
+      "years_p10": 7.83,
+      "years_p50": 8.33,
+      "years_p90": 8.92,
+      "chance_by_target": 0.4624
+     },
+     {
+      "deposit": 10000,
+      "years_p10": 6.58,
+      "years_p50": 6.92,
+      "years_p90": 7.33,
+      "chance_by_target": 0.8565
+     }
+    ]
+   },
+   "sharpe": 0.58,
    "backtest": {
     "months": 120,
-    "cagr_pct": 8.3,
+    "cagr_pct": 8.7,
     "vol_pct": 11,
     "sharpe": 0.58,
     "sortino": 0.81,
@@ -99,21 +417,22 @@
    },
    "long_history": {
     "months": 1205,
-    "cagr_pct": 6.4,
+    "cagr_pct": 6.7,
     "max_drawdown_pct": -27.3,
     "worst_year_pct": -18.6,
     "start": "1926-07",
     "end": "2026-10"
    },
    "model": {
-    "beta": 1,
+    "beta": 0.78,
     "alpha_dropped_pct": 1.2,
     "resid_vol_pct": 8,
     "months": 120,
     "start": "2016-11",
     "end": "2026-10"
    },
-   "fee_pct": 0,
+   "fee_pct": 0.04,
+   "policy": "rebalance",
    "proxy_note": null,
    "notes": []
   },
@@ -134,18 +453,22 @@
     "BND": "BND"
    },
    "status": "ok",
-   "risk_rank": 3,
    "fit": "fits",
+   "risk_rank": 3,
    "worst_year_p10_pct": -17.8,
    "cvar95_1y_pct": -28.5,
-   "p50_value_10y": 134034,
-   "chance_fi": 0.42,
-   "sharpe": 0.55,
    "max_drawdown_pct": -23.1,
    "drawdown_10y": {
     "p10": -35.6,
     "p50": -23.1,
     "p90": -14.2
+   },
+   "p50_value_10y": 134034,
+   "chance_fi": 0.0035,
+   "fi_years": {
+    "p10": 26.67,
+    "p50": 32.33,
+    "p90": null
    },
    "bands": [
     {
@@ -199,6 +522,235 @@
      "return_p50_pct": 7.2
     }
    ],
+   "fi_time": [
+    {
+     "deposit": 500,
+     "years_p10": 28.08,
+     "years_p50": 34.33,
+     "years_p90": null,
+     "chance_by_target": 0.0031
+    },
+    {
+     "deposit": 600,
+     "years_p10": 26.67,
+     "years_p50": 32.33,
+     "years_p90": null,
+     "chance_by_target": 0.0035
+    },
+    {
+     "deposit": 1000,
+     "years_p10": 22.5,
+     "years_p50": 26.67,
+     "years_p90": 33.42,
+     "chance_by_target": 0.0052
+    },
+    {
+     "deposit": 1500,
+     "years_p10": 19.08,
+     "years_p50": 22.25,
+     "years_p90": 27.08,
+     "chance_by_target": 0.0082
+    },
+    {
+     "deposit": 2000,
+     "years_p10": 16.75,
+     "years_p50": 19.25,
+     "years_p90": 23,
+     "chance_by_target": 0.0127
+    },
+    {
+     "deposit": 3000,
+     "years_p10": 13.67,
+     "years_p50": 15.33,
+     "years_p90": 17.75,
+     "chance_by_target": 0.0285
+    },
+    {
+     "deposit": 4000,
+     "years_p10": 11.58,
+     "years_p50": 12.83,
+     "years_p90": 14.58,
+     "chance_by_target": 0.0607
+    },
+    {
+     "deposit": 5000,
+     "years_p10": 10.17,
+     "years_p50": 11.08,
+     "years_p90": 12.33,
+     "chance_by_target": 0.1221
+    },
+    {
+     "deposit": 6000,
+     "years_p10": 9,
+     "years_p50": 9.75,
+     "years_p90": 10.75,
+     "chance_by_target": 0.2303
+    },
+    {
+     "deposit": 8000,
+     "years_p10": 7.42,
+     "years_p50": 7.92,
+     "years_p90": 8.58,
+     "chance_by_target": 0.5667
+    },
+    {
+     "deposit": 10000,
+     "years_p10": 6.33,
+     "years_p50": 6.67,
+     "years_p90": 7.08,
+     "chance_by_target": 0.8508
+    }
+   ],
+   "lower": {
+    "risk_rank": 3,
+    "worst_year_p10_pct": -19.2,
+    "cvar95_1y_pct": -30.7,
+    "max_drawdown_pct": -25,
+    "drawdown_10y": {
+     "p10": -38.4,
+     "p50": -25,
+     "p90": -15.4
+    },
+    "p50_value_10y": 119529,
+    "chance_fi": 0.0025,
+    "fi_years": {
+     "p10": 30.83,
+     "p50": 39.17,
+     "p90": null
+    },
+    "bands": [
+     {
+      "years": 1,
+      "p10": 20767,
+      "p50": 24849,
+      "p90": 29732,
+      "contributed": 23970,
+      "chance_loss": 0.42,
+      "chance_below_contributed": 0.4,
+      "return_p50_pct": 5.24
+     },
+     {
+      "years": 5,
+      "p10": 41259,
+      "p50": 61625,
+      "p90": 92044,
+      "contributed": 52770,
+      "chance_loss": 0.188,
+      "chance_below_contributed": 0.179,
+      "return_p50_pct": 5.24
+     },
+     {
+      "years": 10,
+      "p10": 67774,
+      "p50": 119529,
+      "p90": 210808,
+      "contributed": 88770,
+      "chance_loss": 0.133,
+      "chance_below_contributed": 0.126,
+      "return_p50_pct": 5.24
+     },
+     {
+      "years": 20,
+      "p10": 130341,
+      "p50": 290779,
+      "p90": 648700,
+      "contributed": 160770,
+      "chance_loss": 0.094,
+      "chance_below_contributed": 0.089,
+      "return_p50_pct": 5.24
+     },
+     {
+      "years": 40,
+      "p10": 338138,
+      "p50": 1051772,
+      "p90": 3271516,
+      "contributed": 304770,
+      "chance_loss": 0.066,
+      "chance_below_contributed": 0.063,
+      "return_p50_pct": 5.24
+     }
+    ],
+    "fi_time": [
+     {
+      "deposit": 500,
+      "years_p10": 32.67,
+      "years_p50": null,
+      "years_p90": null,
+      "chance_by_target": 0
+     },
+     {
+      "deposit": 600,
+      "years_p10": 30.83,
+      "years_p50": 39.17,
+      "years_p90": null,
+      "chance_by_target": 0.0025
+     },
+     {
+      "deposit": 1000,
+      "years_p10": 25.58,
+      "years_p50": 31.58,
+      "years_p90": null,
+      "chance_by_target": 0.0036
+     },
+     {
+      "deposit": 1500,
+      "years_p10": 21.42,
+      "years_p50": 25.83,
+      "years_p90": 33.42,
+      "chance_by_target": 0.0056
+     },
+     {
+      "deposit": 2000,
+      "years_p10": 18.67,
+      "years_p50": 22,
+      "years_p90": 27.58,
+      "chance_by_target": 0.0085
+     },
+     {
+      "deposit": 3000,
+      "years_p10": 14.92,
+      "years_p50": 17.17,
+      "years_p90": 20.58,
+      "chance_by_target": 0.0186
+     },
+     {
+      "deposit": 4000,
+      "years_p10": 12.58,
+      "years_p50": 14.17,
+      "years_p90": 16.42,
+      "chance_by_target": 0.0393
+     },
+     {
+      "deposit": 5000,
+      "years_p10": 10.83,
+      "years_p50": 12.08,
+      "years_p90": 13.67,
+      "chance_by_target": 0.0803
+     },
+     {
+      "deposit": 6000,
+      "years_p10": 9.58,
+      "years_p50": 10.5,
+      "years_p90": 11.75,
+      "chance_by_target": 0.1594
+     },
+     {
+      "deposit": 8000,
+      "years_p10": 7.75,
+      "years_p50": 8.42,
+      "years_p90": 9.17,
+      "chance_by_target": 0.4506
+     },
+     {
+      "deposit": 10000,
+      "years_p10": 6.58,
+      "years_p50": 7,
+      "years_p90": 7.5,
+      "chance_by_target": 0.786
+     }
+    ]
+   },
+   "sharpe": 0.55,
    "backtest": {
     "months": 120,
     "cagr_pct": 9.4,
@@ -221,14 +773,15 @@
     "end": "2026-10"
    },
    "model": {
-    "beta": 1,
+    "beta": 0.98,
     "alpha_dropped_pct": 1.2,
     "resid_vol_pct": 8,
     "months": 120,
     "start": "2016-11",
     "end": "2026-10"
    },
-   "fee_pct": 0,
+   "fee_pct": 0.04,
+   "policy": "rebalance",
    "proxy_note": null,
    "notes": []
   },
@@ -249,74 +802,307 @@
     "VXUS": "VXUS"
    },
    "status": "ok",
-   "risk_rank": 4,
    "fit": "fits",
+   "risk_rank": 4,
    "worst_year_p10_pct": -26.9,
    "cvar95_1y_pct": -43,
-   "p50_value_10y": 141342,
-   "chance_fi": 0.53,
-   "sharpe": 0.62,
    "max_drawdown_pct": -35,
    "drawdown_10y": {
     "p10": -53.8,
     "p50": -35,
     "p90": -21.5
    },
+   "p50_value_10y": 137229,
+   "chance_fi": 0.0127,
+   "fi_years": {
+    "p10": 24.83,
+    "p50": 31.25,
+    "p90": null
+   },
    "bands": [
     {
      "years": 1,
-     "p10": 20110,
-     "p50": 25328,
-     "p90": 31900,
+     "p10": 20044,
+     "p50": 25245,
+     "p90": 31795,
      "contributed": 23970,
      "chance_loss": 0.42,
      "chance_below_contributed": 0.4,
-     "return_p50_pct": 8.1
+     "return_p50_pct": 7.6
     },
     {
      "years": 5,
-     "p10": 40046,
-     "p50": 67079,
-     "p90": 112359,
+     "p10": 39457,
+     "p50": 66092,
+     "p90": 110706,
      "contributed": 52770,
      "chance_loss": 0.188,
      "chance_below_contributed": 0.179,
-     "return_p50_pct": 8.1
+     "return_p50_pct": 7.6
     },
     {
      "years": 10,
-     "p10": 68148,
-     "p50": 141342,
-     "p90": 293149,
+     "p10": 66165,
+     "p50": 137229,
+     "p90": 284619,
      "contributed": 88770,
      "chance_loss": 0.133,
      "chance_below_contributed": 0.126,
-     "return_p50_pct": 8.1
+     "return_p50_pct": 7.6
     },
     {
      "years": 20,
-     "p10": 147121,
-     "p50": 412783,
-     "p90": 1158163,
+     "p10": 138223,
+     "p50": 387818,
+     "p90": 1088118,
      "contributed": 160770,
      "chance_loss": 0.094,
      "chance_below_contributed": 0.089,
-     "return_p50_pct": 8.1
+     "return_p50_pct": 7.6
     },
     {
      "years": 40,
-     "p10": 533067,
-     "p50": 2293067,
-     "p90": 9863977,
+     "p10": 463441,
+     "p50": 1993561,
+     "p90": 8575603,
      "contributed": 304770,
      "chance_loss": 0.066,
      "chance_below_contributed": 0.063,
-     "return_p50_pct": 8.1
+     "return_p50_pct": 7.6
     }
    ],
+   "fi_time": [
+    {
+     "deposit": 500,
+     "years_p10": 26.08,
+     "years_p50": 33.08,
+     "years_p90": null,
+     "chance_by_target": 0.0117
+    },
+    {
+     "deposit": 600,
+     "years_p10": 24.83,
+     "years_p50": 31.25,
+     "years_p90": null,
+     "chance_by_target": 0.0127
+    },
+    {
+     "deposit": 1000,
+     "years_p10": 21.08,
+     "years_p50": 25.83,
+     "years_p90": 34.58,
+     "chance_by_target": 0.0175
+    },
+    {
+     "deposit": 1500,
+     "years_p10": 18.08,
+     "years_p50": 21.67,
+     "years_p90": 27.92,
+     "chance_by_target": 0.0249
+    },
+    {
+     "deposit": 2000,
+     "years_p10": 15.92,
+     "years_p50": 18.83,
+     "years_p90": 23.58,
+     "chance_by_target": 0.0345
+    },
+    {
+     "deposit": 3000,
+     "years_p10": 13.08,
+     "years_p50": 15.08,
+     "years_p90": 18.17,
+     "chance_by_target": 0.0634
+    },
+    {
+     "deposit": 4000,
+     "years_p10": 11.17,
+     "years_p50": 12.67,
+     "years_p90": 14.83,
+     "chance_by_target": 0.1108
+    },
+    {
+     "deposit": 5000,
+     "years_p10": 9.75,
+     "years_p50": 10.92,
+     "years_p90": 12.58,
+     "chance_by_target": 0.1869
+    },
+    {
+     "deposit": 6000,
+     "years_p10": 8.75,
+     "years_p50": 9.67,
+     "years_p90": 10.92,
+     "chance_by_target": 0.2896
+    },
+    {
+     "deposit": 8000,
+     "years_p10": 7.17,
+     "years_p50": 7.83,
+     "years_p90": 8.67,
+     "chance_by_target": 0.5693
+    },
+    {
+     "deposit": 10000,
+     "years_p10": 6.17,
+     "years_p50": 6.58,
+     "years_p90": 7.17,
+     "chance_by_target": 0.8105
+    }
+   ],
+   "lower": {
+    "risk_rank": 5,
+    "worst_year_p10_pct": -28.5,
+    "cvar95_1y_pct": -45.6,
+    "max_drawdown_pct": -37.1,
+    "drawdown_10y": {
+     "p10": -57,
+     "p50": -37.1,
+     "p90": -22.8
+    },
+    "p50_value_10y": 120365,
+    "chance_fi": 0.0095,
+    "fi_years": {
+     "p10": 28.83,
+     "p50": 38.67,
+     "p90": null
+    },
+    "bands": [
+     {
+      "years": 1,
+      "p10": 19746,
+      "p50": 24869,
+      "p90": 31322,
+      "contributed": 23970,
+      "chance_loss": 0.42,
+      "chance_below_contributed": 0.4,
+      "return_p50_pct": 5.36
+     },
+     {
+      "years": 5,
+      "p10": 36921,
+      "p50": 61844,
+      "p90": 103591,
+      "contributed": 52770,
+      "chance_loss": 0.188,
+      "chance_below_contributed": 0.179,
+      "return_p50_pct": 5.36
+     },
+     {
+      "years": 10,
+      "p10": 58034,
+      "p50": 120365,
+      "p90": 249642,
+      "contributed": 88770,
+      "chance_loss": 0.133,
+      "chance_below_contributed": 0.126,
+      "return_p50_pct": 5.36
+     },
+     {
+      "years": 20,
+      "p10": 105136,
+      "p50": 294986,
+      "p90": 827653,
+      "contributed": 160770,
+      "chance_loss": 0.094,
+      "chance_below_contributed": 0.089,
+      "return_p50_pct": 5.36
+     },
+     {
+      "years": 40,
+      "p10": 252339,
+      "p50": 1085476,
+      "p90": 4669340,
+      "contributed": 304770,
+      "chance_loss": 0.066,
+      "chance_below_contributed": 0.063,
+      "return_p50_pct": 5.36
+     }
+    ],
+    "fi_time": [
+     {
+      "deposit": 500,
+      "years_p10": 30.5,
+      "years_p50": null,
+      "years_p90": null,
+      "chance_by_target": 0
+     },
+     {
+      "deposit": 600,
+      "years_p10": 28.83,
+      "years_p50": 38.67,
+      "years_p90": null,
+      "chance_by_target": 0.0095
+     },
+     {
+      "deposit": 1000,
+      "years_p10": 24.08,
+      "years_p50": 31.17,
+      "years_p90": null,
+      "chance_by_target": 0.0127
+     },
+     {
+      "deposit": 1500,
+      "years_p10": 20.33,
+      "years_p50": 25.58,
+      "years_p90": 36.25,
+      "chance_by_target": 0.0178
+     },
+     {
+      "deposit": 2000,
+      "years_p10": 17.75,
+      "years_p50": 21.83,
+      "years_p90": 29.5,
+      "chance_by_target": 0.0245
+     },
+     {
+      "deposit": 3000,
+      "years_p10": 14.33,
+      "years_p50": 17,
+      "years_p90": 21.67,
+      "chance_by_target": 0.045
+     },
+     {
+      "deposit": 4000,
+      "years_p10": 12.17,
+      "years_p50": 14.08,
+      "years_p90": 17.17,
+      "chance_by_target": 0.0783
+     },
+     {
+      "deposit": 5000,
+      "years_p10": 10.5,
+      "years_p50": 12,
+      "years_p90": 14.17,
+      "chance_by_target": 0.1336
+     },
+     {
+      "deposit": 6000,
+      "years_p10": 9.33,
+      "years_p50": 10.5,
+      "years_p90": 12.08,
+      "chance_by_target": 0.2153
+     },
+     {
+      "deposit": 8000,
+      "years_p10": 7.58,
+      "years_p50": 8.33,
+      "years_p90": 9.42,
+      "chance_by_target": 0.477
+     },
+     {
+      "deposit": 10000,
+      "years_p10": 6.42,
+      "years_p50": 7,
+      "years_p90": 7.67,
+      "chance_by_target": 0.7334
+     }
+    ]
+   },
+   "sharpe": 0.62,
    "backtest": {
     "months": 120,
-    "cagr_pct": 10.5,
+    "cagr_pct": 9.9,
     "vol_pct": 18,
     "sharpe": 0.62,
     "sortino": 0.87,
@@ -329,21 +1115,22 @@
    },
    "long_history": {
     "months": 1205,
-    "cagr_pct": 8.1,
+    "cagr_pct": 7.6,
     "max_drawdown_pct": -59.2,
     "worst_year_pct": -40.3,
     "start": "1926-07",
     "end": "2026-10"
    },
    "model": {
-    "beta": 1,
+    "beta": 1.12,
     "alpha_dropped_pct": 1.2,
     "resid_vol_pct": 8,
     "months": 120,
     "start": "2016-11",
     "end": "2026-10"
    },
-   "fee_pct": 0,
+   "fee_pct": 0.08,
+   "policy": "rebalance",
    "proxy_note": null,
    "notes": []
   },
@@ -364,165 +1151,715 @@
     "VXUS": "VXUS"
    },
    "status": "ok",
-   "risk_rank": 5,
    "fit": "above",
-   "worst_year_p10_pct": -38.6,
-   "cvar95_1y_pct": -61.8,
-   "p50_value_10y": 143025,
-   "chance_fi": 0.47,
-   "sharpe": 0.41,
-   "max_drawdown_pct": -50.2,
+   "risk_rank": 5,
+   "worst_year_p10_pct": -34.2,
+   "cvar95_1y_pct": -54.7,
+   "max_drawdown_pct": -44.5,
    "drawdown_10y": {
-    "p10": -77.2,
-    "p50": -50.2,
-    "p90": -30.9
+    "p10": -68.4,
+    "p50": -44.5,
+    "p90": -27.4
+   },
+   "p50_value_10y": 134825,
+   "chance_fi": 0.0154,
+   "fi_years": {
+    "p10": 25,
+    "p50": 32,
+    "p90": null
    },
    "bands": [
     {
      "years": 1,
-     "p10": 17943,
-     "p50": 25362,
-     "p90": 35848,
+     "p10": 19749,
+     "p50": 25194,
+     "p90": 32141,
      "contributed": 23970,
      "chance_loss": 0.42,
      "chance_below_contributed": 0.4,
-     "return_p50_pct": 8.3
+     "return_p50_pct": 7.3
     },
     {
      "years": 5,
-     "p10": 31126,
-     "p50": 67478,
-     "p90": 146284,
+     "p10": 38003,
+     "p50": 65506,
+     "p90": 112915,
      "contributed": 52770,
      "chance_loss": 0.188,
      "chance_below_contributed": 0.179,
-     "return_p50_pct": 8.3
+     "return_p50_pct": 7.3
     },
     {
      "years": 10,
-     "p10": 47883,
-     "p50": 143025,
-     "p90": 427206,
+     "p10": 62424,
+     "p50": 134825,
+     "p90": 291199,
      "contributed": 88770,
      "chance_loss": 0.133,
      "chance_below_contributed": 0.126,
-     "return_p50_pct": 8.3
+     "return_p50_pct": 7.3
     },
     {
      "years": 20,
-     "p10": 90062,
-     "p50": 423265,
-     "p90": 1989227,
+     "p10": 125756,
+     "p50": 373651,
+     "p90": 1110211,
      "contributed": 160770,
      "chance_loss": 0.094,
      "chance_below_contributed": 0.089,
-     "return_p50_pct": 8.3
+     "return_p50_pct": 7.3
     },
     {
      "years": 40,
-     "p10": 271919,
-     "p50": 2426007,
-     "p90": 21644363,
+     "p10": 393198,
+     "p50": 1834207,
+     "p90": 8556289,
      "contributed": 304770,
      "chance_loss": 0.066,
      "chance_below_contributed": 0.063,
-     "return_p50_pct": 8.3
+     "return_p50_pct": 7.3
     }
    ],
+   "fi_time": [
+    {
+     "deposit": 500,
+     "years_p10": 26.33,
+     "years_p50": 34,
+     "years_p90": null,
+     "chance_by_target": 0.0142
+    },
+    {
+     "deposit": 600,
+     "years_p10": 25,
+     "years_p50": 32,
+     "years_p90": null,
+     "chance_by_target": 0.0154
+    },
+    {
+     "deposit": 1000,
+     "years_p10": 21.25,
+     "years_p50": 26.42,
+     "years_p90": 36.58,
+     "chance_by_target": 0.0207
+    },
+    {
+     "deposit": 1500,
+     "years_p10": 18.17,
+     "years_p50": 22.08,
+     "years_p90": 29.33,
+     "chance_by_target": 0.0289
+    },
+    {
+     "deposit": 2000,
+     "years_p10": 16,
+     "years_p50": 19.17,
+     "years_p90": 24.58,
+     "chance_by_target": 0.0392
+    },
+    {
+     "deposit": 3000,
+     "years_p10": 13.08,
+     "years_p50": 15.25,
+     "years_p90": 18.75,
+     "chance_by_target": 0.0701
+    },
+    {
+     "deposit": 4000,
+     "years_p10": 11.17,
+     "years_p50": 12.83,
+     "years_p90": 15.25,
+     "chance_by_target": 0.1173
+    },
+    {
+     "deposit": 5000,
+     "years_p10": 9.83,
+     "years_p50": 11.08,
+     "years_p90": 12.83,
+     "chance_by_target": 0.1895
+    },
+    {
+     "deposit": 6000,
+     "years_p10": 8.75,
+     "years_p50": 9.75,
+     "years_p90": 11.17,
+     "chance_by_target": 0.2913
+    },
+    {
+     "deposit": 8000,
+     "years_p10": 7.25,
+     "years_p50": 7.92,
+     "years_p90": 8.75,
+     "chance_by_target": 0.5493
+    },
+    {
+     "deposit": 10000,
+     "years_p10": 6.17,
+     "years_p50": 6.67,
+     "years_p90": 7.25,
+     "chance_by_target": 0.7829
+    }
+   ],
+   "lower": {
+    "risk_rank": 5,
+    "worst_year_p10_pct": -35.9,
+    "cvar95_1y_pct": -57.4,
+    "max_drawdown_pct": -46.7,
+    "drawdown_10y": {
+     "p10": -71.8,
+     "p50": -46.7,
+     "p90": -28.7
+    },
+    "p50_value_10y": 117719,
+    "chance_fi": 0,
+    "fi_years": {
+     "p10": 29.33,
+     "p50": null,
+     "p90": null
+    },
+    "bands": [
+     {
+      "years": 1,
+      "p10": 19444,
+      "p50": 24805,
+      "p90": 31644,
+      "contributed": 23970,
+      "chance_loss": 0.42,
+      "chance_below_contributed": 0.4,
+      "return_p50_pct": 4.98
+     },
+     {
+      "years": 5,
+      "p10": 35473,
+      "p50": 61146,
+      "p90": 105399,
+      "contributed": 52770,
+      "chance_loss": 0.188,
+      "chance_below_contributed": 0.179,
+      "return_p50_pct": 4.98
+     },
+     {
+      "years": 10,
+      "p10": 54504,
+      "p50": 117719,
+      "p90": 254253,
+      "contributed": 88770,
+      "chance_loss": 0.133,
+      "chance_below_contributed": 0.126,
+      "return_p50_pct": 4.98
+     },
+     {
+      "years": 20,
+      "p10": 94839,
+      "p50": 281792,
+      "p90": 837273,
+      "contributed": 160770,
+      "chance_loss": 0.094,
+      "chance_below_contributed": 0.089,
+      "return_p50_pct": 4.98
+     },
+     {
+      "years": 40,
+      "p10": 210483,
+      "p50": 981872,
+      "p90": 4580279,
+      "contributed": 304770,
+      "chance_loss": 0.066,
+      "chance_below_contributed": 0.063,
+      "return_p50_pct": 4.98
+     }
+    ],
+    "fi_time": [
+     {
+      "deposit": 500,
+      "years_p10": 31,
+      "years_p50": null,
+      "years_p90": null,
+      "chance_by_target": 0
+     },
+     {
+      "deposit": 600,
+      "years_p10": 29.33,
+      "years_p50": null,
+      "years_p90": null,
+      "chance_by_target": 0
+     },
+     {
+      "deposit": 1000,
+      "years_p10": 24.42,
+      "years_p50": 32.42,
+      "years_p90": null,
+      "chance_by_target": 0.0151
+     },
+     {
+      "deposit": 1500,
+      "years_p10": 20.58,
+      "years_p50": 26.42,
+      "years_p90": 39.42,
+      "chance_by_target": 0.0207
+     },
+     {
+      "deposit": 2000,
+      "years_p10": 18,
+      "years_p50": 22.42,
+      "years_p90": 31.67,
+      "chance_by_target": 0.028
+     },
+     {
+      "deposit": 3000,
+      "years_p10": 14.5,
+      "years_p50": 17.42,
+      "years_p90": 22.83,
+      "chance_by_target": 0.0493
+     },
+     {
+      "deposit": 4000,
+      "years_p10": 12.25,
+      "years_p50": 14.33,
+      "years_p90": 17.83,
+      "chance_by_target": 0.0838
+     },
+     {
+      "deposit": 5000,
+      "years_p10": 10.58,
+      "years_p50": 12.17,
+      "years_p90": 14.67,
+      "chance_by_target": 0.1389
+     },
+     {
+      "deposit": 6000,
+      "years_p10": 9.42,
+      "years_p50": 10.58,
+      "years_p90": 12.5,
+      "chance_by_target": 0.2213
+     },
+     {
+      "deposit": 8000,
+      "years_p10": 7.67,
+      "years_p50": 8.5,
+      "years_p90": 9.58,
+      "chance_by_target": 0.4508
+     },
+     {
+      "deposit": 10000,
+      "years_p10": 6.5,
+      "years_p50": 7.08,
+      "years_p90": 7.83,
+      "chance_by_target": 0.7078
+     }
+    ]
+   },
+   "sharpe": 0.41,
    "backtest": {
     "months": 120,
-    "cagr_pct": 10.8,
-    "vol_pct": 27,
+    "cagr_pct": 9.5,
+    "vol_pct": 19,
     "sharpe": 0.41,
     "sortino": 0.57,
-    "max_drawdown_pct": -46.3,
+    "max_drawdown_pct": -41,
     "calmar": 0.5,
-    "worst_year_pct": -38.6,
+    "worst_year_pct": -34.2,
     "hit_rate": 0.6,
     "start": "2016-11",
     "end": "2026-10"
    },
    "long_history": {
     "months": 1205,
-    "cagr_pct": 8.3,
-    "max_drawdown_pct": -84.9,
-    "worst_year_pct": -57.9,
+    "cagr_pct": 7.3,
+    "max_drawdown_pct": -75.2,
+    "worst_year_pct": -51.3,
     "start": "1926-07",
     "end": "2026-10"
    },
    "model": {
-    "beta": 1,
+    "beta": 1.21,
     "alpha_dropped_pct": 1.2,
     "resid_vol_pct": 8,
     "months": 120,
     "start": "2016-11",
     "end": "2026-10"
    },
-   "fee_pct": 0,
+   "fee_pct": 0.03,
+   "policy": "hold",
    "proxy_note": "FXAIX trades as IVV",
-   "notes": []
+   "notes": [],
+   "sleeves": [
+    {
+     "id": "ACME",
+     "weight": 0.24,
+     "beta": 1.86,
+     "resid_vol_pct": 62.4,
+     "fee_pct": 0,
+     "months": 82
+    },
+    {
+     "id": "rest",
+     "weight": 0.72,
+     "beta": 1.04,
+     "resid_vol_pct": 3.1,
+     "fee_pct": 0.04,
+     "months": 120,
+     "holds": [
+      "FTEC",
+      "IVV",
+      "VXUS"
+     ]
+    },
+    {
+     "id": "cash",
+     "weight": 0.04,
+     "beta": 0,
+     "resid_vol_pct": 0,
+     "fee_pct": 0,
+     "months": null
+    },
+    {
+     "id": "new-money",
+     "weight": 0,
+     "beta": 0.98,
+     "resid_vol_pct": 2.3,
+     "fee_pct": 0.04,
+     "months": 120,
+     "to": "safe-mix"
+    }
+   ],
+   "new_money": "safe-mix",
+   "variants": [
+    {
+     "id": "rebalanced",
+     "name": "Topped back up to today’s weights",
+     "risk_rank": 5,
+     "worst_year_p10_pct": -41.8,
+     "cvar95_1y_pct": -66.9,
+     "max_drawdown_pct": -54.3,
+     "drawdown_10y": {
+      "p10": -83.6,
+      "p50": -54.3,
+      "p90": -33.4
+     },
+     "p50_value_10y": 135621,
+     "chance_fi": 0.0619,
+     "fi_years": {
+      "p10": 22.42,
+      "p50": 31.75,
+      "p90": null
+     },
+     "bands": [
+      {
+       "years": 1,
+       "p10": 17385,
+       "p50": 25211,
+       "p90": 36560,
+       "contributed": 23970,
+       "chance_loss": 0.42,
+       "chance_below_contributed": 0.4,
+       "return_p50_pct": 7.4
+      },
+      {
+       "years": 5,
+       "p10": 28618,
+       "p50": 65701,
+       "p90": 150834,
+       "contributed": 52770,
+       "chance_loss": 0.188,
+       "chance_below_contributed": 0.179,
+       "return_p50_pct": 7.4
+      },
+      {
+       "years": 10,
+       "p10": 41870,
+       "p50": 135621,
+       "p90": 439295,
+       "contributed": 88770,
+       "chance_loss": 0.133,
+       "chance_below_contributed": 0.126,
+       "return_p50_pct": 7.4
+      },
+      {
+       "years": 20,
+       "p10": 71778,
+       "p50": 378308,
+       "p90": 1993886,
+       "contributed": 160770,
+       "chance_loss": 0.094,
+       "chance_below_contributed": 0.089,
+       "return_p50_pct": 7.4
+      },
+      {
+       "years": 40,
+       "p10": 179733,
+       "p50": 1885747,
+       "p90": 19785187,
+       "contributed": 304770,
+       "chance_loss": 0.066,
+       "chance_below_contributed": 0.063,
+       "return_p50_pct": 7.4
+      }
+     ]
+    }
+   ]
   }
  ],
- "book": "as-held",
- "start_value": 16770,
- "monthly_deposit": 600,
- "deposit_source": "activity",
- "deposit_note": "from your last 12 months of deposits",
- "fi_number": 1000000,
- "target_date": "2035-01-01",
- "real": false,
- "horizons": [
-  1,
-  5,
-  10,
-  20,
-  40
- ],
- "paths": 2000,
- "history": {
-  "start": "1926-07",
-  "end": "2026-10",
-  "months": 1203
- },
- "ladder": [
+ "convictions": [
   {
-   "band": 1,
-   "label": "Conservative",
-   "worst_year_loss_pct": 10
-  },
-  {
-   "band": 2,
-   "label": "Moderately conservative",
-   "worst_year_loss_pct": 18
-  },
-  {
-   "band": 3,
-   "label": "Moderate",
-   "worst_year_loss_pct": 25
-  },
-  {
-   "band": 4,
-   "label": "Moderately aggressive",
-   "worst_year_loss_pct": 33
-  },
-  {
-   "band": 5,
-   "label": "Aggressive",
-   "worst_year_loss_pct": 45
+   "symbol": "ACME",
+   "status": "ok",
+   "weight_pct": 24,
+   "band_min_pct": 5,
+   "band_max_pct": 15,
+   "beta": 1.86,
+   "resid_vol_pct": 62.4,
+   "months": 82,
+   "policies": [
+    {
+     "id": "hold",
+     "name": "Hold",
+     "rule": "Nothing sold or topped up; new money goes to the safe mix.",
+     "risk_rank": 5,
+     "worst_year_p10_pct": -34.2,
+     "cvar95_1y_pct": -54.7,
+     "max_drawdown_pct": -44.5,
+     "drawdown_10y": {
+      "p10": -68.4,
+      "p50": -44.5,
+      "p90": -27.4
+     },
+     "p50_value_10y": 134825,
+     "chance_fi": 0.0154,
+     "fi_years": {
+      "p10": 25,
+      "p50": 32,
+      "p90": null
+     },
+     "bands": [
+      {
+       "years": 1,
+       "p10": 19749,
+       "p50": 25194,
+       "p90": 32141,
+       "contributed": 23970,
+       "chance_loss": 0.42,
+       "chance_below_contributed": 0.4,
+       "return_p50_pct": 7.3,
+       "weight_pct": {
+        "p10": 14,
+        "p50": 21,
+        "p90": 30
+       }
+      },
+      {
+       "years": 5,
+       "p10": 38003,
+       "p50": 65506,
+       "p90": 112915,
+       "contributed": 52770,
+       "chance_loss": 0.188,
+       "chance_below_contributed": 0.179,
+       "return_p50_pct": 7.3,
+       "weight_pct": {
+        "p10": 6,
+        "p50": 13,
+        "p90": 27
+       }
+      },
+      {
+       "years": 10,
+       "p10": 62424,
+       "p50": 134825,
+       "p90": 291199,
+       "contributed": 88770,
+       "chance_loss": 0.133,
+       "chance_below_contributed": 0.126,
+       "return_p50_pct": 7.3,
+       "weight_pct": {
+        "p10": 3,
+        "p50": 8,
+        "p90": 24
+       }
+      },
+      {
+       "years": 20,
+       "p10": 125756,
+       "p50": 373651,
+       "p90": 1110211,
+       "contributed": 160770,
+       "chance_loss": 0.094,
+       "chance_below_contributed": 0.089,
+       "return_p50_pct": 7.3,
+       "weight_pct": {
+        "p10": 1,
+        "p50": 4,
+        "p90": 18
+       }
+      }
+     ]
+    },
+    {
+     "id": "rebalance",
+     "name": "Rebalance",
+     "rule": "Topped back up, or trimmed, to today’s weight every month.",
+     "risk_rank": 5,
+     "worst_year_p10_pct": -41.8,
+     "cvar95_1y_pct": -66.9,
+     "max_drawdown_pct": -54.3,
+     "drawdown_10y": {
+      "p10": -83.6,
+      "p50": -54.3,
+      "p90": -33.4
+     },
+     "p50_value_10y": 135621,
+     "chance_fi": 0.0619,
+     "fi_years": {
+      "p10": 22.42,
+      "p50": 31.75,
+      "p90": null
+     },
+     "bands": [
+      {
+       "years": 1,
+       "p10": 17385,
+       "p50": 25211,
+       "p90": 36560,
+       "contributed": 23970,
+       "chance_loss": 0.42,
+       "chance_below_contributed": 0.4,
+       "return_p50_pct": 7.4,
+       "weight_pct": {
+        "p10": 24,
+        "p50": 24,
+        "p90": 24
+       }
+      },
+      {
+       "years": 5,
+       "p10": 28618,
+       "p50": 65701,
+       "p90": 150834,
+       "contributed": 52770,
+       "chance_loss": 0.188,
+       "chance_below_contributed": 0.179,
+       "return_p50_pct": 7.4,
+       "weight_pct": {
+        "p10": 24,
+        "p50": 24,
+        "p90": 24
+       }
+      },
+      {
+       "years": 10,
+       "p10": 41870,
+       "p50": 135621,
+       "p90": 439295,
+       "contributed": 88770,
+       "chance_loss": 0.133,
+       "chance_below_contributed": 0.126,
+       "return_p50_pct": 7.4,
+       "weight_pct": {
+        "p10": 24,
+        "p50": 24,
+        "p90": 24
+       }
+      },
+      {
+       "years": 20,
+       "p10": 71778,
+       "p50": 378308,
+       "p90": 1993886,
+       "contributed": 160770,
+       "chance_loss": 0.094,
+       "chance_below_contributed": 0.089,
+       "return_p50_pct": 7.4,
+       "weight_pct": {
+        "p10": 24,
+        "p50": 24,
+        "p90": 24
+       }
+      }
+     ]
+    },
+    {
+     "id": "trim",
+     "name": "Trim to band",
+     "rule": "Held, and sold back to the top of its band whenever it grows past it.",
+     "risk_rank": 3,
+     "worst_year_p10_pct": -21.5,
+     "cvar95_1y_pct": -34.4,
+     "max_drawdown_pct": -27.9,
+     "drawdown_10y": {
+      "p10": -43,
+      "p50": -27.9,
+      "p90": -17.2
+     },
+     "p50_value_10y": 135621,
+     "chance_fi": 0.0062,
+     "fi_years": {
+      "p10": 25.83,
+      "p50": 31.75,
+      "p90": null
+     },
+     "bands": [
+      {
+       "years": 1,
+       "p10": 20669,
+       "p50": 25211,
+       "p90": 30751,
+       "contributed": 23970,
+       "chance_loss": 0.42,
+       "chance_below_contributed": 0.4,
+       "return_p50_pct": 7.4,
+       "weight_pct": {
+        "p10": 9,
+        "p50": 13,
+        "p90": 15
+       }
+      },
+      {
+       "years": 5,
+       "p10": 42137,
+       "p50": 65701,
+       "p90": 102443,
+       "contributed": 52770,
+       "chance_loss": 0.188,
+       "chance_below_contributed": 0.179,
+       "return_p50_pct": 7.4,
+       "weight_pct": {
+        "p10": 4,
+        "p50": 9,
+        "p90": 15
+       }
+      },
+      {
+       "years": 10,
+       "p10": 72362,
+       "p50": 135621,
+       "p90": 254181,
+       "contributed": 88770,
+       "chance_loss": 0.133,
+       "chance_below_contributed": 0.126,
+       "return_p50_pct": 7.4,
+       "weight_pct": {
+        "p10": 2,
+        "p50": 6,
+        "p90": 14
+       }
+      },
+      {
+       "years": 20,
+       "p10": 155606,
+       "p50": 378308,
+       "p90": 919739,
+       "contributed": 160770,
+       "chance_loss": 0.094,
+       "chance_below_contributed": 0.089,
+       "return_p50_pct": 7.4,
+       "weight_pct": {
+        "p10": 1,
+        "p50": 3,
+        "p90": 11
+       }
+      }
+     ]
+    }
+   ]
   }
- ],
- "ladder_source": "profile",
- "profile": {
-  "band": 4,
-  "label": "Moderately aggressive",
-  "worst_year_loss_pct": 33,
-  "version": 2
- },
- "method": "Each mix is fitted to the US market on its own price history (beta plus leftover swings, alpha set to zero), then replayed in 12-month blocks of market history since 1926",
- "caveats": [
-  "Alpha is set to zero: no mix gets credit for beating the market in its own history.",
-  "Leftover swings are drawn month by month, so a fund's own long slumps are understated.",
-  "International and bond funds are modelled through their link to the US market since 1926.",
-  "The margin debit is not modelled."
  ]
 }

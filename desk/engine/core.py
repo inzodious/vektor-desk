@@ -328,7 +328,19 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
         wanted["as-held"]["notes"] = held_notes + wanted["as-held"]["notes"]
     with desk:
         catalog.sync(desk, wanted, now=now)
-    out.views["bands"] = bands.run(out, cfg, desk, tr, wanted, value=market, deposits=cash_in, prefs=goal, fees=expense_ratios(plan))
+    out.views["bands"] = bands.run(
+        out,
+        cfg,
+        desk,
+        tr,
+        wanted,
+        value=market,
+        deposits=cash_in,
+        prefs=goal,
+        fees=expense_ratios(plan),
+        kinds=kinds,
+        convictions=convictions(rules_in_force(cfg, plan)[0]),
+    )
     out.views["factors"] = fi.exposure(out, tr, desk, {s: w / 100 for s, w in symbol_weights(now_rows, total).items()})
     out.m("cash.pending", amount, "usd", quality="modelled" if amount is not None else "insufficient_history")
     if when:

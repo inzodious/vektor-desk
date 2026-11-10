@@ -19,13 +19,13 @@ function ticks(lo, hi) {
   return out;
 }
 
-export function RangeBars({ bands = [], fi = null, label }) {
+export function RangeBars({ bands = [], fi = null, label, scale = null }) {
   const [asTable, setAsTable] = useState(false);
   const [ref, width] = useWidth();
   const W = Math.max(260, width);
   const rows = bands.filter((b) => b.p10 != null && b.p90 != null);
   if (!rows.length) return null;
-  const vals = rows.flatMap((b) => [b.p10, b.p90, b.contributed]).concat(fi ? [fi] : []).filter((v) => v > 0);
+  const vals = (scale || rows).flatMap((b) => [b.p10, b.p90, b.contributed]).concat(fi ? [fi] : []).filter((v) => v > 0);
   const lo = Math.min(...vals) * 0.8;
   const hi = Math.max(...vals) * 1.15;
   const y = (v) => T + (H - T - B) * (1 - (Math.log(v) - Math.log(lo)) / (Math.log(hi) - Math.log(lo)));

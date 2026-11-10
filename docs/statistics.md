@@ -156,7 +156,7 @@ Symbols come from `securityDetail.symbol`, else another row with the same CUSIP,
 |---|---|
 | Accounts | Those in the first snapshot whose history runs from before it to on or after it. Each starts on its own history start. Others are listed under `left_out` and join at the first snapshot |
 | Shares and cash | The first snapshot's, minus every buy, sale, split, dividend, deposit and fee after that day. `pro_forma`, the same grade as a rolled-forward day |
-| Prices | The close on or before the day. With none, the nearest trade price in the history (else the snapshot price), `modelled`, and the symbol joins the price backfill with role `past` |
+| Prices | The close on or before the day. With none, the nearest trade price in the history (else the snapshot price), `modelled`, and the symbol joins the price backfill with role `past`. The `daily` job runs that backfill itself, once per symbol never tried, and rebuilds holdings before the core run, so the first evening already has real closes where Tiingo carries the symbol |
 | Opening shares unknown | If undoing a buy takes a holding below zero, the history is missing where those shares went. The holding shows as zero and that account's rows are `modelled` from that day back. Cash that goes negative is `modelled` too |
 | An account that starts later | Its opening value counts as money in on that day, not as return |
 | Day grade | `modelled` when any back-cast row is, else `pro_forma` |
@@ -583,7 +583,7 @@ There is no single target. Four named mixes run side by side on paper and in the
 | id | Name | Mix | Paper |
 |---|---|---|---|
 | `safe-mix` | Safe mix | Built in (`catalog.SAFE_MIX`), his October index plan: FXAIX 40, SCHD 20, FTIHX 10, FTEC 10, and NLR, GRID, ICLN, UFO 5 each. FXAIX trades as IVV and FTIHX as VXUS. It does not read the Escape Vektor plan | Rebalances when a name moves $25 or 10% |
-| `as-held` | As held | His book today, ASTS kept, cash share kept, margin debit left out | Follows his weights each day (same version) |
+| `as-held` | As held | His book today, ASTS kept, cash share kept, margin debit left out. A drifting hold (`policy: "hold"`): nothing sold, nothing topped up | Buys his weights once, then holds those shares (same version). `paper_positions` shows what the sleeve holds |
 | `tech-tilt` | Aggressive tech tilt | 50% IVV, 30% FTEC, 10% SMH, 10% VXUS (proposal) | As safe mix |
 | `dip-buy` | Dip-buy | Safe mix with 20% cash; a third goes in at each 5, 10, 20% drop of IVV from its high; back to 20% cash at a new high | Cash target from IVV's closes |
 
@@ -594,11 +594,16 @@ There is no single target. Four named mixes run side by side on paper and in the
 | Paper | `catalog.rebuild` runs in each paper job before orders. It writes targets to `paper_positions` and the record to `paper_portfolios` (kind `mix`, benchmark IVV) from the sub-ledger's values. The paper gate applies at its checkpoints, so a mix is not flattened for dipping under IVV |
 | Price history | For each proxy, whichever of the proxy and the funds it stands for has the longest prices. The record starts in the first month where 80% of the weight has real prices; missing months use the US market, noted per symbol |
 | Model | Monthly excess return regressed on the US market over that record: beta plus leftover swings. Alpha is dropped (reported as `alpha_dropped_pct`) |
-| Simulation | `DESK_BANDS_PATHS` paths (default 2,000), fixed seed. 12-month blocks of French monthly market history since 1926; each month adds a leftover swing drawn from the fit. The start is his market value; each month adds his trailing net deposit (the FI rule); his plan's fees for the safe mix; today's dollars when his FI goal says so |
+| Simulation | `DESK_BANDS_PATHS` paths (default 2,000), fixed seeds: one stream for the market blocks, so every mix and policy walks the same market paths, and one for leftover swings. 12-month blocks of French monthly market history since 1926; each month adds a leftover swing drawn from the fit. The start is his market value; each month adds his trailing net deposit (the FI rule); today's dollars when his FI goal says so |
+| As held | Fitted holding by holding (`bands.held_sleeves`): each single stock or conviction hold with 2% of the book and 36 months of prices is its own sleeve (six at most), the funds and the rest are one sleeve, cash earns the bill rate. Sleeves drift. New money goes to a `new-money` sleeve on the safe mix's fit (the rest of the book when there is no plan). The old model, topped back up to today's weights each month, stays as `variants[0]` (`id: "rebalanced"`) |
+| Fees | Every mix pays its funds' yearly expense ratio: the plan's figure when it lists the fund, else `catalog.EXPENSE_PCT`, else its ETF twin's; single stocks pay nothing. Taxes and the margin debit are not modelled |
+| Lower-return case | The same paths with `premium_cut_pts` (2) a year taken off what stocks earn over cash, scaled by each sleeve's beta. Stored under `lower` on each row |
+| Time to FI | For each level in `deposit_ladder` ($500 to $10,000 a month, plus his own), the months until each path first holds the FI number. Start holdings and the deposit stream are tracked apart, so one set of paths prices every level |
+| Conviction holds | For each conviction hold that has its own sleeve: hold, rebalance (back to today's weight monthly) and trim (sold back to `band_max_pct` whenever it grows past it, proceeds to new money), over `policy_years` on the same draws |
 | Risk rank | 1–5: the first band whose `worst_year_loss_pct` covers the mix's 1-year p10. Ladder from `desk.decisions.risk.BANDS` when present, else 10/18/25/33/45 |
 | Fit | Against `desk.decisions.risk.current(cfg)`: `above` when the 1-year p10 loses more than his band allows, `below` when it fits the band under his, else `fits`. Null until he answers |
 
-**`GET /api/engine/bands`.** `{as_of, status, book: "as-held", rows, start_value, monthly_deposit, deposit_source, deposit_note, fi_number, target_date, real, horizons: [1, 5, 10, 20, 40], paths, history, ladder, ladder_source, profile, method, caveats}`. Rows run safe → risky. Each row:
+**`GET /api/engine/bands`.** `{as_of, status, book: "as-held", rows, convictions, start_value, monthly_deposit, deposit_source, deposit_note, deposit_ladder, fi_number, target_date, fi_years_max: 40, real, horizons: [1, 5, 10, 20, 40], policy_years: [1, 5, 10, 20], premium_cut_pts: 2, paths, history, ladder, ladder_source, profile, method, caveats}`. Rows run safe → risky. Each row:
 
 | Field | Meaning |
 |---|---|
@@ -608,13 +613,20 @@ There is no single target. Four named mixes run side by side on paper and in the
 | `worst_year_p10_pct, cvar95_1y_pct` | p10 and the mean of the worst 5% of 1-year returns over each path's first 10 years |
 | `drawdown_10y, max_drawdown_pct` | p10/p50/p90 of each path's worst 10-year drawdown; `max_drawdown_pct` is the p50 |
 | `p50_value_10y, chance_fi` | Median 10-year value; share of paths at the FI number by his target date (null without a goal) |
+| `fi_years` | `{p10, p50, p90}`: years until 1 in 10, half and 9 in 10 paths hold the FI number at his deposit; null past 40 years or without a goal |
+| `fi_time[]` | Per `deposit_ladder` level: `deposit, years_p10, years_p50, years_p90, chance_by_target` |
+| `lower` | The lower-return case: `risk_rank, worst_year_p10_pct, cvar95_1y_pct, max_drawdown_pct, drawdown_10y, p50_value_10y, chance_fi, fi_years, bands, fi_time` |
+| `policy` | `hold` for as held, `rebalance` for the fixed mixes |
+| `sleeves, new_money, variants` | As held only. `sleeves[]`: `id` (symbol, `rest`, `cash`, `new-money`), `weight, beta, resid_vol_pct, fee_pct, months`, and `holds` or `to`. `variants[]`: `id, name` plus the `lower` keys without `fi_time` |
 | `backtest` | On real prices: `start, end, months, cagr_pct, vol_pct, sharpe, sortino, max_drawdown_pct, calmar, worst_year_pct, hit_rate` |
 | `long_history` | Beta replayed since 1926 without leftover swings: `cagr_pct, max_drawdown_pct, worst_year_pct` |
-| `model, fee_pct, proxy_note, notes` | Fit details and every substitution |
+| `model, fee_pct, proxy_note, notes` | Fit details (start-weighted across sleeves for as held), the yearly fee charged, and every substitution |
+
+`convictions[]`: `symbol, status, weight_pct, band_min_pct, band_max_pct, beta, resid_vol_pct, months, policies`. Each policy: `id` (`hold`, `rebalance`, `trim`), `name, rule`, the `lower` keys without `fi_time`, and `bands[]` per `policy_years` with `weight_pct: {p10, p50, p90}`, the position's share of the book. `status: "not_ready"` with a `note` when the symbol has no sleeve of its own. A stock plan reads its symbol's entry here.
 
 Metrics `bands.worst_year_p10`, `bands.p50_10y`, `bands.chance_fi` (scope `strategy`). For the agents, `bands.catalog(cfg)` returns `{id, name, risk_rank, fit, worst_year_p10_pct, p50_value_10y, chance_fi, sharpe, max_drawdown_pct, proxy_note}` per ready row, and raises `bands.NotReady` before the first build.
 
-Limits: leftover swings are drawn month by month, so a fund's own long slumps are understated. Bond and international funds enter only through their link to the US market. The margin debit is not modelled.
+Limits: leftover swings are drawn month by month and holding by holding, so a fund's own long slumps and stocks that fall together are understated. Bond and international funds enter only through their link to the US market. Taxes and the margin debit are not modelled. A single stock's middle path falls over time when alpha is dropped and its swings are large; that is the model, not a forecast of the company.
 
 ## Discount-day scanner
 
@@ -642,7 +654,7 @@ Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. On
 | Periods | Run on trading days: `start` is the first and `end` the last trading day of the period. A weekend or holiday data day falls into the next period. The first run backfills every period the value series covers |
 | Base | The last data day on or before the trading day ahead of `start`. If the desk's history starts inside the period, the pack covers what there is and says so (`coverage.full` false) |
 | Closed | `end` has passed, or it is `end` and after 16:15 ET. The open period is "so far" |
-| Final | Closed and a later data day exists. Final packs freeze; a closed pack may be restated once before that (mutual fund prices post late). Two exceptions, both from the back-cast: a pack that started at the edge of the history is redone when the history reaches further back, and a pack whose base day is back-cast is redone when its start or end value moves. `review.run(..., rebuild=True)` recomputes all |
+| Final | Closed and a later data day exists. Final packs freeze; a closed pack may be restated once before that (mutual fund prices post late). Two exceptions, both from the back-cast: a pack that started at the edge of the history is redone when the history reaches further back, and a pack whose base day is back-cast is redone when its start value, end value or return moves. `review.run(..., rebuild=True)` recomputes all |
 | Change | `change_pct` is time-weighted (the `twr_index` series). `net_flows` is every flow the return already nets out, derived per day as value − prior value × (1 + day return). `gain_usd` = change − flows |
 | Versus | SPY, then each live catalog mix, on the same starting dollars with the same flows on the same days. A mix is rebalanced daily, cash earns nothing, Dip buy carries its cash state from the index path. A comparator is left out when under 80% of it has prices |
 | Movers | Per holding: yesterday's shares × today's price change, summed over the period (splits handled). Top 5 up and down. A mover's `return_pct` is chained from the same daily holdings prices, so it always agrees in sign with its contribution. `other_usd` is the rest of the gain: dividends, interest, cash and same-day trades. A day's flow under 5 cents is rounding and counts as zero |
