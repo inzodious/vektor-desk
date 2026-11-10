@@ -31,11 +31,11 @@ Remote Control needs a full sign-in. The year-long `setup-token` the desks use i
 | Need | Do |
 |---|---|
 | Logs now, not in 5 minutes | `bash /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh logs` |
-| A project session didn't start | Read `data/run/logs/eval-debug.log`: the last 1,000 lines of Remote Control's debug log, redacted. `Declined session` lines say why. The raw log is `eval/home/logs/remote-control.log`; each start keeps the previous run as `.1`, and `deploy.sh logs` empties it past 100 MB |
+| A project session didn't start | Read Remote Control's debug log from inside the eval session: `~/logs/remote-control.log` (on the NAS, `eval/home/logs/remote-control.log`). `Declined session` lines say why. Each start keeps the previous run as `.1`, and `deploy.sh logs` empties it past 100 MB. It holds the session's raw tool output, so it is never copied into `data/run/logs` |
 | Pause it | `rm /mnt/Manifest/apps/vektor-desk/eval/home/.claude/.credentials.json && docker restart vektor-desk-eval`; it waits, idle, until step 4 is done again |
 | Remove it | Delete the `eval` service in Apps → `vektor-desk` → Edit, then `rm -rf /mnt/Manifest/apps/vektor-desk/eval` |
 | Clear scratch | `rm -rf /mnt/Manifest/apps/vektor-desk/eval/work/*` |
 
 ## Redaction
 
-`deploy.sh logs` (and every `auto` run) writes the last 400 lines of each desk service's log (the eval container's too), the deploy log and the eval debug log into `data/run/logs`. Before writing, it replaces every value from the box's `*.env` files (8 characters or longer) and anything shaped like a Claude, Tailscale or Porkbun key, a bearer token, a `token=`/`key=`/`secret=` query value, a JWT or a service-account private key with `[redacted]`. The Firestore key file itself is never mounted into the eval container.
+`deploy.sh logs` (and every `auto` run) writes the last 400 lines of each desk service's log (the eval container's too), and the deploy log into `data/run/logs`. Before writing, it replaces every value from the box's `*.env` files (8 characters or longer) and anything shaped like a Claude, Tailscale or Porkbun key, a bearer token, a `token=`/`key=`/`secret=` query value, a JWT or a service-account private key with `[redacted]`. The Firestore key file itself is never mounted into the eval container.
