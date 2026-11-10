@@ -432,7 +432,7 @@ def set_conviction(cfg: Config, symbol: str, *, band_min_pct: float | None = Non
     low = band_min_pct if band_min_pct is not None else old.get("band_min_pct", hint.get("band_min_pct", 0))
     high = band_max_pct if band_max_pct is not None else old.get("band_max_pct", hint.get("band_max_pct"))
     if high is None:
-        raise RiskError("Answer the risk questions first, or give band_max_pct, so the band has a ceiling")
+        raise RiskError("Answer the risk questions in Settings → Risk check first, or give band_max_pct, so the band has a ceiling")
     rule = {
         "id": (found or {}).get("id") or f"conviction-{symbol.lower()}",
         "kind": "conviction_hold",

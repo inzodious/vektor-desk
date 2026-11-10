@@ -100,7 +100,7 @@ rules:
     params: {pct: 2}
 # A held conviction position gets its own band instead of the single-stock cap.
 # No adds above band_max_pct, never on margin; an alert fires only above the band.
-# Set it from the Plan screen (PUT /api/decisions/convictions/{symbol}); the ceiling defaults to your risk band's speculative max.
+# Set it in Settings → Risk check (PUT /api/decisions/convictions/{symbol}); the ceiling defaults to your risk band's speculative max.
 #  - id: conviction-abcd
 #    kind: conviction_hold
 #    symbols: [ABCD]
