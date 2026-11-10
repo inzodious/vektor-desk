@@ -21,7 +21,7 @@ def test_every_job_has_a_stable_unique_name():
 def test_get_jobs_lists_each_job_with_its_state(app_client, cfg):
     client = app_client(packages=["mirror", "engine"])
     body = client.get("/api/jobs").json()
-    assert set(body) == {"now", "scheduler_alive", "cooldown_seconds", "pickup_seconds", "jobs"}
+    assert set(body) == {"now", "scheduler_alive", "cooldown_seconds", "pickup_seconds", "stages", "jobs"}
     assert body["cooldown_seconds"] == 300 and body["scheduler_alive"] is False
     mirror = next(j for j in body["jobs"] if j["name"] == "mirror")
     assert mirror == {
@@ -37,6 +37,7 @@ def test_get_jobs_lists_each_job_with_its_state(app_client, cfg):
         "cooldown_until": None,
         "can_run": True,
         "refreshes": ["freshness", "holdings", "value"],
+        "stage": "mirror",
     }
 
 
