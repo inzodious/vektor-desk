@@ -3,6 +3,13 @@
  "scheduler_alive": false,
  "cooldown_seconds": 300,
  "pickup_seconds": 5,
+ "stages": [
+  "mirror",
+  "engine",
+  "review",
+  "desks",
+  "paper"
+ ],
  "jobs": [
   {
    "name": "agents-run-plan_keeper",
@@ -18,7 +25,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": "desks"
   },
   {
    "name": "agents-run-tax",
@@ -35,7 +43,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-risk",
@@ -51,7 +60,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-research",
@@ -67,7 +77,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-scout",
@@ -83,7 +94,59 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
+  },
+  {
+   "name": "agents-run-strategy",
+   "title": "Agents run strategy",
+   "package": "agents",
+   "schedules": [
+    "45 5 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
+  },
+  {
+   "name": "agents-run-filings",
+   "title": "Agents run filings",
+   "package": "agents",
+   "schedules": [
+    "15 4 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
+  },
+  {
+   "name": "agents-run-discounts",
+   "title": "Agents run discounts",
+   "package": "agents",
+   "schedules": [
+    "15 18 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-triggers",
@@ -99,7 +162,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-queue-now-only",
@@ -115,7 +179,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-queue",
@@ -131,7 +196,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-lab-reviews",
@@ -147,7 +213,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "decisions-sync",
@@ -163,7 +230,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-daily",
@@ -183,7 +251,8 @@
     "holdings",
     "value",
     "closes"
-   ]
+   ],
+   "stage": "engine"
   },
   {
    "name": "engine-lots",
@@ -201,7 +270,8 @@
    "can_run": true,
    "refreshes": [
     "shares"
-   ]
+   ],
+   "stage": null
   },
   {
    "name": "engine-quotes",
@@ -217,7 +287,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-backfill",
@@ -235,7 +306,8 @@
    "can_run": true,
    "refreshes": [
     "closes"
-   ]
+   ],
+   "stage": null
   },
   {
    "name": "engine-research",
@@ -253,7 +325,8 @@
    "can_run": true,
    "refreshes": [
     "research"
-   ]
+   ],
+   "stage": null
   },
   {
    "name": "engine-lookthrough",
@@ -269,7 +342,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-lab-export",
@@ -285,7 +359,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-french",
@@ -301,7 +376,111 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
+  },
+  {
+   "name": "engine-universe",
+   "title": "Engine universe",
+   "package": "engine",
+   "schedules": [
+    "30 19 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
+  },
+  {
+   "name": "engine-filings",
+   "title": "Engine filings",
+   "package": "engine",
+   "schedules": [
+    "35 3 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
+  },
+  {
+   "name": "engine-insider",
+   "title": "Engine insider",
+   "package": "engine",
+   "schedules": [
+    "20 23 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
+  },
+  {
+   "name": "engine-earnings",
+   "title": "Engine earnings",
+   "package": "engine",
+   "schedules": [
+    "50 23 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
+  },
+  {
+   "name": "engine-paper",
+   "title": "Engine paper",
+   "package": "engine",
+   "schedules": [
+    "45 8 * * 1-5",
+    "45 16 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": "paper"
+  },
+  {
+   "name": "engine-discounts",
+   "title": "Engine discounts",
+   "package": "engine",
+   "schedules": [
+    "40 17 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "mirror",
@@ -321,7 +500,8 @@
     "freshness",
     "holdings",
     "value"
-   ]
+   ],
+   "stage": "mirror"
   },
   {
    "name": "notify-ops",
@@ -337,7 +517,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   }
  ]
 }

@@ -77,7 +77,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Strategy desk** | Nightly 05:45, one variant in a rotating family (below); on request from the Console; when a lab result lands; 12 runs a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
 | **Filings desk** | Daily 04:15, one call per new filing, up to 40 a night | One small-cap SEC filing from the statistics queue: form, 8-K items, excerpt (first 12,000 characters) | A score per filing in the signal table (see [Filings desk](#filings-desk)); never a proposal or a trade | high; no tools |
 | **Discount cases** | Weekdays 18:15, after the close, up to 3 a day | One discount-day scanner hit (held, watchlist or quality list), his risk band, conviction bands and planned actions, plus the web | A buy / wait / avoid case per hit, through `desk.engine.discounts.record`; never a proposal or a trade | xhigh; WebSearch, WebFetch |
-| **Debrief desk** | Weekdays 17:50 (day; month and year on their last trading day), Friday 18:30 (week) | One period pack from the 17:35 review job, his risk band, conviction bands and stock plans | What happened, why, what worked against past decisions, what to watch, up to 3 next steps, through `desk.engine.review.record` (see [Debrief desk](#debrief-desk)); never a proposal or a trade | high; no tools |
+| **Debrief desk** | Weekdays 17:50 (day; week, month and year when they close); Friday 18:30 catches up anything missed | One period pack from the 17:35 review job, his risk band, conviction bands and stock plans | What happened, why, what worked against past decisions, what to watch, up to 3 next steps, through `desk.engine.review.record` (see [Debrief desk](#debrief-desk)); never a proposal or a trade | high; no tools |
 
 **Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
 
@@ -188,12 +188,12 @@ Writes the words on the Results page (`docs/statistics.md` owns the period packs
 | Piece | Detail |
 |---|---|
 | Queue | `desk.engine.review.pending(cfg)`: the latest pack per kind (day, week, month, year) whose digest differs from its last debrief; `NotReady` until the first review run |
-| Which periods | Day every weekday. Week, month and year once the review job marks them closed. The first ever run also writes every open period "so far" |
+| Which periods | Day every weekday. Week, month and year once the review job marks them closed. The day a week closes, the open month and year are rewritten "so far". The first ever run writes every open period "so far" |
 | Write | `desk.engine.review.record(cfg, kind, end, result)`, one debrief per (kind, end), rewritten when the pack restates; a refused debrief is noted on the run |
-| Debrief | `schemas/debrief.json`: `headline` ≤ 120, `what_happened` ≤ 700, `why` ≤ 700, `against_decisions` ≤ 500, `watch` ≤ 4, `next_steps` ≤ 3 `{text, symbol}`, `numbers_cited` (keys of the pack's `numbers`; others dropped), plus `pack_digest`, `model`, `written_at`, `run_id` |
+| Debrief | `schemas/debrief.json`: `headline` ≤ 120, `what_happened` ≤ 700, `why` ≤ 700, `against_decisions` ≤ 500 (never empty; a stock sentence when there were no decisions), `watch` ≤ 4, `next_steps` ≤ 3 `{text, symbol}`, `numbers_cited` (keys of the pack's `numbers`; others dropped), plus `pack_digest`, `model`, `written_at`, `run_id` |
 | No call | Pack missing, or digest unchanged since the last debrief: no model call and no run row |
 | Alert | Phone alert on the research topic with the headline, linking to Results |
-| Stops | Usage limit, run lock busy, weekly cap (12), or switch off |
+| Stops | Usage limit, run lock busy, weekly cap (16), or switch off |
 | On switch | On by default behind `agents.enabled`; Settings → Desks turns it off. The first-run guard does not hold it, since it only writes text |
 
 `python -m desk.agents run debrief [--kinds day,week,month,year] [--so-far]` writes now; `dry-run debrief` shows the first pack's prompt.

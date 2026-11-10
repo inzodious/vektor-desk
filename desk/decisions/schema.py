@@ -92,4 +92,25 @@ CREATE TABLE IF NOT EXISTS plan_events (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS plan_events_date ON plan_events (date);
+CREATE TABLE IF NOT EXISTS stock_plans (
+  symbol TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  status TEXT NOT NULL,
+  author TEXT NOT NULL,
+  run_id TEXT,
+  model TEXT,
+  summary TEXT,
+  hash TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  approved_at TEXT,
+  PRIMARY KEY (symbol, version)
+);
+CREATE TABLE IF NOT EXISTS plan_step_state (
+  symbol TEXT NOT NULL,
+  step_id TEXT NOT NULL,
+  done_on TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (symbol, step_id)
+);
 """

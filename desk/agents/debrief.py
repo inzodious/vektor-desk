@@ -15,6 +15,7 @@ LOCK_WAIT = 300
 STOP = ("disabled", "guarded", "over_budget", "busy", "deferred")
 PLAN_FIELDS = ("symbol", "status", "role", "weight_band", "next_review", "steps")
 TEXT = {"headline": 120, "what_happened": 700, "why": 700, "against_decisions": 500}
+NO_DECISIONS = "No decisions to judge in this period."
 
 
 @dataclass
@@ -33,12 +34,23 @@ def label(row: dict) -> str:
     return f"{row.get('kind')} {row.get('end')}"
 
 
+def latest(rows: list[dict], kind: str) -> dict | None:
+    mine = [r for r in rows if r.get("kind") == kind and r.get("end")]
+    return max(mine, key=lambda r: str(r["end"])) if mine else None
+
+
+def week_closed_today(rows: list[dict]) -> bool:
+    day, week = latest(rows, "day"), latest(rows, "week")
+    return bool(day and week and week.get("closed") and str(week["end"]) == str(day["end"]))
+
+
 def due(rows: list[dict], kinds: tuple[str, ...], so_far: bool) -> list[dict]:
+    so_far = so_far or week_closed_today(rows)
     picked = []
     for kind in KINDS:
-        mine = [r for r in rows if r.get("kind") == kind and r.get("end") and (kind == "day" or so_far or r.get("closed"))]
-        if kind in kinds and mine:
-            picked.append(max(mine, key=lambda r: str(r["end"])))
+        row = latest(rows, kind)
+        if kind in kinds and row and (kind == "day" or so_far or row.get("closed")):
+            picked.append(row)
     return picked
 
 
@@ -94,6 +106,7 @@ def _steps(steps: object) -> list[dict]:
 def result_for(answer: dict, row: dict, model: str, run_id: int, now: datetime | None = None) -> tuple[dict, int]:
     numbers, dropped = cited(answer.get("numbers_cited"), row)
     out = {k: str(answer.get(k) or "").strip()[:n] for k, n in TEXT.items()}
+    out["against_decisions"] = out["against_decisions"] or NO_DECISIONS
     out |= {
         "watch": [str(w).strip()[:160] for w in (answer.get("watch") or []) if str(w).strip()][:4],
         "next_steps": _steps(answer.get("next_steps")),

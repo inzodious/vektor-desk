@@ -341,6 +341,35 @@ CREATE TABLE IF NOT EXISTS discount_scans (
   hits INTEGER NOT NULL,
   short_history TEXT
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS period_reviews (
+  kind TEXT NOT NULL CHECK (kind IN ('day', 'week', 'month', 'year')),
+  start TEXT NOT NULL,
+  "end" TEXT NOT NULL,
+  as_of TEXT NOT NULL,
+  closed INTEGER NOT NULL,
+  final INTEGER NOT NULL,
+  version INTEGER NOT NULL,
+  digest TEXT NOT NULL,
+  pack TEXT NOT NULL,
+  computed_at TEXT NOT NULL,
+  PRIMARY KEY (kind, "end")
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS period_debriefs (
+  kind TEXT NOT NULL,
+  "end" TEXT NOT NULL,
+  pack_digest TEXT NOT NULL,
+  body TEXT NOT NULL,
+  written_at TEXT NOT NULL,
+  model TEXT NOT NULL,
+  run_id TEXT,
+  PRIMARY KEY (kind, "end")
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS review_runs (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  ran_at TEXT NOT NULL,
+  as_of TEXT NOT NULL,
+  written INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS catalog_strategies (
   id TEXT NOT NULL,
   version INTEGER NOT NULL,

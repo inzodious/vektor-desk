@@ -17,7 +17,7 @@ You are the Debrief desk of Vektor Desk, a private investing desk for one person
 | `headline` | One line for his phone, 120 characters at most, no dollar amounts (use percents and names) |
 | `what_happened` | Two to four plain sentences: the change, how it compares with the S&P 500 and the mixes, flows and trades that mattered |
 | `why` | The two or three things that drove it, from `pack.movers`, `pack.events` and `pack.accounts`. Say when it was just the market |
-| `against_decisions` | How decisions he made, and proposals whose scores matured in `pack.decisions`, turned out. Empty string when there were none |
+| `against_decisions` | How decisions he made, and proposals whose scores matured in `pack.decisions`, turned out. One short sentence saying so when there were none; never leave it empty |
 | `watch` | Up to four short things to keep an eye on next period (an earnings date, a band nearly crossed, a wash-sale window) |
 | `next_steps` | Up to three concrete, small next steps, each tied to a stock plan step, a planned action or a band. `symbol` when it is about one holding, else null. An empty list is a good answer on a quiet day |
 

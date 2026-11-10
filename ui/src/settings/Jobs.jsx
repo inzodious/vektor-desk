@@ -51,6 +51,11 @@ export function Jobs() {
     return () => ctl.current.abort();
   }, []);
   const d = api.data;
+  const card = useRef(null);
+  const ready = Boolean(d);
+  useEffect(() => {
+    if (ready && window.location.hash === '#jobs') card.current?.scrollIntoView({ block: 'start' });
+  }, [ready]);
   const alive = !!d?.scheduler_alive;
   const { main, rest } = splitJobs(d?.jobs);
   const running = (d?.jobs || []).filter((j) => j.running || j.queued).length;
@@ -74,7 +79,7 @@ export function Jobs() {
   const rows = (list) => list.map((j) => <JobRow key={j.name} job={j} alive={alive} mine={mine[j.name]} onRun={run} />);
 
   return (
-    <div className="card c12" style={{ '--i': 3 }} data-testid="jobs" data-alive={d ? String(alive) : undefined}>
+    <div className="card c12" id="jobs" ref={card} style={{ '--i': 3 }} data-testid="jobs" data-alive={d ? String(alive) : undefined}>
       <div className="card-head">
         <span className="tag mint">Jobs</span>
         <span className="acts">

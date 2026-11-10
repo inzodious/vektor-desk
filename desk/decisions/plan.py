@@ -263,6 +263,9 @@ def calendar_events(cfg: Config, since: str | None = None, until: str | None = N
         rows = conn.execute("SELECT * FROM plan_events WHERE date BETWEEN ? AND ? ORDER BY date", (start.isoformat(), end.isoformat())).fetchall()
         events += [{**dict(r), "source": "you"} for r in rows]
         events += _wash_events(conn, start.isoformat(), end.isoformat())
+    from desk.decisions.plans import plan_events
+
+    events += plan_events(cfg, start.isoformat(), end.isoformat(), now=now)
     return sorted(events, key=lambda e: (e["date"], e["kind"], e["title"]))
 
 
