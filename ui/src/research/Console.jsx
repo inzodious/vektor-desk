@@ -4,7 +4,7 @@ import { Icon, Robot } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
 import { ConsoleContext } from './consoleContext.js';
 import { postJson, useApi } from '../lib/api.js';
-import { ASK_DESKS, ASK_STATUS, SUGGESTED, cleanSymbol, deskTitle, overnightStart } from '../lib/research.js';
+import { ASK_DESKS, ASK_STATUS, SUGGESTED, SYMBOL_DESKS, cleanSymbol, deskTitle, overnightStart } from '../lib/research.js';
 import { whenLabel } from '../lib/agents.js';
 
 const SHOW = 6;
@@ -78,6 +78,10 @@ function ConsoleBody({ prefill }) {
     const sym = symbol.trim() ? cleanSymbol(symbol) : null;
     if (symbol.trim() && !sym) {
       setErr('That symbol looks off. Use letters, like FTEC.');
+      return;
+    }
+    if (SYMBOL_DESKS.includes(desk) && !sym) {
+      setErr(`The ${deskTitle(desk)} works one holding at a time. Add its symbol.`);
       return;
     }
     setBusy(true);

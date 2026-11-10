@@ -23,8 +23,10 @@ function fixtureApi() {
     const symbol = (url.searchParams.get('symbol') || '').toUpperCase();
     const scopeId = url.searchParams.get('scope_id') || '';
     const ids = (url.searchParams.get('ids') || '').replace(/[^A-Za-z0-9]+/g, '_');
+    const kind = (url.searchParams.get('kind') || '').replace(/[^a-z]+/g, '');
+    const end = (url.searchParams.get('end') || '').replace(/[^0-9-]+/g, '');
     const base = url.pathname.slice(5).replace(/\/+$/, '').replace(/\//g, '.') || 'index';
-    const tries = [scenario && `${base}.${scenario}`, ids && `${base}.${ids}`, symbol && `${base}.${symbol}`, scopeId && `${base}.${scopeId}`, symbol && `${base}.any`, base].filter(Boolean);
+    const tries = [scenario && `${base}.${scenario}`, kind && end && `${base}.${kind}.${end}`, kind && `${base}.${kind}`, ids && `${base}.${ids}`, symbol && `${base}.${symbol}`, scopeId && `${base}.${scopeId}`, symbol && `${base}.any`, base].filter(Boolean);
     const file = tries.map((t) => `${FIXTURES}${t}.json`).find((f) => existsSync(f));
     res.setHeader('Cache-Control', 'no-store');
     if (!file) {
