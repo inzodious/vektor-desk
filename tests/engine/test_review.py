@@ -296,6 +296,19 @@ def test_partial_cover_weekend_days_and_old_periods(cfg, monkeypatch):
     conn.close()
 
 
+def test_a_movers_return_agrees_with_its_contribution(cfg, monkeypatch):
+    conn = seeded(cfg, monkeypatch)
+    with conn:
+        conn.execute("UPDATE price_bars SET close=20.0, adj_close=20.0 WHERE symbol='ACME' AND date='2026-11-06'")
+        conn.execute("UPDATE series_daily SET value = value - 0.01 WHERE date='2026-11-06' AND series_id='value' AND scope='account'")
+    review.run(cfg, None, conn, now=NOW)
+    day = stored(conn, "day", "2026-11-06")["pack"]
+    acme = next(r for r in day["movers"]["up"] if r["symbol"] == "ACME")
+    assert acme["contribution_usd"] == 8.0 and acme["return_pct"] == pytest.approx((24 / 23 - 1) * 100, abs=1e-4)
+    assert day["accounts"][0]["net_flows"] == 0.0 and day["value"]["net_flows"] == 0.0
+    conn.close()
+
+
 # ---- Job ----
 
 
