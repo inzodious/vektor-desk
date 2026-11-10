@@ -79,6 +79,18 @@ Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deplo
 
 Same-amount opposite moves between two of your accounts within 3 days are internal at the portfolio level.
 
+**Unsettled and margin-funded buys.** Escape Vektor's sync drops pending and margin lines, so a snapshot can show new shares while its cash is unchanged. Left alone, the engine would book the gap as money in and show no margin debit. `holdings.settle` runs over each pair of snapshots:
+
+| Step | Rule |
+|---|---|
+| Expected cash | The earlier snapshot's cash (after any earlier adjustment) plus every cash move in the activity between the two |
+| Gap | Reported cash − expected cash |
+| Room | The debit already carried, plus buys in the window whose shares show up in the later snapshot. New buys count only when the Fidelity history covers the whole window, since only then is a missing deposit ruled out |
+| Adjustment | The smaller of gap and room, when over $1. The account's cash row is lowered by it and marked `modelled`; `reported_value` keeps what the snapshot said |
+| Ends | A deposit or sale in the activity pays it down. A snapshot that carries its own negative cash line is trusted as it stands |
+
+`margin.debit` is `modelled` while it rests on such a row. A gap with no matching buys is still counted as money in or out, as before.
+
 ## Reconciliation and data health
 
 Before metrics are published for a day, the engine checks:

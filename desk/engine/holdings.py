@@ -12,6 +12,8 @@ SHARE_KINDS = {"buy", "sell", "reinvest"}
 CORPORATE_KINDS = {"split", "distribution"}
 STALE_MIN_ROWS = 1
 STALE_SHARE = 0.6
+SETTLE_TOLERANCE = 1.0
+LANDED_SHARE = 0.98
 CASH_SYMBOLS = {"SPAXX", "FDRXX", "FCASH", "CORE", "CASH", "FZFXX", "SPRXX"}
 
 
@@ -165,6 +167,65 @@ def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict], price=No
     return moved
 
 
+# ---- Unsettled and margin-funded buys ----
+
+
+def _cash_moved(rows: list[dict], account: str) -> float:
+    moved = 0.0
+    for r in rows:
+        if str(r.get("accountKey") or "account") != account:
+            continue
+        core = bool(r.get("core")) or str(r.get("symbol") or "").upper() in CASH_SYMBOLS
+        if not core:
+            moved += _num(r.get("amount")) or 0.0
+    return moved
+
+
+def _landed_buys(rows: list[dict], account: str, before: dict, after: dict) -> float:
+    spent: dict[str, float] = {}
+    bought: dict[str, float] = {}
+    for r in rows:
+        symbol = str(r.get("symbol") or "").upper()
+        amount = _num(r.get("amount")) or 0.0
+        if str(r.get("accountKey") or "account") != account or r.get("kind") != "buy" or not symbol or amount >= 0:
+            continue
+        if bool(r.get("core")) or symbol in CASH_SYMBOLS:
+            continue
+        spent[symbol] = spent.get(symbol, 0.0) - amount
+        bought[symbol] = bought.get(symbol, 0.0) + abs(_num(r.get("quantity")) or 0.0)
+    landed = 0.0
+    for symbol, usd in spent.items():
+        grew = (after.get((account, symbol)) or {}).get("shares", 0.0) - (before.get((account, symbol)) or {}).get("shares", 0.0)
+        if grew > 0 and grew >= bought[symbol] * LANDED_SHARE:
+            landed += usd
+    return landed
+
+
+def settle(anchor_list: list[Anchor], activity: dict[str, list[dict]], cover: dict[str, tuple[str, str]]) -> list[dict]:
+    notes = []
+    act_dates = sorted(activity)
+    for prev, cur in zip(anchor_list, anchor_list[1:], strict=False):
+        window = [r for d in act_dates[bisect_right(act_dates, prev.date) : bisect_right(act_dates, cur.date)] for r in activity[d]]
+        for account in sorted({k[0] for k in cur.rows}):
+            cash = [(k, v) for k, v in cur.rows.items() if k[0] == account and v["is_cash"]]
+            if any(v["shares"] < 0 for _, v in cash):
+                continue
+            before = sum(v["shares"] for k, v in prev.rows.items() if k[0] == account and v["is_cash"])
+            gap = sum(v["shares"] for _, v in cash) - (before + _cash_moved(window, account))
+            span = cover.get(account)
+            covered = span is not None and span[0] <= prev.date and cur.date <= span[1]
+            room = max(0.0, -before) + (_landed_buys(window, account, prev.rows, cur.rows) if covered else 0.0)
+            owed = min(gap, room)
+            if owed <= SETTLE_TOLERANCE:
+                continue
+            key = max(cash, key=lambda kv: kv[1]["shares"])[0] if cash else (account, "CASH")
+            row = cur.rows.setdefault(key, {"shares": 0.0, "value": 0.0, "cost": None, "is_cash": True})
+            row["shares"] -= owed
+            row["modelled"] = True
+            notes.append({"account": account, "date": cur.date, "amount": round(owed, 2), "debit": round(max(0.0, -(row["shares"])), 2)})
+    return notes
+
+
 # ---- Daily holdings ----
 
 
@@ -275,6 +336,7 @@ def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str,
             row_quality = quality
             if h["is_cash"]:
                 close, value = 1.0, round(h["shares"], 2)
+                row_quality = "modelled" if h.get("modelled") else quality
             else:
                 found = prices.dated(symbol, day)
                 base = a.rows.get((account, symbol))
@@ -300,7 +362,9 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
     bars = bar_series(desk)
     prices = Prices(merge(series, bars))
     anchor_list, records = anchors(versions, prices)
-    activity = activity_by_date(broker.activity(mirror, desk))
+    rows_in, history = broker.history(mirror, desk)
+    activity = activity_by_date(rows_in)
+    modelled = settle(anchor_list, activity, history.cover)
     days = build_days(anchor_list, prices, through)
     rows = holdings_rows(anchor_list, prices, activity, days)
     with desk:
@@ -321,4 +385,5 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
         "first": days[0] if days else None,
         "last": days[-1] if days else None,
         "symbols_priced": len(series),
+        "margin_modelled": modelled,
     }
