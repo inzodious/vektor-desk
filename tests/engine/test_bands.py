@@ -184,6 +184,71 @@ def test_constant_history_gives_closed_form_bands():
     assert half["bands"][0]["p50"] == pytest.approx(1000 * 1.005**12, abs=0.01) and half["chance_fi"] == 1.0
 
 
+def flat(months=240, mr=0.01, rf=0.0):
+    return [(f"19{50 + i // 12}-{i % 12 + 1:02d}-01", mr, rf) for i in range(months)]
+
+
+COMMON = {"goal": None, "goal_month": None, "inflation": 0.0, "real": False, "paths": 5}
+
+
+def test_a_hold_drifts_while_rebalance_and_trim_pull_it_back():
+    pair = [bands.sleeve("FAST", {"beta": 2.0}, start=0.5), bands.sleeve("CASH", {"beta": 0.0}, start=0.5, deposit=1.0)]
+    run = {"start": 1000.0, "deposit": 0.0, "watch": (0,), "horizons": (1, 5)} | COMMON
+    hold = bands.walk(flat(), pair, **run)["bands"][0]
+    assert hold["p50"] == pytest.approx(500 * 1.02**12 + 500, abs=0.01)
+    assert hold["weights"]["FAST"]["p50"] == pytest.approx(500 * 1.02**12 / (500 * 1.02**12 + 500) * 100, abs=0.01)
+    again = bands.walk(flat(), pair, policy="rebalance", **run)["bands"][0]
+    assert again["p50"] == pytest.approx(1000 * 1.01**12, abs=0.01) and again["weights"]["FAST"]["p50"] == 50.0
+    trim = bands.walk(flat(), pair, policy="trim", cap=0.5, **run)["bands"][0]
+    assert trim["p50"] == again["p50"] and trim["weights"]["FAST"]["p50"] == 50.0
+    loose = bands.walk(flat(), pair, policy="trim", cap=0.9, **run)["bands"][0]
+    assert loose["p50"] == hold["p50"]
+
+
+def test_new_money_goes_to_its_own_sleeve_and_shrinks_the_hold():
+    pair = [bands.sleeve("FAST", {"beta": 2.0}, start=1.0), bands.sleeve("new-money", {"beta": 0.0}, deposit=1.0)]
+    one = bands.walk(flat(), pair, start=1000.0, deposit=100.0, watch=(0,), horizons=(1,), **COMMON)["bands"][0]
+    assert one["p50"] == pytest.approx(1000 * 1.02**12 + 1200, abs=0.01) and one["contributed"] == 2200.0
+    assert one["weights"]["FAST"]["p50"] == pytest.approx(1000 * 1.02**12 / (1000 * 1.02**12 + 1200) * 100, abs=0.01)
+
+
+def test_time_to_fi_falls_as_the_deposit_rises():
+    def months(deposit, goal=3000.0, rate=0.01):
+        v, m = 1000.0, 0
+        while v < goal:
+            v, m = v * (1 + rate) + deposit, m + 1
+        return m
+
+    mix = {"weights": {"IVV": 1.0}, "cash": 0.0}
+    run = {"start": 1000.0, "deposit": 50.0, "goal": 3000.0, "goal_month": 24, "fee_pct": 0.0, "inflation": 0.0, "real": False, "paths": 5}
+    sim = bands.simulate(flat(600), {"beta": 1.0, "resid": []}, mix, ladder=(0.0, 50.0, 200.0, 25.0), **run)
+    got = {x["deposit"]: x for x in sim["fi_time"]}
+    assert list(got) == [0.0, 25.0, 50.0, 200.0]
+    assert [got[d]["years_p50"] for d in got] == [round(months(d) / 12, 2) for d in got]
+    assert got[50.0]["years_p50"] == sim["fi_years"]["p50"] == got[50.0]["years_p10"] == got[50.0]["years_p90"]
+    assert [got[d]["chance_by_target"] for d in got] == [0.0, 0.0, 0.0, 1.0] and sim["chance_fi"] == 0.0
+    far = bands.simulate(flat(600), {"beta": 1.0, "resid": []}, mix, ladder=(50.0,), **(run | {"goal": 1e12}))
+    assert far["fi_time"][0]["years_p50"] is None and far["fi_years"]["p50"] is None
+
+
+def test_the_lower_return_case_takes_points_off_the_stock_premium():
+    mix = {"weights": {"IVV": 1.0}, "cash": 0.0}
+    run = {"start": 1000.0, "deposit": 0.0, "goal": None, "goal_month": None, "fee_pct": 0.0, "inflation": 0.0, "real": False, "paths": 5}
+    low = bands.simulate(flat(), {"beta": 1.0, "resid": []}, mix, premium_cut_pts=12.0, **run)
+    assert low["bands"][0]["p50"] == pytest.approx(1000.0, abs=0.01)
+    half = bands.simulate(flat(), {"beta": 0.5, "resid": []}, mix, premium_cut_pts=12.0, **run)
+    assert half["bands"][0]["p50"] == pytest.approx(1000.0, abs=0.01)
+    fee = bands.simulate(flat(), {"beta": 1.0, "resid": []}, mix, **(run | {"fee_pct": 12.0}))
+    assert fee["bands"][0]["p50"] == pytest.approx(1000.0, abs=0.01)
+
+
+def test_every_mix_pays_its_funds_fees():
+    assert catalog.expense_pct("FXAIX", {"FXAIX": 0.02}) == 0.02 and catalog.expense_pct("FXAIX") == 0.015
+    assert catalog.expense_pct("SWISX") == catalog.EXPENSE_PCT["SCHF"] and catalog.expense_pct("ACME") == 0.0
+    assert catalog.mix_fee(catalog.TECH_TILT) == pytest.approx(0.5 * 0.03 + 0.3 * 0.08 + 0.1 * 0.35 + 0.1 * 0.05)
+    assert catalog.mix_fee({"ACME": 0.5, "SMH": 0.5}) == pytest.approx(0.175) and catalog.mix_fee({}) == 0.0
+
+
 def test_fit_recovers_beta_and_stats_read_the_record():
     rng = random.Random(4)
     hist = []
@@ -234,7 +299,25 @@ def priced(conn, mkt, symbol, beta, noise, since="2008-01", seed_=1):
         conn.executemany("INSERT OR REPLACE INTO price_bars (symbol, date, open, high, low, close, adj_close) VALUES (?, ?, ?, ?, ?, ?, ?)", rows)
 
 
-def test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatch, app_client):
+def test_as_held_is_split_into_its_single_stocks_and_the_rest():
+    mkt = {f"20{10 + i // 12}-{i % 12 + 1:02d}": (0.01, 0.002) for i in range(60)}
+    rets = {s: {m: 0.01 for m in mkt} for s in ("IVV", "ACME", "NVDA")} | {"NEWCO": {m: 0.01 for m in sorted(mkt)[-12:]}}
+    mix = {"weights": {"IVV": 0.6, "ACME": 0.3, "NVDA": 0.01, "NEWCO": 0.09}, "cash": 0.1, "source": {"FXAIX": 0.6, "ACME": 0.3, "NVDA": 0.01, "NEWCO": 0.09}}
+    kinds = {"ACME": "stock", "NVDA": "stock", "NEWCO": "stock", "IVV": "fund"}
+    safe = {"model": {"beta": 0.9}, "fee_pct": 0.04, "to": "safe-mix"}
+    sleeves, notes = bands.held_sleeves(mix, rets, mkt, kinds, set(), {"FXAIX": 0.02}, safe)
+    rows = {r["id"]: r for r in bands.sleeve_rows(sleeves)}
+    assert list(rows) == ["ACME", "rest", "cash", "new-money"] and rows["rest"]["holds"] == ["IVV", "NEWCO", "NVDA"]
+    assert rows["ACME"]["weight"] == pytest.approx(0.27) and rows["rest"]["weight"] == pytest.approx(0.63) and rows["cash"]["weight"] == 0.1
+    assert rows["rest"]["fee_pct"] == pytest.approx(0.6 * 0.02 / 0.7, abs=1e-4) and rows["ACME"]["fee_pct"] == 0.0
+    assert rows["new-money"] == {"id": "new-money", "weight": 0.0, "beta": 0.9, "resid_vol_pct": 0.0, "fee_pct": 0.04, "months": None, "to": "safe-mix"}
+    assert notes == ["NEWCO: under 36 months of prices, so modelled with the funds"]
+    pinned, _ = bands.held_sleeves(mix, rets, mkt, {}, {"NVDA"}, {}, None)
+    assert [s["id"] for s in pinned] == ["rest", "cash", "new-money"] and pinned[-1]["to"] == "rest"
+    assert bands.held_sleeves(mix | {"weights": {"NEWCO": 1.0}}, rets, mkt, kinds, set(), {}, None) is None
+
+
+def bands_body(cfg, mirror, monkeypatch, app_client):
     monkeypatch.setenv("DESK_BANDS_PATHS", "150")
     monkeypatch.setenv("DESK_MC_PATHS", "100")
     client = app_client(packages=["engine"])
@@ -252,7 +335,11 @@ def test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatc
         priced(conn, mkt, sym, 0.9, 0.01, seed_=i)
     conn.close()
     computed(cfg)
-    body = client.get("/api/engine/bands").json()
+    return client.get("/api/engine/bands").json()
+
+
+def test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatch, app_client):
+    body = bands_body(cfg, mirror, monkeypatch, app_client)
     assert (
         body["status"] == "ok"
         and body["book"] == "as-held"
@@ -269,6 +356,20 @@ def test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatc
     assert "FXAIX trades as IVV" in held["proxy_note"] and held["priced_from"]["IVV"] == "IVV" and "ACME" in held["weights"]
     assert rows["dip-buy"]["cash"] == 0.2 and safe["chance_fi"] is not None and safe["fit"] is None
     assert safe["backtest"]["start"] == "2008-02" and safe["long_history"]["start"] == "1926-01"
+    assert body["premium_cut_pts"] == 2.0 and body["fi_years_max"] == 40 and body["policy_years"] == [1, 5, 10, 20] and body["convictions"] == []
+    assert body["monthly_deposit"] is None and body["deposit_ladder"] == [0.0, *bands.DEPOSIT_LADDER]
+    assert all(r["fee_pct"] > 0 and r["lower"]["p50_value_10y"] < r["p50_value_10y"] for r in rows.values())
+    assert tech["fee_pct"] == pytest.approx(catalog.mix_fee(catalog.TECH_TILT), abs=1e-4) and safe["policy"] == "rebalance"
+    for r in rows.values():
+        assert [x["deposit"] for x in r["fi_time"]] == body["deposit_ladder"] == [x["deposit"] for x in r["lower"]["fi_time"]]
+        reached = [x["years_p50"] for x in r["fi_time"] if x["years_p50"] is not None]
+        assert reached == sorted(reached, reverse=True) and r["fi_time"][-1]["years_p50"] is not None
+        now = r["fi_time"][0]
+        assert now["years_p50"] == r["fi_years"]["p50"] and now["chance_by_target"] == r["chance_fi"]
+    assert held["policy"] == "hold" and held["new_money"] == "safe-mix" and [s["id"] for s in held["sleeves"]] == ["ACME", "rest", "cash", "new-money"]
+    kept, topped = held, held["variants"][0]
+    assert topped["id"] == "rebalanced" and [b["years"] for b in topped["bands"]] == [1, 5, 10, 20, 40]
+    assert topped["bands"] != kept["bands"] and "variants" not in safe and "weights" not in kept["bands"][0] and "weights" not in topped["bands"][0]
     seam = bands.catalog(cfg)
     assert {tuple(r) for r in seam} == {bands.CATALOG_FIELDS} and len(seam) == 4
     conn = connect(cfg.desk_db)
@@ -276,6 +377,58 @@ def test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatc
     worst = conn.execute("SELECT count(*) FROM metric_values WHERE metric_id='bands.worst_year_p10'").fetchone()[0]
     conn.close()
     assert versions == set(rows) and worst == 4
+
+
+def test_a_conviction_hold_gets_hold_rebalance_and_trim_side_by_side(cfg, mirror, monkeypatch, app_client):
+    from desk.engine import core
+
+    plain = core.rules_in_force
+
+    def with_conviction(cfg, plan):
+        rules, source = plain(cfg, plan)
+        return [*rules, {"id": "acme", "kind": "conviction_hold", "symbols": ["ACME"], "params": {"band_min_pct": 2, "band_max_pct": 5}}], source
+
+    monkeypatch.setattr(core, "rules_in_force", with_conviction)
+    body = bands_body(cfg, mirror, monkeypatch, app_client)
+    (acme,) = body["convictions"]
+    held = next(r for r in body["rows"] if r["id"] == "as-held")
+    assert acme["symbol"] == "ACME" and acme["status"] == "ok" and acme["band_max_pct"] == 5 and acme["weight_pct"] > 5
+    assert acme["weight_pct"] == pytest.approx(held["sleeves"][0]["weight"] * 100, abs=0.01)
+    hold, again, trim = acme["policies"]
+    assert [p["id"] for p in acme["policies"]] == ["hold", "rebalance", "trim"] and all(p["rule"] for p in acme["policies"])
+    assert all([b["years"] for b in p["bands"]] == [1, 5, 10, 20] for p in acme["policies"])
+    assert hold["bands"] == [b | {"weight_pct": hold["bands"][i]["weight_pct"]} for i, b in enumerate(held["bands"][:4])]
+    assert all(b["weight_pct"]["p50"] == acme["weight_pct"] for b in again["bands"])
+    assert all(b["weight_pct"]["p90"] <= 5.0 for b in trim["bands"]) and hold["bands"][0]["weight_pct"]["p90"] > 5.0
+    assert trim["worst_year_p10_pct"] > max(hold["worst_year_p10_pct"], again["worst_year_p10_pct"])
+    assert trim["max_drawdown_pct"] > max(hold["max_drawdown_pct"], again["max_drawdown_pct"])
+
+
+def test_paper_as_held_buys_once_and_then_holds(cfg, monkeypatch):
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "paper-id")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "paper-secret")
+    for k in ("ALPACA_BASE_URL", "DESK_PAPER_EXECUTE", "DESK_PAPER_BUDGET", "DESK_PAPER_MAX_STRATEGIES"):
+        monkeypatch.delenv(k, raising=False)
+    conn = desk(cfg)
+    catalog.sync(conn, catalog.mixes({"FXAIX": 0.5, "ACME": 0.5}, 0.0, {"ACME": "stock"}), now=REG)
+    assert catalog.latest(conn)["as-held"]["mix"]["policy"] == "hold" and catalog.is_hold(conn, "as-held", 1) and not catalog.is_hold(conn, "tech-tilt", 1)
+    for sym, px in (("IVV", 100.0), ("ACME", 20.0), ("VXUS", 50.0), ("FTEC", 200.0), ("SMH", 250.0)):
+        bars(conn, sym, [px])
+    broker = FakeAlpaca()
+    paper_exec.run(conn, broker, now=PRE)
+    first = {r["symbol"]: r["filled_qty"] for r in conn.execute("SELECT * FROM paper_legs WHERE strategy_id='as-held'")}
+    assert first == {"IVV": 4.0, "ACME": 24.0} and catalog.held_shares(conn, "as-held", 1) == first
+    catalog.sync(conn, catalog.mixes({"FXAIX": 0.9, "ACME": 0.1}, 0.0, {"ACME": "stock"}), now=REG)
+    assert catalog.latest(conn)["as-held"]["version"] == 1 and catalog.latest(conn)["as-held"]["mix"]["weights"] == {"IVV": 0.9, "ACME": 0.1}
+    bars(conn, "ACME", [20.0, 20.0, 20.0, 20.0, 40.0], start=(2026, 11, 2))
+    later = PRE.replace(day=9)
+    paper_exec.run(conn, broker, now=later)
+    legs = {(r["date"], r["symbol"]) for r in conn.execute("SELECT * FROM paper_legs WHERE strategy_id='as-held'")}
+    assert {d for d, _ in legs} == {"2026-11-06"}
+    pos = {r["symbol"]: (r["shares"], r["value"]) for r in conn.execute("SELECT * FROM paper_positions WHERE strategy_id='as-held'")}
+    assert pos == {"IVV": (4.0, 400.0), "ACME": (24.0, 960.0)}
+    assert paper_exec.strategy_wants(conn, paper_exec.books(conn, 1000.0)[("as-held", 1)], lambda s: 100.0, None) == first
+    conn.close()
 
 
 # ---- Reward to risk on the leaderboard ----
@@ -299,7 +452,7 @@ def test_ratios_need_twenty_days_and_read_the_ledger():
 def test_leaderboard_carries_reward_to_risk_and_backtests(cfg, mirror, monkeypatch, app_client):
     from desk.engine import leaderboard
 
-    test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatch, app_client)
+    bands_body(cfg, mirror, monkeypatch, app_client)
     conn = connect(cfg.desk_db)
     for sym in ("IVV", "VXUS", "FTEC", "SMH"):
         bars(conn, sym, [100.0])
