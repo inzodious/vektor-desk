@@ -606,6 +606,29 @@ Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. On
 
 For the debrief desk: `review.pending(cfg)` returns the latest period of each kind whose pack has no debrief or changed since it (`{kind, start, end, closed, digest, debrief_digest, pack}`), and raises `review.NotReady` before the first run. `review.record(cfg, kind, end, result)` checks a debrief (headline ≤ 120, what_happened and why ≤ 700, against_decisions ≤ 500, up to 4 watch lines ≤ 160, up to 3 next steps ≤ 200, numbers_cited from the pack's `numbers`, pack_digest equal to the current digest, model, written_at), raises `ValueError` on bad values and replaces any earlier debrief for that period.
 
+## Plan facts
+
+Module `desk.engine.planfacts`. The numbers a stock plan is written from, one row per holding, computed on request from the latest engine run (no table, no job).
+
+| Piece | Rule |
+|---|---|
+| Rows | Every non-cash holding on the latest holdings day, summed across accounts. Ask for one symbol and it is returned even when not held (price facts only) |
+| Prices | `price_bars` (adjusted), else `alpaca_bars`, extended with `prices_daily`; else the mirror's closes (mutual funds) |
+| Cost | The lot export when every lot has a cost, else the snapshot's cost. `unrealized_usd` = value − cost |
+| Lots | `acquired, shares, cost, cost_per_share, value, gain, term, long_term_on` (the first day a sale is long term), `days_to_long_term`, `quality` (`modelled` when rebuilt from history) |
+| Range and trend | 52-week high and low (252 sessions), drop from the high, 50 and 200-session averages and the distance to each, 1-year return |
+| Zones | A monthly swing is the 63-session daily volatility × √21 (capped at 45%). Add zone: one to two swings under the last close. Trim zone: one to two above. `zones.levels` lists the reference prices: last close, 52-week high and low, both averages, cost per share, and 10, 20 and 30% under the high |
+| Valuation | As the discount scanner: `pe_annual` against its own 5 years when SEC EPS allows, else `price_vs_5y_avg` |
+| Share of risk | Weight × covariance with the book ÷ the book's variance, on 126 sessions of daily returns at today's weights. Sums to 100 across priced holdings |
+| Band | First that applies: the approved plan's `weight_band`, the conviction hold's band, the single-stock rule (stocks only), the risk band's single-stock cap (stocks only). `status` is `inside`, `over` or `under`; funds with no band are `inside` |
+| Discount | `active` when the scanner flagged the name in the last 5 days |
+
+**Row.** `symbol, name, kind, as_of, price_as_of, held, accounts, numbers, lots, wash_windows [{kind, date, clears, account, amount}], zones {method, sigma_month_pct, add {low, high}, trim {low, high}, levels}, discount {active, signal_id, reason, as_of}, next_earnings {date, hour, eps_estimate, days}, filing_signals, valuation {metric, value, pctile_own}, band {source, min_pct, max_pct, weight_pct, status, room_pct, risk_band}`. `numbers` is flat and numeric: `price, shares, value, weight_pct, cost_basis, cost_per_share, unrealized_usd, unrealized_pct, long_term_shares, short_term_shares, long_term_gain, short_term_gain, risk_share_pct, valuation_value, valuation_pctile, day_move_pct, high_52w, low_52w, drop_from_high_pct, above_low_pct, vol_annual_pct, sigma_month_pct, sma_50, sma_200, vs_sma_50_pct, vs_sma_200_pct, ret_1y_pct, add_low, add_high, trim_low, trim_high`; a key is left out when its input is missing.
+
+**`GET /api/engine/planfacts[?symbol=]`.** `{as_of, rows, note}`.
+
+For the plans desk: `planfacts.facts(cfg, symbol=None)` returns the rows and raises `planfacts.NotReady` before the first engine run. Every price a plan may name as a zone is in `zones` or `numbers`.
+
 ## Strategy lab
 
 Where a strategy from deep research gets tested: a backtest over 3, 5 and 10 years that only sees data as it was known on each day, then forward paper trading with fake money. The research desk proposes; the engine runs the rules; nothing in the lab touches real money.
