@@ -475,7 +475,7 @@ def _view(conn: sqlite3.Connection, row: sqlite3.Row, ctx: dict) -> dict:
             f"The plan's band differs from the conviction hold ({hold['band_min_pct']:g} to {hold['band_max_pct']:g}%), and the hold is what the desk enforces."
         )
     if body["role"] == "conviction" and not hold:
-        warnings.append(f"{symbol} has no conviction hold yet, so the single-stock cap still applies. Set one on the Plan screen.")
+        warnings.append(f"{symbol} has no conviction hold yet, so the single-stock cap still applies. Set one in Settings → Risk check.")
     weight = round(ctx["weights"].get(symbol, 0.0), 2) if ctx["weights_as_of"] else None
     where = None
     if band and weight is not None:
