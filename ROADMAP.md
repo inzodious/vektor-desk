@@ -172,21 +172,37 @@ Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the 
 | Insider-buying clusters and post-earnings drift families, backtested from 2016 with survivorship checks, then paper | Statistics | ✅ history loads over the first nights |
 | Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
 
-## Next: Results and stock plans
+## Results and stock plans ✅
 
-Day, week, month and year results with a written debrief, and one plan per holding. Target: running on the box by the evening of 2026-11-11.
+Day, week, month and year results with a written debrief, and one plan per holding. Shipped as 1.1.0 on 2026-11-10.
 
 | Item | Owner | Status |
 |---|---|---|
-| Period packs for day, week, month, year: change, vs S&P and each mix, movers, flows, trades, risk, decisions, paper race (`/api/engine/reviews`) | Statistics | ⏳ |
-| Value history rebuilt from the Fidelity import so Month and Year are real | Statistics | ⏳ |
+| Period packs for day, week, month, year: change, vs S&P and each mix, movers, flows, trades, risk, decisions, paper race (`/api/engine/reviews`) | Statistics | ✅ |
+| Value history rebuilt from the Fidelity import so Month and Year are real | Statistics | ✅ |
 | Debrief desk: what happened, why, what to watch, next steps, per period | Agents | ✅ |
-| Results page: Day / Week / Month / Year with a period stepper | Design | ⏳ |
-| Plan record per holding: role, band, add and trim rules, exits, tax notes, steps (`/api/decisions/plans`); the ASTS sale and margin repay become steps | Concept | ⏳ |
-| Plan facts per holding: lots, levels, zones, valuation, risk share (`/api/engine/planfacts`) | Statistics | ⏳ |
-| Plan desk drafts and refreshes each plan; Plan keeper lists the steps live today | Agents | ⏳ |
-| Plan → Stock plans cards, and the same block on the Symbol sheet | Design | ⏳ |
-| "Today's run" strip on the Bridge; new jobs in Run now and in health | Design + Infra | ⏳ |
+| Results page: Day / Week / Month / Year with a period stepper | Design | ✅ |
+| Plan record per holding: role, band, add and trim rules, exits, tax notes, steps (`/api/decisions/plans`) | Concept | ✅ |
+| Plan facts per holding: lots, levels, zones, valuation, risk share (`/api/engine/planfacts`) | Statistics | ✅ |
+| Plan desk drafts and refreshes each plan; Plan keeper lists the steps live today | Agents | ✅ |
+| Plan → Stock plans cards, and the same block on the Symbol sheet | Design | ✅ |
+| "Today's run" strip on the Bridge; new jobs in Run now and in health | Design + Infra | ✅ |
+
+## Next: Review rework
+
+From the outside review at 1.0.9 ([docs/review-2026-11.md](docs/review-2026-11.md), Gameplan). Rework threads may edit engine and interface files for their items; every PR goes through Lead.
+
+| Items | What | Owner | Status |
+|---|---|---|---|
+| F1, F2, F3, F5, F8 | Paper gate as a stored verdict against a noise band; family-wide trial count; leaderboard rows ranked inside their own benchmark | Gate and leaderboard thread | ✅ (#160) |
+| F4, F6, N6 | "As held" as a drifting hold; fees and a lower-returns case on every mix; Mixes leads with time to FI by monthly deposit | Bands and FI thread | ✅ (#164) |
+| N4 | Conviction position: hold, rebalance and trim views | Bands and FI thread | ✅ on Mixes (#164); ⏳ on the stock plan card |
+| N1 to N3 | Replay of his own trades under a size cap, an exit rule, no margin and a minimum hold | Replay thread | ✅ (#162) |
+| U1 to U5 | Menu regroup, Settings behind a gear, Bridge diet, single-plan wording retired, Journal paging | Design | ⏳ |
+| F7, N5 | Event study and placebo for every lane and family | Statistics, Agents | ⏳ |
+| N7, T1, C3 | Two new catalog mixes, a tax lens feeding stock plans, a ceiling and exit rule for conviction holds | Concept, Statistics | ⏳ |
+| C1 | Each desk reports the decisions it changed in the last 30 days | Agents, Lead | ⏳ |
+| C2 | No new strategy families until F1 to F3 land | Lead | ✅ lifted by #160 |
 
 ## Next: Advisor foundation
 
@@ -196,7 +212,7 @@ There is no single target plan. Each strategy is measured against his risk profi
 |---|---|---|
 | Risk profile: questionnaire plus capacity, giving bands 1–5 (replaces `risk_level`) | Concept + Design | ✅ |
 | Held-conviction positions with their own band (ASTS); never buy single stocks on margin | Concept | ✅ |
-| One-off actions on the calendar: ASTS tax-loss sale Dec 7–15 with a rebuy after 31 days; margin repaid 11-18 | Concept | ⏳ moves into stock plans as steps |
+| One-off actions: the ASTS tax-loss sale Dec 7–15 and the 11-18 margin repay are stock plan steps he adds and approves (no rebuy step) | Concept + Design | ✅ |
 | Strategy catalog racing side by side: Safe mix, As held, Aggressive tech tilt, Dip-buy, plus the filings, insider and drift families | Statistics | ✅ |
 | Probability bands: Monte Carlo p10–p90 at 1–40 years, chance of loss, drawdown, CVaR, chance of FI, fit to his risk band | Statistics + Design | ✅ |
 | Reward-to-risk on the leaderboard (Sharpe, Sortino, max drawdown, Calmar) | Statistics + Design | ✅ |

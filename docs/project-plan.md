@@ -86,6 +86,8 @@ Shared seams, so nobody edits another owner's code:
 | 2026-11-08 | Alpaca paper trading allowed for the Strategy lab; a live $1,000 Alpaca sandbox only after a strategy survives 6 months of paper, with hard caps and a kill switch. Fidelity stays advisory |
 | 2026-11-08 | No single target plan: Plan v3 is one safe mix in a strategy catalog. A risk profile sets the bands. ASTS is a held-conviction position with its own band (tax-loss sale Dec 7–15, rebuy after 31 days). Never buy single stocks on margin. Every box chore becomes a button |
 | 2026-11-10 | Results reviews for day, week, month and year with a debrief, and one plan per holding, running on the box by 2026-11-11 |
+| 2026-11-10 | The December ASTS loss sale keeps its planned size and has no rebuy step: the November 5 buys are the replacement shares. It is a stock plan step he approves in the app |
+| 2026-11-10 | Rework threads from the outside review (`docs/review-2026-11.md`) may edit engine and interface files across workstreams for their listed items. Every PR still goes through Lead, and workstreams re-merge `main` after each lands |
 | 2026-11-07 | Free services only beyond what is already paid for |
 | 2026-11-07 | Design borrows Escape Vektor's look with a single investing focus |
 | 2026-11-07 | Engine is Python; Preflight is engine code that agents call and Design renders |
