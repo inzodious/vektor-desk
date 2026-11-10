@@ -28,6 +28,18 @@ growth:
   tilt: growth
   fi_target_from_plan: true
 
+# FI goal, used when Escape Vektor has none. Give a number, or a yearly spend and a multiple.
+# Editable in Settings (PATCH /api/decisions/profile).
+fi:
+  number_usd: null
+  yearly_spend_usd: null
+  multiple: 25
+  target_age: null
+  birth_date: null
+  target_date: null
+  inflation_pct: 0
+  inflation_adjusted: false
+
 usage:
   overnight_window: "01:00-05:00"
   weekly_runs:
@@ -53,6 +65,8 @@ agents:
     strategy: false
     filings: false
     discounts: false
+    debrief: true
+    plans: true
 
 alerts:
   min_priority: default

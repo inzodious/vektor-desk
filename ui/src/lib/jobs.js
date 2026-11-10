@@ -12,6 +12,13 @@ const WORD = {
   'engine-lots': ['Lots', 'Reads a new lot export from the inbox'],
   'engine-french': ['Factor library', 'Monthly factor returns for exposure'],
   'engine-lab-export': ['Lab export', 'Hands the strategy lab its data'],
+  'engine-review': ['Results review', 'Packs up the day, week, month and year'],
+  'engine-paper': ['Paper trades', 'Paper strategies place their orders'],
+  'engine-discounts': ['Discount scan', 'Looks for names on sale after the close'],
+  'engine-universe': ['Universe', 'Refreshes the list of names the lab can pick from'],
+  'engine-filings': ['Filings', 'New SEC filings on names you follow'],
+  'engine-insider': ['Insider buys', 'Insider trades from SEC forms'],
+  'engine-earnings': ['Earnings dates', 'Upcoming and reported earnings'],
   'decisions-sync': ['Decision matching', 'Matches trades to your decisions'],
   'notify-ops': ['Ops alerts', 'Sends desk health to your phone'],
   'agents-triggers': ['Agent triggers', 'Wakes a desk when something moves'],
@@ -31,7 +38,12 @@ export function jobWord(job) {
   const name = job?.name || '';
   if (WORD[name]) return { title: WORD[name][0], blurb: WORD[name][1] };
   const desk = /^agents-run-(.+)$/.exec(name);
-  if (desk) return { title: `${originName(desk[1])} desk`, blurb: 'An agent desk run' };
+  if (desk) {
+    const known = originName(desk[1]);
+    const raw = desk[1].replace(/_/g, ' ');
+    const title = known === desk[1] ? `${raw[0].toUpperCase()}${raw.slice(1)} desk` : /desk$/i.test(known) ? known : `${known} desk`;
+    return { title, blurb: 'An agent desk run' };
+  }
   return { title: job?.title || name, blurb: null };
 }
 

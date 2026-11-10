@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import discounts, lab, lane, leaderboard, paper_exec, schema, watchlist
+from desk.engine import discounts, lab, lane, leaderboard, paper_exec, review, schema, watchlist
 from desk.engine.compare import CompareError, compare
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
@@ -525,6 +525,26 @@ def factors_view(request: Request) -> JSONResponse:
 @router.get("/api/engine/bands")
 def bands_view(request: Request) -> JSONResponse:
     return _view(request, "bands", {"as_of": None, "status": "not_ready", "rows": [], "book": "as-held"})
+
+
+@router.get("/api/engine/reviews/index")
+def reviews_index(request: Request) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    try:
+        return _json(review.index_view(conn))
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+@router.get("/api/engine/reviews")
+def reviews_view(request: Request, kind: str = "day", end: str | None = None) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    try:
+        return _json(review.review_view(conn, kind, end))
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 @router.get("/api/engine/discounts")

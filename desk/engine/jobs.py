@@ -13,5 +13,7 @@ JOBS = [
     ("50 23 * * *", "python -m desk.engine earnings"),
     ("45 8 * * 1-5", "python -m desk.engine paper"),
     ("45 16 * * 1-5", "python -m desk.engine paper"),
+    ("35 8 * * 1-5", "python -m desk.engine review"),
+    ("35,45 17 * * 1-5", "python -m desk.engine review"),
     ("40 17 * * 1-5", "python -m desk.engine discounts"),
 ]

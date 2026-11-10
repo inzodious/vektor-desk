@@ -20,7 +20,7 @@ from desk.engine.broker import decision_rows
 
 WINDOW_DAYS = 180
 PAYS_PER_MONTH = {"weekly": 52 / 12, "biweekly": 26 / 12, "semimonthly": 2, "monthly": 1}
-STARTER_DESKS = ("plan_keeper", "tax", "risk", "skeptic")
+STARTER_DESKS = ("plan_keeper", "tax", "risk", "skeptic", "debrief", "plans")
 BROKERAGE_KINDS = ("individual", "brokerage", "joint")
 STARTER_RUNS = {"plan_keeper": 10}
 HEADER = "# Vektor Desk profile, drafted from the mirror"

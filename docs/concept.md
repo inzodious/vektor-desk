@@ -93,6 +93,27 @@ This is the heart of the desk.
 - Deposit schedule: where the next deposit should go to close drift, ready as a proposal on payday.
 - Rules, editable and versioned. Every change to a rule is itself a decision record.
 - Tax calendar: harvest candidates, wash-sale windows, year-end deadlines, and which lots to sell.
+- **Stock plans.** One versioned plan per holding. The desk drafts, he edits and approves; only approved plans reach the calendar, alerts and the daily brief. Orders still go through Preflight tickets.
+
+| Field | Holds |
+|---|---|
+| `role` | core, conviction, satellite or exit |
+| `thesis`, `exit_conditions`, `tax_notes`, `catalysts`, `next_review` | The why, what would end it, and what is coming |
+| `weight_band` | `{min_pct, max_pct}`; falls back to the conviction hold's band |
+| `add_rule`, `trim_rule` | Price zones, a monthly cap, deposits only. Margin is never an option |
+| `steps` | Dated or conditional: add, trim, hold, review, harvest, sell, repay, other. A harvest carries its lots and a 31-day no-buy window |
+
+| Endpoint | Does |
+|---|---|
+| `GET /api/decisions/plans` | Latest version per symbol, with the approved one alongside when the latest is a draft |
+| `GET /api/decisions/plans/{symbol}` | The plan and its version history; `/versions/{n}` reads one |
+| `PUT /api/decisions/plans/{symbol}` `{plan, approve?}` | Saves his edit as a new draft, or approves it in the same call |
+| `POST /api/decisions/plans/{symbol}/approve` `{version?}` | Approves the latest draft |
+| `POST /api/decisions/plans/{symbol}/discard` | Drops the latest draft |
+| `POST /api/decisions/plans/{symbol}/steps/{id}/done` `{on?, undo?}` | Marks a step done by hand; broker fills and a cleared margin debit mark steps done on their own |
+| `GET /api/decisions/plan-steps?days=` | Approved steps live today or coming up, plus symbols under a no-buy window |
+
+The plan desk writes through `desk.decisions.plans.save_draft`. It never changes an approved version, waits when his own draft is unapproved, and carries his steps into its drafts untouched.
 - FI projection: the path to the FI number at current contributions, with scenarios (contribution changes, return assumptions, a drawdown at a bad time). Lines and bars only, no area fills.
 
 ### Lab
@@ -114,6 +135,7 @@ This is the heart of the desk.
 | `PUT /api/decisions/convictions/{symbol}` | Adds or updates a conviction hold; missing band values come from the risk band |
 | `DELETE /api/decisions/convictions/{symbol}` | Removes it |
 
+- **FI goal.** `fi` in the profile (`number_usd`, or `yearly_spend_usd` × `multiple`; `target_age` + `birth_date`, or `target_date`) is the fallback when Escape Vektor has no FI goal. `desk.decisions.profile.fi_goal(data)` returns it in the engine's shape.
 - **Conviction hold.** A held conviction position (rule `conviction_hold`) is exempt from the single-stock cap and has its own band instead. No adds above the ceiling, never on margin, and one friendly alert a week only while above it.
 - Agent status: last run, next run, usage cost of each run in turns, on or off.
 - Data freshness: last mirror, last price tick, last lot import.
