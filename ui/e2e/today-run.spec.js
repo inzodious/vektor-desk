@@ -11,10 +11,10 @@ test('the Bridge shows today’s run stage by stage', async ({ page }) => {
   const card = page.getByTestId('today-run');
   await expect(card.locator('.run-stage')).toHaveCount(5);
   await expect(card.getByTestId('run-head')).toHaveText('More to run today');
-  await expect(card.locator('[data-stage="accounts"]')).toHaveAttribute('data-state', 'waiting');
-  await expect(card.locator('[data-stage="numbers"]')).toContainText('Ran 8:24 AM · Next 5:20 PM');
+  await expect(card.locator('[data-stage="mirror"]')).toHaveAttribute('data-state', 'waiting');
+  await expect(card.locator('[data-stage="engine"]')).toContainText('Ran 8:24 AM · Next 5:20 PM');
   await expect(card.locator('[data-stage="review"]')).toContainText('Arrives with the next desk update');
-  await expect(card.locator('[data-stage="desks"]')).toContainText('2 ran · Plan keeper desk 5:30 PM');
+  await expect(card.locator('[data-stage="desks"]')).toContainText('Next 5:30 PM');
   await expect(card.locator('[data-stage="paper"]')).toContainText('Next 4:45 PM');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
@@ -25,9 +25,10 @@ test('in the evening the strip shows what ran and what is running', async ({ pag
   await page.goto('/?scenario=evening');
   const card = page.getByTestId('today-run');
   await expect(card.getByTestId('run-head')).toHaveText('Running now');
-  await expect(card.locator('[data-stage="accounts"]')).toHaveAttribute('data-state', 'ok');
-  await expect(card.locator('[data-stage="review"]')).toHaveAttribute('data-state', 'running');
-  await expect(card.locator('[data-stage="review"]')).toContainText('Debrief desk is running');
+  await expect(card.locator('[data-stage="mirror"]')).toHaveAttribute('data-state', 'ok');
+  await expect(card.locator('[data-stage="review"]')).toContainText('Ran 5:36 PM');
+  await expect(card.locator('[data-stage="desks"]')).toHaveAttribute('data-state', 'running');
+  await expect(card.locator('[data-stage="desks"]')).toContainText('Debrief desk is running');
   await expect(card.locator('[data-stage="paper"]')).toContainText('Ran 4:46 PM');
 });
 

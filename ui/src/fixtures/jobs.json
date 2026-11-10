@@ -3,6 +3,13 @@
  "scheduler_alive": true,
  "cooldown_seconds": 300,
  "pickup_seconds": 5,
+ "stages": [
+  "mirror",
+  "engine",
+  "review",
+  "desks",
+  "paper"
+ ],
  "jobs": [
   {
    "name": "agents-run-plan_keeper",
@@ -18,7 +25,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": "desks"
   },
   {
    "name": "agents-run-tax",
@@ -35,7 +43,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-risk",
@@ -51,7 +60,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-research",
@@ -67,7 +77,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-scout",
@@ -83,7 +94,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-strategy",
@@ -107,7 +119,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-filings",
@@ -131,7 +144,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-run-discounts",
@@ -147,7 +161,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-triggers",
@@ -163,7 +178,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-queue-now-only",
@@ -187,7 +203,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-queue",
@@ -203,7 +220,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "agents-lab-reviews",
@@ -219,7 +237,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "decisions-sync",
@@ -243,7 +262,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-daily",
@@ -271,7 +291,8 @@
     "holdings",
     "value",
     "closes"
-   ]
+   ],
+   "stage": "engine"
   },
   {
    "name": "engine-lots",
@@ -297,7 +318,8 @@
    "can_run": true,
    "refreshes": [
     "shares"
-   ]
+   ],
+   "stage": null
   },
   {
    "name": "engine-quotes",
@@ -321,7 +343,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-backfill",
@@ -347,7 +370,8 @@
    "can_run": true,
    "refreshes": [
     "closes"
-   ]
+   ],
+   "stage": null
   },
   {
    "name": "engine-research",
@@ -373,7 +397,8 @@
    "can_run": true,
    "refreshes": [
     "research"
-   ]
+   ],
+   "stage": null
   },
   {
    "name": "engine-lookthrough",
@@ -397,7 +422,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-lab-export",
@@ -413,7 +439,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-french",
@@ -437,7 +464,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-universe",
@@ -453,7 +481,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-filings",
@@ -469,7 +498,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-insider",
@@ -485,7 +515,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-earnings",
@@ -501,7 +532,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "engine-paper",
@@ -526,7 +558,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": "paper"
   },
   {
    "name": "engine-discounts",
@@ -542,7 +575,8 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   },
   {
    "name": "mirror",
@@ -570,7 +604,8 @@
     "freshness",
     "holdings",
     "value"
-   ]
+   ],
+   "stage": "mirror"
   },
   {
    "name": "notify-ops",
@@ -594,7 +629,8 @@
    },
    "cooldown_until": null,
    "can_run": true,
-   "refreshes": []
+   "refreshes": [],
+   "stage": null
   }
  ]
 }

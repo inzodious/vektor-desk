@@ -27,8 +27,8 @@ const EVENING = {
   'agents-run-filings': ['09:15', '09:19', 'ok', null],
 };
 const REVIEW_JOBS = [
-  { name: 'engine-review', title: 'Engine review', package: 'engine', schedules: ['35 17 * * 1-5'], refreshes: ['reviews'] },
-  { name: 'agents-run-debrief', title: 'Agents run debrief', package: 'agents', schedules: ['50 17 * * 1-5'], refreshes: [] },
+  { name: 'engine-review', title: 'Engine review', package: 'engine', schedules: ['35 17 * * 1-5'], refreshes: ['reviews'], stage: 'review' },
+  { name: 'agents-run-debrief', title: 'Agents run debrief', package: 'agents', schedules: ['50 17 * * 1-5'], refreshes: ['debrief'], stage: 'desks' },
 ];
 
 const lastRun = (name, table = LAST) => {

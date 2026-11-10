@@ -5,10 +5,10 @@ const ET = 'America/New_York';
 const DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
 export const STAGES = [
-  { id: 'accounts', title: 'Accounts', blurb: 'Balances and activity come in', match: (n) => n === 'mirror' },
-  { id: 'numbers', title: 'Numbers', blurb: 'Values, drift, risk and plan checks', match: (n) => n === 'engine-daily' },
-  { id: 'review', title: 'Review', blurb: 'The day’s results and debrief', match: (n) => /^engine-reviews?$/.test(n) || /debrief/.test(n) },
-  { id: 'desks', title: 'Desks', blurb: 'Agent desks read the day', match: (n) => /^agents-run-/.test(n) && !/debrief/.test(n) },
+  { id: 'mirror', title: 'Accounts', blurb: 'Balances and activity come in', match: (n) => n === 'mirror' },
+  { id: 'engine', title: 'Numbers', blurb: 'Values, drift, risk and plan checks', match: (n) => n === 'engine-daily' },
+  { id: 'review', title: 'Review', blurb: 'The day’s results, packed up', match: (n) => /^engine-reviews?$/.test(n) },
+  { id: 'desks', title: 'Desks', blurb: 'Agent desks read the day', match: (n) => /^agents-run-(plan_keeper|debrief|plans)$/.test(n) },
   { id: 'paper', title: 'Paper', blurb: 'Paper strategies place their trades', match: (n) => n === 'engine-paper' },
 ];
 
@@ -107,7 +107,7 @@ function stageLine(state, rows) {
 }
 
 export function stageToday(stage, jobs, now) {
-  const rows = (jobs || []).filter((j) => stage.match(j.name)).map((j) => jobToday(j, now));
+  const rows = (jobs || []).filter((j) => !stage.match || stage.match(j.name)).map((j) => jobToday(j, now));
   let state = 'soon';
   if (rows.length) {
     const has = (s) => rows.some((r) => r.state === s);
@@ -119,7 +119,13 @@ export function stageToday(stage, jobs, now) {
 export function todayRun(data, fallbackNow = new Date()) {
   const parsed = data?.now ? new Date(data.now) : null;
   const now = parsed && !Number.isNaN(parsed.getTime()) ? parsed : fallbackNow;
-  const stages = STAGES.map((s) => stageToday(s, data?.jobs, now));
+  const jobs = data?.jobs || [];
+  const served = jobs.some((j) => j.stage !== undefined);
+  const order = Array.isArray(data?.stages) && data.stages.length ? data.stages : STAGES.map((s) => s.id);
+  const stages = order.map((id) => {
+    const known = STAGES.find((s) => s.id === id) || { id, title: `${String(id)[0].toUpperCase()}${String(id).slice(1)}`, blurb: null, match: () => false };
+    return stageToday(served ? { ...known, match: null } : known, served ? jobs.filter((j) => j.stage === id) : jobs, now);
+  });
   const live = stages.filter((s) => s.state !== 'soon' && s.state !== 'idle');
   const done = live.filter((s) => s.state === 'ok').length;
   const failed = stages.filter((s) => s.state === 'failed').length;
