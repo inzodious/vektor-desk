@@ -14,7 +14,7 @@ import requests
 from desk.config import Config
 from desk.db import connect
 from desk.engine import ENGINE_VERSION, broker, core, discounts, earnings, filings, french, insider, lane, paper_exec, review, schema, triggers, universe
-from desk.engine.backfill import run_backfill
+from desk.engine.backfill import never_fetched, run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.lab import data as lab_data
 from desk.engine.lab import paper
@@ -76,7 +76,23 @@ def run_daily(cfg: Config) -> dict:
     held = run_holdings(cfg)
     if not held.get("ok"):
         return held
-    return {"ok": True, "history": history, "holdings": held, "core": run_core(cfg)}
+    filled = _fill_backcast(cfg, held)
+    if filled and filled.get("fetched"):
+        held = run_holdings(cfg)
+    out = {"ok": True, "history": history, "holdings": held, "core": run_core(cfg)}
+    return out | {"backfill": filled} if filled else out
+
+
+def _fill_backcast(cfg: Config, held: dict) -> dict | None:
+    unpriced = (held.get("backcast") or {}).get("unpriced") or []
+    if not unpriced or os.environ.get(DRY_RUN) == "1":
+        return None
+    desk = connect(cfg.desk_db)
+    try:
+        new = never_fetched(desk, unpriced)
+    finally:
+        desk.close()
+    return run_market_backfill(cfg) if new else None
 
 
 def run_history(cfg: Config) -> dict:
