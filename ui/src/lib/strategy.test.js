@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { costItems, factorItems, foldItems, horizonRows, mixText, paperProgress, paperSummary, paramText, regimeItems, ruleVariants, sensitivityItems, signedPts, specLines, splitStrategies, stageCounts, statusOf, verdictLamps, verdictOf } from './strategy.js';
+import { barMismatches, costItems, factorItems, foldItems, horizonRows, mixText, paperProgress, paperSummary, paramText, regimeItems, ruleVariants, sensitivityItems, signedPts, specLines, splitStrategies, stageCounts, statusOf, verdictLamps, verdictOf } from './strategy.js';
 
 describe('words', () => {
   it('names statuses and verdicts, with a fallback', () => {
@@ -138,5 +138,31 @@ describe('rule tests', () => {
 
   it('writes the mix biggest first', () => {
     expect(mixText({ BND: 0.2, FXAIX: 0.8 })).toBe('FXAIX 80% · BND 20%');
+  });
+});
+
+describe('verdict bars against their numbers', () => {
+  const views = Object.entries(import.meta.glob('../fixtures/lab.strategies.*.json', { eager: true, import: 'default' }));
+
+  it('finds a bar marked clear that its number does not clear', () => {
+    const sheet = { horizons: [{ years: 5, starts: 12, p5_pts: 0.4 }], deflated_sharpe: 0.96, pbo: 0.62, walk_forward: { excess_pts: 4 } };
+    const final = { bars: { excess_interval: true, deflated_sharpe: true, pbo: true, holdout: true }, holdout: { excess_vs_bench_pts: 3 } };
+    expect(barMismatches({ tear_sheet: sheet, final })).toEqual(['pbo']);
+    expect(barMismatches({ tear_sheet: { ...sheet, pbo: 0.12 }, final })).toEqual([]);
+    expect(barMismatches({ tear_sheet: { ...sheet, pbo: 0.12, deflated_sharpe: 0.95 }, final })).toEqual(['deflated_sharpe']);
+    expect(barMismatches({ tear_sheet: { ...sheet, pbo: 0.12 }, final: { ...final, holdout: { excess_vs_bench_pts: 1.5 } } })).toEqual(['holdout']);
+    expect(barMismatches({ tear_sheet: { ...sheet, pbo: null }, final })).toEqual(['pbo']);
+    expect(barMismatches({ tear_sheet: null, final })).toEqual([]);
+  });
+
+  it('holds for every strategy fixture', () => {
+    const checked = views.filter(([, v]) => v?.final?.bars && v.tear_sheet);
+    expect(checked.length).toBeGreaterThan(0);
+    checked.forEach(([file, v]) => {
+      expect([file, barMismatches(v)]).toEqual([file, []]);
+      const marks = Object.values(v.final.bars).filter((b) => b != null);
+      if (v.final.verdict === 'pass') expect([file, marks.every((b) => b === true)]).toEqual([file, true]);
+      if (v.final.verdict === 'fail') expect([file, marks.some((b) => b === false) || Boolean(v.final.note)]).toEqual([file, true]);
+    });
   });
 });

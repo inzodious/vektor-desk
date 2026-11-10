@@ -4,12 +4,33 @@ from datetime import UTC, date, datetime
 
 from desk.config import Config
 from desk.db import connect
+from desk.engine import gate
+from desk.engine.gate import PAPER_DAYS
 from desk.engine.lab import stats
 from desk.engine.lab.data import data_path, ledger_path, load
-from desk.engine.lab.sim import simulate
+from desk.engine.lab.sim import _benchmark, simulate
 from desk.engine.lab.spec import SpecError, parse, resolve
 
-PAPER_DAYS = 182
+__all__ = ["PAPER_DAYS", "run"]
+PLAN_BENCHMARK = "Plan mix"
+
+
+def _family_sizes(rows) -> dict[str, int]:
+    parents = {r["id"]: r["parent_id"] for r in rows}
+
+    def root(sid):
+        seen = set()
+        while parents.get(sid) and sid not in seen:
+            seen.add(sid)
+            sid = parents[sid]
+        return gate.family(sid) or sid
+
+    keys = {r["id"]: root(r["id"]) for r in rows}
+    return {sid: sum(1 for r in rows if keys[r["id"]] == key) for sid, key in keys.items()}
+
+
+def _buys(trades: list[tuple], cut: str) -> int:
+    return sum(1 for t in trades if t[2] == "buy" and t[0] <= cut)
 
 
 def run(cfg: Config, desk: sqlite3.Connection, *, now: datetime | None = None) -> dict:
@@ -26,6 +47,7 @@ def run(cfg: Config, desk: sqlite3.Connection, *, now: datetime | None = None) -
     finally:
         led.close()
     data = load(data_path(cfg))
+    sizes = _family_sizes(rows)
     done = []
     for row in rows:
         fin = finals.get((row["id"], row["version"]))
@@ -42,7 +64,22 @@ def run(cfg: Config, desk: sqlite3.Connection, *, now: datetime | None = None) -
         bench_ret = (res.bench[-1] - 1) * 100 if res.bench and res.bench[-1] else None
         own_ret = (res.values[-1] / res.values[0] - 1) * 100 if res.values else None
         excess = own_ret - bench_ret if own_ret is not None and bench_ret is not None else None
-        status = "paper" if days < PAPER_DAYS else ("eligible" if excess is not None and excess >= 0 else "retired")
+        settled = gate.settle(
+            desk,
+            spec.id,
+            spec.version,
+            start,
+            res.days,
+            res.values,
+            res.bench,
+            events=lambda cut, trades=res.trades: _buys(trades, cut),
+            bars=fin.get("verdict") == "pass",
+            family_size=sizes.get(row["id"], 1),
+            now=now,
+        )
+        status = settled["status"]
+        mix = _benchmark(data, spec)
+        summary |= {"benchmark": next(iter(mix)) if len(mix) == 1 else (PLAN_BENCHMARK if mix else None), "gate": settled["gate"]}
         holdings = {s: n for s, n in res.holdings.items()}
         with desk:
             desk.execute("DELETE FROM paper_trades WHERE strategy_id=? AND version=?", (spec.id, spec.version))

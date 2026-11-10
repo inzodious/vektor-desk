@@ -60,9 +60,40 @@ def test_forward_record_follows_the_rule(cfg):
     row = dict(conn.execute("SELECT * FROM paper_portfolios WHERE strategy_id='filings-lane'").fetchone())
     summary = json.loads(row["summary"])
     assert summary["forward_only"] and summary["benchmark"] == "IWM" and summary["closed"] == 1 and summary["hit_rate"] == 1.0
+    assert summary["gate"]["verdict"] is None and summary["gate"]["next_checkpoint"] == {"day": 182, "on": "2027-04-05"}
+    assert summary["gate"]["events"] == 2 and summary["gate"]["min_events"] == 30 and summary["gate"]["family_size"] == 1
     assert row["return_pct"] > 0 and row["days"] == 32
     held = [dict(r) for r in conn.execute("SELECT * FROM paper_positions WHERE strategy_id='filings-lane'")]
     assert [h["symbol"] for h in held] == ["MIDZ"]
+    conn.close()
+
+
+def test_one_lucky_trade_is_not_a_pass_and_the_verdict_is_kept(cfg):
+    conn = connect(cfg.desk_db)
+    schema.apply(conn)
+    sessions = [d for d in (date(2026, 1, 5) + timedelta(days=i) for i in range(290)) if trading_day(d)]
+    rows = []
+    for i, d in enumerate(sessions):
+        iwm = 200.0 + (0.4 if i % 2 else -0.4)
+        rocket = 10.0 * 1.04 ** min(i, 20) + (0.02 if i % 3 else -0.02)
+        for sym, px in (("IWM", iwm), ("SMOL", rocket)):
+            rows.append((sym, d.isoformat(), px, px, px, px, px * 0.5, 100000, px))
+    with conn:
+        conn.executemany("INSERT INTO alpaca_bars VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [r for r in rows if r[1] <= "2026-07-20"])
+        conn.execute(
+            "INSERT INTO filing_signals VALUES ('a1', 'SMOL', ?, '8-K', '[]', ?, 'claude-test', 2, 0.9, 'earnings', 20, 'r', '[]', 'run')",
+            ("2026-01-05T08:15:00+00:00",) * 2,
+        )
+    first = lane.rebuild(conn)
+    row = dict(conn.execute("SELECT * FROM paper_portfolios WHERE strategy_id='filings-lane'").fetchone())
+    gate = json.loads(row["summary"])["gate"]
+    assert row["days"] == 196 and row["excess_pts"] > gate["band_pts"] > 0
+    assert first["status"] == "paper" and gate["verdict"]["verdict"] == "unproven" and gate["verdict"]["reason"] == "events" and gate["verdict"]["events"] == 1
+    assert gate["verdict"]["as_of"] == "2026-07-06" and gate["next_checkpoint"] == {"day": 273, "on": "2026-10-05"}
+    with conn:
+        conn.executemany("INSERT INTO alpaca_bars VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [r for r in rows if "2026-07-20" < r[1] <= "2026-08-14"])
+    assert lane.rebuild(conn)["status"] == "paper"
+    assert [dict(r)["checkpoint"] for r in conn.execute("SELECT * FROM paper_verdicts")] == [182]
     conn.close()
 
 
@@ -154,11 +185,11 @@ def held_leg(conn, strategy_id, symbol, qty, px, day="2026-10-05", version=1):
         )
 
 
-def lab_strategy(conn, strategy_id, positions, status="paper", started="2026-10-01", excess=1.0, days=36):
+def lab_strategy(conn, strategy_id, positions, status="paper", started="2026-10-01", excess=1.0, days=36, **summary):
     with conn:
         conn.execute(
             "INSERT OR REPLACE INTO paper_portfolios VALUES (?, 1, ?, ?, '2026-11-05', ?, 1000.0, 2.0, ?, ?, ?)",
-            (strategy_id, f"{strategy_id} title", started, days, excess, status, json.dumps({"mdd_pct": -3.5})),
+            (strategy_id, f"{strategy_id} title", started, days, excess, status, json.dumps({"mdd_pct": -3.5} | summary)),
         )
         conn.executemany("INSERT INTO paper_positions VALUES (?, 1, '2026-11-05', ?, ?, ?)", [(strategy_id, s, n, v) for s, n, v in positions])
 
@@ -334,6 +365,7 @@ def test_variants_validate_and_start_when_registered(cfg):
     assert trades == [("2026-11-06", "MIDZ")]
     again = lane.register(conn, "fast-lane", "Fast exits", {"hold_sessions": 12}, now=datetime(2026, 10, 22, 12, tzinfo=UTC))
     assert again.version == 2 and [v.version for v in lane.variants(conn) if v.id == "fast-lane"] == [2]
+    assert lane.tried(conn) == 3
     conn.close()
     from desk.engine import lab
 
@@ -352,23 +384,42 @@ def test_leaderboard_endpoint_and_register_helper(cfg, app_client):
     assert made["version"] == 1 and made["params"]["event_types"] == ["earnings"]
 
 
-def test_leaderboard_orders_and_carries_the_account(cfg, paper_keys):
+def test_leaderboard_groups_by_benchmark_and_ranks_on_noise_units(cfg, paper_keys):
     from desk.engine import leaderboard
 
     assert leaderboard.build(None, 1000.0)["note"].startswith("No strategies are paper trading yet")
     conn = seed(cfg, SIGNALS)
     paper_exec.run(conn, FakeAlpaca(), now=PRE)
-    lab_strategy(conn, "winner", [], status="eligible", excess=4.0, days=190)
+    lab_strategy(
+        conn, "winner", [], status="eligible", excess=4.0, days=190, gate={"score": 1.6, "luck": 0.05, "next_checkpoint": {"day": 273, "on": "2027-01-01"}}
+    )
     lab_strategy(conn, "loser", [], status="retired", excess=-2.0, days=190)
     lab_strategy(conn, "blank", [], excess=None)
+    lab_strategy(conn, "lucky", [], excess=9.0, days=20, gate={"score": 2.5, "luck": 0.01})
+    lab_strategy(conn, "steady", [], excess=3.0, days=150, gate={"score": 1.1, "luck": 0.14})
+    lab_strategy(conn, "slow", [], excess=5.0, days=150, gate={"score": 0.4, "luck": 0.34})
+    lab_strategy(conn, "safe-mix", [], excess=0.5, days=90, kind="mix", benchmark="IVV", gate={"score": 0.2, "luck": 0.42})
+    lab_strategy(conn, "sector-momentum", [], excess=0.5, days=90, benchmark="Plan mix")
     board = leaderboard.build(conn, 1000.0)
-    assert board["benchmark"] == "IWM" and board["gate_days"] == 182 and board["note"] is None
+    assert board["benchmark"] == "IWM" and board["gate_days"] == 182 and board["step_days"] == 91 and board["young_days"] == 60 and board["note"] is None
+    assert board["luck_bar"] == 0.1
+    assert board["groups"] == [
+        {"benchmark": "IWM", "rows": 7, "racing": 6},
+        {"benchmark": "IVV", "rows": 1, "racing": 1},
+        {"benchmark": "Plan mix", "rows": 1, "racing": 1},
+    ]
     ids = [r["id"] for r in board["rows"]]
-    assert ids[0] == "winner" and ids[-1] == "loser" and ids.index("filings-lane") < ids.index("blank")
-    lane_row = next(r for r in board["rows"] if r["id"] == "filings-lane")
-    assert lane_row["kind"] == "lane" and lane_row["waiting_on"] == "time" and lane_row["eligible_on"] == "2027-04-05"
+    assert ids[:3] == ["winner", "steady", "slow"] and ids[3] == "lucky" and ids[6] == "loser" and ids[7:] == ["safe-mix", "sector-momentum"]
+    assert ids.index("filings-lane") < ids.index("blank")
+    rows = {r["id"]: r for r in board["rows"]}
+    assert rows["lucky"]["young"] and not rows["steady"]["young"] and rows["steady"]["luck"] == 0.14 and rows["steady"]["score"] == 1.1
+    assert rows["safe-mix"]["benchmark"] == "IVV" and rows["safe-mix"]["kind"] == "mix" and rows["sector-momentum"]["benchmark"] == "Plan mix"
+    lane_row = rows["filings-lane"]
+    assert lane_row["kind"] == "lane" and lane_row["checkpoint_on"] == "2027-04-05" and lane_row["days_to_checkpoint"] == 150 and lane_row["young"]
+    assert lane_row["gate"]["verdict"] is None and lane_row["gate"]["min_events"] == 30
     assert lane_row["account"]["sleeve"] == 1000.0 and lane_row["account"]["as_of"] == "2026-11-06" and lane_row["open_positions"] == 1
-    assert next(r for r in board["rows"] if r["id"] == "winner")["max_drawdown_pct"] == -3.5
+    assert rows["winner"]["max_drawdown_pct"] == -3.5 and rows["winner"]["checkpoint_on"] == "2027-01-01" and rows["winner"]["days_to_checkpoint"] == 83
+    assert rows["loser"]["gate"] is None and rows["loser"]["checkpoint_on"] is None
     conn.close()
 
 

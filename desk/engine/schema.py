@@ -660,6 +660,24 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   price REAL NOT NULL,
   cost REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS paper_verdicts (
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  checkpoint INTEGER NOT NULL,
+  as_of TEXT NOT NULL,
+  verdict TEXT NOT NULL CHECK (verdict IN ('eligible', 'unproven', 'retired')),
+  reason TEXT NOT NULL,
+  excess_pts REAL,
+  band_pts REAL,
+  retire_pts REAL,
+  luck REAL,
+  tracking_error_pct REAL,
+  obs INTEGER NOT NULL,
+  events INTEGER,
+  family_size INTEGER NOT NULL,
+  decided_at TEXT NOT NULL,
+  PRIMARY KEY (strategy_id, version, checkpoint)
+);
 CREATE TABLE IF NOT EXISTS signals (
   signal_id TEXT NOT NULL,
   scope_id TEXT NOT NULL,
