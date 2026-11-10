@@ -353,7 +353,7 @@ Patterns are descriptive context with a base rate attached, never a trigger. Eac
 
 ## Rule replays
 
-`desk.engine.replay` replays the imported Fidelity history under a different rule and reports "you versus the capped you". It runs inside the daily core pass and is stored as the `replay` view (`GET /api/engine/replay`). It needs the history import and S&P 500 prices; traded names join the nightly price backfill under the `history` role.
+`desk.engine.replay` replays the imported Fidelity history under a different rule and reports "you versus the capped you". It runs inside the daily core pass and is stored as the `replay` view (`GET /api/engine/replay`). It needs the history import and S&P 500 prices; every traded name joins the price backfill with role `past`, the same role the back-cast uses.
 
 | Family | Variants | What changes |
 |---|---|---|

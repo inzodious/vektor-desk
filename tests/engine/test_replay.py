@@ -411,6 +411,6 @@ def test_traded_names_join_the_price_backfill(cfg):
     broker.import_inbox(cfg, conn)
     assert backfill.traded_symbols(conn) == ["NOVA", "ROKT"]
     backfill.sync_roles(conn)
-    found = {r["symbol"]: (r["role"], r["priority"]) for r in conn.execute("SELECT symbol, role, priority FROM market_symbols WHERE role='history'")}
-    assert found == {"NOVA": ("history", 2), "ROKT": ("history", 2)}
+    found = {r["symbol"]: (r["role"], r["priority"]) for r in conn.execute("SELECT symbol, role, priority FROM market_symbols WHERE role='past'")}
+    assert found == {"NOVA": ("past", 3), "ROKT": ("past", 3)}
     conn.close()

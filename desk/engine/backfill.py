@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 from desk.engine.holdings import CASH_SYMBOLS
 from desk.engine.market import BENCHMARKS, ProviderError, last_trading_day, tiingo_daily, tiingo_key
 
-ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "history": 2, "past": 3, "universe": 3}
+ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "past": 3, "universe": 3}
 TICKER = re.compile(r"^[A-Z]{1,5}$")
 ROTATE_DAYS = 90
 NO_PRICES = "Tiingo has no daily prices"
@@ -54,7 +54,7 @@ def traded_symbols(conn: sqlite3.Connection) -> list[str]:
 
 def sync_roles(conn: sqlite3.Connection, now: datetime | None = None) -> None:
     add_symbols(conn, BENCHMARKS, "benchmark")
-    add_symbols(conn, traded_symbols(conn), "history")
+    add_symbols(conn, traded_symbols(conn), "past")
     day = conn.execute("SELECT max(date) FROM holdings_daily").fetchone()[0]
     if not day:
         return
