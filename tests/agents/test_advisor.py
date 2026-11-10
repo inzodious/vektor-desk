@@ -15,9 +15,11 @@ RISK = {
     "equity_max_pct": 95,
     "speculative_max_pct": 15,
     "single_stock_max_pct": 10,
-    "worst_year_loss_pct": -35,
+    "worst_year_loss_pct": 35,
     "limited_by": "capacity",
-    "taken_at": "2026-11-08T12:00:00Z",
+    "tolerance_band": 5,
+    "capacity_band": 4,
+    "answered_at": "2026-11-08T12:00:00Z",
 }
 CATALOG = [
     {"id": "safe-mix", "name": "Safe mix", "risk_rank": 2, "fit": "fits", "worst_year_p10_pct": -22.5, "chance_fi": 0.61, "proxy_note": "FXAIX as IVV"},
@@ -74,7 +76,15 @@ def test_risk_and_catalog_numbers_become_brief_keys(cfg):
 def test_plan_keeper_prompt_carries_band_catalog_and_actions(cfg):
     prep = prepare(cfg, "plan_keeper", engine=FakeEngine(SLICE), decisions=FakeDecisions(), advice=FakeAdvisor())
     payload = json.loads(prep.prompt.split("\n\n", 1)[1])
-    assert payload["advisor"]["risk_band"] == {"band": 4, "label": "Growth", "limited_by": "capacity", "version": 2, "taken_at": "2026-11-08T12:00:00Z"}
+    assert payload["advisor"]["risk_band"] == {
+        "band": 4,
+        "label": "Growth",
+        "limited_by": "capacity",
+        "tolerance_band": 5,
+        "capacity_band": 4,
+        "version": 2,
+        "answered_at": "2026-11-08T12:00:00Z",
+    }
     assert [c["fit"] for c in payload["advisor"]["catalog"]] == ["fits", "above"]
     assert payload["advisor"]["planned_actions"][0].startswith("Sell 10 TICKA")
     assert any(i["key"] == "risk.single_stock_max_pct:all:now" for i in payload["brief"]["sections"]["advisor"])

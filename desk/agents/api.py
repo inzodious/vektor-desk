@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from desk.agents import console, store, switches
 from desk.agents.desks import DESKS
-from desk.agents.runner import FIRST_RUN
+from desk.agents.runner import UNGUARDED
 from desk.agents.sources import NotReady, RealDecisions
 from desk.agents.status import crew
 from desk.api.deps import get_cfg
@@ -56,7 +56,7 @@ def delete_enabled(desk: str, cfg: CfgDep) -> dict:
 @router.put("/guard")
 def put_guard(body: Switch, cfg: CfgDep) -> dict:
     store.set_guard(cfg, body.enabled)
-    return {"guard": body.enabled, "allowed": list(FIRST_RUN)}
+    return {"guard": body.enabled, "allowed": list(UNGUARDED)}
 
 
 @router.get("/brief")

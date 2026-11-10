@@ -224,3 +224,43 @@ class RealDiscounts:
 
     def record(self, cfg: Config, signal_id: str, case: dict) -> object:
         return self._call("record", cfg, signal_id, case)
+
+
+class Reviews(Protocol):
+    def pending(self, cfg: Config) -> list[dict]: ...
+
+    def record(self, cfg: Config, kind: str, end: str, result: dict) -> object: ...
+
+
+@dataclass
+class RealReviews:
+    def pending(self, cfg: Config) -> list[dict]:
+        return [dict(r) for r in _guarded("desk.engine.review", "pending", cfg)]
+
+    def record(self, cfg: Config, kind: str, end: str, result: dict) -> object:
+        return _guarded("desk.engine.review", "record", cfg, kind, end, result)
+
+
+class Plans(Protocol):
+    def list_plans(self, cfg: Config) -> list[dict]: ...
+
+    def steps_today(self, cfg: Config) -> list[str]: ...
+
+    def save_draft(self, cfg: Config, symbol: str, plan: dict, *, run_id: int, model: str, summary: str) -> dict: ...
+
+
+@dataclass
+class RealPlans:
+    def list_plans(self, cfg: Config) -> list[dict]:
+        return [dict(r) for r in _guarded("desk.decisions.plans", "list_plans", cfg)]
+
+    def steps_today(self, cfg: Config) -> list[str]:
+        return [str(line) for line in _guarded("desk.decisions.plans", "steps_today", cfg)]
+
+    def save_draft(self, cfg: Config, symbol: str, plan: dict, *, run_id: int, model: str, summary: str) -> dict:
+        fn = _fn("desk.decisions.plans", "save_draft")
+        not_ready = getattr(_module("desk.decisions.plans"), "NotReady", NotReady)
+        try:
+            return dict(fn(cfg, symbol, plan, run_id=run_id, model=model, summary=summary) or {})
+        except not_ready as e:
+            raise NotReady(str(e) or "stock plans not ready") from None
