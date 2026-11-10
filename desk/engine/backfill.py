@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from desk.engine.market import BENCHMARKS, ProviderError, last_trading_day, tiingo_daily, tiingo_key
 
-ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "universe": 3}
+ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "past": 3, "universe": 3}
 ROTATE_DAYS = 90
 NO_PRICES = "Tiingo has no daily prices"
 
@@ -51,6 +51,13 @@ def sync_roles(conn: sqlite3.Connection, now: datetime | None = None) -> None:
     covered = {r[0] for r in conn.execute("SELECT DISTINCT symbol FROM prices_daily WHERE date >= ?", (target,))}
     held = [r[0] for r in conn.execute("SELECT DISTINCT symbol FROM holdings_daily WHERE date=? AND is_cash=0", (day,))]
     add_symbols(conn, [s for s in held if s not in covered], "held")
+    add_symbols(conn, past_gaps(conn), "past")
+
+
+def past_gaps(conn: sqlite3.Connection) -> list[str]:
+    first_bar = {r[0]: r[1] for r in conn.execute("SELECT symbol, min(date) FROM price_bars GROUP BY symbol")}
+    rows = conn.execute("SELECT symbol, min(date) FROM holdings_daily WHERE source='history' AND is_cash=0 GROUP BY symbol")
+    return sorted(sym for sym, first in rows if sym not in first_bar or first_bar[sym] > first)
 
 
 def usage(conn: sqlite3.Connection, now: datetime) -> dict[str, int]:
