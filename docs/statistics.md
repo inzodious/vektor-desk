@@ -578,6 +578,31 @@ Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the clo
 
 For the research desk: `discounts.pending(cfg, limit)` returns the last 5 days' hits with no case, biggest discount first, and raises `discounts.NotReady` before the first scan. `discounts.record(cfg, signal_id, case)` checks a case (verdict buy/wait/avoid, case ≤ 400, risks ≤ 240, confidence 0–1, horizon_days ≥ 1, numbers_cited from the hit's `numbers`, model, written_at), raises `ValueError` on bad values and returns False when a case already exists.
 
+## Period reviews
+
+Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. One pack of facts per day, week, month and year; the debrief desk writes the words from it.
+
+| Piece | Rule |
+|---|---|
+| Periods | Run on trading days: `start` is the first and `end` the last trading day of the period. A weekend or holiday data day falls into the next period. The first run backfills every period the value series covers |
+| Base | The last data day on or before the trading day ahead of `start`. If the desk's history starts inside the period, the pack covers what there is and says so (`coverage.full` false) |
+| Closed | `end` has passed, or it is `end` and after 16:15 ET. The open period is "so far" |
+| Final | Closed and a later data day exists. Final packs freeze; a closed pack may be restated once before that (mutual fund prices post late). `review.run(..., rebuild=True)` recomputes all |
+| Change | `change_pct` is time-weighted (the `twr_index` series). `net_flows` is every flow the return already nets out, derived per day as value − prior value × (1 + day return). `gain_usd` = change − flows |
+| Versus | SPY, then each live catalog mix, on the same starting dollars with the same flows on the same days. A mix is rebalanced daily, cash earns nothing, Dip buy carries its cash state from the index path. A comparator is left out when under 80% of it has prices |
+| Movers | Per holding: yesterday's shares × today's price change, summed over the period (splits handled). Top 5 up and down. `other_usd` is the rest of the gain: dividends, interest, cash and same-day trades |
+| Risk | Max drawdown and best and worst day on the return index; volatility annualised from daily returns (5 or more days). `band` (your risk band and the as-held fit) only on the latest pack. `convictions` is each conviction hold's weight against its band |
+| Events | Discount days, scored filings and earnings dates for names held in the period |
+| Tables | `period_reviews(kind, start, end, as_of, closed, final, version, digest, pack, computed_at)`, `period_debriefs(kind, end, pack_digest, body, written_at, model, run_id)`, `review_runs` |
+
+**Pack.** `version, kind, start, end, as_of, label, quality, coverage {full, base, days, note}, value {start, end, change_usd, change_pct, net_flows, gain_usd}, vs [{id, name, kind, return_pct, excess_pts, value_end, diff_usd}], movers {up, down, other_usd, count}` (rows `{symbol, name, contribution_usd, contribution_pts, return_pct, weight_pct}`), `accounts [{account, start, end, change_usd, change_pct, net_flows}], income {dividends, interest, margin_interest}, flows [{date, account, amount, kind}], trades [{date, account, symbol, side, shares, price, amount}], trade_count, realized {short_term, long_term, total, sales}, risk {max_drawdown_pct, volatility_pct, best_day, worst_day, band, convictions}, decisions {made, matured}, paper [{id, name, kind, status, return_pct, value_end}], fi {fi_number, progress_start_pct, progress_end_pct, change_pts}, events [{date, type, symbol, detail}], numbers`. `numbers` is the flat list a debrief may cite (`change_usd`, `vs.spy.pts`, `contrib.<SYM>.usd`, `ret.<SYM>.pct`, `paper.<id>.pct`, `score.<id>.<horizon>.usd` …). `digest` is a hash of the pack.
+
+**`GET /api/engine/reviews?kind=&end=`.** `{kind, start, end, as_of, closed, final, computed_at, digest, pack, debrief}`; leave `end` out for the latest. `pack` is null with a `note` when there is none. `debrief` is null or `{headline, what_happened, why, against_decisions, watch, next_steps [{text, symbol}], numbers_cited, model, written_at, pack_digest, stale}`; `stale` means the pack changed after it was written.
+
+**`GET /api/engine/reviews/index`.** `{as_of, kinds {day, week, month, year}, note}`, newest first, rows `{start, end, as_of, label, closed, final, change_usd, change_pct, has_debrief}`.
+
+For the debrief desk: `review.pending(cfg)` returns the latest period of each kind whose pack has no debrief or changed since it (`{kind, start, end, closed, digest, debrief_digest, pack}`), and raises `review.NotReady` before the first run. `review.record(cfg, kind, end, result)` checks a debrief (headline ≤ 120, what_happened and why ≤ 700, against_decisions ≤ 500, up to 4 watch lines ≤ 160, up to 3 next steps ≤ 200, numbers_cited from the pack's `numbers`, pack_digest equal to the current digest, model, written_at), raises `ValueError` on bad values and replaces any earlier debrief for that period.
+
 ## Strategy lab
 
 Where a strategy from deep research gets tested: a backtest over 3, 5 and 10 years that only sees data as it was known on each day, then forward paper trading with fake money. The research desk proposes; the engine runs the rules; nothing in the lab touches real money.
@@ -870,6 +895,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Nightly 23:50 ET | `earnings`: EPS facts and release times for 300 companies, then every surprise event |
 | Weekdays 08:45 and 16:45 ET | `paper`: lanes and catalog mixes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
+| Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
 | Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Stack and tests
