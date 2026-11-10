@@ -260,12 +260,15 @@ def eligible(cfg: Config) -> list[dict]:
     out = []
     for (sid, version), p in sorted(_paper(cfg).items()):
         if p["status"] == "eligible":
+            verdict = (_raw(p["summary"]).get("gate") or {}).get("verdict") or {}
+            luck = f" The chance that lead is luck is {verdict['luck']:.0%}." if verdict.get("luck") is not None else ""
             out.append(
                 {
                     "strategy_id": sid,
                     "version": version,
                     "title": p["title"],
-                    "summary": f"Passed the lab and {p['days']} days of paper trading, {p['excess_pts']:+.2f} points against its benchmark.",
+                    "summary": f"Passed the lab and its day-{verdict.get('checkpoint') or p['days']} paper checkpoint, "
+                    f"{p['excess_pts']:+.2f} points against its benchmark.{luck}",
                 }
             )
     return out

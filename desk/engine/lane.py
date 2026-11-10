@@ -4,8 +4,8 @@ import sqlite3
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 
+from desk.engine import gate
 from desk.engine.filings import EVENT_TYPES, lane_start
-from desk.engine.lab.paper import PAPER_DAYS
 from desk.engine.market import ET, trading_day
 
 STRATEGY_ID = "filings-lane"
@@ -296,7 +296,11 @@ def drawdown_pct(values: list[float]) -> float:
     return round(worst * 100, 4)
 
 
-def rebuild_one(conn: sqlite3.Connection, spec: LaneSpec = DEFAULT) -> dict:
+def tried(conn: sqlite3.Connection) -> int:
+    return 1 + (conn.execute("SELECT count(*) FROM lane_variants").fetchone()[0] if _has(conn, "lane_variants") else 0)
+
+
+def rebuild_one(conn: sqlite3.Connection, spec: LaneSpec = DEFAULT, *, now: datetime | None = None) -> dict:
     lane = simulate(conn, spec)
     sid, ver = spec.id, spec.version
     if not lane.start or not lane.values:
@@ -306,8 +310,20 @@ def rebuild_one(conn: sqlite3.Connection, spec: LaneSpec = DEFAULT) -> dict:
     own = (lane.values[-1][1] / CAPITAL - 1) * 100
     bench = (lane.bench[-1][1] - 1) * 100
     excess = own - bench
-    status = "paper" if days < PAPER_DAYS else ("eligible" if excess >= 0 else "retired")
     opened = [t for t in lane.trades if t.entry_px is not None]
+    settled = gate.settle(
+        conn,
+        sid,
+        ver,
+        lane.start,
+        [lane.start] + [d for d, _ in lane.values],
+        [CAPITAL] + [v for _, v in lane.values],
+        [1.0] + [b for _, b in lane.bench],
+        events=lambda cut: sum(1 for t in opened if t.entry <= cut),
+        family_size=tried(conn),
+        now=now,
+    )
+    status = settled["status"]
     still = [t for t in opened if t.exit_px is None]
     summary = {
         "kind": "lane",
@@ -324,7 +340,7 @@ def rebuild_one(conn: sqlite3.Connection, spec: LaneSpec = DEFAULT) -> dict:
         "benchmark": BENCHMARK,
         "benchmark_return_pct": round(bench, 4),
         "mdd_pct": drawdown_pct([v for _, v in lane.values]),
-        "days_to_eligible": max(0, PAPER_DAYS - days),
+        "gate": settled["gate"],
     }
     with conn:
         conn.execute("DELETE FROM paper_trades WHERE strategy_id=? AND version=?", (sid, ver))
@@ -346,8 +362,8 @@ def rebuild_one(conn: sqlite3.Connection, spec: LaneSpec = DEFAULT) -> dict:
     return {"strategy_id": sid, "version": ver, "status": status, "start": lane.start, "as_of": as_of, "open_now": len(still), "return_pct": round(own, 4)}
 
 
-def rebuild(conn: sqlite3.Connection) -> dict:
-    results = [rebuild_one(conn, spec) for spec in variants(conn)]
+def rebuild(conn: sqlite3.Connection, *, now: datetime | None = None) -> dict:
+    results = [rebuild_one(conn, spec, now=now) for spec in variants(conn)]
     return results[0] | {"variants": results[1:]}
 
 

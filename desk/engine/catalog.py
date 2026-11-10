@@ -2,8 +2,7 @@ import json
 import sqlite3
 from datetime import UTC, date, datetime
 
-from desk.engine import backfill
-from desk.engine.lab.paper import PAPER_DAYS
+from desk.engine import backfill, gate
 from desk.engine.lane import drawdown_pct, entry_session
 
 BENCHMARK = "IVV"
@@ -231,12 +230,11 @@ def rebuild(conn: sqlite3.Connection, sleeve: float, px, *, now: datetime | None
         b0, b1 = _at(bench, started), _at(bench, as_of)
         bench_ret = (b1 / b0 - 1) * 100 if b0 and b1 and as_of > started else None
         excess = own - bench_ret if own is not None and bench_ret is not None else None
-        if r["retired_at"]:
-            status = "retired"
-        elif days < PAPER_DAYS:
-            status = "paper"
-        else:
-            status = "eligible" if excess is not None and excess >= 0 else "retired"
+        settled = None
+        if not r["retired_at"]:
+            track = [(started, float(sleeve))] + [(d, v) for d, v in ledger if d > started]
+            settled = gate.settle(conn, sid, ver, started, [d for d, _ in track], [v for _, v in track], [_at(bench, d) for d, _ in track], now=now)
+        status = settled["status"] if settled else "retired"
         want = targets(conn, mix) if status != "retired" else {}
         summary = {
             "kind": "mix",
@@ -248,7 +246,7 @@ def rebuild(conn: sqlite3.Connection, sleeve: float, px, *, now: datetime | None
             "benchmark_return_pct": round(bench_ret, 4) if bench_ret is not None else None,
             "mdd_pct": drawdown_pct([v for _, v in ledger]) if ledger else 0.0,
             "forward_only": True,
-            "days_to_eligible": max(0, PAPER_DAYS - days),
+            "gate": settled["gate"] if settled else None,
         }
         with conn:
             conn.execute("DELETE FROM paper_positions WHERE strategy_id=? AND version=?", (sid, ver))
