@@ -18,6 +18,7 @@ import Risk from './pages/Risk.jsx';
 import Boards from './pages/Boards.jsx';
 import Flight from './pages/Flight.jsx';
 import Patterns from './pages/Patterns.jsx';
+import Replay from './pages/Replay.jsx';
 import Strategies from './pages/Strategies.jsx';
 import Strategy from './pages/Strategy.jsx';
 import { LiveProvider } from './live/LiveProvider.jsx';
@@ -50,6 +51,7 @@ export default function App() {
               <Route path="lab/strategies" element={<Strategies />} />
               <Route path="lab/strategies/:id" element={<Strategy />} />
               <Route path="lab/patterns" element={<Patterns />} />
+              <Route path="lab/patterns/replay" element={<Replay />} />
               <Route path="lab/boards" element={<Boards />} />
               <Route path="lab/*" element={<NotFound />} />
               <Route path="settings" element={<Settings />} />

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Combo } from '../components/Combo.jsx';
 import { HBars } from '../components/HBars.jsx';
 import { Heatmap } from '../components/Heatmap.jsx';
@@ -8,6 +9,7 @@ import { useApi } from '../lib/api.js';
 import { dayLabel, divergingColor } from '../lib/charts.js';
 import { baseRateText, fundingItems, patternValue, seasonGrid, setupItems } from '../lib/flight.js';
 import { pct, usd } from '../lib/format.js';
+import { headline } from '../lib/replay.js';
 
 const signedUsd = (v) => (v == null ? '—' : usd(v, { sign: true }));
 
@@ -88,6 +90,24 @@ function Drawdowns({ rows }) {
   );
 }
 
+function ReplayTease() {
+  const api = useApi('/api/engine/replay');
+  const head = api.data?.variants?.length ? headline(api.data) : null;
+  return (
+    <section className="card replay-tease" data-testid="replay-tease">
+      <span className="tag coral">You versus the capped you</span>
+      <span className="rt-copy">
+        {head ? <b className={head.tone}>{head.value}</b> : null}
+        <span>{head ? `${head.line}, replaying your own trades` : 'Your trades replayed under a size cap, an exit rule, no margin and a longer hold'}</span>
+      </span>
+      <Link className="btn sm" to="/lab/patterns/replay">
+        <Icon name="swap" />
+        {head ? 'Open the replay' : 'See the replay'}
+      </Link>
+    </section>
+  );
+}
+
 // ---------- page ----------
 export default function Patterns() {
   const api = useApi('/api/engine/patterns');
@@ -124,6 +144,7 @@ export default function Patterns() {
         </section>
       ) : (
         <>
+          <ReplayTease />
           <section className="card" data-testid="market">
             <div className="card-head">
               <span className="tag">The market today</span>

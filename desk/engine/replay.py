@@ -619,7 +619,11 @@ def run(
     if late:
         notes.append(f"{index} prices start on {mkt.tr.dates[index][0]}, after the history does, so the index stands still before that.")
     if unpriced:
-        notes.append(f"No prices yet for {', '.join(unpriced)}, so those names sit at their last trade price and no rule touches them.")
+        many = len(unpriced) > 1
+        notes.append(
+            f"No prices yet for {', '.join(unpriced)}, so {'they sit' if many else 'it sits'} at {'their' if many else 'its'} last trade price "
+            f"and no rule touches {'them' if many else 'it'}."
+        )
     if seeds:
         held = sorted({s for _, s in seeds})
         one = len(held) == 1

@@ -1184,3 +1184,25 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
   .run-stage::before { left: 10px; right: auto; top: 22px; bottom: 0; width: 2px; height: auto; background: repeating-linear-gradient(180deg, var(--line-2) 0 6px, transparent 6px 11px); }
   .run-text { grid-template-columns: 84px minmax(0, 1fr); align-items: baseline; gap: 8px; padding-top: 2px; }
 }
+
+/* ---------- replay ---------- */
+.replay-top { scroll-margin-top: 84px; height: 0; margin: 0; }
+.replay-pick { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; margin-bottom: 12px; }
+.replay-rule { font-size: 12.5px; font-weight: 600; flex: 1 1 220px; min-width: 0; }
+.replay-kpis { margin-bottom: 12px; }
+.replay-kpis .tile-line.up { color: var(--ok); } .replay-kpis .tile-line.dn { color: var(--watch); }
+.replay-versus .note { margin-top: 10px; }
+.replay-groups { gap: 18px 22px; }
+.replay-ask { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 2px 0 8px; }
+.replay-back { margin: 2px 4px 0; }
+.ph-big b.up { color: var(--ok); } .ph-big b.dn { color: var(--watch); }
+.hbars .hb-pick { cursor: pointer; outline: none; }
+.hbars .hb-pick:hover .hit, .hbars .hb-pick:focus-visible .hit { fill: var(--track); }
+.hbars .hb-pick.on .hit { fill: var(--teal-soft); }
+.hbars .hb-pick.on .hb-lbl { font-weight: 800; fill: var(--ink); }
+.replay-tease { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; }
+.replay-tease .rt-copy { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.replay-tease .rt-copy b { font-family: var(--f-poster); font-weight: 400; font-size: 26px; line-height: 1; letter-spacing: .01em; color: var(--ink); }
+.replay-tease .rt-copy b.up { color: var(--ok); } .replay-tease .rt-copy b.dn { color: var(--watch); }
+.replay-tease .rt-copy span { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+@media (max-width: 1100px) { .replay-groups > .c4.keep { grid-column: span 12; } }
