@@ -1,0 +1,8 @@
+{
+ "as_of": "2026-11-09",
+ "status": "not_ready",
+ "quality": "insufficient_history",
+ "variants": [],
+ "note": "Same deposits and withdrawals on the same dates, one rule changed. Every dollar a rule moves goes into or comes out of the index, so the gap is what the rule alone would have done. Closing prices, no taxes in the end values.",
+ "reason": "No Fidelity history yet. Upload the activity export in Settings and the replay runs with the next engine pass."
+}
