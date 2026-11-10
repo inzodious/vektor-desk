@@ -6,7 +6,7 @@
  "closed": false,
  "final": false,
  "computed_at": "2026-11-06T22:36:00+00:00",
- "digest": "355d82adcc8d911c",
+ "digest": "3e4befa3dd159796",
  "pack": {
   "version": 1,
   "kind": "month",
@@ -26,8 +26,8 @@
    "end": 16769.8,
    "change_usd": 933.43,
    "change_pct": 2.087,
-   "net_flows": 600,
-   "gain_usd": 333.43
+   "net_flows": 600.01,
+   "gain_usd": 333.42
   },
   "vs": [
    {
@@ -36,8 +36,8 @@
     "kind": "benchmark",
     "return_pct": 1.467,
     "excess_pts": 0.62,
-    "value_end": 16668.69,
-    "diff_usd": 101.11
+    "value_end": 16668.7,
+    "diff_usd": 101.1
    },
    {
     "id": "safe-mix",
@@ -45,8 +45,8 @@
     "kind": "mix",
     "return_pct": 1.187,
     "excess_pts": 0.9,
-    "value_end": 16624.35,
-    "diff_usd": 145.45
+    "value_end": 16624.36,
+    "diff_usd": 145.44
    },
    {
     "id": "as-held",
@@ -54,8 +54,8 @@
     "kind": "mix",
     "return_pct": 2.187,
     "excess_pts": -0.1,
-    "value_end": 16782.71,
-    "diff_usd": -12.91
+    "value_end": 16782.72,
+    "diff_usd": -12.92
    },
    {
     "id": "tech-tilt",
@@ -63,8 +63,8 @@
     "kind": "mix",
     "return_pct": 3.387,
     "excess_pts": -1.3,
-    "value_end": 16972.75,
-    "diff_usd": -202.95
+    "value_end": 16972.76,
+    "diff_usd": -202.96
    }
   ],
   "movers": {
@@ -74,7 +74,7 @@
      "name": null,
      "contribution_usd": 430.41,
      "contribution_pts": 2.7179,
-     "return_pct": 3.0539,
+     "return_pct": 4.6548,
      "weight_pct": 58.8362
     },
     {
@@ -82,7 +82,7 @@
      "name": "Acme Orbital (synthetic)",
      "contribution_usd": 0.95,
      "contribution_pts": 0.006,
-     "return_pct": 1.6287,
+     "return_pct": 1.2579,
      "weight_pct": 0.4574
     }
    ],
@@ -92,7 +92,7 @@
      "name": null,
      "contribution_usd": -66.68,
      "contribution_pts": -0.4211,
-     "return_pct": -3.3354,
+     "return_pct": -2.8782,
      "weight_pct": 13.4922
     },
     {
@@ -100,7 +100,7 @@
      "name": null,
      "contribution_usd": -26.2,
      "contribution_pts": -0.1654,
-     "return_pct": -0.6745,
+     "return_pct": -0.6734,
      "weight_pct": 21.6043
     },
     {
@@ -108,11 +108,11 @@
      "name": null,
      "contribution_usd": -5.05,
      "contribution_pts": -0.0319,
-     "return_pct": -0.385,
+     "return_pct": -0.6299,
      "weight_pct": 4.8513
     }
    ],
-   "other_usd": 0.01,
+   "other_usd": 0,
    "count": 5
   },
   "accounts": [

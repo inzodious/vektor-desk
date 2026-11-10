@@ -6,7 +6,7 @@
  "closed": false,
  "final": false,
  "computed_at": "2026-11-06T22:36:00+00:00",
- "digest": "0b1decc9b93408fb",
+ "digest": "474db80b8feb12e5",
  "pack": {
   "version": 1,
   "kind": "year",
@@ -26,8 +26,8 @@
    "end": 16769.8,
    "change_usd": 6776.27,
    "change_pct": 4.1874,
-   "net_flows": 6600,
-   "gain_usd": 176.27
+   "net_flows": 6600.02,
+   "gain_usd": 176.25
   },
   "vs": [
    {
@@ -36,8 +36,8 @@
     "kind": "benchmark",
     "return_pct": 5.5874,
     "excess_pts": -1.4,
-    "value_end": 17151.91,
-    "diff_usd": -382.11
+    "value_end": 17151.93,
+    "diff_usd": -382.13
    },
    {
     "id": "safe-mix",
@@ -45,8 +45,8 @@
     "kind": "mix",
     "return_pct": 2.2874,
     "excess_pts": 1.9,
-    "value_end": 16822.12,
-    "diff_usd": -52.32
+    "value_end": 16822.14,
+    "diff_usd": -52.34
    },
    {
     "id": "as-held",
@@ -54,8 +54,8 @@
     "kind": "mix",
     "return_pct": 3.8874,
     "excess_pts": 0.3,
-    "value_end": 16982.02,
-    "diff_usd": -212.22
+    "value_end": 16982.04,
+    "diff_usd": -212.24
    },
    {
     "id": "tech-tilt",
@@ -63,8 +63,8 @@
     "kind": "mix",
     "return_pct": 7.9874,
     "excess_pts": -3.8,
-    "value_end": 17391.75,
-    "diff_usd": -621.95
+    "value_end": 17391.77,
+    "diff_usd": -621.97
    }
   ],
   "movers": {
@@ -74,7 +74,7 @@
      "name": null,
      "contribution_usd": 360.73,
      "contribution_pts": 3.6096,
-     "return_pct": 8.4498,
+     "return_pct": 9.1838,
      "weight_pct": 58.8362
     },
     {
@@ -82,7 +82,7 @@
      "name": null,
      "contribution_usd": 12.88,
      "contribution_pts": 0.1289,
-     "return_pct": 2.1044,
+     "return_pct": 2.1271,
      "weight_pct": 4.8513
     }
    ],
@@ -92,7 +92,7 @@
      "name": null,
      "contribution_usd": -201.17,
      "contribution_pts": -2.013,
-     "return_pct": -8.7785,
+     "return_pct": -7.6592,
      "weight_pct": 13.4922
     },
     {
@@ -100,7 +100,7 @@
      "name": "Acme Orbital (synthetic)",
      "contribution_usd": -114.34,
      "contribution_pts": -1.1441,
-     "return_pct": -53.0827,
+     "return_pct": -51.7954,
      "weight_pct": 0.4574
     },
     {
@@ -108,11 +108,11 @@
      "name": null,
      "contribution_usd": -42.88,
      "contribution_pts": -0.4291,
-     "return_pct": -0.4595,
+     "return_pct": -0.4539,
      "weight_pct": 21.6043
     }
    ],
-   "other_usd": 161.05,
+   "other_usd": 161.03,
    "count": 5
   },
   "accounts": [
@@ -130,7 +130,7 @@
     "end": 14008.82,
     "change_usd": 5627.83,
     "change_pct": 3.9729,
-    "net_flows": 5499.99
+    "net_flows": 5500.01
    }
   ],
   "income": {
@@ -2003,7 +2003,7 @@
   ],
   "model": "synthetic",
   "written_at": "2026-11-06T22:52:00+00:00",
-  "pack_digest": "0b1decc9b93408fb",
+  "pack_digest": "474db80b8feb12e5",
   "stale": true
  }
 }

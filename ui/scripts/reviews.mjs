@@ -28,7 +28,7 @@ const DEBRIEF = {
   week: {
     headline: 'Up $933 for the week: $600 was your deposits, $333 the market.',
     what_happened: 'A 2.09% time-weighted week. Monday’s deposits went in on plan across both accounts, then the market added $333.',
-    why: 'FXAIX carried the week (+3.1%). VXUS fell 3.3% and FTEC 0.7%, which is why the tech-tilted mix trailed you.',
+    why: 'FXAIX carried the week (+4.7%). VXUS fell 2.9% and FTEC 0.7%, which is why the tech-tilted mix trailed you.',
     against_decisions: 'The risk desk’s August hold-off on ACME scored +$230 at 90 days. The scout’s ACME buy from the same week is −$89.',
     watch: ['The worst day was Tuesday at −0.52%, well inside band 4.', 'A second weak week for VXUS would bring its drift near the band.'],
     next_steps: [

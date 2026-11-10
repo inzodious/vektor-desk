@@ -99,7 +99,7 @@ describe('results', () => {
     expect(rows.map((r) => r.symbol)).toEqual(['FXAIX', 'ACME', 'VXUS', 'FTEC', 'BND']);
     expect(rows[0]).toMatchObject({ tone: 'up', share: 100 });
     expect(rows[2].tone).toBe('dn');
-    expect(moverLine(rows[0])).toBe('+3.1% itself · 58.8% of the portfolio');
+    expect(moverLine(rows[0])).toBe('+4.7% itself · 58.8% of the portfolio');
     const other = moverRows({ up: [], down: [], other_usd: 12 });
     expect(other).toHaveLength(1);
     expect(other[0]).toMatchObject({ symbol: null, tone: 'up' });

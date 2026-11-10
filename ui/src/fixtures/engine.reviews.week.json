@@ -6,7 +6,7 @@
  "closed": true,
  "final": false,
  "computed_at": "2026-11-06T22:36:00+00:00",
- "digest": "8c56ebe0fe08cce4",
+ "digest": "f38b5416599a98a5",
  "pack": {
   "version": 1,
   "kind": "week",
@@ -26,8 +26,8 @@
    "end": 16769.8,
    "change_usd": 933.43,
    "change_pct": 2.087,
-   "net_flows": 600,
-   "gain_usd": 333.43
+   "net_flows": 600.01,
+   "gain_usd": 333.42
   },
   "vs": [
    {
@@ -36,8 +36,8 @@
     "kind": "benchmark",
     "return_pct": 2.427,
     "excess_pts": -0.34,
-    "value_end": 16820.72,
-    "diff_usd": -50.92
+    "value_end": 16820.73,
+    "diff_usd": -50.93
    },
    {
     "id": "safe-mix",
@@ -45,8 +45,8 @@
     "kind": "mix",
     "return_pct": 1.277,
     "excess_pts": 0.81,
-    "value_end": 16638.6,
-    "diff_usd": 131.2
+    "value_end": 16638.61,
+    "diff_usd": 131.19
    },
    {
     "id": "as-held",
@@ -54,8 +54,8 @@
     "kind": "mix",
     "return_pct": 2.037,
     "excess_pts": 0.05,
-    "value_end": 16758.96,
-    "diff_usd": 10.84
+    "value_end": 16758.97,
+    "diff_usd": 10.83
    },
    {
     "id": "tech-tilt",
@@ -63,8 +63,8 @@
     "kind": "mix",
     "return_pct": 3.007,
     "excess_pts": -0.92,
-    "value_end": 16912.57,
-    "diff_usd": -142.77
+    "value_end": 16912.58,
+    "diff_usd": -142.78
    }
   ],
   "movers": {
@@ -74,7 +74,7 @@
      "name": null,
      "contribution_usd": 430.41,
      "contribution_pts": 2.7179,
-     "return_pct": 3.0539,
+     "return_pct": 4.6548,
      "weight_pct": 58.8362
     },
     {
@@ -82,7 +82,7 @@
      "name": "Acme Orbital (synthetic)",
      "contribution_usd": 0.95,
      "contribution_pts": 0.006,
-     "return_pct": 1.6287,
+     "return_pct": 1.2579,
      "weight_pct": 0.4574
     }
    ],
@@ -92,7 +92,7 @@
      "name": null,
      "contribution_usd": -66.68,
      "contribution_pts": -0.4211,
-     "return_pct": -3.3354,
+     "return_pct": -2.8782,
      "weight_pct": 13.4922
     },
     {
@@ -100,7 +100,7 @@
      "name": null,
      "contribution_usd": -26.2,
      "contribution_pts": -0.1654,
-     "return_pct": -0.6745,
+     "return_pct": -0.6734,
      "weight_pct": 21.6043
     },
     {
@@ -108,11 +108,11 @@
      "name": null,
      "contribution_usd": -5.05,
      "contribution_pts": -0.0319,
-     "return_pct": -0.385,
+     "return_pct": -0.6299,
      "weight_pct": 4.8513
     }
    ],
-   "other_usd": 0.01,
+   "other_usd": 0,
    "count": 5
   },
   "accounts": [
@@ -362,7 +362,7 @@
  "debrief": {
   "headline": "Up $933 for the week: $600 was your deposits, $333 the market.",
   "what_happened": "A 2.09% time-weighted week. Monday’s deposits went in on plan across both accounts, then the market added $333.",
-  "why": "FXAIX carried the week (+3.1%). VXUS fell 3.3% and FTEC 0.7%, which is why the tech-tilted mix trailed you.",
+  "why": "FXAIX carried the week (+4.7%). VXUS fell 2.9% and FTEC 0.7%, which is why the tech-tilted mix trailed you.",
   "against_decisions": "The risk desk’s August hold-off on ACME scored +$230 at 90 days. The scout’s ACME buy from the same week is −$89.",
   "watch": [
    "The worst day was Tuesday at −0.52%, well inside band 4.",
@@ -389,7 +389,7 @@
   ],
   "model": "synthetic",
   "written_at": "2026-11-06T22:52:00+00:00",
-  "pack_digest": "8c56ebe0fe08cce4",
+  "pack_digest": "f38b5416599a98a5",
   "stale": false
  }
 }

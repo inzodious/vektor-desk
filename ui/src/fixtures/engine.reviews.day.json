@@ -6,7 +6,7 @@
  "closed": true,
  "final": false,
  "computed_at": "2026-11-06T22:36:00+00:00",
- "digest": "e523dc55ece6f31e",
+ "digest": "efbc227492ea814b",
  "pack": {
   "version": 1,
   "kind": "day",
@@ -74,7 +74,7 @@
      "name": null,
      "contribution_usd": 114.12,
      "contribution_pts": 0.6826,
-     "return_pct": 0.1572,
+     "return_pct": 1.1701,
      "weight_pct": 58.8362
     },
     {
@@ -82,7 +82,7 @@
      "name": "Acme Orbital (synthetic)",
      "contribution_usd": 3.57,
      "contribution_pts": 0.0214,
-     "return_pct": -3.4056,
+     "return_pct": 4.886,
      "weight_pct": 0.4574
     }
    ],
@@ -92,7 +92,7 @@
      "name": null,
      "contribution_usd": -52.86,
      "contribution_pts": -0.3162,
-     "return_pct": -1.4402,
+     "return_pct": -1.4381,
      "weight_pct": 21.6043
     },
     {
@@ -100,7 +100,7 @@
      "name": null,
      "contribution_usd": -11.66,
      "contribution_pts": -0.0698,
-     "return_pct": -0.8786,
+     "return_pct": -0.5127,
      "weight_pct": 13.4922
     },
     {
@@ -108,7 +108,7 @@
      "name": null,
      "contribution_usd": -0.63,
      "contribution_pts": -0.0038,
-     "return_pct": -0.0129,
+     "return_pct": -0.0776,
      "weight_pct": 4.8513
     }
    ],
@@ -130,7 +130,7 @@
     "end": 14008.82,
     "change_usd": 44.37,
     "change_pct": 0.3178,
-    "net_flows": -0.01
+    "net_flows": 0
    }
   ],
   "income": {
@@ -249,7 +249,7 @@
   ],
   "model": "synthetic",
   "written_at": "2026-11-06T22:52:00+00:00",
-  "pack_digest": "e523dc55ece6f31e",
+  "pack_digest": "efbc227492ea814b",
   "stale": false
  }
 }

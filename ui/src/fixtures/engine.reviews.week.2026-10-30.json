@@ -6,7 +6,7 @@
  "closed": true,
  "final": true,
  "computed_at": "2026-10-30T22:36:00+00:00",
- "digest": "7c4cdaab1ed068f4",
+ "digest": "8fac5936658e849b",
  "pack": {
   "version": 1,
   "kind": "week",
@@ -26,8 +26,8 @@
    "end": 15836.37,
    "change_usd": -56.36,
    "change_pct": -0.3546,
-   "net_flows": -0.01,
-   "gain_usd": -56.35
+   "net_flows": 0,
+   "gain_usd": -56.36
   },
   "vs": [
    {
@@ -36,8 +36,8 @@
     "kind": "benchmark",
     "return_pct": -0.0146,
     "excess_pts": -0.34,
-    "value_end": 15890.4,
-    "diff_usd": -54.03
+    "value_end": 15890.41,
+    "diff_usd": -54.04
    },
    {
     "id": "safe-mix",
@@ -45,8 +45,8 @@
     "kind": "mix",
     "return_pct": -1.1646,
     "excess_pts": 0.81,
-    "value_end": 15707.63,
-    "diff_usd": 128.74
+    "value_end": 15707.64,
+    "diff_usd": 128.73
    },
    {
     "id": "as-held",
@@ -54,8 +54,8 @@
     "kind": "mix",
     "return_pct": -0.4046,
     "excess_pts": 0.05,
-    "value_end": 15828.42,
-    "diff_usd": 7.95
+    "value_end": 15828.43,
+    "diff_usd": 7.94
    },
    {
     "id": "tech-tilt",
@@ -63,8 +63,8 @@
     "kind": "mix",
     "return_pct": 0.5654,
     "excess_pts": -0.92,
-    "value_end": 15982.58,
-    "diff_usd": -146.21
+    "value_end": 15982.59,
+    "diff_usd": -146.22
    }
   ],
   "movers": {
@@ -74,7 +74,7 @@
      "name": null,
      "contribution_usd": 35.02,
      "contribution_pts": 0.2204,
-     "return_pct": 0.9989,
+     "return_pct": 1.0023,
      "weight_pct": 22.2853
     }
    ],
@@ -84,7 +84,7 @@
      "name": null,
      "contribution_usd": -63.05,
      "contribution_pts": -0.3967,
-     "return_pct": -1.7881,
+     "return_pct": -2.7385,
      "weight_pct": 14.1402
     },
     {
@@ -92,7 +92,7 @@
      "name": null,
      "contribution_usd": -20.1,
      "contribution_pts": -0.1265,
-     "return_pct": -0.9228,
+     "return_pct": -0.2209,
      "weight_pct": 57.3131
     },
     {
@@ -100,7 +100,7 @@
      "name": null,
      "contribution_usd": -5.37,
      "contribution_pts": -0.0338,
-     "return_pct": -0.7388,
+     "return_pct": -0.6767,
      "weight_pct": 4.9798
     },
     {
@@ -108,11 +108,11 @@
      "name": "Acme Orbital (synthetic)",
      "contribution_usd": -2.86,
      "contribution_pts": -0.018,
-     "return_pct": -4.3614,
+     "return_pct": -3.6363,
      "weight_pct": 0.4783
     }
    ],
-   "other_usd": 0,
+   "other_usd": -0.01,
    "count": 5
   },
   "accounts": [
