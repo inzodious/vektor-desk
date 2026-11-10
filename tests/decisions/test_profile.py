@@ -138,3 +138,30 @@ def test_disabled_rules_are_versioned_but_not_active(cfg, yaml_path):
     with session(cfg) as conn:
         title = conn.execute("SELECT title FROM decisions WHERE kind='rule_change' ORDER BY rowid DESC").fetchone()["title"]
     assert "Cash floor 3%" in title
+
+
+# ---- FI goal ----
+
+
+def test_fi_goal_from_the_profile(cfg, yaml_path):
+    from datetime import date
+
+    from desk.decisions import risk
+    from desk.decisions.profile import DEFAULTS, fi_goal
+    from desk.decisions.yamlfile import edit_profile
+
+    assert fi_goal(DEFAULTS) is None
+    yaml_path.write_text("fi:\n  yearly_spend_usd: 40000\n  target_age: 40\n  birth_date: '1992-02-29'\n  inflation_pct: 3\n  inflation_adjusted: true\n")
+    goal = fi_goal(active_profile(cfg).data)
+    assert goal == {"fi_number": 1000000.0, "target_date": "2032-02-28", "inflation": 0.03, "real": True, "source": "profile"}
+    assert risk.inputs(cfg, date(2026, 11, 10))["fi_horizon_years"] == 5.3
+    out = edit_profile(cfg, {"fi": {"number_usd": 900000, "target_date": "2035-01-01"}})
+    assert out["changed"] is True
+    goal = fi_goal(active_profile(cfg).data)
+    assert (goal["fi_number"], goal["target_date"]) == (900000.0, "2035-01-01")
+    yaml_path.write_text("fi:\n  multiple: 0\n  birth_date: soon\n  inflation_adjusted: maybe\n")
+    with pytest.raises(ProfileError) as e:
+        parse(yaml_path.read_text())
+    assert (
+        "fi.multiple must be between 1 and 100" in str(e.value) and "fi.birth_date must be a date" in str(e.value) and "fi.inflation_adjusted" in str(e.value)
+    )

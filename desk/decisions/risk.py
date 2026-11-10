@@ -282,7 +282,17 @@ def history(cfg: Config, limit: int = 50) -> list[dict]:
 def inputs(cfg: Config, today: date | None = None) -> dict:
     today = today or date.today()
     with session(cfg) as conn:
-        return {"fi_horizon_years": fi_years(conn, today), "savings_rate_pct": savings_rate(conn, today), "portfolio_value": portfolio_value(conn)}
+        horizon = fi_years(conn, today)
+        if horizon is None:
+            horizon = _profile_fi_years(conn, cfg, today)
+        return {"fi_horizon_years": horizon, "savings_rate_pct": savings_rate(conn, today), "portfolio_value": portfolio_value(conn)}
+
+
+def _profile_fi_years(conn: sqlite3.Connection, cfg: Config, today: date) -> float | None:
+    from desk.decisions.profile import fi_goal, profile_path, sync
+
+    target = (fi_goal(sync(conn, profile_path(cfg)).data) or {}).get("target_date")
+    return round((date.fromisoformat(target) - today).days / 365.25, 1) if target else None
 
 
 def save(cfg: Config, answers: dict, *, now: datetime | None = None) -> tuple[dict, bool]:

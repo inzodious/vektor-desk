@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from desk.config import Config
-from desk.decisions import plan, records, risk, starter, tickets, yamlfile
+from desk.decisions import plan, plans, records, risk, starter, tickets, yamlfile
 from desk.decisions import profile as profiles
 from desk.decisions import rules as ruleset
 from desk.decisions.store import session
@@ -97,6 +97,91 @@ def delete_conviction(symbol: str, cfg: Cfg) -> JSONResponse:
     except yamlfile.EditError as e:
         raise HTTPException(e.status, str(e)) from e
     return fresh(result)
+
+
+# ---- Stock plans ----
+
+
+class PlanBody(BaseModel):
+    plan: dict
+    approve: bool = False
+    summary: str | None = None
+
+
+class Approve(BaseModel):
+    version: int | None = None
+
+
+class StepDone(BaseModel):
+    on: str | None = None
+    undo: bool = False
+
+
+def _planned(fn, *args, **kwargs) -> JSONResponse:
+    try:
+        return fresh(fn(*args, **kwargs))
+    except plans.PlanError as e:
+        raise HTTPException(e.status, str(e)) from e
+
+
+@router.get("/plans")
+def get_plans(cfg: Cfg) -> JSONResponse:
+    return fresh(
+        {
+            "items": plans.list_plans(cfg),
+            "roles": plans.ROLES,
+            "step_kinds": plans.STEP_KINDS,
+            "lot_methods": plans.LOT_TEXT,
+            "step_templates": plans.STEP_TEMPLATES,
+        }
+    )
+
+
+@router.get("/plan-steps")
+def get_plan_steps(cfg: Cfg, days: int = Query(0, ge=0, le=366)) -> JSONResponse:
+    return fresh({"items": plans.open_steps(cfg, days=days), "no_buy": plans.no_buy(cfg)})
+
+
+@router.get("/plans/{symbol}")
+def get_plan(symbol: str, cfg: Cfg) -> JSONResponse:
+    def read():
+        found = plans.get_plan(cfg, symbol)
+        if found is None:
+            raise plans.PlanError(f"{symbol.upper()} has no plan yet", 404)
+        return {"plan": found, "history": plans.history(cfg, symbol)}
+
+    return _planned(read)
+
+
+@router.get("/plans/{symbol}/versions/{version}")
+def get_plan_version(symbol: str, version: int, cfg: Cfg) -> JSONResponse:
+    def read():
+        found = plans.get_version(cfg, symbol, version)
+        if found is None:
+            raise plans.PlanError(f"{symbol.upper()} has no version {version}", 404)
+        return {"plan": found}
+
+    return _planned(read)
+
+
+@router.put("/plans/{symbol}")
+def put_plan(symbol: str, body: PlanBody, cfg: Cfg) -> JSONResponse:
+    return _planned(plans.save_plan, cfg, symbol, body.plan, approve=body.approve, summary=body.summary)
+
+
+@router.post("/plans/{symbol}/approve")
+def post_plan_approve(symbol: str, body: Approve, cfg: Cfg) -> JSONResponse:
+    return _planned(plans.approve_plan, cfg, symbol, body.version)
+
+
+@router.post("/plans/{symbol}/discard")
+def post_plan_discard(symbol: str, cfg: Cfg) -> JSONResponse:
+    return _planned(plans.discard_draft, cfg, symbol)
+
+
+@router.post("/plans/{symbol}/steps/{step_id}/done")
+def post_plan_step_done(symbol: str, step_id: str, body: StepDone, cfg: Cfg) -> JSONResponse:
+    return _planned(plans.mark_step, cfg, symbol, step_id, on=body.on, undo=body.undo)
 
 
 @router.get("/risk/versions")

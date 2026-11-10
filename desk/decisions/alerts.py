@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 
 from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
+from desk.decisions.plans import LOT_TEXT, approved_plans
 from desk.decisions.profile import active_profile
 from desk.decisions.records import queue, unmatched
 from desk.decisions.risk import convictions
@@ -134,6 +135,52 @@ def send_alerts(cfg: Config, *, now: datetime | None = None) -> list[str]:
                 f"wash-{r['id']}-{clear}",
                 ("calendar",),
             )
+
+    # ---- Stock plans ----
+    for p in approved_plans(cfg, now=now):
+        if p["next_review"] == today.isoformat():
+            _send(
+                sent,
+                cfg,
+                floor,
+                "alerts",
+                f"{p['symbol']} plan is up for review",
+                "Give the thesis a fresh look.",
+                "default",
+                "/plan",
+                f"plan-review-{p['symbol']}-{p['next_review']}",
+                ("calendar",),
+            )
+        for s in p["steps"]:
+            if s["due"] == today.isoformat() and s["status"] == "open":
+                window = f"Open until {s['until']}." if s["until"] and s["until"] != s["due"] else "Due today."
+                body = " ".join(x for x in (window, f"Lots: {LOT_TEXT[s['lots']]}." if s["lots"] else "", s["note"] or "") if x)
+                _send(
+                    sent,
+                    cfg,
+                    floor,
+                    "alerts",
+                    f"{p['symbol']}: {s['text']}",
+                    body,
+                    "default",
+                    "/plan",
+                    f"plan-step-{p['symbol']}-{s['id']}-{s['due']}",
+                    ("calendar",),
+                )
+            if s["rebuy_on"] == today.isoformat():
+                body = f"{s['no_buy_days']} days have passed since the sale on {s['done_on']}."
+                _send(
+                    sent,
+                    cfg,
+                    floor,
+                    "alerts",
+                    f"{p['symbol']} buys are fine again",
+                    body,
+                    "default",
+                    "/plan",
+                    f"plan-rebuy-{p['symbol']}-{s['id']}-{s['rebuy_on']}",
+                    ("calendar",),
+                )
 
     # ---- Conviction holds ----
     week = "{}-W{:02d}".format(*today.isocalendar()[:2])
