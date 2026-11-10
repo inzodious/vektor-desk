@@ -172,6 +172,22 @@ Brief: Claude reads new small-cap filings nightly, and the lab paper-trades the 
 | Insider-buying clusters and post-earnings drift families, backtested from 2016 with survivorship checks, then paper | Statistics | ✅ history loads over the first nights |
 | Live $1,000 Alpaca sandbox, only for a graduated strategy (cash account, per-trade and daily loss caps, kill switch) | Lead decision | Gated |
 
+## Next: Results and stock plans
+
+Day, week, month and year results with a written debrief, and one plan per holding. Target: running on the box by the evening of 2026-11-11.
+
+| Item | Owner | Status |
+|---|---|---|
+| Period packs for day, week, month, year: change, vs S&P and each mix, movers, flows, trades, risk, decisions, paper race (`/api/engine/reviews`) | Statistics | ⏳ |
+| Value history rebuilt from the Fidelity import so Month and Year are real | Statistics | ⏳ |
+| Debrief desk: what happened, why, what to watch, next steps, per period | Agents | ✅ |
+| Results page: Day / Week / Month / Year with a period stepper | Design | ⏳ |
+| Plan record per holding: role, band, add and trim rules, exits, tax notes, steps (`/api/decisions/plans`); the ASTS sale and margin repay become steps | Concept | ⏳ |
+| Plan facts per holding: lots, levels, zones, valuation, risk share (`/api/engine/planfacts`) | Statistics | ⏳ |
+| Plan desk drafts and refreshes each plan; Plan keeper lists the steps live today | Agents | ⏳ |
+| Plan → Stock plans cards, and the same block on the Symbol sheet | Design | ⏳ |
+| "Today's run" strip on the Bridge; new jobs in Run now and in health | Design + Infra | ⏳ |
+
 ## Next: Advisor foundation
 
 There is no single target plan. Each strategy is measured against his risk profile and the others (2026-11-08). Brief: owners and contracts per item.
@@ -179,8 +195,8 @@ There is no single target plan. Each strategy is measured against his risk profi
 | Item | Owner | Status |
 |---|---|---|
 | Risk profile: questionnaire plus capacity, giving bands 1–5 (replaces `risk_level`) | Concept + Design | ✅ |
-| Held-conviction positions with their own band (ASTS); never buy single stocks on margin | Concept | ⏳ |
-| One-off actions on the calendar: ASTS tax-loss sale Dec 7–15 with a rebuy after 31 days; margin repaid 11-18 | Concept | ⏳ |
+| Held-conviction positions with their own band (ASTS); never buy single stocks on margin | Concept | ✅ |
+| One-off actions on the calendar: ASTS tax-loss sale Dec 7–15 with a rebuy after 31 days; margin repaid 11-18 | Concept | ⏳ moves into stock plans as steps |
 | Strategy catalog racing side by side: Safe mix, As held, Aggressive tech tilt, Dip-buy, plus the filings, insider and drift families | Statistics | ✅ |
 | Probability bands: Monte Carlo p10–p90 at 1–40 years, chance of loss, drawdown, CVaR, chance of FI, fit to his risk band | Statistics + Design | ✅ |
 | Reward-to-risk on the leaderboard (Sharpe, Sortino, max drawdown, Calmar) | Statistics + Design | ✅ |
@@ -195,7 +211,7 @@ Every box chore becomes a button in the app. SSH stays only for true one-time in
 |---|---|---|---|
 | `engine daily`, `backfill` | Run now in Settings → Jobs | Infra + Design | ✅ (#102, #107) |
 | `sed` on desk.yaml for agents and desks | Settings → Desks toggles | Agents + Design | ✅ |
-| `profile init`, profile edits | Settings → Profile and Risk editor | Concept + Design | ⏳ risk check done (#137), profile editor next |
+| `profile init`, profile edits | Settings → Profile and Risk editor | Concept + Design | ✅ |
 | `scp` into the inbox | Upload button for broker exports and lot CSVs | Infra + Design | ✅ |
 | `deploy.sh redeploy / status / check / backup / restore-test / logs` | Settings → Box buttons with last result, through a host-side request queue | Infra + Design | ✅ |
 | `setup-truenas.sh set KEY` | Masked, write-only Keys form, or stays one-time | Infra | ✅ Keys form |
