@@ -1156,3 +1156,82 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .pe-count { margin-right: auto; font-size: 12.5px; font-weight: 700; color: var(--ink-3); }
 .pe-count.on { color: var(--ink); }
 @media (max-width: 640px) { .pe-bar { bottom: -18px; } }
+
+/* ---------- results ---------- */
+.rs-stepper { display: inline-flex; align-items: center; gap: 6px; }
+.rs-stepper b { font-size: 13px; color: var(--ink); white-space: nowrap; }
+.rs-step-btn { width: 30px; height: 30px; }
+.rs-step-btn svg { width: 15px; height: 15px; }
+.rs-step-btn svg { transform: rotate(-90deg); }
+.rs-step-btn.back svg { transform: rotate(90deg); }
+.rs-step-btn.off { opacity: .35; pointer-events: none; }
+.rs-cover { margin: 0; }
+.rs-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.rs-kpis > div { display: grid; gap: 1px; align-content: start; padding: 10px 12px; border-radius: 14px; background: var(--card-2); min-width: 0; }
+.rs-kpis small { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.rs-kpis b { font-size: 18px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rs-kpis b.up { color: var(--ok); } .rs-kpis b.dn { color: var(--watch); }
+.rs-kpis span { font-size: 11.5px; color: var(--ink-2); }
+.rs-col { display: grid; gap: var(--gap, 14px); align-content: start; min-width: 0; }
+.rs-headline { margin: 0 0 8px; font-size: 17px; font-weight: 800; line-height: 1.3; color: var(--ink); }
+.rs-stale { margin: 0 0 8px; font-size: 12.5px; color: var(--ink-2); }
+.rs-words { margin: 0; display: grid; gap: 10px; }
+.rs-words dt { font-size: 10.5px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.rs-words dd { margin: 2px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+.rs-words ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.rs-foot { margin: 8px 0 0; font-size: 12px; }
+.rs-step-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.rs-step-list li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 14px; background: var(--card-2); }
+.rs-step-n { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--ink); font-family: var(--f-poster); font-size: 15px; color: var(--ink); }
+.rs-step-text { font-size: 13px; font-weight: 600; color: var(--ink); }
+.rs-vs, .rs-mv, .rs-lg, .rs-list, .rs-holds { list-style: none; margin: 0; padding: 0; display: grid; }
+.rs-vs li { display: grid; grid-template-columns: minmax(96px, 1.1fr) minmax(0, 1.4fr) 64px; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px dashed var(--line); }
+.rs-vs li:last-child, .rs-mv li:last-child, .rs-lg-row:last-child, .rs-list li:last-child { border-bottom: 0; }
+.rs-vs-name { display: grid; min-width: 0; }
+.rs-vs-name b { font-size: 13px; color: var(--ink); }
+.rs-vs-name small { font-size: 11.5px; color: var(--ink-2); }
+.rs-vs-track { position: relative; height: 16px; }
+.rs-vs-track::before { content: ''; position: absolute; left: var(--zero, 50%); top: 0; bottom: 0; width: 1px; background: var(--line-2); }
+.rs-vs-track i { position: absolute; top: 3px; height: 10px; border-radius: 5px; background: var(--lilac); }
+.rs-vs-track i.pos { left: var(--zero, 50%); } .rs-vs-track i.neg { right: calc(100% - var(--zero, 50%)); }
+.rs-vs li[data-kind='you'] .rs-vs-track i { background: var(--teal); }
+.rs-vs li[data-kind='benchmark'] .rs-vs-track i { background: var(--sky); }
+.rs-vs-num, .rs-mv-num, .rs-lg-amt { text-align: right; font-size: 13px; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rs-mv li { display: grid; grid-template-columns: minmax(110px, 1.2fr) minmax(0, 1.3fr) 72px; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.rs-mv-name { display: grid; gap: 1px; min-width: 0; justify-items: start; }
+.rs-mv-name .sym, .rs-mv-name b { font-weight: 800; font-size: 13.5px; color: var(--ink); }
+.rs-mv-name small { font-size: 11.5px; color: var(--ink-2); }
+.rs-mv-track { height: 12px; border-radius: 6px; background: var(--track); overflow: hidden; }
+.rs-mv-track i { display: block; height: 100%; border-radius: 6px; background: var(--teal); }
+.rs-mv-track i.dn { background: var(--mustard); }
+.rs-mv-num.up { color: var(--ok); } .rs-mv-num.dn { color: var(--watch); }
+.rs-lg-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 2px; border-bottom: 1px dashed var(--line); }
+.rs-lg-main { display: grid; gap: 1px; min-width: 0; }
+.rs-lg-main b { font-size: 13px; color: var(--ink); }
+.rs-lg-main .sym { font-weight: 800; }
+.rs-lg-main small { font-size: 11.5px; color: var(--ink-2); }
+.rs-lg-amt.up { color: var(--ok); }
+.rs-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px dashed var(--line); }
+.rs-list li > span:first-child { display: grid; gap: 1px; min-width: 0; }
+.rs-list b { font-size: 13px; color: var(--ink); }
+.rs-list li > b { font-variant-numeric: tabular-nums; }
+.rs-list li > b.up { color: var(--ok); } .rs-list li > b.dn { color: var(--watch); }
+.rs-list small { font-size: 11.5px; color: var(--ink-2); overflow-wrap: anywhere; }
+.rs-risk-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rs-holds { margin-top: 8px; }
+.rs-holds li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; padding: 6px 0; border-top: 1px dashed var(--line); }
+.rs-holds small { font-size: 12px; color: var(--ink-2); margin-right: auto; }
+.rs-first { position: relative; overflow: hidden; }
+.rs-first-ico { position: absolute; right: 18px; bottom: 10px; width: 72px; height: 72px; color: var(--line-2); }
+@media (max-width: 1100px) {
+  .rs-col, .rs-ledger, .rs-risk { grid-column: 1 / -1; }
+}
+@media (max-width: 760px) {
+  .rs-dec, .rs-paper, .rs-accounts, .rs-events { grid-column: 1 / -1; }
+  .rs-vs li { grid-template-columns: minmax(0, 1fr) 84px 60px; }
+  .rs-mv li { grid-template-columns: minmax(0, 1fr) 72px 68px; }
+  .rs-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rs-stepper b { font-size: 12.5px; }
+}
+.run-link { font-size: 13.5px; font-weight: 700; color: var(--teal-ink); text-decoration: underline; text-underline-offset: 3px; }
+.run-link:hover { color: var(--coral-ink); }

@@ -1,0 +1,224 @@
+{
+ "kind": "week",
+ "start": "2026-10-26",
+ "end": "2026-10-30",
+ "as_of": "2026-10-30",
+ "closed": true,
+ "final": true,
+ "computed_at": "2026-10-30T22:36:00+00:00",
+ "digest": "7c4cdaab1ed068f4",
+ "pack": {
+  "version": 1,
+  "kind": "week",
+  "start": "2026-10-26",
+  "end": "2026-10-30",
+  "as_of": "2026-10-30",
+  "label": "Week of Oct 26, 2026",
+  "quality": "pro_forma",
+  "coverage": {
+   "full": true,
+   "base": "2026-10-23",
+   "days": 5,
+   "note": null
+  },
+  "value": {
+   "start": 15892.73,
+   "end": 15836.37,
+   "change_usd": -56.36,
+   "change_pct": -0.3546,
+   "net_flows": -0.01,
+   "gain_usd": -56.35
+  },
+  "vs": [
+   {
+    "id": "spy",
+    "name": "S&P 500",
+    "kind": "benchmark",
+    "return_pct": -0.0146,
+    "excess_pts": -0.34,
+    "value_end": 15890.4,
+    "diff_usd": -54.03
+   },
+   {
+    "id": "safe-mix",
+    "name": "Safe mix",
+    "kind": "mix",
+    "return_pct": -1.1646,
+    "excess_pts": 0.81,
+    "value_end": 15707.63,
+    "diff_usd": 128.74
+   },
+   {
+    "id": "as-held",
+    "name": "As held",
+    "kind": "mix",
+    "return_pct": -0.4046,
+    "excess_pts": 0.05,
+    "value_end": 15828.42,
+    "diff_usd": 7.95
+   },
+   {
+    "id": "tech-tilt",
+    "name": "Aggressive tech tilt",
+    "kind": "mix",
+    "return_pct": 0.5654,
+    "excess_pts": -0.92,
+    "value_end": 15982.58,
+    "diff_usd": -146.21
+   }
+  ],
+  "movers": {
+   "up": [
+    {
+     "symbol": "FTEC",
+     "name": null,
+     "contribution_usd": 35.02,
+     "contribution_pts": 0.2204,
+     "return_pct": 0.9989,
+     "weight_pct": 22.2853
+    }
+   ],
+   "down": [
+    {
+     "symbol": "VXUS",
+     "name": null,
+     "contribution_usd": -63.05,
+     "contribution_pts": -0.3967,
+     "return_pct": -1.7881,
+     "weight_pct": 14.1402
+    },
+    {
+     "symbol": "FXAIX",
+     "name": null,
+     "contribution_usd": -20.1,
+     "contribution_pts": -0.1265,
+     "return_pct": -0.9228,
+     "weight_pct": 57.3131
+    },
+    {
+     "symbol": "BND",
+     "name": null,
+     "contribution_usd": -5.37,
+     "contribution_pts": -0.0338,
+     "return_pct": -0.7388,
+     "weight_pct": 4.9798
+    },
+    {
+     "symbol": "ACME",
+     "name": "Acme Orbital (synthetic)",
+     "contribution_usd": -2.86,
+     "contribution_pts": -0.018,
+     "return_pct": -4.3614,
+     "weight_pct": 0.4783
+    }
+   ],
+   "other_usd": 0,
+   "count": 5
+  },
+  "accounts": [
+   {
+    "account": "hsa-0002",
+    "start": 2614.48,
+    "end": 2605.56,
+    "change_usd": -8.92,
+    "change_pct": -0.3412,
+    "net_flows": 0
+   },
+   {
+    "account": "individual-0001",
+    "start": 13278.25,
+    "end": 13230.81,
+    "change_usd": -47.44,
+    "change_pct": -0.3573,
+    "net_flows": 0
+   }
+  ],
+  "income": {
+   "dividends": 0,
+   "interest": 0,
+   "margin_interest": 0
+  },
+  "flows": [],
+  "trades": [],
+  "trade_count": 0,
+  "realized": {
+   "short_term": 0,
+   "long_term": 0,
+   "total": 0,
+   "sales": 0
+  },
+  "risk": {
+   "max_drawdown_pct": -1.3428,
+   "volatility_pct": 9.7416,
+   "best_day": {
+    "date": "2026-10-29",
+    "pct": 0.724
+   },
+   "worst_day": {
+    "date": "2026-10-27",
+    "pct": -0.78
+   },
+   "band": null,
+   "convictions": [
+    {
+     "symbol": "ACME",
+     "weight_pct": 0.46,
+     "band_min_pct": 0,
+     "band_max_pct": 10,
+     "status": "inside"
+    }
+   ]
+  },
+  "decisions": {
+   "made": [],
+   "matured": []
+  },
+  "paper": [
+   {
+    "id": "tech-tilt",
+    "name": "Aggressive tech tilt",
+    "kind": "mix",
+    "status": "paper",
+    "return_pct": 3.01,
+    "value_end": 1030.1
+   },
+   {
+    "id": "sector-momentum",
+    "name": "Sector momentum",
+    "kind": "strategy",
+    "status": "paper",
+    "return_pct": 1.12,
+    "value_end": 1011.2
+   },
+   {
+    "id": "filings-lane",
+    "name": "Filings lane",
+    "kind": "lane",
+    "status": "paper",
+    "return_pct": -0.61,
+    "value_end": 993.9
+   }
+  ],
+  "fi": {
+   "fi_number": 1000000,
+   "progress_start_pct": 1.589,
+   "progress_end_pct": 1.584,
+   "change_pts": -0.006
+  },
+  "events": [
+   {
+    "date": "2026-10-30",
+    "type": "discount",
+    "symbol": "ACME",
+    "detail": "First close 20% under its 52-week high"
+   },
+   {
+    "date": "2026-10-26",
+    "type": "filing",
+    "symbol": "ACME",
+    "detail": "8-K: new launch contract, scored +1"
+   }
+  ]
+ },
+ "debrief": null
+}

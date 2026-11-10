@@ -1,0 +1,221 @@
+{
+ "kind": "day",
+ "start": "2026-11-05",
+ "end": "2026-11-05",
+ "as_of": "2026-11-05",
+ "closed": true,
+ "final": true,
+ "computed_at": "2026-11-05T22:36:00+00:00",
+ "digest": "c39c40b938e4de2b",
+ "pack": {
+  "version": 1,
+  "kind": "day",
+  "start": "2026-11-05",
+  "end": "2026-11-05",
+  "as_of": "2026-11-05",
+  "label": "Thu Nov 5, 2026",
+  "quality": "pro_forma",
+  "coverage": {
+   "full": true,
+   "base": "2026-11-04",
+   "days": 1,
+   "note": null
+  },
+  "value": {
+   "start": 16661.84,
+   "end": 16717.26,
+   "change_usd": 55.42,
+   "change_pct": 0.3326,
+   "net_flows": 0,
+   "gain_usd": 55.42
+  },
+  "vs": [
+   {
+    "id": "spy",
+    "name": "S&P 500",
+    "kind": "benchmark",
+    "return_pct": 0.1426,
+    "excess_pts": 0.19,
+    "value_end": 16685.6,
+    "diff_usd": 31.66
+   },
+   {
+    "id": "safe-mix",
+    "name": "Safe mix",
+    "kind": "mix",
+    "return_pct": 0.2126,
+    "excess_pts": 0.12,
+    "value_end": 16697.26,
+    "diff_usd": 20
+   },
+   {
+    "id": "as-held",
+    "name": "As held",
+    "kind": "mix",
+    "return_pct": 0.3126,
+    "excess_pts": 0.02,
+    "value_end": 16713.92,
+    "diff_usd": 3.34
+   },
+   {
+    "id": "tech-tilt",
+    "name": "Aggressive tech tilt",
+    "kind": "mix",
+    "return_pct": 0.6026,
+    "excess_pts": -0.27,
+    "value_end": 16762.24,
+    "diff_usd": -44.98
+   }
+  ],
+  "movers": {
+   "up": [
+    {
+     "symbol": "FTEC",
+     "name": null,
+     "contribution_usd": 54.58,
+     "contribution_pts": 0.3276,
+     "return_pct": 1.5077,
+     "weight_pct": 21.9884
+    },
+    {
+     "symbol": "FXAIX",
+     "name": null,
+     "contribution_usd": 15.31,
+     "contribution_pts": 0.0919,
+     "return_pct": 1.1518,
+     "weight_pct": 58.3385
+    },
+    {
+     "symbol": "BND",
+     "name": null,
+     "contribution_usd": 1.26,
+     "contribution_pts": 0.0076,
+     "return_pct": 0.0258,
+     "weight_pct": 4.8704
+    }
+   ],
+   "down": [
+    {
+     "symbol": "VXUS",
+     "name": null,
+     "contribution_usd": -13.12,
+     "contribution_pts": -0.0787,
+     "return_pct": -0.4995,
+     "weight_pct": 13.6044
+    },
+    {
+     "symbol": "ACME",
+     "name": "Acme Orbital (synthetic)",
+     "contribution_usd": -2.62,
+     "contribution_pts": -0.0157,
+     "return_pct": 4.8701,
+     "weight_pct": 0.4375
+    }
+   ],
+   "other_usd": 0,
+   "count": 5
+  },
+  "accounts": [
+   {
+    "account": "hsa-0002",
+    "start": 2743.14,
+    "end": 2752.81,
+    "change_usd": 9.67,
+    "change_pct": 0.3525,
+    "net_flows": 0
+   },
+   {
+    "account": "individual-0001",
+    "start": 13918.7,
+    "end": 13964.45,
+    "change_usd": 45.75,
+    "change_pct": 0.3286,
+    "net_flows": 0.01
+   }
+  ],
+  "income": {
+   "dividends": 0,
+   "interest": 0,
+   "margin_interest": 0
+  },
+  "flows": [],
+  "trades": [],
+  "trade_count": 0,
+  "realized": {
+   "short_term": 0,
+   "long_term": 0,
+   "total": 0,
+   "sales": 0
+  },
+  "risk": {
+   "max_drawdown_pct": 0,
+   "volatility_pct": null,
+   "best_day": {
+    "date": "2026-11-05",
+    "pct": 0.3326
+   },
+   "worst_day": {
+    "date": "2026-11-05",
+    "pct": 0.3326
+   },
+   "band": null,
+   "convictions": [
+    {
+     "symbol": "ACME",
+     "weight_pct": 0.46,
+     "band_min_pct": 0,
+     "band_max_pct": 10,
+     "status": "inside"
+    }
+   ]
+  },
+  "decisions": {
+   "made": [],
+   "matured": [
+    {
+     "id": "d_20260806140500_34bbb0",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "90D",
+     "usd": -89.17,
+     "end": "2026-11-05"
+    }
+   ]
+  },
+  "paper": [
+   {
+    "id": "tech-tilt",
+    "name": "Aggressive tech tilt",
+    "kind": "mix",
+    "status": "paper",
+    "return_pct": 0.58,
+    "value_end": 1005.8
+   },
+   {
+    "id": "sector-momentum",
+    "name": "Sector momentum",
+    "kind": "strategy",
+    "status": "paper",
+    "return_pct": -0.22,
+    "value_end": 997.8
+   },
+   {
+    "id": "filings-lane",
+    "name": "Filings lane",
+    "kind": "lane",
+    "status": "paper",
+    "return_pct": 0.05,
+    "value_end": 1000.5
+   }
+  ],
+  "fi": {
+   "fi_number": 1000000,
+   "progress_start_pct": 1.666,
+   "progress_end_pct": 1.672,
+   "change_pts": 0.006
+  },
+  "events": []
+ },
+ "debrief": null
+}

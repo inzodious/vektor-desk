@@ -5,6 +5,7 @@ import { AREAS } from './areas.js';
 export function titleFor(pathname) {
   const area = AREAS.filter((a) => a.path !== '/').find((a) => pathname === a.path || pathname.startsWith(`${a.path}/`));
   if (area) return `${area.title} · Vektor Desk`;
+  if (pathname === '/results' || pathname.startsWith('/results/')) return 'Results · Vektor Desk';
   return pathname === '/' ? 'Bridge · Vektor Desk' : 'Vektor Desk';
 }
 

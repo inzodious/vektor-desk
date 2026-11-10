@@ -262,6 +262,10 @@ export default function Bridge() {
                 Clear the queue · {queue.data.count}
               </Link>
             ) : null}
+            <Link className="btn sm ghost" to="/results/day" data-testid="results-link">
+              <Icon name="flag" />
+              Results
+            </Link>
           </>
         }
       />

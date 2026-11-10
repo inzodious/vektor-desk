@@ -1,0 +1,2009 @@
+{
+ "kind": "year",
+ "start": "2026-01-02",
+ "end": "2026-12-31",
+ "as_of": "2026-11-06",
+ "closed": false,
+ "final": false,
+ "computed_at": "2026-11-06T22:36:00+00:00",
+ "digest": "0b1decc9b93408fb",
+ "pack": {
+  "version": 1,
+  "kind": "year",
+  "start": "2026-01-02",
+  "end": "2026-12-31",
+  "as_of": "2026-11-06",
+  "label": "2026",
+  "quality": "pro_forma",
+  "coverage": {
+   "full": true,
+   "base": "2025-12-31",
+   "days": 222,
+   "note": null
+  },
+  "value": {
+   "start": 9993.53,
+   "end": 16769.8,
+   "change_usd": 6776.27,
+   "change_pct": 4.1874,
+   "net_flows": 6600,
+   "gain_usd": 176.27
+  },
+  "vs": [
+   {
+    "id": "spy",
+    "name": "S&P 500",
+    "kind": "benchmark",
+    "return_pct": 5.5874,
+    "excess_pts": -1.4,
+    "value_end": 17151.91,
+    "diff_usd": -382.11
+   },
+   {
+    "id": "safe-mix",
+    "name": "Safe mix",
+    "kind": "mix",
+    "return_pct": 2.2874,
+    "excess_pts": 1.9,
+    "value_end": 16822.12,
+    "diff_usd": -52.32
+   },
+   {
+    "id": "as-held",
+    "name": "As held",
+    "kind": "mix",
+    "return_pct": 3.8874,
+    "excess_pts": 0.3,
+    "value_end": 16982.02,
+    "diff_usd": -212.22
+   },
+   {
+    "id": "tech-tilt",
+    "name": "Aggressive tech tilt",
+    "kind": "mix",
+    "return_pct": 7.9874,
+    "excess_pts": -3.8,
+    "value_end": 17391.75,
+    "diff_usd": -621.95
+   }
+  ],
+  "movers": {
+   "up": [
+    {
+     "symbol": "FXAIX",
+     "name": null,
+     "contribution_usd": 360.73,
+     "contribution_pts": 3.6096,
+     "return_pct": 8.4498,
+     "weight_pct": 58.8362
+    },
+    {
+     "symbol": "BND",
+     "name": null,
+     "contribution_usd": 12.88,
+     "contribution_pts": 0.1289,
+     "return_pct": 2.1044,
+     "weight_pct": 4.8513
+    }
+   ],
+   "down": [
+    {
+     "symbol": "VXUS",
+     "name": null,
+     "contribution_usd": -201.17,
+     "contribution_pts": -2.013,
+     "return_pct": -8.7785,
+     "weight_pct": 13.4922
+    },
+    {
+     "symbol": "ACME",
+     "name": "Acme Orbital (synthetic)",
+     "contribution_usd": -114.34,
+     "contribution_pts": -1.1441,
+     "return_pct": -53.0827,
+     "weight_pct": 0.4574
+    },
+    {
+     "symbol": "FTEC",
+     "name": null,
+     "contribution_usd": -42.88,
+     "contribution_pts": -0.4291,
+     "return_pct": -0.4595,
+     "weight_pct": 21.6043
+    }
+   ],
+   "other_usd": 161.05,
+   "count": 5
+  },
+  "accounts": [
+   {
+    "account": "hsa-0002",
+    "start": 1612.54,
+    "end": 2760.98,
+    "change_usd": 1148.44,
+    "change_pct": 5.2962,
+    "net_flows": 1100
+   },
+   {
+    "account": "individual-0001",
+    "start": 8380.99,
+    "end": 14008.82,
+    "change_usd": 5627.83,
+    "change_pct": 3.9729,
+    "net_flows": 5499.99
+   }
+  ],
+  "income": {
+   "dividends": 160.08,
+   "interest": 0,
+   "margin_interest": 0
+  },
+  "flows": [
+   {
+    "date": "2026-01-01",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-01-01",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-02-02",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-02-02",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-03-02",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-03-02",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-04-01",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-04-01",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-05-01",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-05-01",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-06-01",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-06-01",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-07-01",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-07-01",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-08-03",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-08-03",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-09-01",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-09-01",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-10-01",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-10-01",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-11-02",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-11-02",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   }
+  ],
+  "trades": [
+   {
+    "date": "2026-01-01",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.065634,
+    "price": 76.18,
+    "amount": -5
+   },
+   {
+    "date": "2026-01-01",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.07473,
+    "price": 267.63,
+    "amount": -20
+   },
+   {
+    "date": "2026-01-01",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.308008,
+    "price": 194.8,
+    "amount": -60
+   },
+   {
+    "date": "2026-01-01",
+    "account": "hsa-0002",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.217265,
+    "price": 69.04,
+    "amount": -15
+   },
+   {
+    "date": "2026-01-01",
+    "account": "individual-0001",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.32817,
+    "price": 76.18,
+    "amount": -25
+   },
+   {
+    "date": "2026-01-01",
+    "account": "individual-0001",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.37365,
+    "price": 267.63,
+    "amount": -100
+   },
+   {
+    "date": "2026-01-01",
+    "account": "individual-0001",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 1.540041,
+    "price": 194.8,
+    "amount": -300
+   },
+   {
+    "date": "2026-01-01",
+    "account": "individual-0001",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 1.086327,
+    "price": 69.04,
+    "amount": -75
+   },
+   {
+    "date": "2026-02-02",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.065937,
+    "price": 75.83,
+    "amount": -5
+   },
+   {
+    "date": "2026-02-02",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.078626,
+    "price": 254.37,
+    "amount": -20
+   },
+   {
+    "date": "2026-02-02",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.292711,
+    "price": 204.98,
+    "amount": -60
+   },
+   {
+    "date": "2026-02-02",
+    "account": "hsa-0002",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.237079,
+    "price": 63.27,
+    "amount": -15
+   },
+   {
+    "date": "2026-02-02",
+    "account": "individual-0001",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.329685,
+    "price": 75.83,
+    "amount": -25
+   },
+   {
+    "date": "2026-02-02",
+    "account": "individual-0001",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.393128,
+    "price": 254.37,
+    "amount": -100
+   },
+   {
+    "date": "2026-02-02",
+    "account": "individual-0001",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 1.463557,
+    "price": 204.98,
+    "amount": -300
+   },
+   {
+    "date": "2026-02-02",
+    "account": "individual-0001",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 1.185396,
+    "price": 63.27,
+    "amount": -75
+   },
+   {
+    "date": "2026-03-02",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.065946,
+    "price": 75.82,
+    "amount": -5
+   },
+   {
+    "date": "2026-03-02",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.078582,
+    "price": 254.51,
+    "amount": -20
+   },
+   {
+    "date": "2026-03-02",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.277804,
+    "price": 215.98,
+    "amount": -60
+   },
+   {
+    "date": "2026-03-02",
+    "account": "hsa-0002",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.23977,
+    "price": 62.56,
+    "amount": -15
+   },
+   {
+    "date": "2026-03-02",
+    "account": "individual-0001",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.329728,
+    "price": 75.82,
+    "amount": -25
+   },
+   {
+    "date": "2026-03-02",
+    "account": "individual-0001",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.392912,
+    "price": 254.51,
+    "amount": -100
+   },
+   {
+    "date": "2026-03-02",
+    "account": "individual-0001",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 1.389018,
+    "price": 215.98,
+    "amount": -300
+   },
+   {
+    "date": "2026-03-02",
+    "account": "individual-0001",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 1.198849,
+    "price": 62.56,
+    "amount": -75
+   },
+   {
+    "date": "2026-04-01",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.064625,
+    "price": 77.37,
+    "amount": -5
+   },
+   {
+    "date": "2026-04-01",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.075632,
+    "price": 264.44,
+    "amount": -20
+   },
+   {
+    "date": "2026-04-01",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.272926,
+    "price": 219.84,
+    "amount": -60
+   },
+   {
+    "date": "2026-04-01",
+    "account": "hsa-0002",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.214225,
+    "price": 70.02,
+    "amount": -15
+   },
+   {
+    "date": "2026-04-01",
+    "account": "individual-0001",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.323123,
+    "price": 77.37,
+    "amount": -25
+   },
+   {
+    "date": "2026-04-01",
+    "account": "individual-0001",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.378158,
+    "price": 264.44,
+    "amount": -100
+   },
+   {
+    "date": "2026-04-01",
+    "account": "individual-0001",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 1.364629,
+    "price": 219.84,
+    "amount": -300
+   },
+   {
+    "date": "2026-04-01",
+    "account": "individual-0001",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 1.071123,
+    "price": 70.02,
+    "amount": -75
+   },
+   {
+    "date": "2026-05-01",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.064392,
+    "price": 77.65,
+    "amount": -5
+   },
+   {
+    "date": "2026-05-01",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.071406,
+    "price": 280.09,
+    "amount": -20
+   },
+   {
+    "date": "2026-05-01",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.266477,
+    "price": 225.16,
+    "amount": -60
+   },
+   {
+    "date": "2026-05-01",
+    "account": "hsa-0002",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.206526,
+    "price": 72.63,
+    "amount": -15
+   },
+   {
+    "date": "2026-05-01",
+    "account": "individual-0001",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.321958,
+    "price": 77.65,
+    "amount": -25
+   },
+   {
+    "date": "2026-05-01",
+    "account": "individual-0001",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.357028,
+    "price": 280.09,
+    "amount": -100
+   },
+   {
+    "date": "2026-05-01",
+    "account": "individual-0001",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 1.332386,
+    "price": 225.16,
+    "amount": -300
+   },
+   {
+    "date": "2026-05-01",
+    "account": "individual-0001",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 1.032631,
+    "price": 72.63,
+    "amount": -75
+   },
+   {
+    "date": "2026-06-01",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.064885,
+    "price": 77.06,
+    "amount": -5
+   },
+   {
+    "date": "2026-06-01",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.06897,
+    "price": 289.98,
+    "amount": -20
+   },
+   {
+    "date": "2026-06-01",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.270197,
+    "price": 222.06,
+    "amount": -60
+   },
+   {
+    "date": "2026-06-01",
+    "account": "hsa-0002",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.19836,
+    "price": 75.62,
+    "amount": -15
+   },
+   {
+    "date": "2026-06-01",
+    "account": "individual-0001",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.324423,
+    "price": 77.06,
+    "amount": -25
+   },
+   {
+    "date": "2026-06-01",
+    "account": "individual-0001",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.344851,
+    "price": 289.98,
+    "amount": -100
+   },
+   {
+    "date": "2026-06-01",
+    "account": "individual-0001",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 1.350986,
+    "price": 222.06,
+    "amount": -300
+   },
+   {
+    "date": "2026-06-01",
+    "account": "individual-0001",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.991801,
+    "price": 75.62,
+    "amount": -75
+   },
+   {
+    "date": "2026-07-01",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.064784,
+    "price": 77.18,
+    "amount": -5
+   },
+   {
+    "date": "2026-07-01",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.069498,
+    "price": 287.78,
+    "amount": -20
+   },
+   {
+    "date": "2026-07-01",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.240317,
+    "price": 249.67,
+    "amount": -60
+   },
+   {
+    "date": "2026-07-01",
+    "account": "hsa-0002",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.18875,
+    "price": 79.47,
+    "amount": -15
+   },
+   {
+    "date": "2026-07-01",
+    "account": "individual-0001",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.323918,
+    "price": 77.18,
+    "amount": -25
+   },
+   {
+    "date": "2026-07-01",
+    "account": "individual-0001",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.347488,
+    "price": 287.78,
+    "amount": -100
+   },
+   {
+    "date": "2026-07-01",
+    "account": "individual-0001",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 1.201586,
+    "price": 249.67,
+    "amount": -300
+   },
+   {
+    "date": "2026-07-01",
+    "account": "individual-0001",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.943752,
+    "price": 79.47,
+    "amount": -75
+   },
+   {
+    "date": "2026-07-13",
+    "account": "individual-0001",
+    "symbol": "ACME",
+    "side": "sell",
+    "shares": 25.163563,
+    "price": 5.59,
+    "amount": 140.66
+   },
+   {
+    "date": "2026-08-03",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.065317,
+    "price": 76.55,
+    "amount": -5
+   },
+   {
+    "date": "2026-08-03",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.074934,
+    "price": 266.9,
+    "amount": -20
+   },
+   {
+    "date": "2026-08-03",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.239607,
+    "price": 250.41,
+    "amount": -60
+   }
+  ],
+  "trade_count": 89,
+  "realized": {
+   "short_term": 0,
+   "long_term": 0,
+   "total": 0,
+   "sales": 0
+  },
+  "risk": {
+   "max_drawdown_pct": -17.6025,
+   "volatility_pct": 11.9187,
+   "best_day": {
+    "date": "2026-06-12",
+    "pct": 2.4701
+   },
+   "worst_day": {
+    "date": "2026-05-11",
+    "pct": -2.0651
+   },
+   "band": {
+    "band": 4,
+    "label": "Moderately aggressive",
+    "worst_year_loss_pct": 33,
+    "fit": "below",
+    "worst_year_p10_pct": -12.3592
+   },
+   "convictions": [
+    {
+     "symbol": "ACME",
+     "weight_pct": 0.46,
+     "band_min_pct": 0,
+     "band_max_pct": 10,
+     "status": "inside"
+    }
+   ]
+  },
+  "decisions": {
+   "made": [
+    {
+     "date": "2026-01-02",
+     "id": "d_20260102140500_a0a589",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FXAIX",
+     "title": "Route deposit to $250 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-01-02",
+     "id": "d_20260102140500_7e80a2",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "VXUS",
+     "title": "Route deposit to $370 VXUS",
+     "status": "placed"
+    },
+    {
+     "date": "2026-01-06",
+     "id": "d_20260106140500_3b9b28",
+     "origin": "tax",
+     "kind": "harvest",
+     "symbol": "ACME",
+     "title": "Harvest $650 ACME",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-01-06",
+     "id": "d_20260106140500_ee093c",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "FTEC",
+     "title": "Buy $340 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-01-09",
+     "id": "d_20260109140500_f2c133",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FTEC",
+     "title": "Route deposit to $300 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-01-09",
+     "id": "d_20260109140500_6124c1",
+     "origin": "plan_keeper",
+     "kind": "trim",
+     "symbol": "FXAIX",
+     "title": "Trim $220 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-01-09",
+     "id": "d_20260109140500_d453b4",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "NOVA",
+     "title": "Buy $570 NOVA",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-01-13",
+     "id": "d_20260113140500_8fb1b7",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FXAIX",
+     "title": "Route deposit to $180 FXAIX",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-01-26",
+     "id": "d_20260126140500_5f09fa",
+     "origin": "plan_keeper",
+     "kind": "trim",
+     "symbol": "FXAIX",
+     "title": "Trim $270 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-01-26",
+     "id": "d_20260126140500_edd385",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "NOVA",
+     "title": "Buy $420 NOVA",
+     "status": "placed"
+    },
+    {
+     "date": "2026-01-27",
+     "id": "d_20260127140500_daf72c",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "NOVA",
+     "title": "Buy $610 NOVA",
+     "status": "placed"
+    },
+    {
+     "date": "2026-01-28",
+     "id": "d_20260128140500_84529b",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "VXUS",
+     "title": "Route deposit to $390 VXUS",
+     "status": "placed"
+    },
+    {
+     "date": "2026-02-02",
+     "id": "d_20260202140500_0e400f",
+     "origin": "plan_keeper",
+     "kind": "rebalance",
+     "symbol": "BND",
+     "title": "Rebalance $110 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-02-12",
+     "id": "d_20260212140500_66f2cb",
+     "origin": "plan_keeper",
+     "kind": "rebalance",
+     "symbol": "BND",
+     "title": "Rebalance $90 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-02-12",
+     "id": "d_20260212140500_ae43cc",
+     "origin": "risk",
+     "kind": "hold_off",
+     "symbol": "NOVA",
+     "title": "Hold off on $700 NOVA",
+     "status": "done"
+    },
+    {
+     "date": "2026-02-27",
+     "id": "d_20260227140500_73942b",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FXAIX",
+     "title": "Route deposit to $330 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-03",
+     "id": "d_20260303140500_b2a6c7",
+     "origin": "risk",
+     "kind": "hold_off",
+     "symbol": "ACME",
+     "title": "Hold off on $710 ACME",
+     "status": "done"
+    },
+    {
+     "date": "2026-03-04",
+     "id": "d_20260304140500_c26542",
+     "origin": "tax",
+     "kind": "harvest",
+     "symbol": "VXUS",
+     "title": "Harvest $220 VXUS",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-09",
+     "id": "d_20260309140500_2abe28",
+     "origin": "plan_keeper",
+     "kind": "trim",
+     "symbol": "FXAIX",
+     "title": "Trim $140 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-12",
+     "id": "d_20260312140500_167ad3",
+     "origin": "plan_keeper",
+     "kind": "trim",
+     "symbol": "FTEC",
+     "title": "Trim $200 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-12",
+     "id": "d_20260312140500_3ee504",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "NOVA",
+     "title": "Buy $310 NOVA",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-16",
+     "id": "d_20260316140500_6a312c",
+     "origin": "plan_keeper",
+     "kind": "rebalance",
+     "symbol": "BND",
+     "title": "Rebalance $200 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-20",
+     "id": "d_20260320140500_9f57ad",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FXAIX",
+     "title": "Route deposit to $180 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-26",
+     "id": "d_20260326140500_d20987",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "BND",
+     "title": "Route deposit to $210 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-27",
+     "id": "d_20260327140500_ea1725",
+     "origin": "plan_keeper",
+     "kind": "rebalance",
+     "symbol": "VXUS",
+     "title": "Rebalance $170 VXUS",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-27",
+     "id": "d_20260327140500_05b260",
+     "origin": "risk",
+     "kind": "hold_off",
+     "symbol": "ACME",
+     "title": "Hold off on $380 ACME",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-03-27",
+     "id": "d_20260327140500_819e0b",
+     "origin": "tax",
+     "kind": "harvest",
+     "symbol": "ACME",
+     "title": "Harvest $760 ACME",
+     "status": "placed"
+    },
+    {
+     "date": "2026-03-31",
+     "id": "d_20260331140500_ab80db",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FTEC",
+     "title": "Route deposit to $370 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-04-03",
+     "id": "d_20260403140500_8ae10f",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "BND",
+     "title": "Route deposit to $250 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-04-10",
+     "id": "d_20260410140500_63255e",
+     "origin": "tax",
+     "kind": "harvest",
+     "symbol": "VXUS",
+     "title": "Harvest $860 VXUS",
+     "status": "placed"
+    },
+    {
+     "date": "2026-04-17",
+     "id": "d_20260417140500_c8a7c8",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "ACME",
+     "title": "Buy $530 ACME",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-04-23",
+     "id": "d_20260423140500_d27a6c",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "ACME",
+     "title": "Buy $310 ACME",
+     "status": "placed"
+    },
+    {
+     "date": "2026-04-27",
+     "id": "d_20260427140500_355091",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FXAIX",
+     "title": "Route deposit to $210 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-01",
+     "id": "d_20260501140500_d3fb2e",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "NOVA",
+     "title": "Buy $320 NOVA",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-06",
+     "id": "d_20260506140500_3a5a02",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "NOVA",
+     "title": "Buy $510 NOVA",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-08",
+     "id": "d_20260508140500_c06bef",
+     "origin": "plan_keeper",
+     "kind": "trim",
+     "symbol": "FTEC",
+     "title": "Trim $240 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-08",
+     "id": "d_20260508140500_85ed8e",
+     "origin": "tax",
+     "kind": "harvest",
+     "symbol": "VXUS",
+     "title": "Harvest $750 VXUS",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-11",
+     "id": "d_20260511140500_aab5a4",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "BND",
+     "title": "Route deposit to $360 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-14",
+     "id": "d_20260514140500_1f4c71",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FTEC",
+     "title": "Route deposit to $320 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-15",
+     "id": "d_20260515140500_6e9b65",
+     "origin": "plan_keeper",
+     "kind": "trim",
+     "symbol": "FTEC",
+     "title": "Trim $190 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-18",
+     "id": "d_20260518140500_b184c5",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "ACME",
+     "title": "Buy $340 ACME",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-19",
+     "id": "d_20260519140500_aa6b6e",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "FTEC",
+     "title": "Buy $520 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-22",
+     "id": "d_20260522140500_e72faa",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "BND",
+     "title": "Route deposit to $210 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-05-28",
+     "id": "d_20260528140500_49f291",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "NOVA",
+     "title": "Buy $420 NOVA",
+     "status": "placed"
+    },
+    {
+     "date": "2026-06-04",
+     "id": "d_20260604140500_613f8a",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "ACME",
+     "title": "Buy $460 ACME",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-06-05",
+     "id": "d_20260605140500_8d397d",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "FTEC",
+     "title": "Buy $420 FTEC",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-06-05",
+     "id": "d_20260605140500_c3928b",
+     "origin": "risk",
+     "kind": "hold_off",
+     "symbol": "NOVA",
+     "title": "Hold off on $630 NOVA",
+     "status": "done"
+    },
+    {
+     "date": "2026-06-10",
+     "id": "d_20260610140500_f3dfc5",
+     "origin": "scout",
+     "kind": "buy",
+     "symbol": "FTEC",
+     "title": "Buy $580 FTEC",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-06-15",
+     "id": "d_20260615140500_a4c17d",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "BND",
+     "title": "Route deposit to $280 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-06-15",
+     "id": "d_20260615140500_2469ba",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "ACME",
+     "title": "Buy $500 ACME",
+     "status": "placed"
+    },
+    {
+     "date": "2026-06-17",
+     "id": "d_20260617140500_c156a0",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "ACME",
+     "title": "Buy $400 ACME",
+     "status": "placed"
+    },
+    {
+     "date": "2026-06-22",
+     "id": "d_20260622140500_d10332",
+     "origin": "plan_keeper",
+     "kind": "rebalance",
+     "symbol": "VXUS",
+     "title": "Rebalance $200 VXUS",
+     "status": "placed"
+    },
+    {
+     "date": "2026-06-26",
+     "id": "d_20260626140500_ea0fd5",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FXAIX",
+     "title": "Route deposit to $390 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-07-02",
+     "id": "d_20260702140500_f20b83",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "ACME",
+     "title": "Buy $470 ACME",
+     "status": "placed"
+    },
+    {
+     "date": "2026-07-03",
+     "id": "d_20260703140500_3e97fc",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "BND",
+     "title": "Route deposit to $190 BND",
+     "status": "placed"
+    },
+    {
+     "date": "2026-07-03",
+     "id": "d_20260703140500_3598a7",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "FTEC",
+     "title": "Buy $630 FTEC",
+     "status": "placed"
+    },
+    {
+     "date": "2026-07-08",
+     "id": "d_20260708140500_1d2296",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "VXUS",
+     "title": "Route deposit to $170 VXUS",
+     "status": "placed"
+    },
+    {
+     "date": "2026-07-20",
+     "id": "d_20260720140500_e27492",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FTEC",
+     "title": "Route deposit to $210 FTEC",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-07-21",
+     "id": "d_20260721140500_0f381d",
+     "origin": "risk",
+     "kind": "hold_off",
+     "symbol": "NOVA",
+     "title": "Hold off on $650 NOVA",
+     "status": "done"
+    },
+    {
+     "date": "2026-07-28",
+     "id": "d_20260728140500_fdb45f",
+     "origin": "you",
+     "kind": "buy",
+     "symbol": "NOVA",
+     "title": "Buy $450 NOVA",
+     "status": "placed"
+    }
+   ],
+   "matured": [
+    {
+     "id": "d_20251121140500_473a1d",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "90D",
+     "usd": 16.37,
+     "end": "2026-02-20"
+    },
+    {
+     "id": "d_20251128140500_bd5294",
+     "symbol": "VXUS",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -15.37,
+     "end": "2026-02-27"
+    },
+    {
+     "id": "d_20251212140500_77beaf",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "30D",
+     "usd": -121.26,
+     "end": "2026-01-14"
+    },
+    {
+     "id": "d_20251212140500_77beaf",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "90D",
+     "usd": -174.86,
+     "end": "2026-03-13"
+    },
+    {
+     "id": "d_20251216140500_179ba3",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": 11.29,
+     "end": "2026-01-16"
+    },
+    {
+     "id": "d_20251216140500_179ba3",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": 18.97,
+     "end": "2026-03-17"
+    },
+    {
+     "id": "d_20251223140500_a40a54",
+     "symbol": "FTEC",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -18.21,
+     "end": "2026-01-23"
+    },
+    {
+     "id": "d_20251223140500_a40a54",
+     "symbol": "FTEC",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -19.17,
+     "end": "2026-03-24"
+    },
+    {
+     "id": "d_20251226140500_b6b843",
+     "symbol": "ACME",
+     "kind": "hold_off",
+     "origin": "risk",
+     "horizon": "30D",
+     "usd": 17.92,
+     "end": "2026-01-28"
+    },
+    {
+     "id": "d_20251226140500_b6b843",
+     "symbol": "ACME",
+     "kind": "hold_off",
+     "origin": "risk",
+     "horizon": "90D",
+     "usd": 57.43,
+     "end": "2026-03-27"
+    },
+    {
+     "id": "d_20251226140500_fb4a87",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "you",
+     "horizon": "30D",
+     "usd": -31.09,
+     "end": "2026-01-28"
+    },
+    {
+     "id": "d_20251226140500_fb4a87",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "you",
+     "horizon": "90D",
+     "usd": -99.66,
+     "end": "2026-03-27"
+    },
+    {
+     "id": "d_20260102140500_a0a589",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": 12.84,
+     "end": "2026-02-04"
+    },
+    {
+     "id": "d_20260102140500_a0a589",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": 11.54,
+     "end": "2026-04-03"
+    },
+    {
+     "id": "d_20260102140500_7e80a2",
+     "symbol": "VXUS",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -22.37,
+     "end": "2026-02-04"
+    },
+    {
+     "id": "d_20260102140500_7e80a2",
+     "symbol": "VXUS",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -14.08,
+     "end": "2026-04-03"
+    },
+    {
+     "id": "d_20260106140500_ee093c",
+     "symbol": "FTEC",
+     "kind": "buy",
+     "origin": "you",
+     "horizon": "30D",
+     "usd": -25.61,
+     "end": "2026-02-06"
+    },
+    {
+     "id": "d_20260106140500_ee093c",
+     "symbol": "FTEC",
+     "kind": "buy",
+     "origin": "you",
+     "horizon": "90D",
+     "usd": -34.83,
+     "end": "2026-04-07"
+    },
+    {
+     "id": "d_20260109140500_f2c133",
+     "symbol": "FTEC",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -28.9,
+     "end": "2026-02-11"
+    },
+    {
+     "id": "d_20260109140500_f2c133",
+     "symbol": "FTEC",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -28.21,
+     "end": "2026-04-10"
+    },
+    {
+     "id": "d_20260109140500_6124c1",
+     "symbol": "FXAIX",
+     "kind": "trim",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -12.48,
+     "end": "2026-02-11"
+    },
+    {
+     "id": "d_20260109140500_6124c1",
+     "symbol": "FXAIX",
+     "kind": "trim",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -8.98,
+     "end": "2026-04-10"
+    },
+    {
+     "id": "d_20260113140500_8fb1b7",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": 5.52,
+     "end": "2026-02-13"
+    },
+    {
+     "id": "d_20260113140500_8fb1b7",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": 4.4,
+     "end": "2026-04-14"
+    },
+    {
+     "id": "d_20260126140500_5f09fa",
+     "symbol": "FXAIX",
+     "kind": "trim",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -1.98,
+     "end": "2026-02-26"
+    },
+    {
+     "id": "d_20260126140500_5f09fa",
+     "symbol": "FXAIX",
+     "kind": "trim",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": 4.73,
+     "end": "2026-04-27"
+    },
+    {
+     "id": "d_20260128140500_84529b",
+     "symbol": "VXUS",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -11.9,
+     "end": "2026-02-27"
+    },
+    {
+     "id": "d_20260128140500_84529b",
+     "symbol": "VXUS",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": 6.48,
+     "end": "2026-04-29"
+    },
+    {
+     "id": "d_20260202140500_0e400f",
+     "symbol": "BND",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -2.95,
+     "end": "2026-03-05"
+    },
+    {
+     "id": "d_20260202140500_0e400f",
+     "symbol": "BND",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -6.52,
+     "end": "2026-05-04"
+    },
+    {
+     "id": "d_20260212140500_66f2cb",
+     "symbol": "BND",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -2.27,
+     "end": "2026-03-13"
+    },
+    {
+     "id": "d_20260212140500_66f2cb",
+     "symbol": "BND",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -3.14,
+     "end": "2026-05-14"
+    },
+    {
+     "id": "d_20260227140500_73942b",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -7.74,
+     "end": "2026-04-01"
+    },
+    {
+     "id": "d_20260227140500_73942b",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -16.3,
+     "end": "2026-05-29"
+    },
+    {
+     "id": "d_20260303140500_b2a6c7",
+     "symbol": "ACME",
+     "kind": "hold_off",
+     "origin": "risk",
+     "horizon": "30D",
+     "usd": 133.83,
+     "end": "2026-04-03"
+    },
+    {
+     "id": "d_20260303140500_b2a6c7",
+     "symbol": "ACME",
+     "kind": "hold_off",
+     "origin": "risk",
+     "horizon": "90D",
+     "usd": 301.5,
+     "end": "2026-06-02"
+    },
+    {
+     "id": "d_20260309140500_2abe28",
+     "symbol": "FXAIX",
+     "kind": "trim",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": 0.11,
+     "end": "2026-04-09"
+    },
+    {
+     "id": "d_20260309140500_2abe28",
+     "symbol": "FXAIX",
+     "kind": "trim",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": 4.39,
+     "end": "2026-06-08"
+    },
+    {
+     "id": "d_20260312140500_167ad3",
+     "symbol": "FTEC",
+     "kind": "trim",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -1.26,
+     "end": "2026-04-10"
+    },
+    {
+     "id": "d_20260312140500_167ad3",
+     "symbol": "FTEC",
+     "kind": "trim",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -7.31,
+     "end": "2026-06-11"
+    },
+    {
+     "id": "d_20260316140500_6a312c",
+     "symbol": "BND",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -2.44,
+     "end": "2026-04-16"
+    },
+    {
+     "id": "d_20260316140500_6a312c",
+     "symbol": "BND",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -20.29,
+     "end": "2026-06-15"
+    },
+    {
+     "id": "d_20260320140500_9f57ad",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -5.39,
+     "end": "2026-04-22"
+    },
+    {
+     "id": "d_20260320140500_9f57ad",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -2.84,
+     "end": "2026-06-19"
+    },
+    {
+     "id": "d_20260326140500_d20987",
+     "symbol": "BND",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -4.09,
+     "end": "2026-04-24"
+    },
+    {
+     "id": "d_20260326140500_d20987",
+     "symbol": "BND",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -26.29,
+     "end": "2026-06-25"
+    },
+    {
+     "id": "d_20260327140500_ea1725",
+     "symbol": "VXUS",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": 2.1,
+     "end": "2026-04-29"
+    },
+    {
+     "id": "d_20260327140500_ea1725",
+     "symbol": "VXUS",
+     "kind": "rebalance",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": 15.28,
+     "end": "2026-06-26"
+    },
+    {
+     "id": "d_20260327140500_05b260",
+     "symbol": "ACME",
+     "kind": "hold_off",
+     "origin": "risk",
+     "horizon": "30D",
+     "usd": 175.35,
+     "end": "2026-04-29"
+    },
+    {
+     "id": "d_20260327140500_05b260",
+     "symbol": "ACME",
+     "kind": "hold_off",
+     "origin": "risk",
+     "horizon": "90D",
+     "usd": 125.64,
+     "end": "2026-06-26"
+    },
+    {
+     "id": "d_20260331140500_ab80db",
+     "symbol": "FTEC",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": 11.94,
+     "end": "2026-05-01"
+    },
+    {
+     "id": "d_20260331140500_ab80db",
+     "symbol": "FTEC",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -19.43,
+     "end": "2026-06-30"
+    },
+    {
+     "id": "d_20260403140500_8ae10f",
+     "symbol": "BND",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": 1.94,
+     "end": "2026-05-06"
+    },
+    {
+     "id": "d_20260403140500_8ae10f",
+     "symbol": "BND",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": -30.4,
+     "end": "2026-07-03"
+    },
+    {
+     "id": "d_20260417140500_c8a7c8",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "30D",
+     "usd": -85.84,
+     "end": "2026-05-20"
+    },
+    {
+     "id": "d_20260417140500_c8a7c8",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "90D",
+     "usd": 115.89,
+     "end": "2026-07-17"
+    },
+    {
+     "id": "d_20260423140500_d27a6c",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "30D",
+     "usd": 33.98,
+     "end": "2026-05-22"
+    },
+    {
+     "id": "d_20260423140500_d27a6c",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "90D",
+     "usd": 261.55,
+     "end": "2026-07-23"
+    },
+    {
+     "id": "d_20260427140500_355091",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "30D",
+     "usd": -2.73,
+     "end": "2026-05-28"
+    },
+    {
+     "id": "d_20260427140500_355091",
+     "symbol": "FXAIX",
+     "kind": "deposit_route",
+     "origin": "plan_keeper",
+     "horizon": "90D",
+     "usd": 6.97,
+     "end": "2026-07-27"
+    }
+   ]
+  },
+  "paper": [
+   {
+    "id": "tech-tilt",
+    "name": "Aggressive tech tilt",
+    "kind": "mix",
+    "status": "paper",
+    "return_pct": 7.9,
+    "value_end": 1079
+   },
+   {
+    "id": "sector-momentum",
+    "name": "Sector momentum",
+    "kind": "strategy",
+    "status": "paper",
+    "return_pct": 2.1,
+    "value_end": 1021
+   },
+   {
+    "id": "filings-lane",
+    "name": "Filings lane",
+    "kind": "lane",
+    "status": "paper",
+    "return_pct": -0.9,
+    "value_end": 991
+   }
+  ],
+  "fi": {
+   "fi_number": 1000000,
+   "progress_start_pct": 0.999,
+   "progress_end_pct": 1.677,
+   "change_pts": 0.678
+  },
+  "events": [
+   {
+    "date": "2026-04-29",
+    "type": "earnings",
+    "symbol": "ACME",
+    "detail": "EPS 0.11 against 0.12 expected"
+   },
+   {
+    "date": "2026-07-30",
+    "type": "earnings",
+    "symbol": "ACME",
+    "detail": "EPS 0.19 against 0.16 expected"
+   }
+  ]
+ },
+ "debrief": {
+  "headline": "2026 so far: up $6,776, with most of it from deposits.",
+  "what_happened": "A 4.19% time-weighted year to date. Steady monthly deposits did most of the dollar growth.",
+  "why": "US large caps led. The international and bond sleeves lagged, as the plan expects in a year like this.",
+  "against_decisions": "Deposit routes placed on schedule; one rebalance dismissed with a reason.",
+  "watch": [
+   "December is tax-loss season; the tax desk reviews lots from Dec 1."
+  ],
+  "next_steps": [
+   {
+    "text": "Keep deposits on the plan through year end.",
+    "symbol": null
+   }
+  ],
+  "numbers_cited": [
+   "change_usd",
+   "change_pct",
+   "vs.spy.pts"
+  ],
+  "model": "synthetic",
+  "written_at": "2026-11-06T22:52:00+00:00",
+  "pack_digest": "0b1decc9b93408fb",
+  "stale": true
+ }
+}
