@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -265,3 +266,35 @@ def mark_trigger(cfg: Config, as_of: str, kind: str, scope_id: str) -> bool:
 def link_trigger(cfg: Config, as_of: str, kind: str, scope_id: str, request_id: int) -> None:
     with db(cfg) as conn:
         conn.execute("UPDATE agent_triggers_seen SET request_id=? WHERE as_of=? AND kind=? AND scope_id=?", (request_id, as_of, kind, scope_id))
+
+
+def trigger_seen(cfg: Config, as_of: str, kind: str, scope_id: str) -> bool:
+    with db(cfg) as conn:
+        return conn.execute("SELECT 1 FROM agent_triggers_seen WHERE as_of=? AND kind=? AND scope_id=?", (as_of, kind, scope_id)).fetchone() is not None
+
+
+def pin_steps(cfg: Config, symbol: str, steps: list[dict]) -> None:
+    with db(cfg) as conn:
+        conn.executemany(
+            "INSERT OR REPLACE INTO agent_plan_pins (symbol, step_id, step, created_at, delivered_at) VALUES (?,?,?,?,NULL)",
+            [(symbol, str(s["id"]), json.dumps(s, sort_keys=True), now_iso()) for s in steps],
+        )
+
+
+def unpin_step(cfg: Config, symbol: str, step_id: str) -> bool:
+    with db(cfg) as conn:
+        return conn.execute("DELETE FROM agent_plan_pins WHERE symbol=? AND step_id=?", (symbol, step_id)).rowcount == 1
+
+
+def pinned_steps(cfg: Config, symbol: str | None = None) -> list[dict]:
+    where, args = ("WHERE symbol=?", (symbol,)) if symbol else ("", ())
+    with db(cfg) as conn:
+        rows = conn.execute(f"SELECT symbol, step, delivered_at FROM agent_plan_pins {where} ORDER BY symbol, created_at, step_id", args).fetchall()
+    return [{"symbol": r["symbol"], "delivered": r["delivered_at"] is not None} | json.loads(r["step"]) for r in rows]
+
+
+def pins_delivered(cfg: Config, symbol: str, step_ids: list[str]) -> None:
+    with db(cfg) as conn:
+        conn.executemany(
+            "UPDATE agent_plan_pins SET delivered_at=? WHERE symbol=? AND step_id=? AND delivered_at IS NULL", [(now_iso(), symbol, sid) for sid in step_ids]
+        )

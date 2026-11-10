@@ -64,4 +64,12 @@ CREATE TABLE IF NOT EXISTS agent_triggers_seen (
   request_id INTEGER REFERENCES agent_requests (id),
   PRIMARY KEY (as_of, kind, scope_id)
 );
+CREATE TABLE IF NOT EXISTS agent_plan_pins (
+  symbol TEXT NOT NULL,
+  step_id TEXT NOT NULL,
+  step TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  delivered_at TEXT,
+  PRIMARY KEY (symbol, step_id)
+);
 """
