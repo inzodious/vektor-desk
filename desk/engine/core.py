@@ -537,7 +537,8 @@ def _margin_metrics(out: Out, rows, total):
         if h["is_cash"] and h["value"] < 0:
             a["debit"] -= h["value"]
     debit = sum(a["debit"] for a in by_acct.values())
-    out.m("margin.debit", debit, "usd")
+    modelled = any(h["is_cash"] and h["value"] < 0 and h["quality"] == "modelled" for h in rows)
+    out.m("margin.debit", debit, "usd", quality="modelled" if modelled else "ok")
     if debit > 0:
         out.m("margin.cost_month", debit * rate / 100 * 30 / 360 if rate is not None else None, "usd", quality="ok" if rate is not None else "modelled")
         out.m("margin.funded_share", debit / total * 100 if total else None, "pct")
