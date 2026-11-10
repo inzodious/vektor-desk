@@ -14,6 +14,7 @@ SKEPTIC_FOR = {"research", "scout"}
 SKEPTIC_KINDS = {"buy", "sell"}
 STALE_ENGINE_HOURS = 36
 ADVISED = {"plan_keeper", "tax", "risk", "research", "scout"}
+BUY_KINDS = {"buy", "deposit_route"}
 
 
 @dataclass
@@ -111,6 +112,7 @@ class Prepared:
     prompt: str = ""
     schema: dict = field(default_factory=dict)
     skip: tuple[str, str] | None = None
+    view: dict = field(default_factory=dict)
 
 
 def health_problem(slice_: dict, now: datetime | None = None) -> str | None:
@@ -128,6 +130,15 @@ def health_problem(slice_: dict, now: datetime | None = None) -> str | None:
         if age > STALE_ENGINE_HOURS:
             return f"Engine health is fail: the last engine run finished {age:.0f} hours ago (limit {STALE_ENGINE_HOURS})."
     return None
+
+
+def no_buy_problem(p: dict, view: dict, today: str | None = None) -> str | None:
+    ticket = p.get("order_ticket") if isinstance(p.get("order_ticket"), dict) else {}
+    if p.get("kind") not in BUY_KINDS and ticket.get("action") != "buy":
+        return None
+    symbol = str(p.get("symbol") or ticket.get("symbol") or "").upper()
+    until = advisor.no_buy_until(view, symbol, today or datetime.now(UTC).date().isoformat())
+    return f"{symbol} is inside a planned wash-sale window: no buys until {until}." if until else None
 
 
 def prepare(
@@ -166,7 +177,8 @@ def prepare(
     if name in ADVISED:
         view = advisor.gather(cfg, advice)
         prep.slice_ = advisor.attach(prep.slice_, view)
-    prep.digest = briefs.digest(prep.slice_)
+        prep.view = view
+    prep.digest = briefs.digest(prep.slice_ | {"plan_steps": (view or {}).get("planned_actions") or []})
     if name in SKIP_UNCHANGED and trigger == "schedule" and store.last_digest(cfg, name) == prep.digest:
         prep.skip = prep.skip or ("unchanged", "Nothing in the brief changed since the last run.")
     extra, prep.symbol = _extra(cfg, name, prep.slice_, symbol, question, trigger_row, lab)
@@ -224,6 +236,10 @@ def run_proposal_desk(
     run_id = str(outcome.run_id)
     try:
         for p in proposals:
+            held = no_buy_problem(p, prep.view)
+            if held:
+                report.rejected.append(decisions.reject(cfg, p, name, held, run_id))
+                continue
             problems = briefs.number_problems(p, idx)
             if problems:
                 report.rejected.append(decisions.reject(cfg, p, name, "Numbers don't match the brief: " + "; ".join(problems), run_id))

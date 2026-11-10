@@ -19,7 +19,21 @@ def gather(cfg: Config, source: Advisor | None = None) -> dict:
             view["missing"].append(name)
     if view["risk_profile"] is None and "risk_profile" not in view["missing"]:
         view["missing"].append("risk_profile")
+    try:
+        view["no_buy"] = dict(source.no_buy(cfg) or {}) if hasattr(source, "no_buy") else {}
+    except FAILS:
+        view["no_buy"] = {}
     return view
+
+
+def no_buy_until(view: dict, symbol: object, today: str) -> str | None:
+    window = (view.get("no_buy") or {}).get(str(symbol or "").upper())
+    if not isinstance(window, dict):
+        return None
+    start, until = str(window.get("from") or "")[:10], str(window.get("until") or "")[:10]
+    if (start and start > today) or (until and until < today):
+        return None
+    return until or "the window ends"
 
 
 def _item(metric_id: str, scope: str, scope_id: str, value: object, unit: str) -> dict:
@@ -58,6 +72,7 @@ def summary(view: dict) -> dict:
         "catalog": [{k: r.get(k) for k in CATALOG_LABELS if k in r} for r in view.get("catalog") or ()],
         "convictions": view.get("convictions") or [],
         "planned_actions": view.get("planned_actions") or [],
+        "no_buy": view.get("no_buy") or {},
         "missing": view.get("missing") or [],
     }
 

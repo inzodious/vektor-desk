@@ -1,0 +1,285 @@
+{
+  "title": "Stock plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "action",
+    "summary",
+    "numbers_cited"
+  ],
+  "properties": {
+    "action": {
+      "enum": [
+        "draft",
+        "keep"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "numbers_cited": {
+      "type": "array",
+      "maxItems": 24,
+      "items": {
+        "type": "string",
+        "maxLength": 80
+      }
+    },
+    "plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "thesis",
+        "weight_band",
+        "add_rule",
+        "trim_rule",
+        "exit_conditions",
+        "tax_notes",
+        "catalysts",
+        "next_review",
+        "steps"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "core",
+            "conviction",
+            "satellite",
+            "exit"
+          ]
+        },
+        "thesis": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "weight_band": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "min_pct",
+            "max_pct"
+          ],
+          "properties": {
+            "min_pct": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "max_pct": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "add_rule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "zone_low",
+            "zone_high",
+            "max_per_month_usd",
+            "deposits_only",
+            "note"
+          ],
+          "properties": {
+            "zone_low": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "zone_high": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "max_per_month_usd": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "deposits_only": {
+              "type": "boolean"
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        "trim_rule": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "above_pct",
+            "to_pct",
+            "zone_low",
+            "zone_high",
+            "note"
+          ],
+          "properties": {
+            "above_pct": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "to_pct": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "zone_low": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "zone_high": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        "exit_conditions": {
+          "type": "array",
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "tax_notes": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "catalysts": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "date"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "date": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "next_review": {
+          "type": "string"
+        },
+        "steps": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "kind",
+              "due",
+              "when"
+            ],
+            "properties": {
+              "text": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "kind": {
+                "enum": [
+                  "add",
+                  "trim",
+                  "hold",
+                  "review",
+                  "harvest",
+                  "sell",
+                  "repay",
+                  "other"
+                ]
+              },
+              "due": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "when": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 160
+              },
+              "until": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "shares": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "amount_usd": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "lots": {
+                "enum": [
+                  "highest_cost",
+                  "lowest_cost",
+                  "fifo",
+                  "lifo",
+                  "tax_efficient",
+                  null
+                ]
+              },
+              "no_buy_days": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 300
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
