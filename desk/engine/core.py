@@ -13,7 +13,7 @@ from desk.engine import ENGINE_VERSION, SET_KEY, bands, broker, catalog, fi, loo
 from desk.engine.backfill import NO_PRICES
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
-from desk.engine.holdings import Prices, matching_close, price_series
+from desk.engine.holdings import BACKCAST, Prices, matching_close, price_series
 from desk.engine.lots import current_lots, realized_rows
 from desk.engine.market import BENCHMARKS, last_trading_day
 from desk.engine.research import macro, research_symbols, signals
@@ -259,7 +259,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     kinds = symbol_kinds(mirror, targets, desk)
 
     totals = {d: sum(h["value"] for h in holdings[d]) for d in days}
-    quality_by_day = {d: ("pro_forma" if any(h["quality"] != "ok" for h in holdings[d]) else "ok") for d in days}
+    quality_by_day = {d: _day_quality(holdings[d]) for d in days}
     pflow = defaultdict(float)
     aflow: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
     for f in flows:
@@ -337,17 +337,25 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     return out
 
 
+def _day_quality(rows: list[dict]) -> str:
+    if any(h["source"] == BACKCAST and h["quality"] == "modelled" for h in rows):
+        return "modelled"
+    return "pro_forma" if any(h["quality"] != "ok" for h in rows) else "ok"
+
+
 def implied_flows(days: list[str], holdings: dict[str, list[dict]], aflow, income_rows) -> dict[tuple[str, str], float]:
     found: dict[tuple[str, str], float] = {}
     for i in range(1, len(days)):
         lo, hi = days[i - 1], days[i]
         today = holdings[hi]
         snapped = {h["account"] for h in today if h["source"] == "snapshot"}
-        if not snapped:
+        before = {h["account"] for h in holdings[lo]}
+        opened = {h["account"] for h in today if h["source"] == BACKCAST} - before
+        if not snapped and not opened:
             continue
         price = {h["symbol"]: h["close"] for h in today if not h["is_cash"] and h["close"]}
-        for acct in sorted(snapped | {h["account"] for h in holdings[lo]}):
-            if acct not in snapped and any(h["account"] == acct for h in today):
+        for acct in sorted(snapped | before | opened):
+            if acct not in snapped and acct not in opened and any(h["account"] == acct for h in today):
                 continue
             prev = [h for h in holdings[lo] if h["account"] == acct]
             repriced = sum(h["value"] if h["is_cash"] else h["shares"] * (price.get(h["symbol"]) or h["close"] or 0.0) for h in prev)

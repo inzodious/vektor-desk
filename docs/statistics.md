@@ -66,7 +66,7 @@ Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deplo
 | **core** | `desk.db` | `accounts`, `engine_snapshots` (every snapshot the mirror ever saw, with the one per day used as the anchor), `holdings_daily(date, account, symbol, shares, close, value, cost, reported_value, is_cash, source, anchor, quality)`, `lots`, `cash_flows(date, account, amount, kind, external)`, `prices_daily(symbol, date, close, adj_close, source)`, `benchmarks`, `factors_daily`, `macro_daily`, `fund_holdings(fund, as_of, holding, name, cusip, weight, asset_cat, country, accession)`, `quotes_live(symbol, at, price)` | Normalized, deduplicated, one row per fact |
 | **derived** | `desk.db` | `metric_values`, `series_daily`, `signals`, `proposals_scored`, `data_health` | Written by the engine run, tagged with `engine_version` |
 
-**Keep every pull.** Escape Vektor collapses synced snapshots to one per week. `row_history` keeps every version of every snapshot and position the mirror saw (`positions.json.snapshotId` joins to `snapshots.json.id`), so the engine rebuilds `holdings_daily` for every pull and, from the first day the mirror runs, has a daily history Escape Vektor does not. Earlier history is rebuilt the way Escape Vektor's `market.js` does it: the earliest snapshot's quantities rolled forward by activity rows, priced with daily closes, flagged `pro_forma` where no snapshot confirms it.
+**Keep every pull.** Escape Vektor collapses synced snapshots to one per week. `row_history` keeps every version of every snapshot and position the mirror saw (`positions.json.snapshotId` joins to `snapshots.json.id`), so the engine rebuilds `holdings_daily` for every pull and, from the first day the mirror runs, has a daily history Escape Vektor does not. Earlier history is rebuilt the way Escape Vektor's `market.js` does it: the earliest snapshot's quantities rolled forward by activity rows, priced with daily closes, flagged `pro_forma` where no snapshot confirms it. Days before the earliest snapshot come from the Fidelity history (see History before the first snapshot).
 
 **Cash flows.** External flows are deposits, withdrawals, HSA contributions and 401(k) contributions. Internal moves (the margin and cash sub-account journals, transfers between your own accounts at the portfolio level, core fund sweeps, dividend reinvestment) are not flows. Getting this wrong is the most common way personal return math lies, so the classifier ships with fixtures for every Fidelity action text seen so far.
 
@@ -149,6 +149,20 @@ Symbols come from `securityDetail.symbol`, else another row with the same CUSIP,
 | Sold before the history | A sale with no lots left books shares with unknown basis; it counts as `unknown` and is left out of realized totals, and the Shares check names the symbol |
 | Wash sales | A loss sale with buys of the same symbol within 30 days either side (any account, not the sold lot itself): the loss is disallowed in proportion to the shares bought, and added to that buy's lot cost |
 | Precedence | A lot-export CSV wins for its accounts; a realized export wins for its account and year |
+
+**History before the first snapshot.** The first snapshot is only as old as the desk. `holdings.backcast` walks back from it through the Fidelity history, undoing each day's activity, so the value and holdings series start where the history does. Rows carry `source` `history`.
+
+| Item | Rule |
+|---|---|
+| Accounts | Those in the first snapshot whose history runs from before it to on or after it. Each starts on its own history start. Others are listed under `left_out` and join at the first snapshot |
+| Shares and cash | The first snapshot's, minus every buy, sale, split, dividend, deposit and fee after that day. `pro_forma`, the same grade as a rolled-forward day |
+| Prices | The close on or before the day. With none, the nearest trade price in the history (else the snapshot price), `modelled`, and the symbol joins the price backfill with role `past` |
+| Opening shares unknown | If undoing a buy takes a holding below zero, the history is missing where those shares went. The holding shows as zero and that account's rows are `modelled` from that day back. Cash that goes negative is `modelled` too |
+| An account that starts later | Its opening value counts as money in on that day, not as return |
+| Day grade | `modelled` when any back-cast row is, else `pro_forma` |
+| Job result | `holdings` returns `backcast {from, days, accounts, left_out, unknown, unpriced}` |
+
+Limits: an account the history does not cover is not in the totals before the first snapshot, so earlier values are smaller than the whole portfolio was. Returns are for the covered accounts only.
 
 Tables: `broker_files`, `broker_txns`, `broker_lots`, `broker_realized` (rewritten by each core run). `desk.decisions` reads the same merged stream with `desk.engine.broker.decision_rows(conn, since)` (`conn` is `desk.db` with the mirror attached), which returns `(id, row)` pairs in the activity shape with `source` set to `broker` on broker rows.
 
@@ -628,7 +642,7 @@ Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. On
 | Periods | Run on trading days: `start` is the first and `end` the last trading day of the period. A weekend or holiday data day falls into the next period. The first run backfills every period the value series covers |
 | Base | The last data day on or before the trading day ahead of `start`. If the desk's history starts inside the period, the pack covers what there is and says so (`coverage.full` false) |
 | Closed | `end` has passed, or it is `end` and after 16:15 ET. The open period is "so far" |
-| Final | Closed and a later data day exists. Final packs freeze; a closed pack may be restated once before that (mutual fund prices post late). `review.run(..., rebuild=True)` recomputes all |
+| Final | Closed and a later data day exists. Final packs freeze; a closed pack may be restated once before that (mutual fund prices post late). Two exceptions, both from the back-cast: a pack that started at the edge of the history is redone when the history reaches further back, and a pack whose base day is back-cast is redone when its start or end value moves. `review.run(..., rebuild=True)` recomputes all |
 | Change | `change_pct` is time-weighted (the `twr_index` series). `net_flows` is every flow the return already nets out, derived per day as value − prior value × (1 + day return). `gain_usd` = change − flows |
 | Versus | SPY, then each live catalog mix, on the same starting dollars with the same flows on the same days. A mix is rebalanced daily, cash earns nothing, Dip buy carries its cash state from the index path. A comparator is left out when under 80% of it has prices |
 | Movers | Per holding: yesterday's shares × today's price change, summed over the period (splits handled). Top 5 up and down. A mover's `return_pct` is chained from the same daily holdings prices, so it always agrees in sign with its contribution. `other_usd` is the rest of the gain: dividends, interest, cash and same-day trades. A day's flow under 5 cents is rounding and counts as zero |
