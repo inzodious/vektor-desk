@@ -10,6 +10,9 @@ from desk.engine.source import SnapshotVersion, closes, snapshot_versions
 
 SHARE_KINDS = {"buy", "sell", "reinvest"}
 CORPORATE_KINDS = {"split", "distribution"}
+CASH_INCOME = {"dividend", "interest"}
+BACKCAST = "history"
+SHARE_DUST = 1e-6
 STALE_MIN_ROWS = 1
 STALE_SHARE = 0.6
 SETTLE_TOLERANCE = 1.0
@@ -140,7 +143,15 @@ def activity_by_date(rows) -> dict[str, list[dict]]:
     return out
 
 
-def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict], price=None) -> bool:
+def _core(r: dict, symbol: str) -> bool:
+    return bool(r.get("core")) or symbol in CASH_SYMBOLS
+
+
+def _moves_cash(r: dict, symbol: str) -> bool:
+    return not _core(r, symbol) or r.get("kind") in CASH_INCOME
+
+
+def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict], price=None, sign: float = 1.0) -> bool:
     moved = False
     for r in rows:
         account = str(r.get("accountKey") or "account")
@@ -148,7 +159,7 @@ def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict], price=No
         kind = r.get("kind")
         qty = _num(r.get("quantity"))
         amount = _num(r.get("amount")) or 0.0
-        core = bool(r.get("core")) or symbol in CASH_SYMBOLS
+        core = _core(r, symbol)
         if kind in SHARE_KINDS and symbol and not core and not qty:
             px = price(symbol) if price and amount else None
             if not px:
@@ -156,13 +167,13 @@ def apply_activity(held: dict[tuple[str, str], dict], rows: list[dict], price=No
             qty = -amount / px
         if kind in SHARE_KINDS | CORPORATE_KINDS and symbol and not core and qty:
             cur = held.setdefault((account, symbol), {"shares": 0.0, "value": 0.0, "cost": None, "is_cash": False})
-            cur["shares"] += qty
+            cur["shares"] += sign * qty
             moved = True
-        if core or not amount:
+        if not amount or not _moves_cash(r, symbol):
             continue
         cash_key = next((k for k, v in held.items() if k[0] == account and v["is_cash"]), (account, "CASH"))
         cur = held.setdefault(cash_key, {"shares": 0.0, "value": 0.0, "cost": None, "is_cash": True})
-        cur["shares"] += amount
+        cur["shares"] += sign * amount
         moved = True
     return moved
 
@@ -175,8 +186,7 @@ def _cash_moved(rows: list[dict], account: str) -> float:
     for r in rows:
         if str(r.get("accountKey") or "account") != account:
             continue
-        core = bool(r.get("core")) or str(r.get("symbol") or "").upper() in CASH_SYMBOLS
-        if not core:
+        if _moves_cash(r, str(r.get("symbol") or "").upper()):
             moved += _num(r.get("amount")) or 0.0
     return moved
 
@@ -189,7 +199,7 @@ def _landed_buys(rows: list[dict], account: str, before: dict, after: dict) -> f
         amount = _num(r.get("amount")) or 0.0
         if str(r.get("accountKey") or "account") != account or r.get("kind") != "buy" or not symbol or amount >= 0:
             continue
-        if bool(r.get("core")) or symbol in CASH_SYMBOLS:
+        if _core(r, symbol):
             continue
         spent[symbol] = spent.get(symbol, 0.0) - amount
         bought[symbol] = bought.get(symbol, 0.0) + abs(_num(r.get("quantity")) or 0.0)
@@ -356,6 +366,84 @@ def holdings_rows(anchor_list: list[Anchor], prices: Prices, activity: dict[str,
     return out
 
 
+# ---- Back-cast from the broker history ----
+
+
+def trade_prices(activity: dict[str, list[dict]]) -> dict[str, list[tuple[str, float]]]:
+    out: dict[str, list[tuple[str, float]]] = {}
+    for d in sorted(activity):
+        for r in activity[d]:
+            symbol = str(r.get("symbol") or "").upper()
+            if r.get("kind") not in SHARE_KINDS or not symbol or _core(r, symbol):
+                continue
+            qty, amount = _num(r.get("quantity")), _num(r.get("amount"))
+            unit = abs(amount / qty) if qty and amount else _num(r.get("price"))
+            if unit and unit > 0:
+                out.setdefault(symbol, []).append((d, unit))
+    return out
+
+
+def _traded(units: list[tuple[str, float]] | None, day: str) -> float | None:
+    if not units:
+        return None
+    i = bisect_right([d for d, _ in units], day)
+    return units[i - 1][1] if i else units[0][1]
+
+
+def backcast(first: Anchor, activity: dict[str, list[dict]], cover: dict[str, tuple[str, str]], prices: Prices) -> tuple[list[tuple], dict]:
+    seen = {k[0] for k in first.rows}
+    opens = {a: span[0] for a, span in cover.items() if a in seen and span[0] < first.date <= span[1]}
+    note = {"from": None, "days": 0, "accounts": dict(sorted(opens.items())), "left_out": sorted(seen - set(opens)), "unknown": [], "unpriced": []}
+    start = min(opens.values(), default=first.date)
+    days = sorted(d for d in prices.calendar() if start <= d < first.date)
+    if not days:
+        return [], note
+    held = {k: {**v, "cost": None} for k, v in first.rows.items() if k[0] in opens}
+    trades = trade_prices(activity)
+    act_dates = sorted(d for d in activity if d <= first.date)
+    left = len(act_dates)
+    unknown: dict[str, tuple[str, str]] = {}
+    unpriced: set[str] = set()
+    rows = []
+    for day in reversed(days):
+        while left and act_dates[left - 1] > day:
+            left -= 1
+            d = act_dates[left]
+            mine = [r for r in activity[d] if str(r.get("accountKey") or "account") in opens]
+            apply_activity(held, mine, lambda sym, d=d: prices.close(sym, d) or _traded(trades.get(sym), d), sign=-1.0)
+        for (account, symbol), h in sorted(held.items()):
+            if not h["is_cash"] and h["shares"] < -SHARE_DUST and day >= opens[account]:
+                unknown.setdefault(account, (day, symbol))
+        for (account, symbol), h in sorted(held.items()):
+            if day < opens[account]:
+                continue
+            quality = "modelled" if account in unknown else "pro_forma"
+            if h["is_cash"]:
+                shares, close = h["shares"], 1.0
+                value = round(shares, 2)
+                if shares < -SETTLE_TOLERANCE:
+                    quality = "modelled"
+            else:
+                shares = max(h["shares"], 0.0)
+                close = prices.close(symbol, day)
+                if close is None and shares > SHARE_DUST:
+                    close = _traded(trades.get(symbol), day) or _anchor_price(first, symbol)
+                    quality = "modelled"
+                    unpriced.add(symbol)
+                value = round(shares * close, 2) if close is not None else 0.0
+            if abs(shares) < SHARE_DUST and abs(value) < 0.005:
+                continue
+            rows.append((day, account, symbol, round(shares, 6), close, value, None, None, int(h["is_cash"]), BACKCAST, first.as_of, quality))
+    rows.sort(key=lambda r: r[:3])
+    note |= {
+        "from": days[0],
+        "days": len(days),
+        "unknown": [{"account": a, "symbol": sym, "on_or_before": day} for a, (day, sym) in sorted(unknown.items())],
+        "unpriced": sorted(unpriced),
+    }
+    return rows, note
+
+
 def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: str | None = None) -> dict:
     versions = snapshot_versions(mirror)
     series = closes(mirror)
@@ -366,7 +454,8 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
     activity = activity_by_date(rows_in)
     modelled = settle(anchor_list, activity, history.cover)
     days = build_days(anchor_list, prices, through)
-    rows = holdings_rows(anchor_list, prices, activity, days)
+    back, cast = backcast(anchor_list[0], activity, history.cover, prices) if anchor_list else ([], None)
+    rows = back + holdings_rows(anchor_list, prices, activity, days)
     with desk:
         desk.execute("DELETE FROM engine_snapshots")
         desk.executemany("INSERT INTO engine_snapshots VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", records)
@@ -380,10 +469,11 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
     return {
         "snapshots": len(records),
         "anchors": len(anchor_list),
-        "days": len(days),
+        "days": len(days) + (cast["days"] if cast else 0),
         "rows": len(rows),
-        "first": days[0] if days else None,
+        "first": (cast["from"] if cast and cast["from"] else None) or (days[0] if days else None),
         "last": days[-1] if days else None,
         "symbols_priced": len(series),
         "margin_modelled": modelled,
+        "backcast": cast,
     }

@@ -11,7 +11,7 @@ from desk.db import connect
 from desk.engine import broker, catalog
 from desk.engine.bands import limit
 from desk.engine.core import PROFILE_ERRORS, convictions, latest_plan, rules_in_force
-from desk.engine.holdings import CASH_SYMBOLS, bar_series, price_series
+from desk.engine.holdings import BACKCAST, CASH_SYMBOLS, bar_series, price_series
 from desk.engine.lots import realized_rows
 from desk.engine.market import ET, trading_day
 from desk.engine.shadows import TotalReturn
@@ -641,6 +641,25 @@ def _settled(latest: str, now: datetime) -> str:
     return (date.fromisoformat(latest) - timedelta(days=1)).isoformat()
 
 
+SEEN_PATHS = {"full": "coverage.full", "base": "coverage.base", "v0": "value.start", "v1": "value.end"}
+SEEN = ", ".join(["as_of"] + [f"json_extract(pack, '$.{path}') AS {name}" for name, path in SEEN_PATHS.items()])
+
+
+def _backcast_end(desk: sqlite3.Connection) -> str | None:
+    return desk.execute("SELECT max(date) FROM holdings_daily WHERE source=?", (BACKCAST,)).fetchone()[0]
+
+
+def _revised(old: sqlite3.Row, data: Data, cast: str | None) -> bool:
+    base = old["base"]
+    if base is None:
+        return False
+    if not old["full"] and data.days[0] < base:
+        return True
+    if cast is None or base > cast:
+        return False
+    return any(abs((data.value.get(d) or 0.0) - (v or 0.0)) > 0.005 for d, v in ((base, old["v0"]), (old["as_of"], old["v1"])))
+
+
 def run(cfg: Config | None, mirror: sqlite3.Connection | None, desk: sqlite3.Connection, *, now: datetime | None = None, rebuild: bool = False) -> dict:
     now = now or datetime.now(UTC)
     data = load(cfg, mirror, desk)
@@ -649,14 +668,15 @@ def run(cfg: Config | None, mirror: sqlite3.Connection | None, desk: sqlite3.Con
     first, latest = data.days[0], data.days[-1]
     settled = _settled(latest, now)
     stamp = now.isoformat(timespec="seconds")
-    have = {(r["kind"], r["end"]): r for r in desk.execute('SELECT kind, "end", final, version FROM period_reviews')}
+    have = {(r["kind"], r["end"]): r for r in desk.execute(f'SELECT kind, "end", final, version, {SEEN} FROM period_reviews')}
+    cast = _backcast_end(desk)
     written: dict[str, int] = {}
     kept = 0
     rows = []
     for kind in KINDS:
         for start, end in periods(kind, first, latest):
             old = have.get((kind, end))
-            if old and old["final"] and old["version"] == PACK_VERSION and not rebuild:
+            if old and old["final"] and old["version"] == PACK_VERSION and not rebuild and not _revised(old, data, cast):
                 kept += 1
                 continue
             closed = end <= settled
