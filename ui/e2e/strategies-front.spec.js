@@ -6,20 +6,38 @@ test.beforeEach(async ({ page }) => {
 });
 
 // ---------- leaderboard ----------
-test('the leaderboard ranks paper strategies against IWM with the filings lane as a row', async ({ page }) => {
+test('the leaderboard groups racers under their own benchmark and ranks on lead against noise', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/lab/strategies');
   const board = page.getByTestId('leaderboard');
-  await expect(board.getByTestId('lb-lede')).toContainText('Calm sectors leads at +3.7 pts against IWM.');
-  await expect(board.locator('.lb-row')).toHaveCount(6);
+  await expect(board.getByTestId('lb-lede')).toContainText('Calm sectors has the firmest lead: +3.7 pts against Plan mix, 6% chance it’s luck.');
+  await expect(board.locator('.card-head')).toContainText('Checked at day 182, then every 91 days');
+  await expect(board.locator('.lb-row')).toHaveCount(8);
+  await expect(board.locator('.lb-group')).toHaveCount(3);
+  await expect(board.locator('[data-group="IWM"] .lb-bench')).toContainText('4 racers');
+  await expect(board.locator('[data-group="Plan mix"] .lb-bench')).toContainText('2 racers, 1 retired');
+  await expect(board.locator('[data-group="IVV"] [data-row="tech-tilt"] .lb-edge')).toContainText('vs IVV');
+  await expect(board.locator('[data-group="Plan mix"] [data-row="low-vol-sectors"] .lb-edge')).toContainText('vs Plan mix');
+  const top = board.locator('[data-row="insider-cluster-3"]');
+  await expect(top.locator('.lb-rank')).toHaveText('1');
+  await expect(top.getByTestId('lb-luck')).toHaveText('27% chance it’s luck');
+  await expect(top).toContainText('noise band ±9.6 pts');
   await expect(board.locator('[data-row="filings-lane-strong"]')).toContainText('Lane');
   const lane = board.locator('[data-row="filings-lane"]');
   await expect(lane).toContainText('Lane');
-  await expect(lane).toContainText('Day 32 of 182 · 150 to go');
+  await expect(lane).toContainText('Day 32 of 182 · first check Apr 5, 2027');
+  await expect(lane).toHaveAttribute('data-young', 'true');
+  await expect(lane.locator('.lb-rank')).toHaveText('·');
+  await expect(lane.locator('.lb-edge .chip')).toHaveText('Too new to rank');
   await expect(lane.getByRole('link')).toHaveCount(0);
   await expect(lane.getByTestId('lb-account')).toHaveText('Paper account $1,012 of $1,000 (+1.2%) · $906 cash');
+  await expect(board.locator('[data-row="low-vol-sectors"]')).toContainText('passed the day 182 check');
   await expect(board.locator('[data-row="sector-momentum"] .lb-edge b')).toHaveClass(/dn/);
+  await expect(board.locator('[data-row="sector-momentum"]').getByTestId('lb-luck')).toHaveText('No lead to test');
   await expect(board.locator('[data-row="dip-buyer"] .lb-rank')).toHaveText('—');
+  await expect(board.locator('[data-row="dip-buyer"]')).toContainText('Retired at the day 182 check · behind by more than noise');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
   await board.locator('[data-row="sector-momentum"]').getByRole('link').click();
   await expect(page).toHaveURL(/\/lab\/strategies\/sector-momentum/);
   expect(errors).toEqual([]);

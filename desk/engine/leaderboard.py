@@ -1,16 +1,17 @@
 import json
 import math
 import sqlite3
-from datetime import date, timedelta
+from datetime import date
 
 from desk.config import Config
 from desk.db import connect
+from desk.engine.gate import LUCK_BAR, PAPER_DAYS, STEP_DAYS
 from desk.engine.lab.data import ledger_path
-from desk.engine.lab.paper import PAPER_DAYS
 from desk.engine.lane import BENCHMARK
 
 EMPTY_NOTE = "No strategies are paper trading yet. The filings lane starts the morning after the first filing is scored."
 STATUS_RANK = {"eligible": 0, "paper": 1, "retired": 2}
+YOUNG_DAYS = 60
 MIN_DAYS = 20
 CALMAR_DAYS = 63
 RATIO_KEYS = ("ann_return_pct", "sharpe", "sortino", "max_drawdown_pct", "calmar", "hit_rate")
@@ -137,8 +138,23 @@ def _reward_risk(ledger: tuple[list[str], list[float]] | None, summary: dict) ->
     return {"source": None, "days": len(ledger[0]) if ledger else 0} | dict.fromkeys(RATIO_KEYS)
 
 
+def _order(row: dict) -> tuple:
+    score = row["score"]
+    return (STATUS_RANK.get(row["status"], 3), row["young"], score is None, -(score or 0), -row["days_live"], row["id"])
+
+
 def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict] | None = None) -> dict:
-    base = {"as_of": None, "benchmark": BENCHMARK, "gate_days": PAPER_DAYS, "rows": [], "note": EMPTY_NOTE}
+    base = {
+        "as_of": None,
+        "benchmark": BENCHMARK,
+        "gate_days": PAPER_DAYS,
+        "step_days": STEP_DAYS,
+        "young_days": YOUNG_DAYS,
+        "luck_bar": LUCK_BAR,
+        "groups": [],
+        "rows": [],
+        "note": EMPTY_NOTE,
+    }
     if conn is None or not _has(conn, "paper_portfolios"):
         return base
     trades, opens, accounts = _counts(conn, "paper_trades"), _counts(conn, "paper_positions"), _accounts(conn, sleeve)
@@ -149,10 +165,13 @@ def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict
         summary = json.loads(r["summary"] or "{}")
         excess, own = r["excess_pts"], r["return_pct"]
         bench = summary.get("benchmark_return_pct")
+        if bench is None:
+            bench = summary.get("bench_return_pct")
         if bench is None and own is not None and excess is not None:
             bench = own - excess
         days = r["days"]
-        waiting = "time" if days < PAPER_DAYS else ("benchmark" if excess is None else None)
+        gate = summary.get("gate") or {}
+        upcoming = gate.get("next_checkpoint") or {}
         rows.append(
             {
                 "id": r["strategy_id"],
@@ -164,12 +183,18 @@ def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict
                 "started": r["started"],
                 "as_of": r["as_of"],
                 "days_live": days,
-                "days_to_eligible": max(0, PAPER_DAYS - days),
-                "eligible_on": (date.fromisoformat(r["started"]) + timedelta(days=PAPER_DAYS)).isoformat(),
-                "waiting_on": waiting if r["status"] == "paper" else None,
+                "young": days < YOUNG_DAYS,
+                "checkpoint_day": upcoming.get("day"),
+                "checkpoint_on": upcoming.get("on"),
+                "days_to_checkpoint": max(0, upcoming["day"] - days) if upcoming.get("day") is not None else None,
                 "return_pct": _r(own),
                 "bench_return_pct": _r(bench),
                 "excess_pts": _r(excess),
+                "score": gate.get("score"),
+                "luck": gate.get("luck"),
+                "tracking_error_pct": gate.get("tracking_error_pct"),
+                "band_pts": gate.get("band_pts"),
+                "gate": gate or None,
                 "max_drawdown_pct": _r(summary.get("mdd_pct")),
                 "trades": trades.get(key, 0),
                 "open_positions": opens.get(key, 0),
@@ -178,6 +203,15 @@ def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict
                 "backtest": tested.get(f"{r['strategy_id']}@{r['version']}") or tested.get(r["strategy_id"]),
             }
         )
-    rows.sort(key=lambda x: (STATUS_RANK.get(x["status"], 3), x["excess_pts"] is None, -(x["excess_pts"] or 0), -x["days_live"], x["id"]))
+    sizes: dict[str, int] = {}
+    for x in rows:
+        sizes[x["benchmark"]] = sizes.get(x["benchmark"], 0) + 1
+    rows.sort(key=lambda x: (-sizes[x["benchmark"]], x["benchmark"], *_order(x)))
+    groups = []
+    for x in rows:
+        if not groups or groups[-1]["benchmark"] != x["benchmark"]:
+            groups.append({"benchmark": x["benchmark"], "rows": 0, "racing": 0})
+        groups[-1]["rows"] += 1
+        groups[-1]["racing"] += x["status"] != "retired"
     as_of = max((x["as_of"] for x in rows), default=None)
-    return base | {"as_of": as_of, "rows": rows, "note": None if rows else EMPTY_NOTE}
+    return base | {"as_of": as_of, "groups": groups, "rows": rows, "note": None if rows else EMPTY_NOTE}

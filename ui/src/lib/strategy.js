@@ -57,6 +57,8 @@ export const BARS = [
 ];
 
 export const PAPER_DAYS = 182;
+export const DSR_BAR = 0.95;
+export const PBO_BAR = 0.2;
 
 const MINUS = '−';
 export function signedPts(v, d = 1) {
@@ -116,6 +118,22 @@ export function verdictLamps(bars) {
     const v = bars[b.key];
     return { id: b.key, label: b.t, status: v === true ? 'ok' : v === false ? 'act' : 'watch', detail: v == null ? `${b.line}. Did not run.` : b.line, short: v === true ? 'Clear' : v === false ? 'Missed' : 'Not run' };
   });
+}
+
+export function barMismatches(view) {
+  const bars = view?.final?.bars;
+  const t = view?.tear_sheet;
+  if (!bars || !t) return [];
+  const longest = [...(t.horizons || [])].filter((h) => h.starts).sort((a, b) => b.years - a.years)[0];
+  const wf = t.walk_forward?.excess_pts;
+  const held = view.final.holdout?.excess_vs_bench_pts;
+  const want = {
+    excess_interval: longest ? longest.p5_pts > 0 : null,
+    deflated_sharpe: t.deflated_sharpe == null ? null : t.deflated_sharpe > DSR_BAR,
+    pbo: t.pbo == null ? null : t.pbo < PBO_BAR,
+    holdout: wf == null || held == null ? null : wf > 0 && held > 0 && held >= wf / 2,
+  };
+  return Object.keys(want).filter((k) => k in bars && bars[k] !== want[k]);
 }
 
 export function foldItems(folds = []) {
