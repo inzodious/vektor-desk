@@ -13,6 +13,7 @@ Vite + React. Hand-rolled SVG charts, no chart library. Tokens are copied from E
 | `npm run fixtures` | Rebuilds the fixtures from a demo API (`DESK_DEMO=1`) with seeded intraday moves |
 | `python scripts/demo_seed.py` | Seeds synthetic proposals, agent runs, a brief, research rows (filings, earnings, insiders, FRED), a watched symbol, dossiers, Console questions and a year of decided calls for the flight record into a demo data dir (run with `DESK_DEMO=1 DESK_DATA_DIR=…` before `npm run fixtures`) |
 | `python scripts/demo_lab.py` | Writes a synthetic lab market, queues three strategies, a finalize and three rule tests, runs the lab and steps one paper portfolio (same env, after `demo_seed.py`) |
+| `python scripts/demo_replay.py` | Runs the replay engine on a seeded synthetic market and trade story and writes `src/fixtures/engine.replay*.json` (run from the repo root; no data dir needed) |
 | `npm run screens -- <dir>` | Screens at 1920, 1440, 390 in light and dark (needs a preview on 4318, fixtures on 4319) |
 
 ## Fixtures
@@ -49,3 +50,4 @@ For real shapes, run the API in demo mode (`DESK_DEMO=1`) and use `npm run dev`.
 | `/lab/boards` | 7 | Saved Compare and Risk views with their slicers, kept in this browser |
 | `/decisions/flight` | 10 | Total against the plan, a card per desk (record, 90% interval, chip), calibration by desk, groups by desk, kind, Preflight path or taken at 30, 90 or 365 days, saves, off-plan gap, every decided call |
 | `/lab/patterns` | 10 | Market context tiles with base rates, each holding against its own past, drawdown base rates, month-by-month seasonality, correlation shifts, your own buying habits |
+| `/lab/patterns/replay` | 10 | You versus the capped you: his own trades replayed under one rule at a time (`?rule=`), three lines on the same dollars, where the rule helped and hurt by name, what it did, every rule side by side, how he sized it. Opens from the card at the top of Patterns |

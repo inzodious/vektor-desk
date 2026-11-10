@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Tip } from './Tip.jsx';
 import { useWidth } from '../lib/useWidth.js';
 
-export function HBars({ items, fmt = (v) => String(v), name = 'Value', label, labelW = 80, rowH = 26, tone = 'sign', legend, table = true, empty = 'Nothing to show yet.' }) {
+export function HBars({ items, fmt = (v) => String(v), name = 'Value', label, labelW = 80, rowH = 26, tone = 'sign', legend, table = true, empty = 'Nothing to show yet.', onPick, picked }) {
   const [ref, width] = useWidth(360);
   const [asTable, setAsTable] = useState(false);
   const [hover, setHover] = useState(null);
@@ -67,8 +67,20 @@ export function HBars({ items, fmt = (v) => String(v), name = 'Value', label, la
             const x0 = X(Math.min(0, d.value ?? 0));
             const x1 = X(Math.max(0, d.value ?? 0));
             return (
-              <g key={d.label} data-bar={d.label} onPointerMove={(e) => setHover({ d, at: { x: e.clientX, y: e.clientY } })} onPointerLeave={() => setHover(null)}>
-                <rect className="hit" x={0} y={y} width={W} height={rowH} />
+              <g
+                key={d.label}
+                data-bar={d.label}
+                className={onPick ? `hb-pick${picked === d.label ? ' on' : ''}` : undefined}
+                role={onPick ? 'button' : undefined}
+                tabIndex={onPick ? 0 : undefined}
+                aria-pressed={onPick ? picked === d.label : undefined}
+                aria-label={onPick ? `${d.label}: ${has ? fmt(d.value) : d.note || 'no value'}` : undefined}
+                onClick={onPick ? () => onPick(d) : undefined}
+                onKeyDown={onPick ? (e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onPick(d)) : undefined}
+                onPointerMove={(e) => setHover({ d, at: { x: e.clientX, y: e.clientY } })}
+                onPointerLeave={() => setHover(null)}
+              >
+                <rect className="hit" x={0} y={y} width={W} height={rowH} rx={onPick ? 8 : undefined} />
                 <text x={L - 8} y={y + rowH / 2 + 4} textAnchor="end" className="lbl hb-lbl">
                   {d.label}
                 </text>

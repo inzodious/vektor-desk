@@ -22,6 +22,8 @@ export const ROUTES = [
   { path: '/lab/strategies/sector-momentum', h1: 'Sector momentum' },
   { path: '/lab/strategies/dip-margin', h1: 'Margin in a dip' },
   { path: '/lab/patterns', h1: 'Patterns' },
+  { path: '/lab/patterns/replay', h1: 'Replay' },
+  { path: '/lab/patterns/replay?rule=long-term', h1: 'Replay' },
   { path: '/lab/boards', h1: 'Saved boards' },
   { path: '/settings', h1: 'Settings' },
   { path: '/settings/first-run', h1: 'First run' },
@@ -39,6 +41,7 @@ export const ROUTES = [
   { path: '/plan?scenario=fresh', h1: 'Plan' },
   { path: '/lab/risk?scenario=fresh', h1: 'Risk' },
   { path: '/lab/strategies?scenario=fresh', h1: 'Strategy lab' },
+  { path: '/lab/patterns/replay?scenario=fresh', h1: 'Replay' },
   { path: '/settings?scenario=fresh', h1: 'Settings' },
   { path: '/nowhere', h1: 'Lost in orbit' },
 ];
