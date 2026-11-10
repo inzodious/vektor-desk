@@ -41,7 +41,23 @@ ENGINE_KINDS = {"earnings": "earnings", "concentration": "band"}
 IN_BAND = ("", "fits", "inside", "ok", "in_band", "within", "none")
 TEXT_KINDS = ("hold", "other")
 ORDER = ("asked", "new", "discount", "band", "earnings", "review_due", "weekly")
-FACT_FIELDS = ("symbol", "name", "as_of", "numbers", "lots", "wash_windows", "zones", "discount", "next_earnings", "filing_signals", "valuation", "band")
+FACT_FIELDS = (
+    "symbol",
+    "name",
+    "kind",
+    "as_of",
+    "price_as_of",
+    "accounts",
+    "numbers",
+    "lots",
+    "wash_windows",
+    "zones",
+    "discount",
+    "next_earnings",
+    "filing_signals",
+    "valuation",
+    "band",
+)
 PLAN_FIELDS = ("role", "thesis", "weight_band", "add_rule", "trim_rule", "exit_conditions", "tax_notes", "catalysts", "next_review", "steps")
 VIEW_FIELDS = ("status", "author", "summary", "approved_at", "weight_pct", "band_status", "band_source", "review_due", "warnings")
 STEP_FIELDS = ("id", "kind", "text", "due", "until", "when", "shares", "amount_usd", "account", "lots", "no_buy_days", "note")
@@ -520,7 +536,8 @@ def run_plan_desk(
     report = PlanReport("ok", waiting=waiting, pending=len(queue), left=len(items) - len(queue))
     if not queue:
         held = f" Your own draft is waiting for {', '.join(waiting)}." if waiting else ""
-        report.note = "No plans to draft or refresh today." + held
+        asked = [x for x in _symbols(symbols) if x not in waiting]
+        report.note = (f"{', '.join(asked)} isn't a holding in today's plan facts." if asked else "No plans to draft or refresh today.") + held
         return report
     view = advisor.gather(cfg, advice)
     system = briefs.prompt_file(NAME)

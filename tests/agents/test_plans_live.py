@@ -1,10 +1,10 @@
 import json
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
 from desk.agents import advisor, console, plans, store
-from desk.agents.sources import RealAdvisor, RealPlans
+from desk.agents.sources import RealAdvisor, RealPlanFacts, RealPlans
 from desk.decisions import plans as record
 from tests.agents.agent_fakes import FakeDecisions
 from tests.agents.test_advisor import FakeAdvisor
@@ -91,3 +91,26 @@ def test_bad_pins_are_refused_by_the_real_record(cfg):
     with pytest.raises(ValueError, match="shares"):
         console.ask(cfg, "plans", json.dumps({"steps": [{"kind": "repay", "due": "2026-11-18", "shares": 5}]}), symbol="TICKA")
     assert store.pinned_steps(cfg) == []
+
+
+def test_runs_on_the_engines_real_plan_facts(cfg, monkeypatch):
+    planfacts = pytest.importorskip("desk.engine.planfacts")
+    seeded = pytest.importorskip("tests.engine.test_planfacts").seeded
+    seeded(cfg, monkeypatch).close()
+    zones = next(r for r in planfacts.facts(cfg) if r["symbol"] == "ACME")["zones"]
+    answer = draft()
+    answer["plan"]["add_rule"] |= {"zone_low": zones["add"]["low"], "zone_high": zones["add"]["high"]}
+    answer["plan"]["trim_rule"] |= {"zone_low": zones["levels"]["high_52w"], "zone_high": 9999.0}
+    fake = Served({"plans": answer})
+    kw = {"facts": RealPlanFacts(), "plans": RealPlans(), "decisions": FakeDecisions(profile_data=ON), "adapter": fake, "advice": FakeAdvisor()}
+    report = plans.run_plan_desk(cfg, triggers=FakeTriggers(), today=WED, **kw)
+    assert report.drafted == ["ACME", "IVV", "SOLO"] and report.reasons["ACME"] == ["new", "discount", "band"]
+    sent = json.loads(fake.calls[0]["prompt"].split("\n\n", 1)[1])
+    assert sent["holding"]["kind"] == "stock" and sent["holding"]["band"]["status"] == "over" and sent["holding"]["accounts"] == ["ind"]
+    plan = record.get_plan(cfg, "ACME", now=NOW)
+    assert plan["add_rule"]["zone_low"] == zones["add"]["low"] and plan["trim_rule"]["zone_low"] == zones["levels"]["high_52w"]
+    assert plan["trim_rule"]["zone_high"] is None
+    again = plans.run_plan_desk(cfg, triggers=FakeTriggers(), today=date(2026, 11, 12), **kw)
+    assert again.note == "No plans to draft or refresh today." and len(fake.calls) == 3
+    asked = plans.run_plan_desk(cfg, triggers=FakeTriggers(), today=WED, symbols=("wtch",), **kw)
+    assert asked.note == "WTCH isn't a holding in today's plan facts."
