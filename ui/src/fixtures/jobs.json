@@ -86,6 +86,70 @@
    "refreshes": []
   },
   {
+   "name": "agents-run-strategy",
+   "title": "Agents run strategy",
+   "package": "agents",
+   "schedules": [
+    "45 5 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "trigger": "schedule",
+    "request_id": null,
+    "started": "2026-11-09T10:45:00Z",
+    "finished": "2026-11-09T10:52:00Z",
+    "result": "ok",
+    "exit_code": 0,
+    "detail": null
+   },
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-run-filings",
+   "title": "Agents run filings",
+   "package": "agents",
+   "schedules": [
+    "15 4 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "trigger": "schedule",
+    "request_id": null,
+    "started": "2026-11-09T09:15:00Z",
+    "finished": "2026-11-09T09:19:00Z",
+    "result": "ok",
+    "exit_code": 0,
+    "detail": null
+   },
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "agents-run-discounts",
+   "title": "Agents run discounts",
+   "package": "agents",
+   "schedules": [
+    "15 18 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
    "name": "agents-triggers",
    "title": "Agents triggers",
    "package": "agents",
@@ -371,6 +435,111 @@
     "exit_code": 0,
     "detail": null
    },
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-universe",
+   "title": "Engine universe",
+   "package": "engine",
+   "schedules": [
+    "30 19 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-filings",
+   "title": "Engine filings",
+   "package": "engine",
+   "schedules": [
+    "35 3 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-insider",
+   "title": "Engine insider",
+   "package": "engine",
+   "schedules": [
+    "20 23 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-earnings",
+   "title": "Engine earnings",
+   "package": "engine",
+   "schedules": [
+    "50 23 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-paper",
+   "title": "Engine paper",
+   "package": "engine",
+   "schedules": [
+    "45 8 * * 1-5",
+    "45 16 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "trigger": "schedule",
+    "request_id": null,
+    "started": "2026-11-09T13:45:00Z",
+    "finished": "2026-11-09T13:46:00Z",
+    "result": "ok",
+    "exit_code": 0,
+    "detail": null
+   },
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": []
+  },
+  {
+   "name": "engine-discounts",
+   "title": "Engine discounts",
+   "package": "engine",
+   "schedules": [
+    "40 17 * * 1-5"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
    "cooldown_until": null,
    "can_run": true,
    "refreshes": []

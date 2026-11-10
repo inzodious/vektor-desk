@@ -12,6 +12,7 @@ import { DriftRows } from '../components/DriftRows.jsx';
 import { QueueCard } from '../decisions/QueueCard.jsx';
 import { BriefCard } from '../agents/BriefCard.jsx';
 import { Discounts } from '../research/Discounts.jsx';
+import { TodayRun } from '../components/TodayRun.jsx';
 import { CashDrawer, DriftDrawer, ExcessDrawer, SinglesDrawer, ValueDrawer } from './BridgeDrawers.jsx';
 import { LIVE_STATES, useLive, useSymbol } from '../live/context.js';
 import { useApi } from '../lib/api.js';
@@ -275,6 +276,7 @@ export default function Bridge() {
         <Kpi i={7} label="FI progress" metric="fi.progress" value={fiV == null ? 'Not yet' : fiV.toFixed(1)} unit={fiV == null ? undefined : '%'} line={fiV == null ? 'Needs the FI path' : 'of the FI number'} quality={fiV == null ? undefined : fi?.quality} asOf={fiV == null ? null : engineAsOf} />
       </section>
       <section className="grid">
+        <TodayRun i={7} />
         <BriefCard brief={brief} i={7} />
         <QueueCard queue={queue} i={7} span="c8" />
         <Discounts i={7} />
