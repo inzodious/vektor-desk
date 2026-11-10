@@ -77,6 +77,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Strategy desk** | Nightly 05:45, one variant in a rotating family (below); on request from the Console; when a lab result lands; 12 runs a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
 | **Filings desk** | Daily 04:15, one call per new filing, up to 40 a night | One small-cap SEC filing from the statistics queue: form, 8-K items, excerpt (first 12,000 characters) | A score per filing in the signal table (see [Filings desk](#filings-desk)); never a proposal or a trade | high; no tools |
 | **Discount cases** | Weekdays 18:15, after the close, up to 3 a day | One discount-day scanner hit (held, watchlist or quality list), his risk band, conviction bands and planned actions, plus the web | A buy / wait / avoid case per hit, through `desk.engine.discounts.record`; never a proposal or a trade | xhigh; WebSearch, WebFetch |
+| **Debrief desk** | Weekdays 17:50 (day; month and year on their last trading day), Friday 18:30 (week) | One period pack from the 17:35 review job, his risk band, conviction bands and stock plans | What happened, why, what worked against past decisions, what to watch, up to 3 next steps, through `desk.engine.review.record` (see [Debrief desk](#debrief-desk)); never a proposal or a trade | high; no tools |
 
 **Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
 
@@ -179,6 +180,23 @@ There is no single target plan. Every proposal desk (Plan keeper, Tax, Risk, Res
 | Planned actions | `desk.decisions.targets.planned_actions` + `describe` (C3) | `advisor.planned_actions`, ready sentences |
 
 Each piece is optional: a missing one is listed in `advisor.missing` and the desk carries on. With no risk band yet, desks stay conservative and mention the questionnaire once. The v3 mix is one catalog entry, and v3 items he hasn't re-confirmed are suggestions only. A risk band change counts as a brief change, so the Plan keeper runs that day.
+
+## Debrief desk
+
+Writes the words on the Results page (`docs/statistics.md` owns the period packs). Advisory only.
+
+| Piece | Detail |
+|---|---|
+| Queue | `desk.engine.review.pending(cfg)`: the latest pack per kind (day, week, month, year) whose digest differs from its last debrief; `NotReady` until the first review run |
+| Which periods | Day every weekday. Week, month and year once the review job marks them closed. The first ever run also writes every open period "so far" |
+| Write | `desk.engine.review.record(cfg, kind, end, result)`, one debrief per (kind, end), rewritten when the pack restates; a refused debrief is noted on the run |
+| Debrief | `schemas/debrief.json`: `headline` ≤ 120, `what_happened` ≤ 700, `why` ≤ 700, `against_decisions` ≤ 500, `watch` ≤ 4, `next_steps` ≤ 3 `{text, symbol}`, `numbers_cited` (keys of the pack's `numbers`; others dropped), plus `pack_digest`, `model`, `written_at`, `run_id` |
+| No call | Pack missing, or digest unchanged since the last debrief: no model call and no run row |
+| Alert | Phone alert on the research topic with the headline, linking to Results |
+| Stops | Usage limit, run lock busy, weekly cap (12), or switch off |
+| On switch | On by default behind `agents.enabled`; Settings → Desks turns it off. The first-run guard does not hold it, since it only writes text |
+
+`python -m desk.agents run debrief [--kinds day,week,month,year] [--so-far]` writes now; `dry-run debrief` shows the first pack's prompt.
 
 ## Discount cases
 
@@ -303,10 +321,11 @@ desk/agents/
   schema.py       the package's tables
   filings.py      the filings desk's nightly loop: queue, score, number check, record
   discounts.py    discount cases after the close: queue, case, number check, record
+  debrief.py      period debriefs after the review job: pack, debrief, number check, record
   advisor.py      risk band, catalog, convictions and planned actions for every brief
   switches.py     Settings over desk.yaml over defaults
   prompts/        one system prompt per desk (Phase 5 on)
-  schemas/        proposal.json, strategy.json, skeptic.json, filings.json (Phase 5 on)
+  schemas/        proposal.json, strategy.json, skeptic.json, filings.json, discounts.json, debrief.json
   briefs.py       builds each desk's prompt from engine brief slices (Phase 5 on)
 tests/agents/     fake adapter and a stand-in claude binary only; never the real CLI
 desk.example.yaml
@@ -335,7 +354,7 @@ Numbering follows `ROADMAP.md`.
 | Switches | Settings (`PUT /api/agents/{desk}/enabled`, `*` for all) overrides `desk.yaml`; `DELETE` the same path to follow `desk.yaml` again. Status shows each desk's `source` (`app`, `desk.yaml` or `default`); the Filings desk defaults to off | Settings, Desks panel |
 | Health gate | A desk logs `unhealthy` and stays quiet while any engine health check is `fail`, or the engine's last run finished over 36 hours ago. Warnings don't block. | Fix the failing check; the next run goes ahead |
 | Dry run | `python -m desk.agents dry-run <desk>` builds the real brief and prompt from live data and prints them with the health checks and any skip reason. It calls no model and writes nothing. | Add `--symbol`, `--question`, `--system` or `--schema` as needed |
-| First-run guard | On by default: only the Plan keeper and Tax desk run, whatever `desk.yaml` enables. Status shows the other desks as guarded, and `guard.ready` turns true once both have finished an ok run (`guard.why` says which is missing). | `python -m desk.agents guard off` once their first runs look right (or `PUT /api/agents/guard`) |
+| First-run guard | On by default: only the Plan keeper and Tax desk run, whatever `desk.yaml` enables (the Debrief desk is exempt; it only writes text). Status shows the other desks as guarded, and `guard.ready` turns true once both have finished an ok run (`guard.why` says which is missing). | `python -m desk.agents guard off` once their first runs look right (or `PUT /api/agents/guard`) |
 | Recovery | A run or request left `running` by a stopped process is closed or queued again at the next `run` or `queue`, but only while no desk holds the run lock. A request interrupted twice fails. | Automatic |
 
 ## Before you start
