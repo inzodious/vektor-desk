@@ -182,6 +182,8 @@ def lane_wants(conn: sqlite3.Connection, b: Book, spec: lane.LaneSpec, now: date
 def strategy_wants(conn: sqlite3.Connection, b: Book, px, ok) -> dict[str, float]:
     if b.status not in LIVE:
         return {}
+    if b.held and b.kind == "mix" and catalog.is_hold(conn, b.strategy_id, b.version):
+        return dict(b.held)
     row = conn.execute("SELECT value FROM paper_portfolios WHERE strategy_id=? AND version=?", (b.strategy_id, b.version)).fetchone()
     pos = conn.execute("SELECT symbol, value FROM paper_positions WHERE strategy_id=? AND version=?", (b.strategy_id, b.version)).fetchall()
     total = (row[0] if row and row[0] else None) or sum(r["value"] or 0 for r in pos)

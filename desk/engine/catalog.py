@@ -39,6 +39,44 @@ PROXIES = {
     "FSELX": "SOXX",
     "FSPTX": "VGT",
 }
+EXPENSE_PCT = {
+    "IVV": 0.03,
+    "VOO": 0.03,
+    "SPY": 0.09,
+    "ITOT": 0.03,
+    "VTI": 0.03,
+    "SCHB": 0.03,
+    "VXUS": 0.05,
+    "IEFA": 0.07,
+    "SCHF": 0.06,
+    "AGG": 0.03,
+    "BND": 0.03,
+    "SCHZ": 0.03,
+    "IEF": 0.15,
+    "IJH": 0.05,
+    "IJR": 0.06,
+    "VO": 0.04,
+    "VB": 0.05,
+    "SOXX": 0.34,
+    "VGT": 0.09,
+    "FTEC": 0.08,
+    "SMH": 0.35,
+    "QQQ": 0.2,
+    "FXAIX": 0.015,
+    "FSKAX": 0.015,
+    "FZROX": 0.0,
+    "FTIHX": 0.06,
+    "FZILX": 0.0,
+    "FSPSX": 0.035,
+    "FXNAX": 0.025,
+    "VFIAX": 0.04,
+    "VTSAX": 0.04,
+    "VTIAX": 0.09,
+    "VBTLX": 0.04,
+    "SWPPX": 0.02,
+    "SWTSX": 0.03,
+}
+HOLD = "hold"
 ENTRIES = (
     {
         "id": "safe-mix",
@@ -48,7 +86,7 @@ ENTRIES = (
     {
         "id": "as-held",
         "name": "As held",
-        "hypothesis": "Your book as it stands, ASTS kept, followed each day so the other mixes have a real yardstick.",
+        "hypothesis": "Your book bought once and left alone, ASTS kept: what doing nothing earns, so the other mixes have a real yardstick.",
     },
     {
         "id": "tech-tilt",
@@ -93,6 +131,22 @@ def proxied(weights: dict[str, float], kinds: dict[str, str] | None = None) -> t
     return ({s: round(w / total, 6) for s, w in out.items()} if total else {}), notes
 
 
+# ---- Fees ----
+
+
+def expense_pct(symbol: str, fees: dict[str, float] | None = None) -> float:
+    sym = symbol.upper()
+    for table in (fees or {}, EXPENSE_PCT):
+        if sym in table:
+            return float(table[sym])
+    return float(EXPENSE_PCT.get(proxy(sym), 0.0))
+
+
+def mix_fee(source: dict[str, float], fees: dict[str, float] | None = None) -> float:
+    total = sum(w for w in source.values() if w > 0)
+    return sum(w * expense_pct(s, fees) for s, w in source.items() if w > 0) / total if total else 0.0
+
+
 # ---- Mixes ----
 
 
@@ -104,7 +158,13 @@ def mixes(plan_targets: dict[str, float], held: dict[str, float], cash: float, k
         out["dip-buy"] = {"weights": w, "cash": DIP_CASH, "notes": notes, "source": dict(plan_targets), "steps": list(DIP_STEPS)}
     if held:
         w, notes = proxied(held, kinds)
-        out["as-held"] = {"weights": w, "cash": round(max(0.0, min(1.0, cash)), 6), "notes": notes, "source": {s: round(v, 6) for s, v in held.items()}}
+        out["as-held"] = {
+            "weights": w,
+            "cash": round(max(0.0, min(1.0, cash)), 6),
+            "notes": notes,
+            "source": {s: round(v, 6) for s, v in held.items()},
+            "policy": HOLD,
+        }
     out["tech-tilt"] = {"weights": dict(TECH_TILT), "cash": 0.0, "notes": [], "source": dict(TECH_TILT)}
     return {k: out[k] for k in NAMES if k in out}
 
@@ -205,6 +265,19 @@ def _at(series: list[tuple[str, float]], day: str) -> float | None:
     return hit[-1] if hit else None
 
 
+def is_hold(conn: sqlite3.Connection, strategy_id: str, version: int) -> bool:
+    row = conn.execute("SELECT mix FROM catalog_strategies WHERE id=? AND version=?", (strategy_id, version)).fetchone()
+    return bool(row) and json.loads(row[0]).get("policy") == HOLD
+
+
+def held_shares(conn: sqlite3.Connection, strategy_id: str, version: int) -> dict[str, float]:
+    rows = conn.execute(
+        "SELECT symbol, sum(filled_qty) FROM paper_legs WHERE strategy_id=? AND version=? AND filled_qty IS NOT NULL AND price IS NOT NULL GROUP BY symbol",
+        (strategy_id, version),
+    ).fetchall()
+    return {r[0]: round(r[1], 6) for r in rows if r[1] and abs(r[1]) > 1e-6}
+
+
 def targets(conn: sqlite3.Connection, mix: dict) -> dict[str, float]:
     cash = mix.get("cash", 0.0)
     if mix.get("steps"):
@@ -253,7 +326,12 @@ def rebuild(conn: sqlite3.Connection, sleeve: float, px, *, now: datetime | None
         with conn:
             conn.execute("DELETE FROM paper_positions WHERE strategy_id=? AND version=?", (sid, ver))
             rows = []
-            for sym, w in sorted(want.items()):
+            kept = held_shares(conn, sid, ver) if want and mix.get("policy") == HOLD else {}
+            for sym, qty in sorted(kept.items()):
+                p = px(sym)
+                if p:
+                    rows.append((sid, ver, as_of, sym, qty, round(qty * p, 2)))
+            for sym, w in sorted(want.items() if not kept else ()):
                 p = px(sym)
                 if p:
                     rows.append((sid, ver, as_of, sym, round(value * w / p, 6), round(value * w, 2)))
