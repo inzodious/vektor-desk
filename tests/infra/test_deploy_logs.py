@@ -98,7 +98,7 @@ def test_app_card_sets_icon_and_web_ui_then_rebuilds_the_app_list_once(tmp_path)
     assert calls.read_text().count("app.metadata.generate") == 1
 
 
-def test_logs_export_includes_the_eval_debug_log_redacted_and_caps_it(tmp_path):
+def test_logs_export_leaves_the_eval_debug_log_out_deletes_an_old_copy_and_caps_the_raw_log(tmp_path):
     claude = "sk-" + "ant-oat01-" + "R" * 24
     (tmp_path / "data").mkdir()
     (tmp_path / "desk.env").write_text(f"CLAUDE_CODE_OAUTH_TOKEN={claude}\n")
@@ -112,12 +112,13 @@ def test_logs_export_includes_the_eval_debug_log_redacted_and_caps_it(tmp_path):
     (stub / "docker").chmod(0o755)
     (stub / "chown").write_text("#!/bin/sh\nexit 0\n")
     (stub / "chown").chmod(0o755)
+    out = tmp_path / "data" / "run" / "logs"
+    out.mkdir(parents=True)
+    (out / "eval-debug.log").write_text("tool output from an earlier export\n")
     env = {"DESK_ROOT": str(tmp_path), "DESK_DEBUG_MAX": "100", "PATH": "/usr/bin:/bin"}
     subprocess.run(["bash", "-c", f'source "{DEPLOY}"; PATH="{stub}:$PATH"; logs_export'], capture_output=True, text=True, env=env, check=True)
-    out = tmp_path / "data" / "run" / "logs"
-    exported = (out / "eval-debug.log").read_text()
-    assert "Declined session cse_1" in exported and claude not in exported
-    assert len(exported.splitlines()) == 1000
+    assert not (out / "eval-debug.log").exists()
+    assert not any("Declined session" in f.read_text() for f in out.iterdir())
     assert "vektor-desk-eval" in (out / "eval.log").read_text()
     assert debug.stat().st_size == 0
 
