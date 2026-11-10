@@ -71,7 +71,9 @@ def pick_columns(set_name: str, header: list[str]) -> list[int]:
 # ---- Fetch ----
 
 
-def _fresh(conn: sqlite3.Connection, name: str, now: datetime) -> bool:
+def _fresh(conn: sqlite3.Connection, name: str, now: datetime, have: str | None = None) -> bool:
+    if have is not None and conn.execute(have).fetchone() is None:
+        return False
     cut = (now - timedelta(days=REFRESH_DAYS)).isoformat(timespec="seconds")
     q = "SELECT 1 FROM api_calls WHERE provider='french' AND symbol=? AND ok=1 AND at >= ? LIMIT 1"
     return conn.execute(q, (name, cut)).fetchone() is not None
@@ -89,7 +91,8 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None, sets: tu
     stamp = now.isoformat(timespec="seconds")
     done, errors = [], []
     for name, columns in FACTOR_FILES.items():
-        if _fresh(conn, name, now):
+        wanted = ", ".join(f"'{series}'" for series in columns.values())
+        if _fresh(conn, name, now, f"SELECT 1 FROM factors_daily WHERE series IN ({wanted}) LIMIT 1"):
             continue
         try:
             header, rows = first_block(_download(http, name))
@@ -109,7 +112,7 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None, sets: tu
         done.append(name)
     for set_name in sets:
         name = PORTFOLIO_FILES[set_name]
-        if _fresh(conn, name, now):
+        if _fresh(conn, name, now, f"SELECT 1 FROM french_returns WHERE set_name='{set_name}' LIMIT 1"):
             continue
         try:
             header, rows = first_block(_download(http, name))

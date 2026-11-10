@@ -17,6 +17,10 @@ OVERLAP_DAYS = 7
 SIP_DELAY_MIN = 20
 
 
+class BadRequest(ProviderError):
+    pass
+
+
 def headers() -> dict[str, str] | None:
     key, secret = (os.environ.get(k, "").strip() for k in KEYS)
     if not key or not secret:
@@ -35,8 +39,19 @@ def _get(http, url: str, params: dict, hdrs: dict):
     if res.status_code == 429:
         raise ProviderError("Alpaca rate limit")
     if res.status_code != 200:
-        raise ProviderError(f"Alpaca {res.status_code}")
+        path = url.split("//", 1)[-1].partition("/")[2]
+        text = f"Alpaca {res.status_code} on /{path}: {_message(res)}"
+        raise BadRequest(text) if res.status_code in (400, 404, 422) else ProviderError(text)
     return res.json()
+
+
+def _message(res) -> str:
+    try:
+        body = res.json()
+    except ValueError:
+        body = None
+    said = body.get("message") if isinstance(body, dict) else None
+    return str(said or getattr(res, "text", "") or "no message")[:200]
 
 
 def _day(stamp: str) -> str:
@@ -66,33 +81,47 @@ def fetch_assets(conn: sqlite3.Connection, http, *, now: datetime) -> int:
 # ---- Daily bars (market data host, read only) ----
 
 
-def fetch_bars(http, symbols: list[str], start: str, end: str, adjustment: str, *, sleep=time.sleep) -> dict[str, list[dict]]:
+def fetch_bars(http, symbols: list[str], start: str, end: str, adjustment: str, *, sleep=time.sleep, skipped: list | None = None) -> dict[str, list[dict]]:
     hdrs = headers()
     if hdrs is None:
         raise ProviderError("ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set")
     out: dict[str, list[dict]] = {}
     for i in range(0, len(symbols), CHUNK):
-        token = None
-        while True:
-            params = {
-                "symbols": ",".join(symbols[i : i + CHUNK]),
-                "timeframe": "1Day",
-                "start": start,
-                "end": end,
-                "adjustment": adjustment,
-                "feed": feed(),
-                "limit": 10000,
-            }
-            if token:
-                params["page_token"] = token
-            body = _get(http, DATA_URL + BARS_PATH, params, hdrs) or {}
-            sleep(GAP)
-            for sym, bars in (body.get("bars") or {}).items():
-                out.setdefault(sym.upper(), []).extend(bars or [])
-            token = body.get("next_page_token")
-            if not token:
-                break
+        _batch(http, symbols[i : i + CHUNK], start, end, adjustment, hdrs, sleep, out, skipped)
     return out
+
+
+def _batch(http, symbols: list[str], start: str, end: str, adjustment: str, hdrs: dict, sleep, out: dict, skipped: list | None) -> None:
+    try:
+        got = _pages(http, symbols, start, end, adjustment, hdrs, sleep)
+    except BadRequest as e:
+        if skipped is None:
+            raise
+        if len(symbols) == 1:
+            skipped.append((symbols[0], str(e)))
+            return
+        mid = len(symbols) // 2
+        _batch(http, symbols[:mid], start, end, adjustment, hdrs, sleep, out, skipped)
+        _batch(http, symbols[mid:], start, end, adjustment, hdrs, sleep, out, skipped)
+        return
+    for sym, bars in got.items():
+        out.setdefault(sym, []).extend(bars)
+
+
+def _pages(http, symbols: list[str], start: str, end: str, adjustment: str, hdrs: dict, sleep) -> dict[str, list[dict]]:
+    out: dict[str, list[dict]] = {}
+    token = None
+    while True:
+        params = {"symbols": ",".join(symbols), "timeframe": "1Day", "start": start, "end": end, "adjustment": adjustment, "feed": feed(), "limit": 10000}
+        if token:
+            params["page_token"] = token
+        body = _get(http, DATA_URL + BARS_PATH, params, hdrs) or {}
+        sleep(GAP)
+        for sym, bars in (body.get("bars") or {}).items():
+            out.setdefault(sym.upper(), []).extend(bars or [])
+        token = body.get("next_page_token")
+        if not token:
+            return out
 
 
 def run_bars(conn: sqlite3.Connection, http, symbols: list[str], *, now: datetime, sleep=time.sleep) -> dict:
