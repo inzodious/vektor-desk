@@ -4,6 +4,36 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.1.0 - 2026-11-10
+
+### Added
+
+- Results: the engine writes a review pack for each day, week, month and year (change, against the S&P 500 and each mix, movers, money in, trades, risk, decisions, paper race), and the Results page shows it with the desk's debrief and next steps ([#148], [#159])
+- Value and holdings history from before the desk's first snapshot, rebuilt from the Fidelity history, so Month and Year results are real; the first evening run fetches missing prices itself ([#161], [#163])
+- Stock plans: one versioned plan per holding with a thesis, band, add and trim rules and dated steps, drafted by the Plan desk and approved by you; planned harvests hold new buys through the wash-sale window ([#152], [#157])
+- Plan facts per holding: lots with long-term dates, wash windows, 52-week range, add and trim zones, valuation, discount state, share of risk and band status ([#156])
+- Plan → Stock plans gives every holding a plan card with forms to write a plan, add a step, approve a draft and mark steps done; the same block is on the Symbol sheet, and coming plan steps show on the Bridge and in the daily Brief ([#165], [#157])
+- The Bridge shows today's run stage by stage (accounts, numbers, review, desks, paper), with what ran and what is still due ([#151])
+- Replay: your own trades replayed under a size cap, an exit rule, no margin and a year-and-a-day hold, shown as "you versus the capped you" on Lab → Patterns → Replay ([#162])
+- An FI goal can be set in the desk profile, and the FI forecast falls back to it ([#152], [#155])
+- Settings → Box gains Deploy now ([#154])
+- An outside review of the app at 1.0.9, with a rework gameplan ([#153])
+
+### Changed
+
+- The paper gate is a stored verdict at day 182 and every 91 days after, judged against a noise band with a minimum of 30 buys; each leaderboard row shows the chance its lead is luck, is ranked inside its own benchmark and is greyed under 60 days; deflated Sharpe counts trials across a whole strategy family. `/api/engine/lab/leaderboard` rows drop `days_to_eligible`, `eligible_on` and `waiting_on` and gain a per-row benchmark, `gate`, `score`, `luck`, `young` and `checkpoint_on` ([#160])
+- Mixes leads with time to FI by monthly deposit, with a lower-returns switch; "As held" is modelled and papered as a drifting hold; every mix carries its fund fees; conviction positions get a hold, rebalance or trim view ([#164])
+- Safe mix and dip-buy are built in and no longer depend on an Escape Vektor plan; market history loads on a new box without waiting for the monthly job ([#155])
+- The Debrief desk writes week, month and year when they close and never refuses a quiet period ([#150])
+
+### Fixed
+
+- Backups pass again: the live quotes table no longer trips a false integrity error on the box's SQLite version ([#155])
+- A failed backup no longer leaves a deploy half-applied, the alert says why it failed, and the eval debug log is no longer exported ([#154])
+- The insider job survives malformed symbols and skips a refused batch instead of failing ([#155])
+- A buy on margin, or one that has not settled, shows as margin debt instead of an invented deposit ([#158])
+- A mover's return on a review comes from the same prices as its dollar contribution ([#155])
+
 ## 1.0.9 - 2026-11-10
 
 ### Added
@@ -403,3 +433,20 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#144]: https://github.com/inzodious/vektor-desk/pull/144
 [#146]: https://github.com/inzodious/vektor-desk/pull/146
 [#147]: https://github.com/inzodious/vektor-desk/pull/147
+[#148]: https://github.com/inzodious/vektor-desk/pull/148
+[#150]: https://github.com/inzodious/vektor-desk/pull/150
+[#151]: https://github.com/inzodious/vektor-desk/pull/151
+[#152]: https://github.com/inzodious/vektor-desk/pull/152
+[#153]: https://github.com/inzodious/vektor-desk/pull/153
+[#154]: https://github.com/inzodious/vektor-desk/pull/154
+[#155]: https://github.com/inzodious/vektor-desk/pull/155
+[#156]: https://github.com/inzodious/vektor-desk/pull/156
+[#157]: https://github.com/inzodious/vektor-desk/pull/157
+[#158]: https://github.com/inzodious/vektor-desk/pull/158
+[#159]: https://github.com/inzodious/vektor-desk/pull/159
+[#160]: https://github.com/inzodious/vektor-desk/pull/160
+[#161]: https://github.com/inzodious/vektor-desk/pull/161
+[#162]: https://github.com/inzodious/vektor-desk/pull/162
+[#163]: https://github.com/inzodious/vektor-desk/pull/163
+[#164]: https://github.com/inzodious/vektor-desk/pull/164
+[#165]: https://github.com/inzodious/vektor-desk/pull/165
