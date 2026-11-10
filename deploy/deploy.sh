@@ -15,7 +15,7 @@
 #   deploy.sh redeploy recreate the containers on the images already live, so an edited *.env file takes effect (a
 #                      docker restart doesn't re-read env files); refuses while a desk job is running
 #   deploy.sh box      run the box actions the app asked for (Settings → Box): redeploy, status, check, backup,
-#                      restore-test, logs; auto does this every 5 minutes
+#                      restore-test, logs, update-script, apply-compose, deploy-now; auto does this every 5 minutes
 #   deploy.sh card     the app's icon and Web UI button in TrueNAS Apps; TrueNAS drops them when the YAML is edited, so
 #                      now and auto put them back
 # Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
@@ -42,14 +42,17 @@ BUILD_LOG=$ROOT/deploy-build.log
 DEBUG_MAX=${DESK_DEBUG_MAX:-104857600}
 NO_SELF_PIN=${DESK_NO_SELF_PIN:-$ROOT/deploy.no-self-pin}
 SELF=${DESK_SELF:-$(readlink -f "${BASH_SOURCE[0]}")}
-BOX_ACTIONS="redeploy status check backup restore-test logs update-script apply-compose"
+BOX_ACTIONS="redeploy status check backup restore-test logs update-script apply-compose deploy-now"
 BOX_TIMEOUT=${DESK_BOX_TIMEOUT:-1800}
 KEYS_PEM=${DESK_KEYS_PEM:-$ROOT/box-keys.pem}
 ENV_FILES="settings.env desk.env caddy.env tailscale.env"
 PAPER_URL=https://paper-api.alpaca.markets
 LOCK=/run/vektor-desk-deploy.lock
 AUTO_FAILED=$ROOT/deploy-auto.failed
+AUTO_WHY=$ROOT/deploy-auto.failed.why
+STOPPED_ON=deploy
 AUTO_NOTE=$ROOT/deploy-auto.note
+BACKUP_WHY=$ROOT/backup.why
 BUSY=75
 IMAGES=("vektor-desk:local=." "vektor-desk/caddy:local=deploy/caddy")
 
@@ -71,6 +74,14 @@ repo() { git -C "$SRC" -c safe.directory="$SRC" -c credential.helper="store --fi
 app_state() { midclt call app.query "[[\"name\", \"=\", \"$APP\"]]" | jq -r '.[0].state // "MISSING"'; }
 image_build() { docker image inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$1" 2>/dev/null || true; }
 live_build() { docker inspect -f '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$1" 2>/dev/null || true; }
+image_container() {
+  case $1 in
+    vektor-desk:local) echo vektor-desk-api ;;
+    vektor-desk/caddy:local) echo vektor-desk-caddy ;;
+  esac
+}
+running_image() { docker inspect -f '{{ .Image }}' "$1" 2>/dev/null || true; }
+backup_why() { head -c 200 "$BACKUP_WHY" 2>/dev/null | tr -d '\n' || true; }
 health() { docker inspect -f '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}{{ .State.Status }}{{ end }}' "$1" 2>/dev/null || echo missing; }
 
 run_job() {
@@ -135,18 +146,41 @@ tarball() {
 }
 
 backup() {
-  local staging=$ROOT/data/backup-staging
+  local staging=$ROOT/data/backup-staging out rc=0 why
+  rm -f "$BACKUP_WHY"
   [ -d "$ROOT/data" ] || {
-    echo "there's no $ROOT/data to back up" >&2
+    echo "there's no $ROOT/data to back up" | tee "$BACKUP_WHY" >&2
     return 1
   }
   if [ "$(docker inspect -f '{{ .State.Running }}' vektor-desk-cron 2>/dev/null)" = true ]; then
-    docker exec vektor-desk-cron python -m desk.backup --out /data/backup-staging >>"$LOG" 2>&1 || return 1
+    out=$(docker exec vektor-desk-cron python -m desk.backup --out /data/backup-staging 2>&1) || rc=$?
   else
-    docker run --rm --user 568:568 -v "$ROOT/data:/data" vektor-desk:local python -m desk.backup --out /data/backup-staging >>"$LOG" 2>&1 || return 1
+    out=$(docker run --rm --user 568:568 -v "$ROOT/data:/data" vektor-desk:local python -m desk.backup --out /data/backup-staging 2>&1) || rc=$?
   fi
-  tarball -C "$staging" . || return 1
+  printf '%s\n' "$out" >>"$LOG"
+  if [ "$rc" -ne 0 ]; then
+    why=$(printf '%s\n' "$out" | tail -n 1 | jq -r '.error // empty' 2>/dev/null || true)
+    printf '%s\n' "${why:-$(printf '%s\n' "$out" | tail -n 1)}" >"$BACKUP_WHY"
+    return 1
+  fi
+  tarball -C "$staging" . || {
+    echo "couldn't write the tarball to $BACKUPS" >"$BACKUP_WHY"
+    return 1
+  }
   rm -rf "$staging"
+}
+
+backup_now() {
+  local files why
+  if ! files=$(backup); then
+    why=$(backup_why)
+    die "the backup failed${why:+: $why}"
+  fi
+  log "Backed up: $files"
+  if [ "$(cat "$AUTO_WHY" 2>/dev/null)" = backup ]; then
+    rm -f "$AUTO_FAILED" "$AUTO_WHY"
+    log "The backup works again, so auto-deploy retries the commit it was holding back"
+  fi
 }
 
 # ---- Commands ----
@@ -177,7 +211,7 @@ update_checkout() {
 }
 
 deploy() {
-  local state why before target pair image dir built=() previous=() files
+  local state why before target pair image dir id live=1 built=() previous=() files
   state=$(app_state)
   if [ "$state" = RUNNING ] && why=$(busy); then
     die "a desk job is running: $why. Nothing was changed" "$BUSY"
@@ -189,30 +223,27 @@ deploy() {
   for pair in "${IMAGES[@]}"; do
     image=${pair%%=*}
     dir=${pair#*=}
+    [ "$(live_build "$(image_container "$image")")" = "$target" ] || live=0
     [ "$(image_build "$image")" = "$target" ] && continue
+    built+=("$image")
+    [ "$(image_build "${image%:*}:candidate")" = "$target" ] && continue
     log "Building $image ${target:0:7}: $(repo log -1 --format=%s) (output in $BUILD_LOG)"
     echo "==== $(date '+%F %T') build $image ${target:0:7}" >>"$BUILD_LOG"
     docker build --build-arg "DESK_BUILD=$target" --label vektor-desk.app=1 -t "${image%:*}:candidate" "$SRC/$dir" >>"$BUILD_LOG" 2>&1 ||
       die "$image didn't build; the live app wasn't touched. See $BUILD_LOG"
-    built+=("$image")
-  done
-
-  if [ ${#built[@]} -eq 0 ]; then
-    log "Already live: ${target:0:7}"
-    rm -f "$AUTO_FAILED"
-    return 0
-  fi
-  for image in "${built[@]}"; do
-    if docker image inspect "$image" >/dev/null 2>&1; then
-      previous+=("$image")
-      docker tag "$image" "${image%:*}:previous"
-    fi
-    docker tag "${image%:*}:candidate" "$image"
-    docker rmi "${image%:*}:candidate" >/dev/null
   done
 
   if [ "$state" = MISSING ]; then
-    log "Built ${built[*]} at ${target:0:7}. There's no app called $APP yet: install it from deploy/compose.yaml (docs/setup.md, step 6)"
+    for image in "${built[@]}"; do
+      docker tag "${image%:*}:candidate" "$image"
+      docker rmi "${image%:*}:candidate" >/dev/null
+    done
+    log "Images are at ${target:0:7}. There's no app called $APP yet: install it from deploy/compose.yaml (docs/setup.md, step 6)"
+    return 0
+  fi
+  if [ ${#built[@]} -eq 0 ] && [ "$live" -eq 1 ]; then
+    log "Already live: ${target:0:7}"
+    rm -f "$AUTO_FAILED" "$AUTO_WHY"
     return 0
   fi
   if [ -n "$before" ] && ! repo diff --quiet "$before" "$target" -- deploy/compose.yaml; then
@@ -220,18 +251,33 @@ deploy() {
     alert "Desk needs you" "compose.yaml changed. Open Settings, Box to apply it."
   fi
 
-  files=$(backup) || die "the backup failed, so nothing was restarted"
+  if ! files=$(backup); then
+    why=$(backup_why)
+    STOPPED_ON=backup
+    die "the backup failed${why:+ ($why)}, so nothing was changed"
+  fi
   log "Backed up: $files"
-  log "Restarting $APP"
+  for pair in "${IMAGES[@]}"; do
+    image=${pair%%=*}
+    id=$(running_image "$(image_container "$image")")
+    [ -n "$id" ] || continue
+    docker tag "$id" "${image%:*}:previous"
+    previous+=("$image")
+  done
+  for image in "${built[@]}"; do
+    docker tag "${image%:*}:candidate" "$image"
+    docker rmi "${image%:*}:candidate" >/dev/null
+  done
+  log "Restarting $APP on ${target:0:7}"
   if restart_app && healthy "$target"; then
     log "Live: ${target:0:7}"
-    rm -f "$AUTO_FAILED"
+    rm -f "$AUTO_FAILED" "$AUTO_WHY"
     docker image prune -f --filter "label=vektor-desk.app=1" >/dev/null 2>&1 || true
     return 0
   fi
 
   [ ${#previous[@]} -gt 0 ] || die "it didn't come up healthy and there are no previous images. See the app's logs"
-  log "It didn't come up healthy; going back to the previous images"
+  log "It didn't come up healthy; going back to the images that were running"
   for image in "${previous[@]}"; do docker tag "${image%:*}:previous" "$image"; done
   if restart_app && [ "$(health vektor-desk-api)" != missing ]; then
     die "rolled back; the previous version is live again. Pre-deploy backup: $files"
@@ -240,8 +286,15 @@ deploy() {
 }
 
 redeploy() {
-  local why target
+  local why target pair image live
   if why=$(busy); then die "a desk job is running: $why. Nothing was changed" "$BUSY"; fi
+  for pair in "${IMAGES[@]}"; do
+    image=${pair%%=*}
+    live=$(live_build "$(image_container "$image")")
+    if [ -n "$live" ] && [ "$(image_build "$image")" != "$live" ]; then
+      die "$image is a build that isn't running yet (${live:0:7} is live), so a redeploy would start it without a backup. Run deploy.sh now, or wait for auto-deploy, then redeploy. Nothing was changed"
+    fi
+  done
   target=$(live_build vektor-desk-api)
   log "Redeploying $APP on ${target:0:7} to pick up the env files"
   if restart_app && healthy "$target"; then
@@ -261,6 +314,7 @@ note() {
 auto_stopped() {
   if [ "$1" -eq 0 ] || [ "$1" -eq "$BUSY" ]; then return 0; fi
   printf '%s\n' "$AUTO_TARGET" >"$AUTO_FAILED"
+  printf '%s\n' "$STOPPED_ON" >"$AUTO_WHY"
 }
 
 pinned_stale() { [ -f "$PINNED" ] && ! cmp -s "$PINNED" "$SRC/deploy/deploy.sh"; }
@@ -403,7 +457,11 @@ status() {
   echo "Backups:     $(find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" 2>/dev/null | wc -l) in $BACKUPS"
   crons=$(midclt call cronjob.query 2>/dev/null | jq -r '[.[] | select(.enabled and (.command | test("vektor-desk-deploy/deploy\\.sh auto")))] | length' 2>/dev/null || true)
   if [ "${crons:-0}" -gt 0 ]; then echo "Auto-deploy: on"; else echo "Auto-deploy: off (docs/setup.md, step 8)"; fi
-  if [ -s "$AUTO_FAILED" ]; then echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or run deploy.sh now"; fi
+  if [ -s "$AUTO_FAILED" ] && [ "$(cat "$AUTO_WHY" 2>/dev/null)" = backup ]; then
+    echo "             holding back $(cut -c1-7 "$AUTO_FAILED") because its backup failed; it retries after the next good backup (Settings → Box → Back up now), or tap Deploy now"
+  elif [ -s "$AUTO_FAILED" ]; then
+    echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or Settings → Box → Deploy now"
+  fi
   echo "Box script:  $(script_line)"
   compose_drift
   echo
@@ -871,7 +929,8 @@ apply_compose() {
     echo "Made $d"
   done < <(jq -r '.missing_dirs[]' <<<"$report")
   files=$(backup) || {
-    echo "The backup failed, so nothing was changed"
+    why=$(backup_why)
+    echo "The backup failed${why:+ ($why)}, so nothing was changed"
     return 1
   }
   log "Backed up: $files"
@@ -982,8 +1041,7 @@ logs_export() {
   } | redact "$list" >"$out/.deploy.log.part"
   mv "$out/.deploy.log.part" "$out/deploy.log"
   debug=$ROOT/eval/home/logs/remote-control.log
-  tail -n 1000 "$debug" 2>/dev/null | redact "$list" >"$out/.eval-debug.log.part" || true
-  mv "$out/.eval-debug.log.part" "$out/eval-debug.log"
+  rm -f "$out/eval-debug.log" "$out/.eval-debug.log.part"
   if [ -f "$debug" ] && [ "$(stat -c %s "$debug")" -gt "$DEBUG_MAX" ]; then truncate -s 0 "$debug"; fi
   docker ps -a --filter name=vektor-desk --format '{{.Names}}\t{{.Status}}\t{{.Image}}' >"$out/containers.txt" 2>&1 || true
   date -Is >"$out/exported_at"
@@ -993,31 +1051,31 @@ logs_export() {
 }
 
 main() {
-  local files
+  local rc=0
   [ "$(id -u)" -eq 0 ] || {
     echo "Run it as root: sudo bash $0 ${1:-now}" >&2
     exit 1
   }
   mkdir -p "$ROOT"
   case "${1:-now}" in
-    now)
+    now | deploy-now)
       exec 9>"$LOCK"
-      flock -n 9 || die "a deploy is already running: tail -f $LOG"
+      flock -n 9 || die "a deploy is already running: tail -f $LOG" "$BUSY"
       deploy
       app_card || true
       ;;
     backup)
       ALERTS="Nightly backup failed"
-      files=$(backup) || die "the backup failed"
-      log "Backed up: $files"
+      backup_now
       ;;
     auto)
-      auto
-      exec 9>&-
+      bash "$SELF" auto-deploy || rc=$?
       app_card >/dev/null 2>&1 || true
       logs_export || true
       box_requests || true
+      exit "$rc"
       ;;
+    auto-deploy) auto ;;
     box) box_requests ;;
     redeploy)
       exec 9>"$LOCK"
@@ -1036,7 +1094,7 @@ main() {
       apply_compose
       ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box | update-script | apply-compose]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box | update-script | apply-compose | deploy-now]" >&2
       exit 2
       ;;
   esac

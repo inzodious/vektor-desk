@@ -29,6 +29,9 @@ CLUSTER_BUYERS = 2
 ROLES = ("director", "officer")
 FORMS = {"4", "4/A"}
 MONTHS = {m: i for i, m in enumerate(("JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"), start=1)}
+TICKER = re.compile(r"^[A-Z]{1,5}(\.[A-Z]{1,2})?$")
+PAREN = re.compile(r"\(([^()]+)\)")
+NOT_TICKERS = {"NONE", "NA", "N.A", "NULL", "TBD", "NO", "NOT"}
 RULE = "Open-market purchases (code P) on Form 4 by directors and officers; known the session after the filing date"
 
 
@@ -61,6 +64,15 @@ def role(text: str) -> str | None:
     return ",".join(hits) or None
 
 
+def clean_symbol(raw) -> str | None:
+    text = str(raw or "").upper().strip().strip("\"'").strip()
+    inside = PAREN.search(text)
+    if inside:
+        text = inside.group(1)
+    text = text.rsplit(":", 1)[-1].strip().replace("/", ".").replace("-", ".")
+    return text if TICKER.match(text) and text not in NOT_TICKERS else None
+
+
 def _tsv(z: zipfile.ZipFile, name: str) -> list[dict]:
     match = next((n for n in z.namelist() if n.upper().endswith(name.upper())), None)
     if match is None:
@@ -91,7 +103,7 @@ def parse_bulk(blob: bytes) -> list[tuple]:
     rows = []
     for acc, (shares, usd, traded) in buys.items():
         s = subs[acc]
-        symbol = str(s.get("ISSUERTRADINGSYMBOL") or "").strip().upper()
+        symbol = clean_symbol(s.get("ISSUERTRADINGSYMBOL"))
         filed = _date(s.get("FILING_DATE"))
         if not symbol or not filed or not str(s.get("ISSUERCIK") or "").strip().isdigit():
             continue
@@ -128,7 +140,7 @@ def parse_form4(xml: str, accession: str, filed: str) -> list[tuple]:
         return []
     if _x(root, "documentType") not in FORMS:
         return []
-    cik, symbol = _x(root, "issuer/issuerCik"), _x(root, "issuer/issuerTradingSymbol").upper()
+    cik, symbol = _x(root, "issuer/issuerCik"), clean_symbol(_x(root, "issuer/issuerTradingSymbol"))
     owners = []
     for o in root.findall("reportingOwner"):
         rel = o.find("reportingOwnerRelationship")
@@ -280,6 +292,20 @@ def clusters(conn: sqlite3.Connection, days: int = CLUSTER_DAYS, buyers: int = C
     return out
 
 
+def clean_stored(conn: sqlite3.Connection) -> dict:
+    fixed = dropped = 0
+    with conn:
+        for (sym,) in conn.execute("SELECT DISTINCT symbol FROM insider_buys").fetchall():
+            good = clean_symbol(sym)
+            if good == sym:
+                continue
+            if good is None:
+                dropped += conn.execute("DELETE FROM insider_buys WHERE symbol=?", (sym,)).rowcount
+            else:
+                fixed += conn.execute("UPDATE insider_buys SET symbol=? WHERE symbol=?", (good, sym)).rowcount
+    return {"fixed": fixed, "dropped": dropped}
+
+
 def history_names(conn: sqlite3.Connection) -> list[str]:
     first = sorted(set(clusters(conn)) | {BENCHMARK})
     rest = [r[0] for r in conn.execute("SELECT symbol FROM insider_buys WHERE filed_date >= ? GROUP BY symbol ORDER BY min(filed_date)", (HISTORY_START,))]
@@ -292,8 +318,10 @@ def fetch_history(conn: sqlite3.Connection, http, symbols: list[str], *, now: da
     if not todo:
         return {"symbols": 0, "bars": 0}
     end = (now - timedelta(minutes=alpaca.SIP_DELAY_MIN)).astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
-    raw = alpaca.fetch_bars(http, todo, HISTORY_START, end, "raw", sleep=sleep)
-    adj = alpaca.fetch_bars(http, todo, HISTORY_START, end, "all", sleep=sleep)
+    bad: list[tuple[str, str]] = []
+    raw = alpaca.fetch_bars(http, todo, HISTORY_START, end, "raw", sleep=sleep, skipped=bad)
+    refused = {s for s, _ in bad}
+    adj = alpaca.fetch_bars(http, [s for s in todo if s not in refused], HISTORY_START, end, "all", sleep=sleep, skipped=bad)
     rows: dict[tuple[str, str], list] = {}
     for sym, bars in raw.items():
         for b in bars:
@@ -307,7 +335,10 @@ def fetch_history(conn: sqlite3.Connection, http, symbols: list[str], *, now: da
     with conn:
         conn.executemany("INSERT OR IGNORE INTO alpaca_bars VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [tuple(r) for r in rows.values()])
         conn.executemany("INSERT OR REPLACE INTO alpaca_history VALUES (?, ?, ?, ?)", [(s, HISTORY_START, len(raw.get(s, [])), stamp) for s in todo])
-    return {"symbols": len(todo), "bars": len(rows), "left": max(0, len([s for s in symbols if s not in done]) - len(todo))}
+    out = {"symbols": len(todo), "bars": len(rows), "left": max(0, len([s for s in symbols if s not in done]) - len(todo))}
+    if bad:
+        out |= {"skipped": sorted({s for s, _ in bad}), "skipped_why": bad[0][1]}
+    return out
 
 
 def coverage(conn: sqlite3.Connection, limit: int = 20) -> dict:
@@ -385,6 +416,7 @@ def run(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> d
         return {"ok": True, "skipped": "DESK_SEC_USER_AGENT is not set"}
     out: dict = {"ok": True}
     try:
+        out["cleaned"] = clean_stored(conn)
         out["bulk"] = fetch_bulk(conn, http, agent, now=now, sleep=sleep)
         out["live"] = fetch_form4(conn, http, agent, sleep=sleep)
         out["frames"] = fetch_frames(conn, http, agent, now=now, sleep=sleep)

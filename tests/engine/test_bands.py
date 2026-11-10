@@ -33,9 +33,16 @@ def test_held_mix_keeps_asts_and_leaves_margin_out():
     assert w == {"FXAIX": 0.6, "ASTS": 0.4} and cash == 0.0 and "margin debit" in notes[0]
     w, cash, _ = catalog.held_mix(rows[:2] + [{"symbol": "SPAXX", "value": 250.0, "is_cash": True}])
     assert cash == pytest.approx(0.2)
-    made = catalog.mixes({"FXAIX": 0.8, "VXUS": 0.2}, w, cash)
+    made = catalog.mixes(w, cash, safe={"FXAIX": 0.8, "VXUS": 0.2})
     assert list(made) == ["safe-mix", "as-held", "tech-tilt", "dip-buy"]
     assert made["as-held"]["weights"] == {"IVV": 0.6, "ASTS": 0.4} and made["dip-buy"]["cash"] == 0.2
+    built_in = catalog.mixes({}, 0.0)
+    assert list(built_in) == ["safe-mix", "tech-tilt", "dip-buy"] and built_in["dip-buy"]["weights"] == built_in["safe-mix"]["weights"]
+    assert built_in["safe-mix"]["weights"] == {"IVV": 0.4, "SCHD": 0.2, "VXUS": 0.1, "FTEC": 0.1, "NLR": 0.05, "GRID": 0.05, "ICLN": 0.05, "UFO": 0.05}
+    assert (
+        built_in["safe-mix"]["notes"] == [catalog.SAFE_NOTE, "FTIHX trades as VXUS", "FXAIX trades as IVV"]
+        and built_in["safe-mix"]["source"] == catalog.SAFE_MIX
+    )
 
 
 def test_dip_deploys_a_third_at_each_drop_and_refills_at_a_new_high():
@@ -67,12 +74,12 @@ def bars(conn, symbol, closes, start=(2026, 10, 1)):
 
 def test_sync_versions_fixed_mixes_and_follows_the_book(cfg):
     conn = desk(cfg)
-    first = catalog.mixes({"FXAIX": 0.8, "VXUS": 0.2}, {"FXAIX": 1.0}, 0.0)
+    first = catalog.mixes({"FXAIX": 1.0}, 0.0, safe={"FXAIX": 0.8, "VXUS": 0.2})
     out = catalog.sync(conn, first, now=REG)
     assert sorted(out["registered"]) == ["as-held@1", "dip-buy@1", "safe-mix@1", "tech-tilt@1"] and "FTEC" in out["symbols"]
     assert {r[0] for r in conn.execute("SELECT symbol FROM market_symbols")} >= {"IVV", "VXUS", "FTEC", "SMH"}
     assert catalog.sync(conn, first, now=REG)["registered"] == []
-    second = catalog.mixes({"FXAIX": 0.6, "VXUS": 0.4}, {"FXAIX": 0.5, "ASTS": 0.5}, 0.0)
+    second = catalog.mixes({"FXAIX": 0.5, "ASTS": 0.5}, 0.0, safe={"FXAIX": 0.6, "VXUS": 0.4})
     assert sorted(catalog.sync(conn, second, now=REG)["registered"]) == ["dip-buy@2", "safe-mix@2"]
     rows = {(r["id"], r["version"]): r["retired_at"] for r in conn.execute("SELECT * FROM catalog_strategies")}
     assert rows[("safe-mix", 1)] and rows[("safe-mix", 2)] is None and ("as-held", 2) not in rows
@@ -80,10 +87,41 @@ def test_sync_versions_fixed_mixes_and_follows_the_book(cfg):
     conn.close()
 
 
+def test_a_mix_is_judged_at_its_checkpoint_not_every_night(cfg):
+    conn = desk(cfg)
+    tilt = {"weights": dict(catalog.TECH_TILT), "cash": 0.0, "notes": [], "source": dict(catalog.TECH_TILT)}
+    catalog.sync(conn, {"tech-tilt": tilt, "safe-mix": tilt}, now=REG)
+    closes = [100.0 + 0.05 * i + (0.4 if i % 2 else -0.4) for i in range(150)]
+    bars(conn, "IVV", closes, start=(2026, 11, 5))
+    days = [r[0] for r in conn.execute("SELECT date FROM price_bars WHERE symbol='IVV' ORDER BY date")]
+    rows = []
+    for i, (d, px) in enumerate(zip(days, closes, strict=True)):
+        near = 1000.0 * px / closes[0] * (1 + (0.002 if i % 3 else -0.004)) - 0.03 * i
+        far = 1000.0 * px / closes[0] * (1 + (0.002 if i % 3 else -0.004)) - 1.6 * i
+        rows += [("tech-tilt", 1, d, 0.0, near, near), ("safe-mix", 1, d, 0.0, far, far)]
+    with conn:
+        conn.executemany("INSERT INTO paper_ledger_daily VALUES (?, ?, ?, ?, ?, ?)", [r for r in rows if r[2] > days[0]])
+    prices = {"IVV": 100.0, "VXUS": 50.0, "FTEC": 200.0, "SMH": 250.0}
+    out = {r["strategy_id"]: r for r in catalog.rebuild(conn, 1000.0, prices.get, now=datetime(2027, 6, 2, 13, 0, tzinfo=UTC))}
+    near = dict(conn.execute("SELECT * FROM paper_portfolios WHERE strategy_id='tech-tilt'").fetchone())
+    gate = json.loads(near["summary"])["gate"]
+    assert near["days"] > 182 and near["excess_pts"] < 0
+    assert out["tech-tilt"]["status"] == "paper" and out["tech-tilt"]["targets"] == 4
+    assert gate["verdict"]["verdict"] == "unproven" and gate["verdict"]["reason"] == "noise" and gate["verdict"]["as_of"] == "2027-05-06"
+    assert gate["min_events"] is None and gate["next_checkpoint"] == {"day": 273, "on": "2027-08-05"}
+    assert out["safe-mix"]["status"] == "retired" and out["safe-mix"]["targets"] == 0
+    with conn:
+        conn.execute("UPDATE paper_ledger_daily SET value = value * 2 WHERE strategy_id='safe-mix' AND date=?", (days[-1],))
+    again = {r["strategy_id"]: r for r in catalog.rebuild(conn, 1000.0, prices.get, now=datetime(2027, 6, 3, 13, 0, tzinfo=UTC))}
+    assert again["safe-mix"]["status"] == "retired" and again["tech-tilt"]["status"] == "paper"
+    assert conn.execute("SELECT count(*) FROM paper_verdicts").fetchone()[0] == 2
+    conn.close()
+
+
 def test_rebuild_writes_targets_and_retires_old_versions(cfg):
     conn = desk(cfg)
-    catalog.sync(conn, catalog.mixes({"FXAIX": 0.8, "VXUS": 0.2}, {}, 0.0), now=REG)
-    catalog.sync(conn, catalog.mixes({"FXAIX": 0.5, "VXUS": 0.5}, {}, 0.0), now=REG)
+    catalog.sync(conn, catalog.mixes({}, 0.0, safe={"FXAIX": 0.8, "VXUS": 0.2}), now=REG)
+    catalog.sync(conn, catalog.mixes({}, 0.0, safe={"FXAIX": 0.5, "VXUS": 0.5}), now=REG)
     for sym, px in (("IVV", 100.0), ("VXUS", 50.0), ("FTEC", 200.0), ("SMH", 250.0)):
         bars(conn, sym, [px * 0.9, px])
     prices = {"IVV": 100.0, "VXUS": 50.0, "FTEC": 200.0, "SMH": 250.0}
@@ -105,7 +143,7 @@ def test_the_executor_buys_each_mix_into_its_own_sleeve(cfg, monkeypatch):
     for k in ("ALPACA_BASE_URL", "DESK_PAPER_EXECUTE", "DESK_PAPER_BUDGET", "DESK_PAPER_MAX_STRATEGIES"):
         monkeypatch.delenv(k, raising=False)
     conn = desk(cfg)
-    catalog.sync(conn, catalog.mixes({"FXAIX": 1.0}, {}, 0.0), now=REG)
+    catalog.sync(conn, catalog.mixes({}, 0.0, safe={"FXAIX": 1.0}), now=REG)
     for sym, px in (("IVV", 100.0), ("VXUS", 50.0), ("FTEC", 200.0), ("SMH", 250.0)):
         bars(conn, sym, [px])
     broker = FakeAlpaca()
@@ -293,6 +331,8 @@ def bands_body(cfg, mirror, monkeypatch, app_client):
     mkt = market_months(conn)
     for sym, beta, noise, i in (("IVV", 1.0, 0.002, 1), ("VXUS", 0.9, 0.02, 2), ("FTEC", 1.3, 0.03, 3), ("SMH", 1.6, 0.05, 4), ("ACME", 1.5, 0.12, 5)):
         priced(conn, mkt, sym, beta, noise, seed_=i)
+    for i, sym in enumerate(("SCHD", "NLR", "GRID", "ICLN", "UFO"), start=6):
+        priced(conn, mkt, sym, 0.9, 0.01, seed_=i)
     conn.close()
     computed(cfg)
     return client.get("/api/engine/bands").json()
@@ -370,7 +410,7 @@ def test_paper_as_held_buys_once_and_then_holds(cfg, monkeypatch):
     for k in ("ALPACA_BASE_URL", "DESK_PAPER_EXECUTE", "DESK_PAPER_BUDGET", "DESK_PAPER_MAX_STRATEGIES"):
         monkeypatch.delenv(k, raising=False)
     conn = desk(cfg)
-    catalog.sync(conn, catalog.mixes({}, {"FXAIX": 0.5, "ACME": 0.5}, 0.0, {"ACME": "stock"}), now=REG)
+    catalog.sync(conn, catalog.mixes({"FXAIX": 0.5, "ACME": 0.5}, 0.0, {"ACME": "stock"}), now=REG)
     assert catalog.latest(conn)["as-held"]["mix"]["policy"] == "hold" and catalog.is_hold(conn, "as-held", 1) and not catalog.is_hold(conn, "tech-tilt", 1)
     for sym, px in (("IVV", 100.0), ("ACME", 20.0), ("VXUS", 50.0), ("FTEC", 200.0), ("SMH", 250.0)):
         bars(conn, sym, [px])
@@ -378,7 +418,7 @@ def test_paper_as_held_buys_once_and_then_holds(cfg, monkeypatch):
     paper_exec.run(conn, broker, now=PRE)
     first = {r["symbol"]: r["filled_qty"] for r in conn.execute("SELECT * FROM paper_legs WHERE strategy_id='as-held'")}
     assert first == {"IVV": 4.0, "ACME": 24.0} and catalog.held_shares(conn, "as-held", 1) == first
-    catalog.sync(conn, catalog.mixes({}, {"FXAIX": 0.9, "ACME": 0.1}, 0.0, {"ACME": "stock"}), now=REG)
+    catalog.sync(conn, catalog.mixes({"FXAIX": 0.9, "ACME": 0.1}, 0.0, {"ACME": "stock"}), now=REG)
     assert catalog.latest(conn)["as-held"]["version"] == 1 and catalog.latest(conn)["as-held"]["mix"]["weights"] == {"IVV": 0.9, "ACME": 0.1}
     bars(conn, "ACME", [20.0, 20.0, 20.0, 20.0, 40.0], start=(2026, 11, 2))
     later = PRE.replace(day=9)

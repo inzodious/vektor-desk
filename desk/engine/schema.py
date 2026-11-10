@@ -1,3 +1,4 @@
+import re
 import sqlite3
 
 SCHEMA = """
@@ -423,7 +424,7 @@ CREATE TABLE IF NOT EXISTS quotes_live (
   source TEXT NOT NULL,
   fetched_at TEXT NOT NULL,
   PRIMARY KEY (symbol, fetched_at)
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS quotes_live_fetched ON quotes_live (fetched_at);
 CREATE TABLE IF NOT EXISTS price_bars (
   symbol TEXT NOT NULL,
@@ -659,6 +660,24 @@ CREATE TABLE IF NOT EXISTS paper_trades (
   price REAL NOT NULL,
   cost REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS paper_verdicts (
+  strategy_id TEXT NOT NULL,
+  version INTEGER NOT NULL,
+  checkpoint INTEGER NOT NULL,
+  as_of TEXT NOT NULL,
+  verdict TEXT NOT NULL CHECK (verdict IN ('eligible', 'unproven', 'retired')),
+  reason TEXT NOT NULL,
+  excess_pts REAL,
+  band_pts REAL,
+  retire_pts REAL,
+  luck REAL,
+  tracking_error_pct REAL,
+  obs INTEGER NOT NULL,
+  events INTEGER,
+  family_size INTEGER NOT NULL,
+  decided_at TEXT NOT NULL,
+  PRIMARY KEY (strategy_id, version, checkpoint)
+);
 CREATE TABLE IF NOT EXISTS signals (
   signal_id TEXT NOT NULL,
   scope_id TEXT NOT NULL,
@@ -692,5 +711,26 @@ CREATE TABLE IF NOT EXISTS french_returns (
 """
 
 
+QUOTES_LIVE = re.search(r"CREATE TABLE IF NOT EXISTS quotes_live \(.*?\);", SCHEMA, re.S).group(0)
+
+
 def apply(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
+    rebuild_quotes(conn)
+
+
+def rebuild_quotes(conn: sqlite3.Connection) -> bool:
+    row = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='quotes_live'").fetchone()
+    if row is None or "WITHOUT ROWID" not in row[0].upper():
+        return False
+    conn.executescript(
+        "BEGIN;"
+        "DROP INDEX IF EXISTS quotes_live_fetched;"
+        "ALTER TABLE quotes_live RENAME TO quotes_live_old;"
+        f"{QUOTES_LIVE}"
+        "INSERT INTO quotes_live SELECT symbol, at, price, prev_close, source, fetched_at FROM quotes_live_old;"
+        "DROP TABLE quotes_live_old;"
+        "CREATE INDEX quotes_live_fetched ON quotes_live (fetched_at);"
+        "COMMIT;"
+    )
+    return True

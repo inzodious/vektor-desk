@@ -56,6 +56,8 @@ Two SQLite files on the TrueNAS dataset, both WAL mode, each with one writer. Ni
 
 Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deploy waits for them. Engine code builds on the shared scaffold: `desk/config.py`, `desk/db.py`, `desk/runlock.py`, and schedule lines in `deploy/crontab`.
 
+**Table shape.** A `WITHOUT ROWID` table must not end on a primary-key column unless every column is in the key. SQLite 3.40.1 (the image's library) reports false NOT NULL errors from `quick_check` on that shape, which fails the backup check and blocks a deploy. `quotes_live` is a rowid table for this reason; `schema.apply` rebuilds an older copy in place, and `tests/engine/test_schema.py` holds the rule.
+
 **Late deletes.** Current holdings always come from the latest snapshot (by `asOf`), so a deleted older snapshot that lingers for a week changes nothing. A lingering deleted activity or transaction row could double a flow; the cash check below catches it, marks the day `stale` and names the row, and the weekly full pass clears it.
 
 | Layer | Where | Tables | Rule |
@@ -76,6 +78,18 @@ Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deplo
 | Any row with a non-core symbol | Never (share transfers are holdings moves) |
 
 Same-amount opposite moves between two of your accounts within 3 days are internal at the portfolio level.
+
+**Unsettled and margin-funded buys.** Escape Vektor's sync drops pending and margin lines, so a snapshot can show new shares while its cash is unchanged. Left alone, the engine would book the gap as money in and show no margin debit. `holdings.settle` runs over each pair of snapshots:
+
+| Step | Rule |
+|---|---|
+| Expected cash | The earlier snapshot's cash (after any earlier adjustment) plus every cash move in the activity between the two |
+| Gap | Reported cash − expected cash |
+| Room | The debit already carried, plus buys in the window whose shares show up in the later snapshot. New buys count only when the Fidelity history covers the whole window, since only then is a missing deposit ruled out |
+| Adjustment | The smaller of gap and room, when over $1. The account's cash row is lowered by it and marked `modelled`; `reported_value` keeps what the snapshot said |
+| Ends | A deposit or sale in the activity pays it down. A snapshot that carries its own negative cash line is trusted as it stands |
+
+`margin.debit` is `modelled` while it rests on such a row. A gap with no matching buys is still counted as money in or out, as before.
 
 ## Reconciliation and data health
 
@@ -270,7 +284,7 @@ Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamen
 
 | Id | Metric | Notes |
 |---|---|---|
-| `fi.progress` | Progress to the FI number | The FI number comes from Escape Vektor's plan, never retyped |
+| `fi.progress` | Progress to the FI number | The FI number comes from Escape Vektor's `fi` pref; when that is missing, from the desk profile's `fi` section (`desk.decisions.profile.fi_goal`) |
 | `fi.required_return` | Return needed to hit the target date at the current deposit rate | |
 | `fi.date_pctl` | FI date at the 10th, 50th and 90th percentile | Monte Carlo, below |
 
@@ -280,7 +294,7 @@ Tables: `sec_tickers`, `filings` (last two years, with archive links), `fundamen
 
 | Input | From |
 |---|---|
-| FI number, target date | Escape Vektor pref `fi`: `fiYearlySpend × fiMultiple`, birth date plus `fiTargetAge` |
+| FI number, target date | Escape Vektor pref `fi`: `fiYearlySpend × fiMultiple`, birth date plus `fiTargetAge`. Fallback: the desk profile's `fi` section |
 | Real or nominal | The same pref's `inflationAdjusted` and `inflation`; real paths deflate each month at that rate |
 | Start value | `value.market` (the desk's accounts only) |
 | Deposits | Your net external cash flow (deposits and transfers in, minus withdrawals and transfers out) over the trailing 12 months ÷ 12, or ÷ the months since your first deposit when there are fewer, floored at 0; the view says "from your last N months of deposits, net of withdrawals". None seen: no deposits (caveat). The plan is not used |
@@ -466,6 +480,7 @@ Backtestable small-cap family: directors and officers buying their own stock on 
 | Live | `insider_buys` (`source` form4), `insider_form4_seen` | Form 4s in `filings_feed` (universe names) after the last bulk quarter: the raw XML, same rules, 200 a night. Bulk rows replace them when the quarter is published |
 | Known date | | The session after the filing date. Nothing counts before then |
 | Prices | `alpaca_bars`, `alpaca_history` | Names with any director or officer buy since 2016, cluster names (2+ insiders within 30 days) and IWM first: daily bars since 2016-01-01 (raw and adjusted), 300 names a night. Roughly 2,500 rows a name |
+| Symbols | | `insider.clean_symbol`: quotes and exchange prefixes stripped, a ticker in brackets used, class shares written `BRK.B`; anything else (names, numbers, `--`) is dropped, at parse time and from stored rows at the start of each run. A batch Alpaca refuses is split until the one bad name is found; that name is skipped and listed in the job result with Alpaca's path and message |
 | Share counts | `sec_shares`, `sec_frames` | SEC `dei:EntityCommonStockSharesOutstanding` frames since late 2014, each quarter once (the last two refresh) |
 | Membership | `smallcap_months` | At each month's first session: shares from a period ending 45+ days earlier (under 400 days old) × raw close between $50M and $2B, and median dollar volume over the prior 20 sessions at least $500K. The whole month uses that answer |
 
@@ -513,13 +528,39 @@ Every strategy on paper shares the one Alpaca **paper** account. The URL comes o
 |---|---|---|
 | Lanes | `desk.engine.lane` | Forward-only filing strategies. `filings-lane` v1: score ≥ +1, confidence ≥ 0.6, next open after `max(scored_at, filed_at)`, hold 20 sessions, 10 equal slots, $1,000 notional, benchmark IWM. Starts at the first score |
 | Lane variants | `lane.register(conn, id, title, params)`, `lane.register_variant(cfg, …)`, table `lane_variants` | Params `min_direction` 1–2, `min_confidence` 0.5–0.95, `hold_sessions` 5–60, `max_names` 3–20, `event_types` from `filings.EVENT_TYPES`. Same id again = next version (the latest runs). Duplicate params refused; at most 12. A variant starts at its registration and ignores signals known before it |
-| Forward record | `paper_portfolios`, `paper_positions`, `paper_trades` | Lanes rebuild after each universe and paper run; lab strategies replay nightly (`lab-export`). Status `paper` until 182 days, then `eligible` (excess ≥ 0) or `retired` |
+| Forward record | `paper_portfolios`, `paper_positions`, `paper_trades` | Lanes rebuild after each universe and paper run; lab strategies replay nightly (`lab-export`). Status comes from the paper gate below, never from the night's excess |
 | Sub-ledgers | `paper_exec.books`, tables `paper_legs`, `paper_ledger_daily` | Each strategy has its own sleeve (`DESK_PAPER_BUDGET`, default $1,000, cap $5,000), holdings and cash built only from its own filled legs, never from account positions |
 | Orders | `paper_exec.run` | Before the open only, once per day. Lanes buy whole shares per slot and sell on exit; lab strategies follow `paper_positions` weights × the sleeve's value, rebalancing a name only when it moves $25 or 10%. Retired strategies flatten. Legs net into one market day order per symbol (`vd-{day}-{symbol}-{side}`), so strategies never trade against each other on Alpaca; a sell never exceeds the account's shares. Names Alpaca can't trade are skipped and listed |
 | Fills | `paper_exec.allocate` | Filled quantity goes to same-side legs pro rata at the average fill price; crossed quantity fills at that price too, or at the day's open when the symbol netted to zero. Rejected orders leave the books alone |
 | Limits | env | `DESK_PAPER_EXECUTE=0` stops orders (reconciling continues); `DESK_PAPER_MAX_STRATEGIES` (default 20) |
 
-**`/api/engine/lab/leaderboard`.** `{as_of, benchmark: "IWM", gate_days: 182, rows, note}`. Each row: `id, version, name, kind ("lane" | "mix" | "strategy"), benchmark, status, started, as_of, days_live, days_to_eligible, eligible_on, waiting_on ("time" | "benchmark" | null), return_pct, bench_return_pct, excess_pts, max_drawdown_pct` (negative), `trades, open_positions, account` (`{as_of, sleeve, cash, value, return_pct}` from the sub-ledger, or null). `reward_risk`: `{source, days, ann_return_pct, sharpe, sortino, max_drawdown_pct, calmar, hit_rate}` from the sub-ledger's daily values once it has 20 days (`source: "sub_ledger"`; hit rate = share of up days, Sharpe and Sortino annualized on 252 days, annual return and Calmar from 63 days), else from the forward record (`"forward_record"`; a lane's hit rate is its share of winning closed trades), else nulls. `backtest`: the same keys plus `start, end` from the mix's real-price backtest in the bands (`"bands"`) or a lab strategy's holdout (`"lab_holdout"`), or null. Order: eligible, paper, retired; then excess desc (nulls last), then days live desc. Empty: `rows: []` and a note. Returns and the gate use the forward record; `account` shows what the paper fills did.
+### Paper gate
+
+`desk.engine.gate`. Half a year of paper proves the plumbing, not the edge, so the gate is a stored verdict against a noise band and every row carries the chance its lead is luck.
+
+| Piece | Rule |
+|---|---|
+| Checkpoints | Day 182 from the start, then every 91 days. A verdict uses only the days up to its checkpoint date, so a late run decides the same thing |
+| Stored once | Table `paper_verdicts` (strategy_id, version, checkpoint, as_of, verdict, reason, excess_pts, band_pts, retire_pts, luck, tracking_error_pct, obs, events, family_size, decided_at). A row is never rewritten. Status is the latest verdict: `eligible`, `unproven` (stays `paper`) or `retired`. A retire is final; nothing changes between checkpoints |
+| Noise | Daily excess return against the row's own benchmark. `noise_pts` = its standard deviation × √days × 100; `score` = cumulative excess ÷ noise; `tracking_error_pct` is the yearly figure |
+| Chance it is luck | `luck_alone` = 1 − Φ(score): how often a strategy with no edge would lead by this much. `luck` = 1 − (1 − luck_alone)^k for a family of k tries |
+| Family size k | Lanes: every lane variant ever registered plus the default. Lab strategies: paper strategies sharing a family key (`insider-`, `drift-`, `filings-`) or a `parent_id` root. Mixes: 1 |
+| Pass | `luck` ≤ 0.10, so excess ≥ `band_pts` (1.28 × noise for one try, wider for a family, never under 1 point), plus 30 buys by the checkpoint (lanes and lab strategies) and a lab pass on every backtest bar (lab strategies). Reasons when it does not pass: `noise`, `events`, `bars`, `short_record` (under 60 priced days) |
+| Retire | Excess ≤ `retire_pts` (−1.28 × noise, never inside 1 point) at a checkpoint. A superseded mix version still retires at once |
+| Summary | Each `paper_portfolios.summary` carries `benchmark` and `gate`: `{luck, luck_alone, luck_bar, family_size, score, tracking_error_pct, band_pts, retire_pts, obs, events, min_events, bars, checkpoints, next_checkpoint: {day, on}, verdict: {checkpoint, as_of, verdict, reason, excess_pts, band_pts, retire_pts, luck, events}}` |
+
+Chance of each verdict at day 182, simulated (40,000 paths). The old rule (excess ≥ 0) passed a strategy losing 5 points a year 33 to 44% of the time.
+
+| True yearly edge | Tracking error 8%: pass / retire | 15% | 25% |
+|---|---|---|---|
+| −5 pts | 4% / 20% | 7% / 15% | 8% / 13% |
+| 0 | 10% / 10% | 10% / 10% | 10% / 10% |
+| +5 pts | 20% / 4% | 15% / 7% | 13% / 8% |
+| +10 pts | 34% / 2% | 21% / 4% | 16% / 6% |
+
+Most rows stay `unproven` at day 182 and go on to the next checkpoint. Over seven checkpoints (two years) a strategy with no edge is eligible at some checkpoint about 24% of the time, so `eligible` means "worth a decision", not "proven".
+
+**`/api/engine/lab/leaderboard`.** `{as_of, benchmark: "IWM", gate_days: 182, step_days: 91, young_days: 60, luck_bar: 0.1, groups, rows, note}`. `groups`: `[{benchmark, rows, racing}]` in display order (largest group first). Each row: `id, version, name, kind ("lane" | "mix" | "strategy"), benchmark` (its own: IWM for lanes and small-cap strategies, IVV for mixes, the spec's benchmark or `Plan mix` for other lab strategies), `status, started, as_of, days_live, young` (under 60 days), `checkpoint_day, checkpoint_on, days_to_checkpoint` (the next verdict; null once retired), `return_pct, bench_return_pct, excess_pts, score, luck, tracking_error_pct, band_pts, gate` (the summary's gate, or null), `max_drawdown_pct` (negative), `trades, open_positions, account` (`{as_of, sleeve, cash, value, return_pct}` from the sub-ledger, or null). `reward_risk`: `{source, days, ann_return_pct, sharpe, sortino, max_drawdown_pct, calmar, hit_rate}` from the sub-ledger's daily values once it has 20 days (`source: "sub_ledger"`; hit rate = share of up days, Sharpe and Sortino annualized on 252 days, annual return and Calmar from 63 days), else from the forward record (`"forward_record"`; a lane's hit rate is its share of winning closed trades), else nulls. `backtest`: the same keys plus `start, end` from the mix's real-price backtest in the bands (`"bands"`) or a lab strategy's holdout (`"lab_holdout"`), or null. Order: by benchmark group; inside a group eligible, paper, retired; then rows of 60 days or more before younger ones; then `score` desc (nulls last), then days live desc. Raw excess never ranks: a 20-day row cannot outrank a 150-day row. Empty: `rows: []` and a note. Returns and the gate use the forward record; `account` shows what the paper fills did.
 
 ## Strategy catalog and probability bands
 
@@ -527,7 +568,7 @@ There is no single target. Four named mixes run side by side on paper and in the
 
 | id | Name | Mix | Paper |
 |---|---|---|---|
-| `safe-mix` | Safe mix | The plan's fund weights (v3 today), ETF proxies | Rebalances when a name moves $25 or 10% |
+| `safe-mix` | Safe mix | Built in (`catalog.SAFE_MIX`), his October index plan: FXAIX 40, SCHD 20, FTIHX 10, FTEC 10, and NLR, GRID, ICLN, UFO 5 each. FXAIX trades as IVV and FTIHX as VXUS. It does not read the Escape Vektor plan | Rebalances when a name moves $25 or 10% |
 | `as-held` | As held | His book today, ASTS kept, cash share kept, margin debit left out. A drifting hold (`policy: "hold"`): nothing sold, nothing topped up | Buys his weights once, then holds those shares (same version). `paper_positions` shows what the sleeve holds |
 | `tech-tilt` | Aggressive tech tilt | 50% IVV, 30% FTEC, 10% SMH, 10% VXUS (proposal) | As safe mix |
 | `dip-buy` | Dip-buy | Safe mix with 20% cash; a third goes in at each 5, 10, 20% drop of IVV from its high; back to 20% cash at a new high | Cash target from IVV's closes |
@@ -536,7 +577,7 @@ There is no single target. Four named mixes run side by side on paper and in the
 |---|---|
 | Proxies | Mutual funds trade as ETFs on Alpaca: FXAIX → IVV, FSKAX/FZROX → ITOT, FTIHX/FZILX → VXUS, FXNAX → AGG, VFIAX → VOO, VTSAX → VTI, VBTLX → BND, and a few more in `catalog.PROXIES`. A fund or 401(k) code with no twin trades as IVV, and the row says so in `proxy_note` |
 | Registry | `catalog_strategies` (id, version, title, mix, registered_at, retired_at). The daily engine syncs it. A fixed mix whose weights move more than 0.5 points gets a new version; the old one retires and flattens. Each mix's symbols join the price backfill |
-| Paper | `catalog.rebuild` runs in each paper job before orders. It writes targets to `paper_positions` and the record to `paper_portfolios` (kind `mix`, benchmark IVV) from the sub-ledger's values. The 182-day gate applies |
+| Paper | `catalog.rebuild` runs in each paper job before orders. It writes targets to `paper_positions` and the record to `paper_portfolios` (kind `mix`, benchmark IVV) from the sub-ledger's values. The paper gate applies at its checkpoints, so a mix is not flattened for dipping under IVV |
 | Price history | For each proxy, whichever of the proxy and the funds it stands for has the longest prices. The record starts in the first month where 80% of the weight has real prices; missing months use the US market, noted per symbol |
 | Model | Monthly excess return regressed on the US market over that record: beta plus leftover swings. Alpha is dropped (reported as `alpha_dropped_pct`) |
 | Simulation | `DESK_BANDS_PATHS` paths (default 2,000), fixed seeds: one stream for the market blocks, so every mix and policy walks the same market paths, and one for leftover swings. 12-month blocks of French monthly market history since 1926; each month adds a leftover swing drawn from the fit. The start is his market value; each month adds his trailing net deposit (the FI rule); today's dollars when his FI goal says so |
@@ -602,7 +643,7 @@ Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. On
 | Final | Closed and a later data day exists. Final packs freeze; a closed pack may be restated once before that (mutual fund prices post late). `review.run(..., rebuild=True)` recomputes all |
 | Change | `change_pct` is time-weighted (the `twr_index` series). `net_flows` is every flow the return already nets out, derived per day as value − prior value × (1 + day return). `gain_usd` = change − flows |
 | Versus | SPY, then each live catalog mix, on the same starting dollars with the same flows on the same days. A mix is rebalanced daily, cash earns nothing, Dip buy carries its cash state from the index path. A comparator is left out when under 80% of it has prices |
-| Movers | Per holding: yesterday's shares × today's price change, summed over the period (splits handled). Top 5 up and down. `other_usd` is the rest of the gain: dividends, interest, cash and same-day trades |
+| Movers | Per holding: yesterday's shares × today's price change, summed over the period (splits handled). Top 5 up and down. A mover's `return_pct` is chained from the same daily holdings prices, so it always agrees in sign with its contribution. `other_usd` is the rest of the gain: dividends, interest, cash and same-day trades. A day's flow under 5 cents is rounding and counts as zero |
 | Risk | Max drawdown and best and worst day on the return index; volatility annualised from daily returns (5 or more days). `band` (your risk band and the as-held fit) only on the latest pack. `convictions` is each conviction hold's weight against its band |
 | Events | Discount days, scored filings and earnings dates for names held in the period |
 | Tables | `period_reviews(kind, start, end, as_of, closed, final, version, digest, pack, computed_at)`, `period_debriefs(kind, end, pack_digest, body, written_at, model, run_id)`, `review_runs` |
@@ -614,6 +655,29 @@ Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. On
 **`GET /api/engine/reviews/index`.** `{as_of, kinds {day, week, month, year}, note}`, newest first, rows `{start, end, as_of, label, closed, final, change_usd, change_pct, has_debrief}`.
 
 For the debrief desk: `review.pending(cfg)` returns the latest period of each kind whose pack has no debrief or changed since it (`{kind, start, end, closed, digest, debrief_digest, pack}`), and raises `review.NotReady` before the first run. `review.record(cfg, kind, end, result)` checks a debrief (headline ≤ 120, what_happened and why ≤ 700, against_decisions ≤ 500, up to 4 watch lines ≤ 160, up to 3 next steps ≤ 200, numbers_cited from the pack's `numbers`, pack_digest equal to the current digest, model, written_at), raises `ValueError` on bad values and replaces any earlier debrief for that period.
+
+## Plan facts
+
+Module `desk.engine.planfacts`. The numbers a stock plan is written from, one row per holding, computed on request from the latest engine run (no table, no job).
+
+| Piece | Rule |
+|---|---|
+| Rows | Every non-cash holding on the latest holdings day, summed across accounts. Ask for one symbol and it is returned even when not held (price facts only) |
+| Prices | `price_bars` (adjusted), else `alpaca_bars`, extended with `prices_daily`; else the mirror's closes (mutual funds) |
+| Cost | The lot export when every lot has a cost, else the snapshot's cost. `unrealized_usd` = value − cost |
+| Lots | `acquired, shares, cost, cost_per_share, value, gain, term, long_term_on` (the first day a sale is long term), `days_to_long_term`, `quality` (`modelled` when rebuilt from history) |
+| Range and trend | 52-week high and low (252 sessions), drop from the high, 50 and 200-session averages and the distance to each, 1-year return |
+| Zones | A monthly swing is the 63-session daily volatility × √21 (capped at 45%). Add zone: one to two swings under the last close. Trim zone: one to two above. `zones.levels` lists the reference prices: last close, 52-week high and low, both averages, cost per share, and 10, 20 and 30% under the high |
+| Valuation | As the discount scanner: `pe_annual` against its own 5 years when SEC EPS allows, else `price_vs_5y_avg` |
+| Share of risk | Weight × covariance with the book ÷ the book's variance, on 126 sessions of daily returns at today's weights. Sums to 100 across priced holdings |
+| Band | First that applies: the approved plan's `weight_band`, the conviction hold's band, the single-stock rule (stocks only), the risk band's single-stock cap (stocks only). `status` is `inside`, `over` or `under`; funds with no band are `inside` |
+| Discount | `active` when the scanner flagged the name in the last 5 days |
+
+**Row.** `symbol, name, kind, as_of, price_as_of, held, accounts, numbers, lots, wash_windows [{kind, date, clears, account, amount}], zones {method, sigma_month_pct, add {low, high}, trim {low, high}, levels}, discount {active, signal_id, reason, as_of}, next_earnings {date, hour, eps_estimate, days}, filing_signals, valuation {metric, value, pctile_own}, band {source, min_pct, max_pct, weight_pct, status, room_pct, risk_band}`. `numbers` is flat and numeric: `price, shares, value, weight_pct, cost_basis, cost_per_share, unrealized_usd, unrealized_pct, long_term_shares, short_term_shares, long_term_gain, short_term_gain, risk_share_pct, valuation_value, valuation_pctile, day_move_pct, high_52w, low_52w, drop_from_high_pct, above_low_pct, vol_annual_pct, sigma_month_pct, sma_50, sma_200, vs_sma_50_pct, vs_sma_200_pct, ret_1y_pct, add_low, add_high, trim_low, trim_high`; a key is left out when its input is missing.
+
+**`GET /api/engine/planfacts[?symbol=]`.** `{as_of, rows, note}`.
+
+For the plans desk: `planfacts.facts(cfg, symbol=None)` returns the rows and raises `planfacts.NotReady` before the first engine run. Every price a plan may name as a zone is in `zones` or `numbers`.
 
 ## Strategy lab
 
@@ -753,13 +817,13 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 **Walk-forward.** The two years before the newest bar are the holdout and never run before finalize. The range before it splits into folds of 3 years train and 1 year test (2 and 0.5 under 4 years; under 2.5 years is rejected). Each fold picks the variant with the best training Sharpe that meets `max_turnover` (read as turnover a year), then runs it on the test year; test years are stitched into the walk-forward record. Every variant also runs over the whole range for the overfitting tests.
 
-**What the desk sees** (`desk_view`): folds, the walk-forward summary, the start-month distribution per horizon (walk-forward when long enough, else the full range flagged `in_sample`), deflated Sharpe (trials counted across the spec's whole `parent_id` family, Sharpe variance across variants), PBO by combinatorial cross-validation over 10 blocks, the factor check, the analyses it asked for (`param_sensitivity`, `regime_split` bull/bear and high/low rates, `turnover_cost` at 1×, 2×, 4×, `factor_regression`), caveats, and rejection reasons. A changed spec under the same version, or any spec after finalize, is rejected.
+**What the desk sees** (`desk_view`): folds, the walk-forward summary, the start-month distribution per horizon (walk-forward when long enough, else the full range flagged `in_sample`), deflated Sharpe (trials = every distinct full-range run in the family: ids sharing a family key `insider-`, `drift-` or `filings-`, plus any `parent_id` chain, across versions and nights; Sharpe variance is the larger of this run's variants and the whole family's; a family id registered without a `parent_id` gets the family's first id), PBO by combinatorial cross-validation over 10 blocks, the factor check, the analyses it asked for (`param_sensitivity`, `regime_split` bull/bear and high/low rates, `turnover_cost` at 1×, 2×, 4×, `factor_regression`), caveats, and rejection reasons. A changed spec under the same version, or any spec after finalize, is rejected.
 
 **Finalize** runs the last fold's parameters on the holdout and on the days after the writing model's cutoff (`DESK_LAB_MODEL_CUTOFFS`, a JSON map of model to date, default 2026-06-30), then checks the bars: start-month 5th percentile above zero on the longest horizon, deflated Sharpe over 0.95, PBO under 0.2, holdout excess positive and at least half the walk-forward excess, and the spec's own `excess_vs_plan_pts`, `max_drawdown_pct`, `min_trades`. Any failed bar is `fail`; all computed bars passing is `pass`; anything missing is `inconclusive`. The factor bar is alpha t of 2 or more; it is `null`, and does not block, only when the factors are missing or overlap fewer than 252 days. A pass moves a fund, screen or small-cap strategy to `paper` and a French one to `research`.
 
-**Paper.** Each night the engine replays a paper strategy with its finalized parameters from the finalize day to the newest bar on fresh data, so it can never be tuned after the fact. After 182 days it becomes `eligible` if it is level with or ahead of its benchmark, otherwise `retired`. `desk.engine.lab.eligible` lists the eligible ones for Scout.
+**Paper.** Each night the engine replays a paper strategy with its finalized parameters from the finalize day to the newest bar on fresh data, so it can never be tuned after the fact. Its status comes from the paper gate (above): a stored verdict at day 182 and every 91 days after, `eligible` only when the lead clears the noise band with 30 buys. `desk.engine.lab.eligible` lists the eligible ones for Scout, with the chance the lead is luck.
 
-**API.** `GET /api/lab/strategies` (list with `hypothesis`, trial counts, paper state, feature catalog, grammar) and `GET /api/lab/strategies/{id}` (the desk view plus paper trades, and `spec`: the frozen title, hypothesis, predicted effect, universe, signals, entry, exit, rebalance, sizing, params, success criteria, horizons, `written_at` and `model`; null for a rejected version). Paper graduation is `paper.days` ≥ 182 calendar days; `paper.summary` is a JSON string. Workers: `DESK_LAB_WORKERS` (default 1) processes.
+**API.** `GET /api/lab/strategies` (list with `hypothesis`, trial counts, paper state, feature catalog, grammar) and `GET /api/lab/strategies/{id}` (the desk view plus paper trades, and `spec`: the frozen title, hypothesis, predicted effect, universe, signals, entry, exit, rebalance, sizing, params, success criteria, horizons, `written_at` and `model`; null for a rejected version). The first paper verdict is at `paper.days` ≥ 182 calendar days; `paper.summary` is a JSON string and carries `benchmark` and `gate`. Workers: `DESK_LAB_WORKERS` (default 1) processes.
 
 **Not in this cut.** Point-in-time fundamentals and insider signals from the SEC bulk data sets, and reconstructed index membership.
 
@@ -908,7 +972,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekdays 08:45 and 16:45 ET | `paper`: lanes and catalog mixes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
-| Monthly, 2nd at 03:30 | `french`: daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
+| Nightly 03:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Stack and tests
 

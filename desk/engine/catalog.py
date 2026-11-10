@@ -2,14 +2,15 @@ import json
 import sqlite3
 from datetime import UTC, date, datetime
 
-from desk.engine import backfill
-from desk.engine.lab.paper import PAPER_DAYS
+from desk.engine import backfill, gate
 from desk.engine.lane import drawdown_pct, entry_session
 
 BENCHMARK = "IVV"
 DIP_CASH = 0.20
 DIP_STEPS = (0.05, 0.10, 0.20)
 TECH_TILT = {"IVV": 0.50, "FTEC": 0.30, "SMH": 0.10, "VXUS": 0.10}
+SAFE_MIX = {"FXAIX": 0.40, "SCHD": 0.20, "FTIHX": 0.10, "FTEC": 0.10, "NLR": 0.05, "GRID": 0.05, "ICLN": 0.05, "UFO": 0.05}
+SAFE_NOTE = "Your October index plan, kept as one mix among several"
 REVERSION_PTS = 0.5
 FALLBACK = "IVV"
 PROXIES = {
@@ -61,6 +62,11 @@ EXPENSE_PCT = {
     "VGT": 0.09,
     "FTEC": 0.08,
     "SMH": 0.35,
+    "SCHD": 0.06,
+    "NLR": 0.56,
+    "GRID": 0.56,
+    "ICLN": 0.39,
+    "UFO": 0.75,
     "QQQ": 0.2,
     "FXAIX": 0.015,
     "FSKAX": 0.015,
@@ -81,7 +87,7 @@ ENTRIES = (
     {
         "id": "safe-mix",
         "name": "Safe mix",
-        "hypothesis": "The plan's fund weights, rebalanced when a fund drifts, is the steady way to compound deposits.",
+        "hypothesis": "Your October index plan (40% S&P 500, 20% SCHD, 10% international, 10% FTEC, 5% each NLR, GRID, ICLN, UFO), rebalanced on drift.",
     },
     {
         "id": "as-held",
@@ -150,18 +156,19 @@ def mix_fee(source: dict[str, float], fees: dict[str, float] | None = None) -> f
 # ---- Mixes ----
 
 
-def mixes(plan_targets: dict[str, float], held: dict[str, float], cash: float, kinds: dict[str, str] | None = None) -> dict[str, dict]:
+def mixes(held: dict[str, float], cash: float, kinds: dict[str, str] | None = None, safe: dict[str, float] | None = None) -> dict[str, dict]:
     out: dict[str, dict] = {}
-    if plan_targets:
-        w, notes = proxied(plan_targets, kinds)
-        out["safe-mix"] = {"weights": w, "cash": 0.0, "notes": notes, "source": dict(plan_targets)}
-        out["dip-buy"] = {"weights": w, "cash": DIP_CASH, "notes": notes, "source": dict(plan_targets), "steps": list(DIP_STEPS)}
+    source = dict(safe or SAFE_MIX)
+    w, notes = proxied(source, kinds if safe else None)
+    notes = ([] if safe else [SAFE_NOTE]) + notes
+    out["safe-mix"] = {"weights": w, "cash": 0.0, "notes": notes, "source": source}
+    out["dip-buy"] = {"weights": w, "cash": DIP_CASH, "notes": notes, "source": source, "steps": list(DIP_STEPS)}
     if held:
-        w, notes = proxied(held, kinds)
+        hw, held_notes = proxied(held, kinds)
         out["as-held"] = {
-            "weights": w,
+            "weights": hw,
             "cash": round(max(0.0, min(1.0, cash)), 6),
-            "notes": notes,
+            "notes": held_notes,
             "source": {s: round(v, 6) for s, v in held.items()},
             "policy": HOLD,
         }
@@ -304,12 +311,11 @@ def rebuild(conn: sqlite3.Connection, sleeve: float, px, *, now: datetime | None
         b0, b1 = _at(bench, started), _at(bench, as_of)
         bench_ret = (b1 / b0 - 1) * 100 if b0 and b1 and as_of > started else None
         excess = own - bench_ret if own is not None and bench_ret is not None else None
-        if r["retired_at"]:
-            status = "retired"
-        elif days < PAPER_DAYS:
-            status = "paper"
-        else:
-            status = "eligible" if excess is not None and excess >= 0 else "retired"
+        settled = None
+        if not r["retired_at"]:
+            track = [(started, float(sleeve))] + [(d, v) for d, v in ledger if d > started]
+            settled = gate.settle(conn, sid, ver, started, [d for d, _ in track], [v for _, v in track], [_at(bench, d) for d, _ in track], now=now)
+        status = settled["status"] if settled else "retired"
         want = targets(conn, mix) if status != "retired" else {}
         summary = {
             "kind": "mix",
@@ -321,7 +327,7 @@ def rebuild(conn: sqlite3.Connection, sleeve: float, px, *, now: datetime | None
             "benchmark_return_pct": round(bench_ret, 4) if bench_ret is not None else None,
             "mdd_pct": drawdown_pct([v for _, v in ledger]) if ledger else 0.0,
             "forward_only": True,
-            "days_to_eligible": max(0, PAPER_DAYS - days),
+            "gate": settled["gate"] if settled else None,
         }
         with conn:
             conn.execute("DELETE FROM paper_positions WHERE strategy_id=? AND version=?", (sid, ver))

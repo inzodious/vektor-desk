@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from typing import Protocol
 
-from desk.agents import alerts, store
+from desk.agents import alerts, plans, store
 from desk.agents.adapter import Adapter
 from desk.agents.pipeline import run_proposal_desk
 from desk.agents.sources import Decisions, Engine, Lab, NotReady, RealTriggers
 from desk.agents.strategy import run_strategy_desk
 from desk.config import Config
 
-ASKABLE = ("plan_keeper", "tax", "risk", "research", "strategy")
+ASKABLE = ("plan_keeper", "tax", "risk", "research", "strategy", "plans")
 TRIGGER_DESKS = {
     "margin_debit": ("risk", True),
     "daily_move": ("risk", True),
@@ -41,10 +41,25 @@ def ask(cfg: Config, desk: str, question: str, *, symbol: str | None = None, run
     question = question.strip()
     if not question or len(question) > 2000:
         raise ValueError("questions are 1 to 2000 characters")
-    return store.add_request(cfg, desk, question, symbol=(symbol or "").strip().upper() or None, run_now=run_now)
+    symbol = (symbol or "").strip().upper() or None
+    if desk == "plans":
+        if not symbol:
+            raise ValueError("pick the holding whose plan this is about")
+        pins = plans.parse_pins(question)
+        if pins is not None:
+            plans.check_pins(symbol, pins)
+            store.pin_steps(cfg, symbol, pins)
+            question = f"{plans.PIN_NOTE} {', '.join(str(p['id']) for p in pins)}."
+    return store.add_request(cfg, desk, question, symbol=symbol, run_now=run_now)
+
+
+def _run_id(report) -> int | None:
+    return report.run_id if isinstance(report, plans.PlanReport) else report.outcome.run_id
 
 
 def _answer(report) -> str:
+    if isinstance(report, plans.PlanReport):
+        return report.answer
     parts = [report.summary] if report.summary else []
     if getattr(report, "memo", ""):
         parts.append(report.memo)
@@ -74,7 +89,10 @@ def process_queue(
         if req is None:
             break
         tally.ran += 1
-        if req["desk"] == "strategy":
+        if req["desk"] == "plans":
+            note = None if req["question"].startswith(plans.PIN_NOTE) else req["question"]
+            report = plans.run_plan_desk(cfg, symbols=(req["symbol"],), note=note, decisions=decisions, adapter=adapter, trigger=req["source"], wait=wait)
+        elif req["desk"] == "strategy":
             report = run_strategy_desk(
                 cfg, question=req["question"], strategy_id=req["symbol"], lab=lab, decisions=decisions, adapter=adapter, trigger=req["source"], wait=wait
             )
@@ -94,7 +112,7 @@ def process_queue(
         status = report.status
         if status in DONE:
             answer = _answer(report)
-            store.finish_request(cfg, req["id"], "done", run_id=report.outcome.run_id, answer=answer, note=report.note)
+            store.finish_request(cfg, req["id"], "done", run_id=_run_id(report), answer=answer, note=report.note)
             if status == "ok":
                 alerts.answer_ready(cfg, req, answer)
             tally.done += 1
@@ -107,9 +125,9 @@ def process_queue(
             tally.requeued += 1
             break
         else:
-            store.finish_request(cfg, req["id"], "failed", run_id=report.outcome.run_id, note=report.note)
+            store.finish_request(cfg, req["id"], "failed", run_id=_run_id(report), note=report.note)
             if status == "deferred":
-                alerts.run_failed(cfg, req["desk"], status, report.outcome.run_id, report.note)
+                alerts.run_failed(cfg, req["desk"], status, _run_id(report), report.note)
             tally.failed += 1
     return tally
 

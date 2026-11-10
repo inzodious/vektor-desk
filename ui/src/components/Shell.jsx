@@ -1,4 +1,4 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { HealthBanner } from './HealthBanner.jsx';
 import { Icon } from './Icon.jsx';
 import { AREAS } from '../lib/areas.js';
@@ -37,14 +37,30 @@ export function ThemeButton() {
 
 // ---------- nav ----------
 function NavLinks({ badges }) {
-  return AREAS.map((a) => (
-    <NavLink key={a.key} to={a.path} end={a.path === '/'} title={a.title}>
-      <Icon name={a.key} />
-      <span className="long">{a.title}</span>
-      <span className="short">{a.short}</span>
-      {badges?.[a.key] ? <span className="badge">{badges[a.key]}</span> : null}
-    </NavLink>
-  ));
+  const { pathname } = useLocation();
+  return AREAS.map((a) => {
+    const inner = (
+      <>
+        <Icon name={a.key} />
+        <span className="long">{a.title}</span>
+        <span className="short">{a.short}</span>
+        {badges?.[a.key] ? <span className="badge">{badges[a.key]}</span> : null}
+      </>
+    );
+    if (a.path === '/') {
+      const here = pathname === '/' || pathname === '/results' || pathname.startsWith('/results/');
+      return (
+        <Link key={a.key} to="/" title={a.title} aria-current={here ? 'page' : undefined}>
+          {inner}
+        </Link>
+      );
+    }
+    return (
+      <NavLink key={a.key} to={a.path} title={a.title}>
+        {inner}
+      </NavLink>
+    );
+  });
 }
 
 export function Shell({ badges }) {

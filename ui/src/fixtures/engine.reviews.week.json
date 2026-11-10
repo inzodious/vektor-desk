@@ -1,0 +1,395 @@
+{
+ "kind": "week",
+ "start": "2026-11-02",
+ "end": "2026-11-06",
+ "as_of": "2026-11-06",
+ "closed": true,
+ "final": false,
+ "computed_at": "2026-11-06T22:36:00+00:00",
+ "digest": "f38b5416599a98a5",
+ "pack": {
+  "version": 1,
+  "kind": "week",
+  "start": "2026-11-02",
+  "end": "2026-11-06",
+  "as_of": "2026-11-06",
+  "label": "Week of Nov 2, 2026",
+  "quality": "pro_forma",
+  "coverage": {
+   "full": true,
+   "base": "2026-10-30",
+   "days": 5,
+   "note": null
+  },
+  "value": {
+   "start": 15836.37,
+   "end": 16769.8,
+   "change_usd": 933.43,
+   "change_pct": 2.087,
+   "net_flows": 600.01,
+   "gain_usd": 333.42
+  },
+  "vs": [
+   {
+    "id": "spy",
+    "name": "S&P 500",
+    "kind": "benchmark",
+    "return_pct": 2.427,
+    "excess_pts": -0.34,
+    "value_end": 16820.73,
+    "diff_usd": -50.93
+   },
+   {
+    "id": "safe-mix",
+    "name": "Safe mix",
+    "kind": "mix",
+    "return_pct": 1.277,
+    "excess_pts": 0.81,
+    "value_end": 16638.61,
+    "diff_usd": 131.19
+   },
+   {
+    "id": "as-held",
+    "name": "As held",
+    "kind": "mix",
+    "return_pct": 2.037,
+    "excess_pts": 0.05,
+    "value_end": 16758.97,
+    "diff_usd": 10.83
+   },
+   {
+    "id": "tech-tilt",
+    "name": "Aggressive tech tilt",
+    "kind": "mix",
+    "return_pct": 3.007,
+    "excess_pts": -0.92,
+    "value_end": 16912.58,
+    "diff_usd": -142.78
+   }
+  ],
+  "movers": {
+   "up": [
+    {
+     "symbol": "FXAIX",
+     "name": null,
+     "contribution_usd": 430.41,
+     "contribution_pts": 2.7179,
+     "return_pct": 4.6548,
+     "weight_pct": 58.8362
+    },
+    {
+     "symbol": "ACME",
+     "name": "Acme Orbital (synthetic)",
+     "contribution_usd": 0.95,
+     "contribution_pts": 0.006,
+     "return_pct": 1.2579,
+     "weight_pct": 0.4574
+    }
+   ],
+   "down": [
+    {
+     "symbol": "VXUS",
+     "name": null,
+     "contribution_usd": -66.68,
+     "contribution_pts": -0.4211,
+     "return_pct": -2.8782,
+     "weight_pct": 13.4922
+    },
+    {
+     "symbol": "FTEC",
+     "name": null,
+     "contribution_usd": -26.2,
+     "contribution_pts": -0.1654,
+     "return_pct": -0.6734,
+     "weight_pct": 21.6043
+    },
+    {
+     "symbol": "BND",
+     "name": null,
+     "contribution_usd": -5.05,
+     "contribution_pts": -0.0319,
+     "return_pct": -0.6299,
+     "weight_pct": 4.8513
+    }
+   ],
+   "other_usd": 0,
+   "count": 5
+  },
+  "accounts": [
+   {
+    "account": "hsa-0002",
+    "start": 2605.56,
+    "end": 2760.98,
+    "change_usd": 155.42,
+    "change_pct": 2.1089,
+    "net_flows": 100
+   },
+   {
+    "account": "individual-0001",
+    "start": 13230.81,
+    "end": 14008.82,
+    "change_usd": 778.01,
+    "change_pct": 2.0827,
+    "net_flows": 500
+   }
+  ],
+  "income": {
+   "dividends": 0,
+   "interest": 0,
+   "margin_interest": 0
+  },
+  "flows": [
+   {
+    "date": "2026-11-02",
+    "account": "hsa-0002",
+    "amount": 100,
+    "kind": "deposit"
+   },
+   {
+    "date": "2026-11-02",
+    "account": "individual-0001",
+    "amount": 500,
+    "kind": "deposit"
+   }
+  ],
+  "trades": [
+   {
+    "date": "2026-11-02",
+    "account": "hsa-0002",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.064466,
+    "price": 77.56,
+    "amount": -5
+   },
+   {
+    "date": "2026-11-02",
+    "account": "hsa-0002",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.074752,
+    "price": 267.55,
+    "amount": -20
+   },
+   {
+    "date": "2026-11-02",
+    "account": "hsa-0002",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 0.295232,
+    "price": 203.23,
+    "amount": -60
+   },
+   {
+    "date": "2026-11-02",
+    "account": "hsa-0002",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 0.232234,
+    "price": 64.59,
+    "amount": -15
+   },
+   {
+    "date": "2026-11-02",
+    "account": "individual-0001",
+    "symbol": "BND",
+    "side": "buy",
+    "shares": 0.322331,
+    "price": 77.56,
+    "amount": -25
+   },
+   {
+    "date": "2026-11-02",
+    "account": "individual-0001",
+    "symbol": "FTEC",
+    "side": "buy",
+    "shares": 0.373762,
+    "price": 267.55,
+    "amount": -100
+   },
+   {
+    "date": "2026-11-02",
+    "account": "individual-0001",
+    "symbol": "FXAIX",
+    "side": "buy",
+    "shares": 1.47616,
+    "price": 203.23,
+    "amount": -300
+   },
+   {
+    "date": "2026-11-02",
+    "account": "individual-0001",
+    "symbol": "VXUS",
+    "side": "buy",
+    "shares": 1.16117,
+    "price": 64.59,
+    "amount": -75
+   }
+  ],
+  "trade_count": 8,
+  "realized": {
+   "short_term": 0,
+   "long_term": 0,
+   "total": 0,
+   "sales": 0
+  },
+  "risk": {
+   "max_drawdown_pct": -0.5189,
+   "volatility_pct": 11.9731,
+   "best_day": {
+    "date": "2026-11-02",
+    "pct": 1.5912
+   },
+   "worst_day": {
+    "date": "2026-11-03",
+    "pct": -0.5189
+   },
+   "band": {
+    "band": 4,
+    "label": "Moderately aggressive",
+    "worst_year_loss_pct": 33,
+    "fit": "below",
+    "worst_year_p10_pct": -12.3592
+   },
+   "convictions": [
+    {
+     "symbol": "ACME",
+     "weight_pct": 0.46,
+     "band_min_pct": 0,
+     "band_max_pct": 10,
+     "status": "inside"
+    }
+   ]
+  },
+  "decisions": {
+   "made": [
+    {
+     "date": "2026-11-02",
+     "id": "d_20261102130500_da319c",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "FXAIX",
+     "title": "Route deposit to $300 FXAIX",
+     "status": "placed"
+    },
+    {
+     "date": "2026-11-04",
+     "id": "d_20261104130500_ba10c8",
+     "origin": "plan_keeper",
+     "kind": "rebalance",
+     "symbol": "BND",
+     "title": "Rebalance $40 BND",
+     "status": "dismissed"
+    },
+    {
+     "date": "2026-11-06",
+     "id": "d_20261106130500_13b6fb",
+     "origin": "plan_keeper",
+     "kind": "deposit_route",
+     "symbol": "BND",
+     "title": "Route deposit to $25 BND",
+     "status": "approved"
+    }
+   ],
+   "matured": [
+    {
+     "id": "d_20260803140500_5e5235",
+     "symbol": "ACME",
+     "kind": "hold_off",
+     "origin": "risk",
+     "horizon": "90D",
+     "usd": 230.13,
+     "end": "2026-11-02"
+    },
+    {
+     "id": "d_20260806140500_34bbb0",
+     "symbol": "ACME",
+     "kind": "buy",
+     "origin": "scout",
+     "horizon": "90D",
+     "usd": -89.17,
+     "end": "2026-11-05"
+    }
+   ]
+  },
+  "paper": [
+   {
+    "id": "tech-tilt",
+    "name": "Aggressive tech tilt",
+    "kind": "mix",
+    "status": "paper",
+    "return_pct": 3.01,
+    "value_end": 1030.1
+   },
+   {
+    "id": "sector-momentum",
+    "name": "Sector momentum",
+    "kind": "strategy",
+    "status": "paper",
+    "return_pct": 1.12,
+    "value_end": 1011.2
+   },
+   {
+    "id": "filings-lane",
+    "name": "Filings lane",
+    "kind": "lane",
+    "status": "paper",
+    "return_pct": -0.61,
+    "value_end": 993.9
+   }
+  ],
+  "fi": {
+   "fi_number": 1000000,
+   "progress_start_pct": 1.584,
+   "progress_end_pct": 1.677,
+   "change_pts": 0.093
+  },
+  "events": [
+   {
+    "date": "2026-11-06",
+    "type": "discount",
+    "symbol": "ACME",
+    "detail": "First close 20% under its 52-week high"
+   },
+   {
+    "date": "2026-11-02",
+    "type": "filing",
+    "symbol": "ACME",
+    "detail": "8-K: new launch contract, scored +1"
+   }
+  ]
+ },
+ "debrief": {
+  "headline": "Up $933 for the week: $600 was your deposits, $333 the market.",
+  "what_happened": "A 2.09% time-weighted week. Monday’s deposits went in on plan across both accounts, then the market added $333.",
+  "why": "FXAIX carried the week (+4.7%). VXUS fell 2.9% and FTEC 0.7%, which is why the tech-tilted mix trailed you.",
+  "against_decisions": "The risk desk’s August hold-off on ACME scored +$230 at 90 days. The scout’s ACME buy from the same week is −$89.",
+  "watch": [
+   "The worst day was Tuesday at −0.52%, well inside band 4.",
+   "A second weak week for VXUS would bring its drift near the band."
+  ],
+  "next_steps": [
+   {
+    "text": "Route the next deposit toward VXUS to close its drift.",
+    "symbol": "VXUS"
+   },
+   {
+    "text": "Review the dismissed BND rebalance; the reason still stands.",
+    "symbol": "BND"
+   },
+   {
+    "text": "Check the paper race on Friday; the tech tilt leads by 0.9 pts.",
+    "symbol": null
+   }
+  ],
+  "numbers_cited": [
+   "change_usd",
+   "change_pct",
+   "vs.spy.pts"
+  ],
+  "model": "synthetic",
+  "written_at": "2026-11-06T22:52:00+00:00",
+  "pack_digest": "f38b5416599a98a5",
+  "stale": false
+ }
+}

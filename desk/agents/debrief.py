@@ -13,7 +13,8 @@ NAME = "debrief"
 KINDS = ("day", "week", "month", "year")
 LOCK_WAIT = 300
 STOP = ("disabled", "guarded", "over_budget", "busy", "deferred")
-PLAN_FIELDS = ("symbol", "status", "role", "weight_band", "next_review", "steps")
+PLAN_FIELDS = ("symbol", "status", "role", "weight_band", "weight_pct", "band_status", "next_review")
+STEP_FIELDS = ("kind", "text", "due", "until", "when", "status", "by")
 TEXT = {"headline": 120, "what_happened": 700, "why": 700, "against_decisions": 500}
 NO_DECISIONS = "No decisions to judge in this period."
 
@@ -64,7 +65,11 @@ def unchanged(row: dict) -> bool:
 
 def _plans(cfg: Config, plans: Plans) -> list[dict]:
     try:
-        return [{k: p.get(k) for k in PLAN_FIELDS if k in p} for p in plans.list_plans(cfg)]
+        return [
+            {k: p.get(k) for k in PLAN_FIELDS if k in p}
+            | {"steps": [{k: s.get(k) for k in STEP_FIELDS if s.get(k) is not None} for s in p.get("steps") or () if isinstance(s, dict)]}
+            for p in plans.list_plans(cfg)
+        ]
     except advisor.FAILS:
         return []
 

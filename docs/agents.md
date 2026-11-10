@@ -78,6 +78,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Filings desk** | Daily 04:15, one call per new filing, up to 40 a night | One small-cap SEC filing from the statistics queue: form, 8-K items, excerpt (first 12,000 characters) | A score per filing in the signal table (see [Filings desk](#filings-desk)); never a proposal or a trade | high; no tools |
 | **Discount cases** | Weekdays 18:15, after the close, up to 3 a day | One discount-day scanner hit (held, watchlist or quality list), his risk band, conviction bands and planned actions, plus the web | A buy / wait / avoid case per hit, through `desk.engine.discounts.record`; never a proposal or a trade | xhigh; WebSearch, WebFetch |
 | **Debrief desk** | Weekdays 17:50 (day; week, month and year when they close); Friday 18:30 catches up anything missed | One period pack from the 17:35 review job, his risk band, conviction bands and stock plans | What happened, why, what worked against past decisions, what to watch, up to 3 next steps, through `desk.engine.review.record` (see [Debrief desk](#debrief-desk)); never a proposal or a trade | high; no tools |
+| **Plan desk** | Weekdays 18:40 (holdings with a reason: no plan yet, a discount day, a band crossing, earnings, a review date); Saturday 03:00 (every holding); from the Console | One holding's plan facts, its current plan, the research dossier, his risk band and conviction bands | A draft stock plan through `desk.decisions.plans.save_draft`, or nothing when the current plan still fits (see [Plan desk](#plan-desk)); never approves, never a trade | high; no tools |
 
 **Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
 
@@ -100,7 +101,9 @@ Trigger kinds and where they go: `margin_debit`, `daily_move` and `concentration
 
 | Event | Topic | Priority | Opens | Repeats |
 |---|---|---|---|---|
-| Console or trigger request answered | research | default | `/research` (`/lab` for strategy) | once per request |
+| Console or trigger request answered | research | default | `/research` (`/lab` for strategy, `/plan` for the Plan desk) | once per request |
+| Stock plan drafts saved | research | default | `/plan` | once per day |
+| Period debrief written | research | low for a day, else default | `/results` | once per period |
 | Scheduled research dossier saved | research | low | `/research` | once per run |
 | Desk run failed or timed out | ops | default | `/settings` | once per desk, status and day |
 | Request dropped after busy or usage limit twice | ops | default | `/settings` | once per desk, status and day |
@@ -177,7 +180,8 @@ There is no single target plan. Every proposal desk (Plan keeper, Tax, Risk, Res
 | Risk band | `desk.decisions.risk.current(cfg)` (Concept C1) | `advisor.risk_band`; numbers as brief keys `risk.<field>:all:now` (band, equity range, speculative max, single-stock max, worst-year loss) |
 | Strategy catalog | `desk.engine.bands.catalog(cfg)` (Statistics S1, S2) | `advisor.catalog` (id, name, fit, proxy); numbers as `catalog.<field>:<id>:now` |
 | Conviction holds | `desk.decisions.risk.convictions(cfg)` (C2) | `advisor.convictions` |
-| Planned actions | `desk.decisions.targets.planned_actions` + `describe` (C3) | `advisor.planned_actions`, ready sentences |
+| Plan steps live today | `desk.decisions.plans.steps_today(cfg)` (Concept P1) | `advisor.planned_actions`, ready sentences. The Plan keeper names each in the daily Brief, and a change in them counts as a brief change |
+| No-buy windows | `desk.decisions.plans.no_buy(cfg)` | `advisor.no_buy` by symbol. A buy or deposit route for a listed symbol is rejected before it reaches the queue, and the Plan desk writes no add step |
 
 Each piece is optional: a missing one is listed in `advisor.missing` and the desk carries on. With no risk band yet, desks stay conservative and mention the questionnaire once. The v3 mix is one catalog entry, and v3 items he hasn't re-confirmed are suggestions only. A risk band change counts as a brief change, so the Plan keeper runs that day.
 
@@ -197,6 +201,27 @@ Writes the words on the Results page (`docs/statistics.md` owns the period packs
 | On switch | On by default behind `agents.enabled`; Settings → Desks turns it off. The first-run guard does not hold it, since it only writes text |
 
 `python -m desk.agents run debrief [--kinds day,week,month,year] [--so-far]` writes now; `dry-run debrief` shows the first pack's prompt.
+
+## Plan desk
+
+Drafts and refreshes one stock plan per holding (`docs/concept.md` owns the plan record, `docs/statistics.md` the plan facts). He edits and approves; the desk only ever writes drafts.
+
+| Piece | Detail |
+|---|---|
+| Reads | `desk.engine.planfacts.facts(cfg)` (one row per holding), `desk.decisions.plans.list_plans(cfg)`, the latest dossier, the advisor view, `desk.engine.triggers.today(cfg)` |
+| Weekdays 18:40 | Only holdings with a reason: `new` (no plan or no thesis), `discount` (plan facts `discount.active`), `band` (plan facts `band` or the plan's `band_status` outside), `earnings` and `concentration` engine triggers, `review_due`. Each reason fires once |
+| Saturday 03:00 | Every holding (`weekly`); `run plans --all` does the same any day |
+| Answer | `schemas/plans.json`: `action` draft or keep, a one-line `summary`, `numbers_cited` (keys of the holding's `numbers`), and the `plan` on a draft. Keep writes nothing |
+| Checks | Role and thesis required. Add and trim zone levels must match a number in the holding's `zones` or `numbers` within 0.5%, else they are nulled. `next_review` must be after today, else a week out. Add steps that mention margin are dropped. No add steps inside a no-buy window |
+| Write | `save_draft(cfg, symbol, plan, run_id=, model=, summary=)`. A refused draft is noted on the run. His own unapproved draft is never touched, and no call is made for that holding |
+| Pinned steps | A Console request to the Plan desk whose text is JSON `{"steps": [...]}` (the plan record's step fields) pins those steps to the symbol. They ride in every draft, even when the desk would keep the plan, until he drops the step from the plan or 60 days after its window |
+| Console | Any other text sent to the Plan desk with a symbol is his note for that plan and runs the desk for that holding |
+| Volume | `usage.plans_per_run` in `desk.yaml`, default 12, at most 30; the rest wait for the next run. Weekly cap is twice that plus 10 |
+| Alert | One phone alert per run that saved drafts, linking to Plan |
+| Stops | Usage limit, run lock busy, weekly cap, switch off, or 2 failures in a row. A failed call keeps its reason for the next run |
+| On switch | On by default behind `agents.enabled`; the first-run guard does not hold it |
+
+`python -m desk.agents run plans [--symbol SYM] [--all] [--limit N]` writes now; `dry-run plans` lists the holdings it would write and shows the first prompt.
 
 ## Discount cases
 
@@ -322,10 +347,11 @@ desk/agents/
   filings.py      the filings desk's nightly loop: queue, score, number check, record
   discounts.py    discount cases after the close: queue, case, number check, record
   debrief.py      period debriefs after the review job: pack, debrief, number check, record
+  plans.py        stock plan drafts: queue by reason, draft or keep, level check, pinned steps, save
   advisor.py      risk band, catalog, convictions and planned actions for every brief
   switches.py     Settings over desk.yaml over defaults
   prompts/        one system prompt per desk (Phase 5 on)
-  schemas/        proposal.json, strategy.json, skeptic.json, filings.json, discounts.json, debrief.json
+  schemas/        proposal.json, strategy.json, skeptic.json, filings.json, discounts.json, debrief.json, plans.json
   briefs.py       builds each desk's prompt from engine brief slices (Phase 5 on)
 tests/agents/     fake adapter and a stand-in claude binary only; never the real CLI
 desk.example.yaml
@@ -354,7 +380,7 @@ Numbering follows `ROADMAP.md`.
 | Switches | Settings (`PUT /api/agents/{desk}/enabled`, `*` for all) overrides `desk.yaml`; `DELETE` the same path to follow `desk.yaml` again. Status shows each desk's `source` (`app`, `desk.yaml` or `default`); the Filings desk defaults to off | Settings, Desks panel |
 | Health gate | A desk logs `unhealthy` and stays quiet while any engine health check is `fail`, or the engine's last run finished over 36 hours ago. Warnings don't block. | Fix the failing check; the next run goes ahead |
 | Dry run | `python -m desk.agents dry-run <desk>` builds the real brief and prompt from live data and prints them with the health checks and any skip reason. It calls no model and writes nothing. | Add `--symbol`, `--question`, `--system` or `--schema` as needed |
-| First-run guard | On by default: only the Plan keeper and Tax desk run, whatever `desk.yaml` enables (the Debrief desk is exempt; it only writes text). Status shows the other desks as guarded, and `guard.ready` turns true once both have finished an ok run (`guard.why` says which is missing). | `python -m desk.agents guard off` once their first runs look right (or `PUT /api/agents/guard`) |
+| First-run guard | On by default: only the Plan keeper and Tax desk run, whatever `desk.yaml` enables (the Debrief and Plan desks are exempt; they only write text and drafts). Status shows the other desks as guarded, and `guard.ready` turns true once both have finished an ok run (`guard.why` says which is missing). | `python -m desk.agents guard off` once their first runs look right (or `PUT /api/agents/guard`) |
 | Recovery | A run or request left `running` by a stopped process is closed or queued again at the next `run` or `queue`, but only while no desk holds the run lock. A request interrupted twice fails. | Automatic |
 
 ## Before you start

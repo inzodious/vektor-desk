@@ -202,6 +202,22 @@ def rules_in_force(cfg: Config, plan: dict) -> tuple[list[dict], str]:
         return rules, "plan"
 
 
+def fi_goal(cfg: Config, mirror: sqlite3.Connection) -> dict | None:
+    prefs = fi.fi_prefs(current_rows(mirror, "prefs"))
+    if prefs is not None:
+        return prefs
+    try:
+        from desk.decisions import profile
+
+        read = getattr(profile, "fi_goal", None)
+        goal = read(active_profile(cfg).data) if read else None
+    except PROFILE_ERRORS:
+        return None
+    if not isinstance(goal, dict) or not isinstance(goal.get("fi_number"), int | float) or goal["fi_number"] <= 0:
+        return None
+    return {"target_date": None, "inflation": 0.0, "real": False} | goal
+
+
 def convictions(rules: list[dict]) -> dict[str, tuple[float, float]]:
     out = {}
     for r in rules:
@@ -304,9 +320,10 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     _flight_record(out, cfg, desk, tr, targets, kinds, now_rows)
     market = next((m[5] for m in out.metrics if m[0] == "value.market" and m[1] == "portfolio"), total)
     cash_in = [(f["date"], f["amount"]) for f in flows if f["external_portfolio"]]
-    out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), fi.fi_prefs(current_rows(mirror, "prefs")), desk, market, cash_in)
+    goal = fi_goal(cfg, mirror)
+    out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), goal, desk, market, cash_in)
     held, cash_share, held_notes = catalog.held_mix(now_rows)
-    wanted = catalog.mixes(targets, held, cash_share, kinds)
+    wanted = catalog.mixes(held, cash_share, kinds)
     if "as-held" in wanted:
         wanted["as-held"]["notes"] = held_notes + wanted["as-held"]["notes"]
     with desk:
@@ -319,7 +336,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
         wanted,
         value=market,
         deposits=cash_in,
-        prefs=fi.fi_prefs(current_rows(mirror, "prefs")),
+        prefs=goal,
         fees=expense_ratios(plan),
         kinds=kinds,
         convictions=convictions(rules_in_force(cfg, plan)[0]),
@@ -532,7 +549,8 @@ def _margin_metrics(out: Out, rows, total):
         if h["is_cash"] and h["value"] < 0:
             a["debit"] -= h["value"]
     debit = sum(a["debit"] for a in by_acct.values())
-    out.m("margin.debit", debit, "usd")
+    modelled = any(h["is_cash"] and h["value"] < 0 and h["quality"] == "modelled" for h in rows)
+    out.m("margin.debit", debit, "usd", quality="modelled" if modelled else "ok")
     if debit > 0:
         out.m("margin.cost_month", debit * rate / 100 * 30 / 360 if rate is not None else None, "usd", quality="ok" if rate is not None else "modelled")
         out.m("margin.funded_share", debit / total * 100 if total else None, "pct")
