@@ -149,3 +149,30 @@ def test_fi_endpoints_before_a_run(cfg, app_client):
     client = app_client(packages=["engine"])
     assert client.get("/api/engine/fi").json()["status"] == "not_ready"
     assert client.get("/api/engine/factors").json()["holdings"] == {}
+
+
+# ---- Goal fallback ----
+
+
+def test_the_goal_falls_back_to_the_desk_profile(cfg, mirror, monkeypatch):
+    from desk.decisions import profile
+    from desk.engine import core
+    from desk.engine.source import open_mirror
+
+    mirror.put("prefs", "theme", {"key": "theme", "value": "dark"})
+    mirror.pull("2026-11-04T21:00:00+00:00")
+    conn = open_mirror(cfg)
+    assert core.fi_goal(cfg, conn) is None
+    monkeypatch.setattr(core, "active_profile", lambda cfg: profile.Profile(1, {"fi": {}}, "test", "2026-11-10", 1))
+    monkeypatch.setattr(profile, "fi_goal", lambda data: {"fi_number": 900000.0, "target_date": "2040-01-01", "source": "profile"}, raising=False)
+    assert core.fi_goal(cfg, conn) == {"fi_number": 900000.0, "target_date": "2040-01-01", "inflation": 0.0, "real": False, "source": "profile"}
+    monkeypatch.setattr(profile, "fi_goal", lambda data: {"fi_number": 0}, raising=False)
+    assert core.fi_goal(cfg, conn) is None
+    monkeypatch.setattr(profile, "fi_goal", lambda data: None, raising=False)
+    assert core.fi_goal(cfg, conn) is None
+    conn.close()
+    mirror.put("prefs", "fi", PREFS)
+    mirror.pull("2026-11-04T21:30:00+00:00")
+    conn = open_mirror(cfg)
+    assert core.fi_goal(cfg, conn)["fi_number"] == 1_000_000.0
+    conn.close()

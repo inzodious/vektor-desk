@@ -159,7 +159,7 @@ def run(
 ) -> dict:
     view = {"as_of": out.as_of, "status": "not_ready"}
     if prefs is None:
-        view["note"] = "No FI goal in Escape Vektor yet; set yearly spend and target age there."
+        view["note"] = "No FI goal yet. Set one in Settings → Profile, or in Escape Vektor."
         return view
     goal = prefs["fi_number"]
     out.m("fi.number", goal, "usd", quality="ok")

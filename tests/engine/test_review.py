@@ -133,7 +133,7 @@ def seeded(cfg, monkeypatch):
         conn.execute(signal, ("a1", "ACME"))
         conn.execute(signal, ("a2", "OTHER"))
         conn.execute("INSERT INTO earnings (symbol, date, eps_estimate, eps_actual) VALUES ('ACME', '2026-11-03', 1.0, 1.2)")
-    catalog.sync(conn, catalog.mixes({"IVV": 0.8, "VXUS": 0.2}, {}, 0.0), now=NOW)
+    catalog.sync(conn, catalog.mixes({}, 0.0, safe={"IVV": 0.8, "VXUS": 0.2}), now=NOW)
     monkeypatch.setattr(review.broker, "history", lambda mirror, desk: (list(ACTIVITY), None))
     monkeypatch.setattr(review, "rules_in_force", lambda cfg, plan: (RULES, "profile"))
     monkeypatch.setattr("desk.decisions.risk.current", lambda cfg: {"band": 3, "label": "Balanced", "worst_year_loss_pct": 20})
@@ -293,6 +293,19 @@ def test_partial_cover_weekend_days_and_old_periods(cfg, monkeypatch):
     assert monday["risk"]["volatility_pct"] is None and "volatility_pct" not in monday["numbers"]
     assert monday["movers"]["down"][0]["symbol"] == "ACME" and monday["movers"]["up"] == []
     assert conn.execute("SELECT count(*) FROM period_reviews WHERE \"end\"='2026-10-23'").fetchone()[0] == 0
+    conn.close()
+
+
+def test_a_movers_return_agrees_with_its_contribution(cfg, monkeypatch):
+    conn = seeded(cfg, monkeypatch)
+    with conn:
+        conn.execute("UPDATE price_bars SET close=20.0, adj_close=20.0 WHERE symbol='ACME' AND date='2026-11-06'")
+        conn.execute("UPDATE series_daily SET value = value - 0.01 WHERE date='2026-11-06' AND series_id='value' AND scope='account'")
+    review.run(cfg, None, conn, now=NOW)
+    day = stored(conn, "day", "2026-11-06")["pack"]
+    acme = next(r for r in day["movers"]["up"] if r["symbol"] == "ACME")
+    assert acme["contribution_usd"] == 8.0 and acme["return_pct"] == pytest.approx((24 / 23 - 1) * 100, abs=1e-4)
+    assert day["accounts"][0]["net_flows"] == 0.0 and day["value"]["net_flows"] == 0.0
     conn.close()
 
 
