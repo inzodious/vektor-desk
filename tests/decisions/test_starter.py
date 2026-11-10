@@ -210,6 +210,7 @@ def test_no_money_in_on_the_brokerage_says_what_it_saw(cfg):
 
 def test_init_deposits_prints_a_block_without_touching_desk_yaml(cfg, monkeypatch, capsys):
     monkeypatch.setattr("desk.decisions.profile.Config.from_env", lambda: cfg)
+    monkeypatch.setattr(starter, "_local_today", lambda cfg: TODAY)
     csv = [_act(d, "individual-0100", "deposit", "EFT RECEIVED", 3000) for d in MONTHLY]
     _brokerage_shape(cfg, csv)
     path = cfg.data_dir / "desk.yaml"

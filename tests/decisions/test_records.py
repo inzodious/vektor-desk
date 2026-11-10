@@ -269,14 +269,16 @@ def test_journal_groups_by_day_and_reads_scores(cfg, preflight, now, desk_db, pr
     desk_db.execute("CREATE TABLE IF NOT EXISTS metric_values (metric_id, scope, scope_id, window, as_of, value, unit, n_obs, quality, engine_version)")
     desk_db.execute("INSERT INTO metric_values VALUES ('dec.score_30', 'decision', ?, '30d', '2026-12-10', 12.5, 'usd', 1, 'ok', '1')", (a["id"],))
     desk_db.commit()
-    j = journal(cfg)
-    assert [d["day"] for d in j["days"]][:2] == ["2026-11-10", "2026-11-09"]
+    later = now + timedelta(days=1, hours=1)
+    j = journal(cfg, now=later)
+    assert [d["day"] for d in j["days"] if any(i["kind"] != "rule_change" for i in d["items"])] == ["2026-11-10", "2026-11-09"]
     items = [i for day in j["days"] for i in day["items"] if i["kind"] != "rule_change"]
     assert [i["id"] for i in items] == [b["id"], a["id"]]
     assert items[1]["scores"] == {"30d": 12.5}
-    assert [i["id"] for day in journal(cfg, origin="tax")["days"] for i in day["items"]] == [b["id"]]
-    assert journal(cfg, symbol="wxyz")["count"] == 1
-    assert journal(cfg, since="2026-11-10T00:00:00+00:00")["count"] == 1
+    assert [i["id"] for day in journal(cfg, origin="tax", now=later)["days"] for i in day["items"]] == [b["id"]]
+    assert journal(cfg, symbol="wxyz", now=later)["count"] == 1
+    tomorrow = [i for day in journal(cfg, since="2026-11-10T00:00:00+00:00", now=later)["days"] for i in day["items"] if i["kind"] != "rule_change"]
+    assert [i["id"] for i in tomorrow] == [b["id"]]
 
 
 def test_scoring_rows_skip_open_and_rule_changes(cfg, preflight, now, proposal):
