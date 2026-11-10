@@ -197,8 +197,10 @@ class RealAdvisor:
         return [dict(r) for r in _guarded("desk.decisions.risk", "convictions", cfg)]
 
     def actions(self, cfg: Config) -> list[str]:
-        items = _guarded("desk.decisions.targets", "planned_actions", cfg)
-        return [str(line) for line in _guarded("desk.decisions.targets", "describe", items)]
+        return [str(line) for line in _guarded("desk.decisions.plans", "steps_today", cfg)]
+
+    def no_buy(self, cfg: Config) -> dict:
+        return {str(k).upper(): dict(v) for k, v in dict(_guarded("desk.decisions.plans", "no_buy", cfg)).items()}
 
 
 class Discounts(Protocol):
@@ -244,8 +246,6 @@ class RealReviews:
 class Plans(Protocol):
     def list_plans(self, cfg: Config) -> list[dict]: ...
 
-    def steps_today(self, cfg: Config) -> list[str]: ...
-
     def save_draft(self, cfg: Config, symbol: str, plan: dict, *, run_id: int, model: str, summary: str) -> dict: ...
 
 
@@ -254,13 +254,20 @@ class RealPlans:
     def list_plans(self, cfg: Config) -> list[dict]:
         return [dict(r) for r in _guarded("desk.decisions.plans", "list_plans", cfg)]
 
-    def steps_today(self, cfg: Config) -> list[str]:
-        return [str(line) for line in _guarded("desk.decisions.plans", "steps_today", cfg)]
-
     def save_draft(self, cfg: Config, symbol: str, plan: dict, *, run_id: int, model: str, summary: str) -> dict:
         fn = _fn("desk.decisions.plans", "save_draft")
         not_ready = getattr(_module("desk.decisions.plans"), "NotReady", NotReady)
         try:
-            return dict(fn(cfg, symbol, plan, run_id=run_id, model=model, summary=summary) or {})
+            return dict(fn(cfg, symbol, plan, run_id=str(run_id), model=model, summary=summary) or {})
         except not_ready as e:
             raise NotReady(str(e) or "stock plans not ready") from None
+
+
+class PlanFacts(Protocol):
+    def facts(self, cfg: Config, symbol: str | None = None) -> list[dict]: ...
+
+
+@dataclass
+class RealPlanFacts:
+    def facts(self, cfg: Config, symbol: str | None = None) -> list[dict]:
+        return [dict(r) for r in _guarded("desk.engine.planfacts", "facts", cfg, symbol)]

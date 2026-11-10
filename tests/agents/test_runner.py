@@ -29,7 +29,7 @@ OK_JSON = {
 
 
 def test_registry_is_all_opus_and_jobs_only_for_live_desks():
-    assert set(DESKS) == {"plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts", "debrief"}
+    assert set(DESKS) == {"plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts", "debrief", "plans"}
     assert {d.model for d in DESKS.values()} == {"opus"}
     assert {d.name for d in DESKS.values() if d.tools} == {"research", "scout", "strategy", "discounts"}
     assert {cmd for _, cmd in JOBS if "run " in cmd} >= {f"python -m desk.agents run {d.name}" for d in DESKS.values() if d.schedules}
