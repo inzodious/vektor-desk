@@ -13,6 +13,7 @@ import { leaderboardFixtures } from './leaderboard.mjs';
 import { bandsFixtures } from './bands.mjs';
 import { discountsFixtures } from './discounts.mjs';
 import { readReviews, reviewsFixtures } from './reviews.mjs';
+import { plansFixtures, readPlans, seedPlans } from './stockplans.mjs';
 import { convictionsFixtures, withEditable } from './convictions.mjs';
 import { withFilingSignals } from './filing-signals.mjs';
 
@@ -216,6 +217,12 @@ for (const [name, body] of Object.entries(bandsFixtures(await get('/api/engine/b
 for (const [name, body] of Object.entries(discountsFixtures(await get('/api/engine/discounts')))) save(name, body);
 const reviews = await readReviews(get).catch(() => null);
 if (reviews) for (const [name, body] of Object.entries(reviewsFixtures(reviews.index, reviews.got))) save(name, body);
+
+// ---------- stock plans ----------
+const stockPlans = await seedPlans(API, get)
+  .then(() => readPlans(get))
+  .catch(() => null);
+if (stockPlans?.plans.items.length) for (const [name, body] of Object.entries(plansFixtures(stockPlans))) save(name, body);
 
 // ---------- jobs ----------
 for (const [name, body] of Object.entries(jobsFixtures(await get('/api/jobs')))) save(name, body);

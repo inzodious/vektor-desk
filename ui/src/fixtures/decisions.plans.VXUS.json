@@ -1,0 +1,102 @@
+{
+ "plan": {
+  "symbol": "VXUS",
+  "version": 1,
+  "status": "draft",
+  "author": "desk",
+  "run_id": "run_demo_plans_1",
+  "model": "synthetic",
+  "summary": "First draft: a satellite with a deposit-only add rule.",
+  "created_at": "2026-11-10T22:46:17+00:00",
+  "approved_at": null,
+  "add_rule": {
+   "deposits_only": true,
+   "max_per_month_usd": 100,
+   "note": "Route deposits here while it sits under target.",
+   "zone_high": 63.5,
+   "zone_low": 61
+  },
+  "catalysts": [],
+  "exit_conditions": [],
+  "next_review": "2027-02-01",
+  "role": "satellite",
+  "steps": [
+   {
+    "account": null,
+    "amount_usd": 60,
+    "by": "desk",
+    "due": "2026-11-18",
+    "id": "add-2026-11-18",
+    "kind": "add",
+    "lots": null,
+    "no_buy_days": null,
+    "note": "From the 11-18 deposit.",
+    "shares": null,
+    "text": "Buy $60 of VXUS",
+    "until": null,
+    "when": null,
+    "symbol": "VXUS",
+    "done_by": null,
+    "filled_shares": null,
+    "activity_ids": [],
+    "status": "upcoming",
+    "done_on": null,
+    "no_buy_from": null,
+    "rebuy_on": null,
+    "no_buy_now": false
+   }
+  ],
+  "tax_notes": null,
+  "thesis": "International diversifier. It lags in US-led years and that is what it is for.",
+  "trim_rule": null,
+  "weight_band": {
+   "max_pct": 18,
+   "min_pct": 12
+  },
+  "band_source": "plan",
+  "next_step": {
+   "account": null,
+   "amount_usd": 60,
+   "by": "desk",
+   "due": "2026-11-18",
+   "id": "add-2026-11-18",
+   "kind": "add",
+   "lots": null,
+   "no_buy_days": null,
+   "note": "From the 11-18 deposit.",
+   "shares": null,
+   "text": "Buy $60 of VXUS",
+   "until": null,
+   "when": null,
+   "symbol": "VXUS",
+   "done_by": null,
+   "filled_shares": null,
+   "activity_ids": [],
+   "status": "upcoming",
+   "done_on": null,
+   "no_buy_from": null,
+   "rebuy_on": null,
+   "no_buy_now": false
+  },
+  "weight_pct": 13.49,
+  "weight_as_of": "2026-11-06",
+  "band_status": "inside",
+  "conviction": null,
+  "review_due": false,
+  "warnings": [],
+  "approved": null,
+  "versions": 1
+ },
+ "history": [
+  {
+   "version": 1,
+   "status": "draft",
+   "author": "desk",
+   "run_id": "run_demo_plans_1",
+   "model": "synthetic",
+   "summary": "First draft: a satellite with a deposit-only add rule.",
+   "created_at": "2026-11-10T22:46:17+00:00",
+   "approved_at": null
+  }
+ ]
+}

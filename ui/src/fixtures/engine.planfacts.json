@@ -1,0 +1,530 @@
+{
+ "as_of": "2026-11-06",
+ "rows": [
+  {
+   "symbol": "ACME",
+   "name": "Acme Orbital (synthetic)",
+   "kind": "stock",
+   "as_of": "2026-11-06",
+   "price_as_of": "2026-11-06",
+   "held": true,
+   "accounts": [
+    "individual-0001"
+   ],
+   "numbers": {
+    "price": 3.22,
+    "shares": 23.8209,
+    "value": 76.7,
+    "weight_pct": 0.4574,
+    "cost_basis": 500,
+    "cost_per_share": 20.99,
+    "unrealized_usd": -423.3,
+    "unrealized_pct": -84.66,
+    "risk_share_pct": -0.0765,
+    "valuation_value": -0.7687,
+    "valuation_pctile": 0.04,
+    "day_move_pct": 4.886,
+    "high_52w": 7.48,
+    "low_52w": 3.06,
+    "drop_from_high_pct": -56.9519,
+    "above_low_pct": 5.2288,
+    "vol_annual_pct": 69.9108,
+    "sigma_month_pct": 20.1815,
+    "sma_50": 3.3334,
+    "vs_sma_50_pct": -3.4019,
+    "sma_200": 4.7012,
+    "vs_sma_200_pct": -31.5061,
+    "ret_1y_pct": -53.6023,
+    "add_low": 1.9203,
+    "add_high": 2.5702,
+    "trim_low": 3.8698,
+    "trim_high": 4.5197
+   },
+   "lots": [],
+   "wash_windows": [],
+   "zones": {
+    "method": "Add zone is one to two monthly swings under the last close, trim zone one to two above. A monthly swing is 63-session daily volatility × √21.",
+    "sigma_month_pct": 20.1815,
+    "add": {
+     "low": 1.9203,
+     "high": 2.5702
+    },
+    "trim": {
+     "low": 3.8698,
+     "high": 4.5197
+    },
+    "levels": {
+     "price": 3.22,
+     "high_52w": 7.48,
+     "low_52w": 3.06,
+     "sma_50": 3.3334,
+     "sma_200": 4.7012,
+     "cost_per_share": 20.99,
+     "down_10_from_high": 6.732,
+     "down_20_from_high": 5.984,
+     "down_30_from_high": 5.236
+    }
+   },
+   "discount": {
+    "active": false,
+    "signal_id": null,
+    "reason": null,
+    "as_of": null
+   },
+   "next_earnings": {
+    "date": "2026-11-12",
+    "hour": "amc",
+    "eps_estimate": 0.21,
+    "days": 6
+   },
+   "filing_signals": [],
+   "valuation": {
+    "metric": "price_vs_5y_avg",
+    "value": -0.7687,
+    "pctile_own": 0.04
+   },
+   "band": {
+    "source": "plan",
+    "min_pct": 0,
+    "max_pct": 5,
+    "weight_pct": 0.4574,
+    "status": "inside",
+    "room_pct": 4.5426,
+    "risk_band": {
+     "band": 4,
+     "label": "Moderately aggressive",
+     "single_stock_max_pct": 10
+    }
+   }
+  },
+  {
+   "symbol": "BND",
+   "name": null,
+   "kind": "fund",
+   "as_of": "2026-11-06",
+   "price_as_of": "2026-11-06",
+   "held": true,
+   "accounts": [
+    "hsa-0002",
+    "individual-0001"
+   ],
+   "numbers": {
+    "price": 77.3,
+    "shares": 10.5247,
+    "value": 813.56,
+    "weight_pct": 4.8513,
+    "cost_basis": 777.71,
+    "cost_per_share": 73.8938,
+    "unrealized_usd": 35.85,
+    "unrealized_pct": 4.6097,
+    "risk_share_pct": -0.1632,
+    "valuation_value": 0.0851,
+    "valuation_pctile": 0.94,
+    "day_move_pct": -0.0776,
+    "high_52w": 78.99,
+    "low_52w": 73.02,
+    "drop_from_high_pct": -2.1395,
+    "above_low_pct": 5.8614,
+    "vol_annual_pct": 4.675,
+    "sigma_month_pct": 1.3496,
+    "sma_50": 77.628,
+    "vs_sma_50_pct": -0.4225,
+    "sma_200": 76.7681,
+    "vs_sma_200_pct": 0.6929,
+    "ret_1y_pct": 5.789,
+    "add_low": 75.2136,
+    "add_high": 76.2568,
+    "trim_low": 78.3432,
+    "trim_high": 79.3864
+   },
+   "lots": [],
+   "wash_windows": [
+    {
+     "kind": "recent_buy",
+     "date": "2026-11-02",
+     "clears": "2026-12-03",
+     "account": "hsa-0002",
+     "amount": 5
+    },
+    {
+     "kind": "recent_buy",
+     "date": "2026-11-02",
+     "clears": "2026-12-03",
+     "account": "individual-0001",
+     "amount": 25
+    }
+   ],
+   "zones": {
+    "method": "Add zone is one to two monthly swings under the last close, trim zone one to two above. A monthly swing is 63-session daily volatility × √21.",
+    "sigma_month_pct": 1.3496,
+    "add": {
+     "low": 75.2136,
+     "high": 76.2568
+    },
+    "trim": {
+     "low": 78.3432,
+     "high": 79.3864
+    },
+    "levels": {
+     "price": 77.3,
+     "high_52w": 78.99,
+     "low_52w": 73.02,
+     "sma_50": 77.628,
+     "sma_200": 76.7681,
+     "cost_per_share": 73.8938,
+     "down_10_from_high": 71.091,
+     "down_20_from_high": 63.192,
+     "down_30_from_high": 55.293
+    }
+   },
+   "discount": {
+    "active": false,
+    "signal_id": null,
+    "reason": null,
+    "as_of": null
+   },
+   "next_earnings": null,
+   "filing_signals": [],
+   "valuation": {
+    "metric": "price_vs_5y_avg",
+    "value": 0.0851,
+    "pctile_own": 0.94
+   },
+   "band": {
+    "source": "none",
+    "min_pct": null,
+    "max_pct": null,
+    "weight_pct": 4.8513,
+    "status": "inside",
+    "room_pct": null,
+    "risk_band": {
+     "band": 4,
+     "label": "Moderately aggressive",
+     "single_stock_max_pct": 10
+    }
+   }
+  },
+  {
+   "symbol": "FTEC",
+   "name": null,
+   "kind": "fund",
+   "as_of": "2026-11-06",
+   "price_as_of": "2026-11-06",
+   "held": true,
+   "accounts": [
+    "hsa-0002",
+    "individual-0001"
+   ],
+   "numbers": {
+    "price": 252.22,
+    "shares": 14.3644,
+    "value": 3623,
+    "weight_pct": 21.6043,
+    "cost_basis": 3022.76,
+    "cost_per_share": 210.4338,
+    "unrealized_usd": 600.24,
+    "unrealized_pct": 19.8573,
+    "risk_share_pct": 30.3818,
+    "valuation_value": 0.3627,
+    "valuation_pctile": 0.84,
+    "day_move_pct": -1.4381,
+    "high_52w": 285.69,
+    "low_52w": 226.89,
+    "drop_from_high_pct": -11.7155,
+    "above_low_pct": 11.164,
+    "vol_annual_pct": 27.7201,
+    "sigma_month_pct": 8.0021,
+    "sma_50": 247.216,
+    "vs_sma_50_pct": 2.0241,
+    "sma_200": 258.3974,
+    "vs_sma_200_pct": -2.3907,
+    "ret_1y_pct": 8.1329,
+    "add_low": 211.8542,
+    "add_high": 232.0371,
+    "trim_low": 272.4029,
+    "trim_high": 292.5858
+   },
+   "lots": [],
+   "wash_windows": [
+    {
+     "kind": "recent_buy",
+     "date": "2026-11-02",
+     "clears": "2026-12-03",
+     "account": "hsa-0002",
+     "amount": 20
+    },
+    {
+     "kind": "recent_buy",
+     "date": "2026-11-02",
+     "clears": "2026-12-03",
+     "account": "individual-0001",
+     "amount": 100
+    }
+   ],
+   "zones": {
+    "method": "Add zone is one to two monthly swings under the last close, trim zone one to two above. A monthly swing is 63-session daily volatility × √21.",
+    "sigma_month_pct": 8.0021,
+    "add": {
+     "low": 211.8542,
+     "high": 232.0371
+    },
+    "trim": {
+     "low": 272.4029,
+     "high": 292.5858
+    },
+    "levels": {
+     "price": 252.22,
+     "high_52w": 285.69,
+     "low_52w": 226.89,
+     "sma_50": 247.216,
+     "sma_200": 258.3974,
+     "cost_per_share": 210.4338,
+     "down_10_from_high": 257.121,
+     "down_20_from_high": 228.552,
+     "down_30_from_high": 199.983
+    }
+   },
+   "discount": {
+    "active": false,
+    "signal_id": null,
+    "reason": null,
+    "as_of": null
+   },
+   "next_earnings": null,
+   "filing_signals": [],
+   "valuation": {
+    "metric": "price_vs_5y_avg",
+    "value": 0.3627,
+    "pctile_own": 0.84
+   },
+   "band": {
+    "source": "none",
+    "min_pct": null,
+    "max_pct": null,
+    "weight_pct": 21.6043,
+    "status": "inside",
+    "room_pct": null,
+    "risk_band": {
+     "band": 4,
+     "label": "Moderately aggressive",
+     "single_stock_max_pct": 10
+    }
+   }
+  },
+  {
+   "symbol": "FXAIX",
+   "name": null,
+   "kind": "fund",
+   "as_of": "2026-11-06",
+   "price_as_of": "2026-11-06",
+   "held": true,
+   "accounts": [
+    "hsa-0002",
+    "individual-0001"
+   ],
+   "numbers": {
+    "price": 212.69,
+    "shares": 46.3901,
+    "value": 9866.72,
+    "weight_pct": 58.8362,
+    "cost_basis": 9135.36,
+    "cost_per_share": 196.9246,
+    "unrealized_usd": 731.36,
+    "unrealized_pct": 8.0058,
+    "risk_share_pct": 65.6682,
+    "valuation_value": 0.1425,
+    "valuation_pctile": 0.84,
+    "day_move_pct": 1.1701,
+    "high_52w": 257.8,
+    "low_52w": 184.85,
+    "drop_from_high_pct": -17.4981,
+    "above_low_pct": 15.0609,
+    "vol_annual_pct": 14.2181,
+    "sigma_month_pct": 4.1044,
+    "sma_50": 216.0728,
+    "vs_sma_50_pct": -1.5656,
+    "sma_200": 224.8612,
+    "vs_sma_200_pct": -5.4128,
+    "ret_1y_pct": 1.0932,
+    "add_low": 195.2306,
+    "add_high": 203.9603,
+    "trim_low": 221.4197,
+    "trim_high": 230.1494
+   },
+   "lots": [],
+   "wash_windows": [
+    {
+     "kind": "recent_buy",
+     "date": "2026-11-02",
+     "clears": "2026-12-03",
+     "account": "hsa-0002",
+     "amount": 60
+    },
+    {
+     "kind": "recent_buy",
+     "date": "2026-11-02",
+     "clears": "2026-12-03",
+     "account": "individual-0001",
+     "amount": 300
+    }
+   ],
+   "zones": {
+    "method": "Add zone is one to two monthly swings under the last close, trim zone one to two above. A monthly swing is 63-session daily volatility × √21.",
+    "sigma_month_pct": 4.1044,
+    "add": {
+     "low": 195.2306,
+     "high": 203.9603
+    },
+    "trim": {
+     "low": 221.4197,
+     "high": 230.1494
+    },
+    "levels": {
+     "price": 212.69,
+     "high_52w": 257.8,
+     "low_52w": 184.85,
+     "sma_50": 216.0728,
+     "sma_200": 224.8612,
+     "cost_per_share": 196.9246,
+     "down_10_from_high": 232.02,
+     "down_20_from_high": 206.24,
+     "down_30_from_high": 180.46
+    }
+   },
+   "discount": {
+    "active": false,
+    "signal_id": null,
+    "reason": null,
+    "as_of": null
+   },
+   "next_earnings": null,
+   "filing_signals": [],
+   "valuation": {
+    "metric": "price_vs_5y_avg",
+    "value": 0.1425,
+    "pctile_own": 0.84
+   },
+   "band": {
+    "source": "plan",
+    "min_pct": 50,
+    "max_pct": 65,
+    "weight_pct": 58.8362,
+    "status": "inside",
+    "room_pct": 6.1638,
+    "risk_band": {
+     "band": 4,
+     "label": "Moderately aggressive",
+     "single_stock_max_pct": 10
+    }
+   }
+  },
+  {
+   "symbol": "VXUS",
+   "name": null,
+   "kind": "fund",
+   "as_of": "2026-11-06",
+   "price_as_of": "2026-11-06",
+   "held": true,
+   "accounts": [
+    "hsa-0002",
+    "individual-0001"
+   ],
+   "numbers": {
+    "price": 62.09,
+    "shares": 36.441,
+    "value": 2262.62,
+    "weight_pct": 13.4922,
+    "cost_basis": 2324.97,
+    "cost_per_share": 63.801,
+    "unrealized_usd": -62.35,
+    "unrealized_pct": -2.6818,
+    "risk_share_pct": 4.1898,
+    "valuation_value": 0.0064,
+    "valuation_pctile": 0.66,
+    "day_move_pct": -0.5127,
+    "high_52w": 81.35,
+    "low_52w": 60.43,
+    "drop_from_high_pct": -23.6755,
+    "above_low_pct": 2.747,
+    "vol_annual_pct": 15.0856,
+    "sigma_month_pct": 4.3549,
+    "sma_50": 66.0778,
+    "vs_sma_50_pct": -6.035,
+    "sma_200": 69.448,
+    "vs_sma_200_pct": -10.595,
+    "ret_1y_pct": -4.1673,
+    "add_low": 56.6821,
+    "add_high": 59.3861,
+    "trim_low": 64.7939,
+    "trim_high": 67.4979
+   },
+   "lots": [],
+   "wash_windows": [
+    {
+     "kind": "recent_buy",
+     "date": "2026-11-02",
+     "clears": "2026-12-03",
+     "account": "hsa-0002",
+     "amount": 15
+    },
+    {
+     "kind": "recent_buy",
+     "date": "2026-11-02",
+     "clears": "2026-12-03",
+     "account": "individual-0001",
+     "amount": 75
+    }
+   ],
+   "zones": {
+    "method": "Add zone is one to two monthly swings under the last close, trim zone one to two above. A monthly swing is 63-session daily volatility × √21.",
+    "sigma_month_pct": 4.3549,
+    "add": {
+     "low": 56.6821,
+     "high": 59.3861
+    },
+    "trim": {
+     "low": 64.7939,
+     "high": 67.4979
+    },
+    "levels": {
+     "price": 62.09,
+     "high_52w": 81.35,
+     "low_52w": 60.43,
+     "sma_50": 66.0778,
+     "sma_200": 69.448,
+     "cost_per_share": 63.801,
+     "down_10_from_high": 73.215,
+     "down_20_from_high": 65.08,
+     "down_30_from_high": 56.945
+    }
+   },
+   "discount": {
+    "active": false,
+    "signal_id": null,
+    "reason": null,
+    "as_of": null
+   },
+   "next_earnings": null,
+   "filing_signals": [],
+   "valuation": {
+    "metric": "price_vs_5y_avg",
+    "value": 0.0064,
+    "pctile_own": 0.66
+   },
+   "band": {
+    "source": "none",
+    "min_pct": null,
+    "max_pct": null,
+    "weight_pct": 13.4922,
+    "status": "inside",
+    "room_pct": null,
+    "risk_band": {
+     "band": 4,
+     "label": "Moderately aggressive",
+     "single_stock_max_pct": 10
+    }
+   }
+  }
+ ],
+ "note": null
+}

@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Kpi } from '../components/Kpi.jsx';
+import { Subtabs } from '../components/Subtabs.jsx';
+import { PLAN_TABS } from '../lib/stockPlans.js';
 import { DriftRows } from '../components/DriftRows.jsx';
 import { TaxCalendar } from '../components/TaxCalendar.jsx';
 import { FiPath } from '../plan/FiPath.jsx';
@@ -313,6 +315,7 @@ export default function Plan() {
         }
         foot={
           <>
+            <Subtabs label="Plan views" tabs={PLAN_TABS} />
             {p.risk_level != null ? <span className="chip">Risk {p.risk_level} of 5</span> : null}
             {p.growth?.tilt ? <span className="chip">{TILT[p.growth.tilt] || p.growth.tilt}</span> : null}
             {p.growth?.horizon_years ? <span className="chip">{p.growth.horizon_years}-year horizon</span> : null}

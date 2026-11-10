@@ -9,6 +9,7 @@ import { count, etStamp, pct, px, usd } from '../lib/format.js';
 import { dayLabel, periodStart } from '../lib/charts.js';
 import { useConsole } from '../research/consoleContext.js';
 import { filingChip, freshness, verdictOf } from '../lib/research.js';
+import { PlanBlock, RoleChip, VersionChip } from '../plan/PlanParts.jsx';
 
 function PriceHistory({ symbol, row, lots }) {
   const last = new Date().toISOString().slice(0, 10);
@@ -132,6 +133,35 @@ function DossierBit({ symbol, onClose }) {
   );
 }
 
+// ---------- stock plan ----------
+function PlanBit({ symbol, onClose }) {
+  const api = useApi(`/api/decisions/plans/${encodeURIComponent(symbol)}`);
+  const facts = useApi(`/api/engine/planfacts?symbol=${encodeURIComponent(symbol)}`);
+  const meta = useApi('/api/decisions/plans');
+  const plan = api.data?.plan?.symbol === symbol ? api.data.plan : null;
+  const fact = (facts.data?.rows || []).find((r) => r.symbol === symbol) || null;
+  if (!plan && !fact) return null;
+  return (
+    <div data-testid="sheet-plan" data-status={plan?.status || 'none'}>
+      <div className="card-head" style={{ marginBottom: 4 }}>
+        <span className="kicker">Stock plan</span>
+        <span className="acts">
+          <RoleChip plan={plan} />
+          <VersionChip plan={plan} />
+        </span>
+      </div>
+      <PlanBlock symbol={symbol} plan={plan} fact={fact} lotMethods={meta.data?.lot_methods} showNext />
+      {!plan ? <p className="empty-hint">No plan for {symbol} yet. The zones above are a starting point from its monthly swing.</p> : null}
+      <div className="sheet-acts">
+        <Link className="btn sm ghost" to={`/plan/stocks?symbol=${encodeURIComponent(symbol)}`} onClick={onClose}>
+          <Icon name="plan" />
+          {plan ? 'Open the plan' : 'Write a plan'}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function SheetBody({ symbol, onClose }) {
   const ctx = useLive();
   const row = ctx.symbols.find((s) => s.symbol === symbol);
@@ -155,6 +185,7 @@ function SheetBody({ symbol, onClose }) {
           <span className="kicker">Price, 1 year</span>
           <PriceHistory symbol={symbol} row={null} lots={[]} />
         </div>
+        <PlanBit symbol={symbol} onClose={onClose} />
         <FilingBit symbol={symbol} />
         <DossierBit symbol={symbol} onClose={onClose} />
       </>
@@ -200,6 +231,7 @@ function SheetBody({ symbol, onClose }) {
           <b className={row.day_change >= 0 ? 'up' : 'dn'}>{usd(row.day_change, { sign: true })}</b>
         </div>
       </div>
+      <PlanBit symbol={symbol} onClose={onClose} />
       <div>
         <span className="kicker">By account</span>
         <div className="tscroll">
