@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 from dataclasses import dataclass, field, replace
+from datetime import date
 from pathlib import Path
 
 import yaml
@@ -11,7 +12,8 @@ import yaml
 from desk.config import Config
 from desk.decisions.store import dumps, now_iso, session
 
-DESKS = ("plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts")
+DESKS = ("plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts", "debrief", "plans")
+DEFAULT_ON = ("debrief", "plans")
 LOT_METHODS = ("highest_cost", "lowest_cost", "fifo", "lifo", "tax_efficient")
 TILTS = ("growth", "balanced", "income")
 
@@ -21,8 +23,18 @@ DEFAULTS: dict = {
     "opportunity": {"satellite_cap_pct": 10, "ideas_per_month": 2, "min_confidence": 0.55},
     "tax": {"harvest_threshold_usd": 250, "lot_method": "highest_cost", "year_end_start": "12-01", "wash_sale_accounts": []},
     "growth": {"horizon_years": 10, "tilt": "growth", "fi_target_from_plan": True},
+    "fi": {
+        "number_usd": None,
+        "yearly_spend_usd": None,
+        "multiple": 25,
+        "target_age": None,
+        "birth_date": None,
+        "target_date": None,
+        "inflation_pct": 0,
+        "inflation_adjusted": False,
+    },
     "usage": {"overnight_window": "01:00-05:00", "weekly_runs": {}},
-    "agents": {"enabled": False, "desks": {d: False for d in DESKS}},
+    "agents": {"enabled": False, "desks": {d: d in DEFAULT_ON for d in DESKS}},
     "deposits": "auto",
     "alerts": {"min_priority": "default"},
     "rules": [
@@ -109,6 +121,33 @@ def _str_list(errors, where, value):
         errors.append(f"{where} must be a list of text")
 
 
+def _iso_day(value) -> date | None:
+    try:
+        return date.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
+def fi_goal(data: dict) -> dict | None:
+    fi = data.get("fi") or {}
+    spend, multiple = fi.get("yearly_spend_usd"), fi.get("multiple") or 25
+    number = fi.get("number_usd") or (spend * multiple if spend else None)
+    if not number:
+        return None
+    target = _iso_day(fi["target_date"]) if fi.get("target_date") else None
+    birth = _iso_day(fi["birth_date"]) if fi.get("birth_date") else None
+    if target is None and birth is not None and fi.get("target_age"):
+        year = birth.year + int(fi["target_age"])
+        target = birth.replace(year=year, day=28) if (birth.month, birth.day) == (2, 29) else birth.replace(year=year)
+    return {
+        "fi_number": float(number),
+        "target_date": target.isoformat() if target else None,
+        "inflation": float(fi.get("inflation_pct") or 0) / 100,
+        "real": bool(fi.get("inflation_adjusted")),
+        "source": "profile",
+    }
+
+
 def validate(data) -> list[str]:
     from desk.decisions.rules import validate_rules
 
@@ -151,6 +190,15 @@ def validate(data) -> list[str]:
         _num(errors, "growth.horizon_years", growth["horizon_years"], 0, 80)
     if "tilt" in growth:
         _choice(errors, "growth.tilt", growth["tilt"], TILTS)
+    fi = _section(errors, data, "fi")
+    for name, low, high in (("number_usd", 1, 1e10), ("yearly_spend_usd", 1, 1e8), ("multiple", 1, 100), ("target_age", 18, 100), ("inflation_pct", 0, 20)):
+        if fi.get(name) is not None:
+            _num(errors, f"fi.{name}", fi[name], low, high)
+    for name in ("birth_date", "target_date"):
+        if fi.get(name) is not None and _iso_day(fi[name]) is None:
+            errors.append(f"fi.{name} must be a date like 1990-01-31")
+    if "inflation_adjusted" in fi and not isinstance(fi["inflation_adjusted"], bool):
+        errors.append("fi.inflation_adjusted must be true or false")
     usage = _section(errors, data, "usage")
     runs = usage.get("weekly_runs", {}) or {}
     if not isinstance(runs, dict):
