@@ -32,6 +32,7 @@ DESKS: dict[str, Desk] = {
     for d in (
         Desk("plan_keeper", "Plan keeper", "high", 1, 12, 10, ("30 17 * * *",), live=True),
         Desk("tax", "Tax desk", "high", 2, 16, 8, ("0 2 * 1-11 0", "0 2 * 12 *"), live=True),
+        Desk("debrief", "Debrief desk", "high", 2, 8, 12, ("50 17 * * 1-5", "30 18 * * 5"), live=True),
         Desk("risk", "Risk desk", "high", 3, 16, 3, ("0 2 * * 6",), live=True),
         Desk("research", "Research desk", "xhigh", 4, 40, 4, ("0 1 * * 3",), WEB, live=True),
         Desk("skeptic", "Skeptic", "high", 4, 8, 10, live=True),

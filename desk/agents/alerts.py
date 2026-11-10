@@ -43,3 +43,9 @@ def answer_ready(cfg: Config, request: dict, answer: str) -> bool:
 def dossier_ready(cfg: Config, symbol: str, run_id: int, summary: str = "") -> bool:
     body = _first_line(summary) or "The research desk updated this dossier."
     return _send(cfg, "research", f"Dossier ready: {symbol}", body, "low", tags=["memo"], click="/research", key=f"agents:dossier:{symbol}:{run_id}")
+
+
+def debrief_ready(cfg: Config, kind: str, end: str, headline: str) -> bool:
+    body = _first_line(headline) or "The debrief for this period is ready."
+    priority = "low" if kind == "day" else "default"
+    return _send(cfg, "research", f"{kind.title()} review: {end}", body, priority, tags=["memo"], click="/results", key=f"agents:debrief:{kind}:{end}")

@@ -4,6 +4,15 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.0.9 - 2026-11-10
+
+### Added
+
+- Conviction holds (ASTS) get their own band, are exempt from the single-stock band, and Preflight blocks buys past the band or on margin; a weekly trim alert fires only above the band ([#142], [#143])
+- Conviction holds and the desk profile can be edited from the app, with no SSH ([#142], [#144])
+- Debrief desk writes a short review of each day, week, month and year (what happened, why, what to watch, up to 3 next steps) with a phone alert; it starts once the period results land ([#147])
+- The desk says when the day's results review didn't run, in `deploy.sh check`, in status and by phone alert ([#146])
+
 ## 1.0.8 - 2026-11-08
 
 ### Added
@@ -389,3 +398,8 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#138]: https://github.com/inzodious/vektor-desk/pull/138
 [#139]: https://github.com/inzodious/vektor-desk/pull/139
 [#140]: https://github.com/inzodious/vektor-desk/pull/140
+[#142]: https://github.com/inzodious/vektor-desk/pull/142
+[#143]: https://github.com/inzodious/vektor-desk/pull/143
+[#144]: https://github.com/inzodious/vektor-desk/pull/144
+[#146]: https://github.com/inzodious/vektor-desk/pull/146
+[#147]: https://github.com/inzodious/vektor-desk/pull/147
