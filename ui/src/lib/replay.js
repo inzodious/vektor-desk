@@ -92,7 +92,7 @@ export function chartSeries(view, v) {
   return [
     { name: 'You', short: 'You', color: 'var(--s1)', values: view.you.values, width: 2.5 },
     { name: shortLabel(v), short: v.family === 'house' ? 'Capped you' : 'With the rule', color: 'var(--s2)', values: v.values, width: 2.5 },
-    { name: 'S&P 500', short: 'S&P 500', color: 'var(--s-other)', values: view.index_only.values, dash: true },
+    { name: 'S&P 500', short: 'S&P 500', color: 'var(--s5)', values: view.index_only.values, dash: true },
   ];
 }
 
