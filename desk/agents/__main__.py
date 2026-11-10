@@ -14,6 +14,8 @@ from desk.agents.discounts import run_discount_desk
 from desk.agents.filings import preview as preview_filings
 from desk.agents.filings import run_filings_desk
 from desk.agents.pipeline import prepare, run_proposal_desk
+from desk.agents.plans import preview as preview_plans
+from desk.agents.plans import run_plan_desk
 from desk.agents.runner import GUARD_NOTE, LOCK, UNGUARDED, run_desk
 from desk.agents.sources import NotReady, RealLab
 from desk.agents.status import crew
@@ -26,7 +28,7 @@ SMOKE = Desk("smoke", "Smoke test", "low", 0, 1, 1000)
 SMOKE_SYSTEM = "You are a connectivity check. Reply with the single word OK."
 EXIT = {"ok": 0, "disabled": 0, "over_budget": 0, "not_ready": 0, "unchanged": 0, "unhealthy": 0, "guarded": 0, "busy": 75, "deferred": 75}
 RUN_WAIT = 2700
-STANDALONE = ("filings", "discounts", "debrief")
+STANDALONE = ("filings", "discounts", "debrief", "plans")
 
 
 def _recover(cfg: Config) -> None:
@@ -43,6 +45,8 @@ def _dry_run(cfg: Config, name: str, args) -> int:
     if name in STANDALONE:
         if name == "debrief":
             report, prompt = preview_debrief(cfg, kinds=parse_kinds(args.kinds), so_far=args.so_far)
+        elif name == "plans":
+            report, prompt = preview_plans(cfg, symbols=(args.symbol,) if args.symbol else None, full=True if args.all else None)
         else:
             report, prompt = (preview_filings if name == "filings" else preview_discounts)(cfg)
         print(report.note)
@@ -102,9 +106,11 @@ def main(argv: list[str] | None = None) -> int:
     run = sub.add_parser("run", help="run one desk now")
     run.add_argument("desk", choices=sorted(DESKS))
     run.add_argument("--trigger", default="schedule")
-    run.add_argument("--limit", type=int, help="filings and discount desks only: at most this many this run")
+    run.add_argument("--limit", type=int, help="filings, discount and plan desks only: at most this many this run")
     run.add_argument("--kinds", help="debrief desk only: day,week,month,year (default: all that are due)")
     run.add_argument("--so-far", action="store_true", help="debrief desk only: also debrief periods that are still open")
+    run.add_argument("--symbol", help="plan desk only: write this holding's plan")
+    run.add_argument("--all", action="store_true", help="plan desk only: refresh every holding's plan, as on Saturday")
     queue = sub.add_parser("queue", help="work through Console and trigger requests")
     queue.add_argument("--now-only", action="store_true", help="only requests marked Run now")
     sub.add_parser("triggers", help="turn today's engine triggers into requests")
@@ -120,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
     dry.add_argument("--schema", action="store_true", help="also print the output schema")
     dry.add_argument("--kinds", help="debrief desk only: day,week,month,year")
     dry.add_argument("--so-far", action="store_true", help="debrief desk only: include periods that are still open")
+    dry.add_argument("--all", action="store_true", help="plan desk only: every holding, as on Saturday")
     guard = sub.add_parser("guard", help="the first-run guard: only the Plan keeper, Tax, Debrief and Plan desks run while it is on")
     guard.add_argument("state", choices=("on", "off", "status"), nargs="?", default="status")
     args = parser.parse_args(argv)
@@ -175,6 +182,14 @@ def main(argv: list[str] | None = None) -> int:
         done = ", ".join(review.written) or "none"
         print(f"{desk.title}: {review.status}, wrote {done}, {len(review.failed)} failed. {review.note or ''}".strip())
         return EXIT.get(review.status, 1)
+    if desk.name == "plans":
+        wait = RUN_WAIT if args.trigger == "schedule" else 0.0
+        symbols = (args.symbol,) if args.symbol else None
+        book = run_plan_desk(cfg, symbols=symbols, full=True if args.all else None, trigger=args.trigger, limit=args.limit, wait=wait)
+        left = f", {book.left} left for the next run" if book.left else ""
+        tally = f"{len(book.drafted)} drafted, {len(book.kept)} kept, {len(book.failed)} failed of {book.pending}{left}"
+        print(f"{desk.title}: {book.status}, {tally}. {book.note or ''}".strip())
+        return EXIT.get(book.status, 1)
     if desk.name == "discounts":
         day = run_discount_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
         votes = list(day.verdicts.values())

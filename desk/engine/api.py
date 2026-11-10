@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import discounts, lab, lane, leaderboard, paper_exec, review, schema, watchlist
+from desk.engine import discounts, lab, lane, leaderboard, paper_exec, planfacts, review, schema, watchlist
 from desk.engine.compare import CompareError, compare
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
@@ -545,6 +545,11 @@ def reviews_view(request: Request, kind: str = "day", end: str | None = None) ->
     finally:
         if conn is not None:
             conn.close()
+
+
+@router.get("/api/engine/planfacts")
+def planfacts_view(request: Request, symbol: str | None = None) -> JSONResponse:
+    return _json(planfacts.view(get_cfg(request), symbol))
 
 
 @router.get("/api/engine/discounts")

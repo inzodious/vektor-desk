@@ -33,7 +33,7 @@ def run_failed(cfg: Config, desk: str, status: str, run_id: int, note: str | Non
 
 def answer_ready(cfg: Config, request: dict, answer: str) -> bool:
     desk = request["desk"]
-    where = "/lab" if desk == "strategy" else "/research"
+    where = {"strategy": "/lab", "plans": "/plan"}.get(desk, "/research")
     asked = request.get("source") == "console"
     title = f"{_title(desk)} answered" if asked else f"{_title(desk)} has a new note"
     body = _first_line(answer) or _first_line(request.get("question"))
@@ -49,3 +49,10 @@ def debrief_ready(cfg: Config, kind: str, end: str, headline: str) -> bool:
     body = _first_line(headline) or "The debrief for this period is ready."
     priority = "low" if kind == "day" else "default"
     return _send(cfg, "research", f"{kind.title()} review: {end}", body, priority, tags=["memo"], click="/results", key=f"agents:debrief:{kind}:{end}")
+
+
+def plans_ready(cfg: Config, symbols: list[str], day: str) -> bool:
+    n = len(symbols)
+    title = f"Stock plans: {n} draft{'s' if n != 1 else ''} to review"
+    more = f" and {n - 6} more" if n > 6 else ""
+    return _send(cfg, "research", title, ", ".join(symbols[:6]) + more, "default", tags=["memo"], click="/plan", key=f"agents:plans:{day}")
