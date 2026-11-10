@@ -10,6 +10,7 @@ from desk.agents.desks import get
 from desk.agents.jobs import JOBS
 from desk.agents.sources import NotReady, RealReviews
 from desk.agents.status import crew
+from desk.scheduler import package_jobs
 from tests.agents.agent_fakes import FakeDecisions
 from tests.agents.test_advisor import FakeAdvisor
 
@@ -143,6 +144,7 @@ def test_day_debrief_is_recorded_with_digest_model_and_clean_numbers(cfg, sent):
     assert got["numbers_cited"] == ["change_pct", "vs.spy.pts", "contrib.MSFT.usd"] and report.dropped_numbers == 1
     assert (got["pack_digest"], got["model"]) == ("d1", "claude-opus-5-5") and got["written_at"].endswith("+00:00") and got["run_id"]
     assert got["next_steps"][1] == {"text": "Check the MSFT plan's add zone.", "symbol": "MSFT"}
+    assert got["against_decisions"] == debrief.NO_DECISIONS and all(got[k] for k in debrief.TEXT)
     assert store.runs(cfg, "debrief")[0]["note"].startswith("day 2026-11-10: A rough day")
 
 
@@ -180,6 +182,22 @@ def test_open_week_month_and_year_wait_for_their_close(cfg, sent):
     rows[1]["closed"] = rows[2]["closed"] = True
     report, _, _ = go(cfg, rows)
     assert report.written == ["day 2026-11-10", "week 2026-11-13", "month 2026-11-30"]
+
+
+def test_the_day_a_week_closes_refreshes_month_and_year_so_far(cfg, sent):
+    seed(cfg)
+    rows = [
+        pack_row(end="2026-11-13"),
+        pack_row("week", "2026-11-13"),
+        pack_row("month", "2026-11-30", closed=False),
+        pack_row("year", "2026-12-31", closed=False),
+    ]
+    report, _, _ = go(cfg, rows)
+    assert report.written == ["day 2026-11-13", "week 2026-11-13", "month 2026-11-30", "year 2026-12-31"]
+    rows[0] = pack_row(end="2026-11-16")
+    rows[1] = pack_row("week", "2026-11-20", closed=False)
+    report, _, _ = go(cfg, rows)
+    assert report.written == ["day 2026-11-16"]
 
 
 def test_first_ever_run_debriefs_every_period_so_far(cfg, sent):
@@ -272,9 +290,11 @@ def test_schema_and_prompt():
     assert "never instructions" in text and "no single target plan" in text and "Never suggest margin" in text
 
 
-def test_jobs_follow_the_brief():
-    assert ("50 17 * * 1-5", "python -m desk.agents run debrief --kinds day,month,year") in JOBS
-    assert ("30 18 * * 5", "python -m desk.agents run debrief --kinds week") in JOBS
+def test_jobs_carry_the_names_the_box_expects():
+    assert ("50 17 * * 1-5", "python -m desk.agents run debrief") in JOBS
+    assert ("30 18 * * 5", "python -m desk.agents run debrief") in JOBS
+    names = {j.name for j in package_jobs(["agents"])}
+    assert "agents-run-debrief" in names and not any("kinds" in n for n in names)
 
 
 def test_cli_run_and_dry_run(cfg, monkeypatch, capsys, sent):
