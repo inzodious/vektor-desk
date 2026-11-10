@@ -48,6 +48,7 @@ STEP_FIELDS = ("id", "kind", "text", "due", "until", "when", "shares", "amount_u
 STEP_VIEW = ("by", "status", "done_on", "rebuy_on")
 SLUG = re.compile(r"^[a-z0-9][a-z0-9\-]{0,47}$")
 TRADES = ("add", "trim", "harvest", "sell")
+ONE_EACH = ("harvest", "repay")
 SELLS = ("trim", "harvest", "sell")
 LOT_METHODS = ("highest_cost", "lowest_cost", "fifo", "lifo", "tax_efficient")
 DOSSIER_FIELDS = ("thesis", "bear_case", "valuation_range", "verdict", "what_would_change", "changes_since_last")
@@ -374,7 +375,8 @@ def merge_steps(steps: list[dict], pins: list[dict], plan: dict | None) -> list[
     mine = his_ids(plan)
     keep = [p for p in pins if p["id"] not in mine]
     taken = {(p.get("kind"), _day(p.get("due"))) for p in keep}
-    rest = [s for s in steps if (s.get("kind"), s.get("due")) not in taken]
+    once = {p.get("kind") for p in keep if p.get("kind") in ONE_EACH}
+    rest = [s for s in steps if (s.get("kind"), s.get("due")) not in taken and s.get("kind") not in once]
     return (keep + rest)[:STEPS_MAX]
 
 

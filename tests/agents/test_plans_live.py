@@ -57,7 +57,9 @@ def test_his_steps_and_pins_survive_a_desk_redraft(cfg):
     body = {k: mine[k] for k in plans.PLAN_FIELDS} | {"steps": [{"id": "my-trim", "kind": "trim", "when": "Above 12% of the book"}]}
     record.save_plan(cfg, "TICKA", body, approve=True, now=NOW)
     console.ask(cfg, "plans", json.dumps(PINS), symbol="TICKA")
-    report, fake = run(cfg, draft(thesis="A new thesis after earnings."), today=SAT)
+    answer = draft(thesis="A new thesis after earnings.")
+    answer["plan"]["steps"].append({"kind": "harvest", "text": "Harvest some.", "due": "2026-12-20", "when": None})
+    report, fake = run(cfg, answer, today=SAT)
     assert report.drafted == ["TICKA"]
     sent = json.loads(fake.calls[0]["prompt"].split("\n\n", 1)[1])
     assert sent["current_plan"]["status"] == "approved" and sent["current_plan"]["steps"][0]["by"] == "you"
