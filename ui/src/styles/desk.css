@@ -1069,7 +1069,6 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .mix-race { display: inline-flex; align-items: center; gap: 6px; width: fit-content; font-size: 12px; font-weight: 600; color: var(--teal-ink); text-decoration: none; }
 .mix-race svg { width: 14px; height: 14px; }
 .mix-assume { margin: 0; font-size: 13px; color: var(--ink); }
-.mix-best { margin: 6px 0 0; font-size: 12.5px; }
 .mix-method summary { cursor: pointer; font-weight: 700; color: var(--ink); }
 .mix-method p, .mix-method ul { font-size: 12.5px; color: var(--ink-2); }
 .range-bars svg { width: 100%; height: auto; max-width: 100%; display: block; }
@@ -1081,7 +1080,36 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .rb-k-mid { width: 9px; height: 9px; border-radius: 50%; background: var(--ink); }
 .rb-k-in { width: 14px; border-top: 2px dashed var(--mustard-ink); }
 .rb-k-fi { width: 14px; border-top: 2px dashed var(--coral); }
-@media (max-width: 1100px) { .mix.c6 { grid-column: span 12; } }
+.fi-switch { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--ink); cursor: pointer; }
+.fi-switch small { display: block; font-size: 11px; font-weight: 500; color: var(--ink-3); }
+.fi-split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 18px; align-items: start; margin-bottom: 10px; }
+.fi-say { display: grid; gap: 12px; align-content: start; min-width: 0; }
+.fi-big { margin: 0; display: grid; gap: 2px; }
+.fi-big b { font-family: var(--f-head); font-size: 30px; line-height: 1.1; color: var(--ink); }
+.fi-big span { font-size: 13px; color: var(--ink-2); }
+.fi-moves b { display: block; font-size: 16px; }
+.fi-moves span { color: var(--ink-3); font-weight: 500; }
+.fi-ladder svg { width: 100%; height: auto; max-width: 100%; display: block; }
+.range-bars .chart-tools, .fi-ladder .chart-tools { align-items: flex-start; }
+.range-bars .chart-tools .link, .fi-ladder .chart-tools .link { flex: none; white-space: nowrap; }
+.fl-axis { color: var(--ink-2); font-weight: 700; }
+.rb-key .fl-axis + i { margin-left: 6px; }
+.fl-k-mid { width: 7px; height: 14px; border-radius: 4px; background: var(--ink); }
+.rb-tick.fl-on { fill: var(--teal-ink); font-weight: 700; }
+tr.fl-you td { font-weight: 700; color: var(--ink); }
+.mix-variant { display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; border: 1px dashed var(--line-2); font-size: 12.5px; color: var(--ink-2); }
+.mix-variant small { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); }
+.mix-variant b { color: var(--ink); }
+.mix-variant b.dn { color: var(--watch); }
+.policy-lede { margin: 0 0 10px; font-size: 12.5px; }
+.policies { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.policy { display: grid; gap: 8px; align-content: start; min-width: 0; padding: 12px; border-radius: 16px; background: var(--card-2); }
+.policy .mini-kpis div { background: var(--card); }
+.policy-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.policy-head b { font-size: 15px; color: var(--ink); }
+.policy-rule { margin: 0; font-size: 12px; min-height: 2.6em; }
+.policy-kpis b { display: block; font-size: 16px; }
+@media (max-width: 1100px) { .mix.c6 { grid-column: span 12; } .fi-split { grid-template-columns: minmax(0, 1fr); } .policies { grid-template-columns: minmax(0, 1fr); } .policy-rule { min-height: 0; } }
 @media (max-width: 640px) { .mix-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* ---------- discount days ---------- */
