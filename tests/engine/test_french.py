@@ -9,6 +9,7 @@ import pytest
 
 from desk.db import connect
 from desk.engine import french, lab, schema
+from desk.engine.jobs import JOBS
 from desk.engine.lab import data as lab_data
 from desk.engine.lab import factors
 from desk.engine.lab.data import EXPORT_SCHEMA, FRENCH_MARKET, data_path, ledger_path, load
@@ -137,6 +138,15 @@ def test_french_job_fills_factors_and_portfolios_and_waits_a_month(desk_db):
     french.run(desk_db, http, now=now)
     assert len(http.calls) == calls + 2
     assert all("Momentum" not in c and "5_Factors" not in c for c in http.calls[calls:])
+    calls = len(http.calls)
+    with desk_db:
+        desk_db.execute("DELETE FROM french_returns WHERE set_name='size_deciles'")
+        desk_db.execute("DELETE FROM factors_daily WHERE series='mom'")
+    french.run(desk_db, http, now=now)
+    fetched = [c for c in http.calls[calls:] if "49_Industry" not in c and "Prior_12_2" not in c]
+    assert len(fetched) == 2 and any("Momentum" in c for c in fetched) and any("Formed_on_ME" in c for c in fetched)
+    assert desk_db.execute("SELECT count(*) FROM french_returns WHERE set_name='size_deciles'").fetchone()[0] > 0
+    assert ("30 3 * * *", "python -m desk.engine french") in JOBS
 
 
 # ---- Lab data ----

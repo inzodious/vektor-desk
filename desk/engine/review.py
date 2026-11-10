@@ -25,6 +25,7 @@ INDEX_CAP = {"day": 260, "week": 156, "month": 120, "year": 40}
 MIN_VOL_DAYS = 5
 PRICED_SHARE = 0.8
 SPLIT_TOLERANCE = 0.03
+FLOW_DUST = 0.05
 CLOSE_TIME = time(16, 15)
 QUALITY_ORDER = ("ok", "trimmed", "pro_forma", "modelled", "mismatch", "stale", "insufficient_history")
 EMPTY_NOTE = "No reviews yet. The first one is written after the 5:20 PM engine run on a trading day."
@@ -117,7 +118,7 @@ class Data:
     discounts: list[dict]
     filings: list[dict]
     earnings: list[dict]
-    pnl: dict[tuple[str, str], dict[str, float]] = field(default_factory=dict)
+    pnl: dict[tuple[str, str], dict[str, tuple[float, float]]] = field(default_factory=dict)
     dip_days: list[str] = field(default_factory=list)
     dip_cash: list[float] = field(default_factory=list)
 
@@ -235,15 +236,15 @@ def _worst(qualities) -> str:
 def day_flow(data: Data, a: str, b: str) -> float:
     r = data.index[b] / data.index[a] if data.index[a] else 1.0
     f = data.value[b] - data.value[a] * r
-    return 0.0 if abs(f) < 0.005 else f
+    return 0.0 if abs(f) < FLOW_DUST else f
 
 
-def pair_pnl(data: Data, a: str, b: str) -> dict[str, float]:
+def pair_pnl(data: Data, a: str, b: str) -> dict[str, tuple[float, float]]:
     key = (a, b)
     if key in data.pnl:
         return data.pnl[key]
     after = {(h["account"], h["symbol"]): h for h in data.holdings.get(b, [])}
-    out: dict[str, float] = {}
+    out: dict[str, tuple[float, float]] = {}
     for h in data.holdings.get(a, []):
         if h["is_cash"] or not h["shares"]:
             continue
@@ -259,8 +260,8 @@ def pair_pnl(data: Data, a: str, b: str) -> dict[str, float]:
         else:
             ret = _ret(data, sym, a, b)
             pnl = h["value"] * ret if ret is not None else 0.0
-        if pnl:
-            out[sym] = out.get(sym, 0.0) + pnl
+        was = out.get(sym, (0.0, 0.0))
+        out[sym] = (was[0] + pnl, was[1] + max(h["value"], 0.0))
     data.pnl[key] = out
     return out
 
@@ -321,9 +322,12 @@ def versus(data: Data, span: list[str], start: float, end: float, change: float)
 
 def movers(data: Data, span: list[str], start: float, gain: float) -> tuple[dict, dict[str, float]]:
     total: dict[str, float] = {}
+    growth: dict[str, float] = {}
     for a, b in zip(span, span[1:], strict=False):
-        for sym, pnl in pair_pnl(data, a, b).items():
+        for sym, (pnl, base) in pair_pnl(data, a, b).items():
             total[sym] = total.get(sym, 0.0) + pnl
+            if base:
+                growth[sym] = growth.get(sym, 1.0) * (1 + pnl / base)
     last = data.holdings.get(span[-1], [])
     worth = sum(h["value"] for h in last)
     weights: dict[str, float] = {}
@@ -332,7 +336,7 @@ def movers(data: Data, span: list[str], start: float, gain: float) -> tuple[dict
             weights[h["symbol"]] = weights.get(h["symbol"], 0.0) + h["value"] / worth * 100
 
     def row(sym: str, usd: float) -> dict:
-        ret = _ret(data, sym, span[0], span[-1])
+        ret = growth[sym] - 1 if sym in growth else _ret(data, sym, span[0], span[-1])
         return {
             "symbol": sym,
             "name": data.names.get(sym),
@@ -360,7 +364,8 @@ def account_rows(data: Data, base: str, as_of: str) -> list[dict]:
         flow = 0.0
         for a, b in zip(span, span[1:], strict=False):
             (va, xa), (vb, xb) = series[a], series[b]
-            flow += vb - va * (xb / xa if xa else 1.0)
+            day = vb - va * (xb / xa if xa else 1.0)
+            flow += 0.0 if abs(day) < FLOW_DUST else day
         out.append(
             {
                 "account": acct,
@@ -368,7 +373,7 @@ def account_rows(data: Data, base: str, as_of: str) -> list[dict]:
                 "end": _r(v1),
                 "change_usd": _r(v1 - v0),
                 "change_pct": _r((x1 / x0 - 1) * 100 if x0 else 0.0, 4),
-                "net_flows": _r(0.0 if abs(flow) < 0.005 else flow),
+                "net_flows": _r(flow),
             }
         )
     return out
