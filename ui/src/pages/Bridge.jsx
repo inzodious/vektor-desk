@@ -12,6 +12,7 @@ import { DriftRows } from '../components/DriftRows.jsx';
 import { QueueCard } from '../decisions/QueueCard.jsx';
 import { BriefCard } from '../agents/BriefCard.jsx';
 import { Discounts } from '../research/Discounts.jsx';
+import { PlanSteps } from '../plan/PlanSteps.jsx';
 import { TodayRun } from '../components/TodayRun.jsx';
 import { CashDrawer, DriftDrawer, ExcessDrawer, SinglesDrawer, ValueDrawer } from './BridgeDrawers.jsx';
 import { LIVE_STATES, useLive, useSymbol } from '../live/context.js';
@@ -281,6 +282,7 @@ export default function Bridge() {
       </section>
       <section className="grid">
         <TodayRun i={7} />
+        <PlanSteps i={7} />
         <BriefCard brief={brief} i={7} />
         <QueueCard queue={queue} i={7} span="c8" />
         <Discounts i={7} />

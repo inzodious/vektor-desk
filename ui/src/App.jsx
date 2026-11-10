@@ -6,6 +6,7 @@ import Mixes from './pages/Mixes.jsx';
 import RiskCheck from './pages/RiskCheck.jsx';
 import Bridge from './pages/Bridge.jsx';
 import Plan from './pages/Plan.jsx';
+import StockPlans from './pages/StockPlans.jsx';
 import Results from './pages/Results.jsx';
 import Decisions from './pages/Decisions.jsx';
 import Journal from './pages/Journal.jsx';
@@ -47,6 +48,7 @@ export default function App() {
               <Route path="decisions/journal" element={<Journal />} />
               <Route path="decisions/flight" element={<Flight />} />
               <Route path="decisions/*" element={<NotFound />} />
+              <Route path="plan/stocks" element={<StockPlans />} />
               <Route path="plan/*" element={<Plan />} />
               <Route path="lab" element={<Compare />} />
               <Route path="lab/risk" element={<Risk />} />

@@ -1,0 +1,102 @@
+{
+ "plan": {
+  "symbol": "FXAIX",
+  "version": 1,
+  "status": "approved",
+  "author": "you",
+  "run_id": null,
+  "model": null,
+  "summary": null,
+  "created_at": "2026-11-10T22:45:45+00:00",
+  "approved_at": "2026-11-10T22:45:45+00:00",
+  "add_rule": {
+   "deposits_only": true,
+   "max_per_month_usd": null,
+   "note": "Every deposit routes here first.",
+   "zone_high": null,
+   "zone_low": null
+  },
+  "catalysts": [],
+  "exit_conditions": [],
+  "next_review": "2027-01-15",
+  "role": "core",
+  "steps": [
+   {
+    "account": null,
+    "amount_usd": 300,
+    "by": "you",
+    "due": null,
+    "id": "add",
+    "kind": "add",
+    "lots": null,
+    "no_buy_days": null,
+    "note": "Per the deposit route.",
+    "shares": null,
+    "text": "Buy $300 of FXAIX",
+    "until": null,
+    "when": "Each deposit",
+    "symbol": "FXAIX",
+    "done_by": null,
+    "filled_shares": null,
+    "activity_ids": [],
+    "status": "waiting",
+    "done_on": null,
+    "no_buy_from": null,
+    "rebuy_on": null,
+    "no_buy_now": false
+   }
+  ],
+  "tax_notes": null,
+  "thesis": "The base of the portfolio. Low cost, broad, bought on every deposit.",
+  "trim_rule": null,
+  "weight_band": {
+   "max_pct": 65,
+   "min_pct": 50
+  },
+  "band_source": "plan",
+  "next_step": {
+   "account": null,
+   "amount_usd": 300,
+   "by": "you",
+   "due": null,
+   "id": "add",
+   "kind": "add",
+   "lots": null,
+   "no_buy_days": null,
+   "note": "Per the deposit route.",
+   "shares": null,
+   "text": "Buy $300 of FXAIX",
+   "until": null,
+   "when": "Each deposit",
+   "symbol": "FXAIX",
+   "done_by": null,
+   "filled_shares": null,
+   "activity_ids": [],
+   "status": "waiting",
+   "done_on": null,
+   "no_buy_from": null,
+   "rebuy_on": null,
+   "no_buy_now": false
+  },
+  "weight_pct": 58.84,
+  "weight_as_of": "2026-11-06",
+  "band_status": "inside",
+  "conviction": null,
+  "review_due": false,
+  "warnings": [],
+  "approved": null,
+  "versions": 1
+ },
+ "history": [
+  {
+   "version": 1,
+   "status": "approved",
+   "author": "you",
+   "run_id": null,
+   "model": null,
+   "summary": null,
+   "created_at": "2026-11-10T22:45:45+00:00",
+   "approved_at": "2026-11-10T22:45:45+00:00"
+  }
+ ]
+}

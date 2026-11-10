@@ -29,6 +29,8 @@ export const ROUTES = [
   { path: '/settings/first-run', h1: 'First run' },
   { path: '/settings/risk', h1: 'Risk check' },
   { path: '/lab/mixes', h1: 'Mixes' },
+  { path: '/plan/stocks', h1: 'Stock plans' },
+  { path: '/plan/stocks?scenario=fresh', h1: 'Stock plans' },
   { path: '/results/day', h1: 'Results' },
   { path: '/results/week', h1: 'Results' },
   { path: '/results/year', h1: 'Results' },
