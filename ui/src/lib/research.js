@@ -236,7 +236,9 @@ export const ASK_DESKS = [
   { v: 'risk', t: 'Risk desk' },
   { v: 'research', t: 'Research desk' },
   { v: 'strategy', t: 'Strategy desk' },
+  { v: 'plans', t: 'Plan desk' },
 ];
+export const SYMBOL_DESKS = ['plans'];
 
 export const ASK_STATUS = {
   queued: { icon: 'clock', t: 'Queued' },
