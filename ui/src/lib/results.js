@@ -47,7 +47,7 @@ export function changeText(value) {
 
 export function gainLine(value) {
   if (!value) return null;
-  const flows = value.net_flows || 0;
+  const flows = Math.abs(value.net_flows || 0) >= 0.5 ? value.net_flows : 0;
   if (!flows) return `All of it from the market: ${usd(value.gain_usd, { sign: true })}`;
   return `${usd(value.gain_usd, { sign: true })} from the market, ${usd(flows, { sign: true })} ${flows > 0 ? 'you put in' : 'you took out'}`;
 }
@@ -82,7 +82,7 @@ export function versusScale(rows) {
   const hi = Math.max(0, ...vals);
   const lo = Math.min(0, ...vals);
   const span = Math.max(0.01, hi - lo);
-  return { zero: (-lo / span) * 100, width: (v) => (Math.abs(v || 0) / span) * 100 };
+  return { zero: lo < 0 ? (-lo / span) * 100 : 0, width: (v) => (Math.abs(v || 0) / span) * 100 };
 }
 
 export function diffText(row) {
@@ -130,7 +130,7 @@ export function ledger(pack) {
     amount: t.amount,
     detail: t.shares != null && t.price != null ? `${Number(t.shares.toFixed(3))} sh at $${t.price.toFixed(2)}` : null,
   }));
-  return [...flows, ...trades].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.type === 'flow' ? -1 : 1));
+  return [...flows, ...trades].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (a.type === 'flow') === (b.type === 'flow') ? 0 : a.type === 'flow' ? -1 : 1));
 }
 
 export function accountName(id) {

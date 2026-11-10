@@ -28,7 +28,13 @@ export function TodayRun({ i = 7 }) {
               {s.state === 'ok' ? <Icon name="check" /> : null}
             </span>
             <span className="run-text">
-              <b>{s.title}</b>
+              {s.id === 'review' && s.state !== 'soon' ? (
+                <Link className="run-link" to="/results/day" data-testid="run-results">
+                  {s.title}
+                </Link>
+              ) : (
+                <b>{s.title}</b>
+              )}
               <small>
                 <span className="sr-only">{s.word.t}. </span>
                 {s.line}

@@ -389,7 +389,7 @@ export function Accounts({ pack, i }) {
               <b>{accountName(a.account)}</b>
               <small>
                 {usd(a.start)} to {usd(a.end)}
-                {a.net_flows ? ` · ${usd(a.net_flows, { sign: true })} in` : ''}
+                {Math.abs(a.net_flows || 0) >= 0.5 ? ` · ${usd(a.net_flows, { sign: true })} ${a.net_flows > 0 ? 'in' : 'out'}` : ''}
               </small>
             </span>
             <b className={a.change_pct > 0 ? 'up' : a.change_pct < 0 ? 'dn' : undefined}>{signedPct(a.change_pct, 2)}</b>

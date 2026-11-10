@@ -82,16 +82,13 @@ const SHOTS = [
   { name: 'lab-factors-empty', path: '/lab/risk?scenario=empty', fixtures: true, clock: MONDAY, el: 'factors' },
   { name: 'lab-factors-demo', path: '/lab/risk', el: 'factors' },
   { name: 'settings', path: '/settings' },
-<<<<<<< HEAD
+  { name: 'bridge-run', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('today-run').scrollIntoViewIfNeeded() },
+  { name: 'bridge-run-evening', path: '/?scenario=evening', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('today-run').scrollIntoViewIfNeeded() },
   { name: 'results-day', path: '/results/day', fixtures: true, clock: MONDAY, full: true },
   { name: 'results-week', path: '/results/week', fixtures: true, clock: MONDAY, full: true },
   { name: 'results-month', path: '/results/month', fixtures: true, clock: MONDAY, full: true },
   { name: 'results-year', path: '/results/year', fixtures: true, clock: MONDAY, full: true },
   { name: 'results-first', path: '/results/day?scenario=fresh', fixtures: true, clock: MONDAY },
-=======
-  { name: 'bridge-run', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('today-run').scrollIntoViewIfNeeded() },
-  { name: 'bridge-run-evening', path: '/?scenario=evening', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('today-run').scrollIntoViewIfNeeded() },
->>>>>>> origin/main
   { name: 'bridge-discounts', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('discounts').scrollIntoViewIfNeeded() },
   { name: 'bridge-discounts-quiet', path: '/?scenario=quiet', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('discounts').scrollIntoViewIfNeeded() },
   { name: 'settings-box', path: '/settings', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('box').scrollIntoViewIfNeeded() },
