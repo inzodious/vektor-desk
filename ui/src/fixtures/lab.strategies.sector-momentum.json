@@ -412,7 +412,7 @@
    }
   ],
   "deflated_sharpe": 0.9553,
-  "pbo": 0.619,
+  "pbo": 0.119,
   "factor_check": {
    "status": "not_available",
    "note": "The French factors are not in the lab yet; the engine's monthly french job fetches them."
@@ -565,7 +565,7 @@
   "return_pct": 0.9237,
   "excess_pts": -4.2634,
   "status": "paper",
-  "summary": "{\"start\": \"2026-06-30\", \"end\": \"2026-11-06\", \"days\": 94, \"return_pct\": 0.9237, \"ann_return_pct\": null, \"vol_pct\": 10.0434, \"sharpe\": 0.2977, \"sortino\": 0.4477, \"mdd_pct\": -5.0436, \"turnover_per_year\": 7.3484, \"trades\": 23, \"costs_usd\": 13.1, \"taxes_usd\": 0.0, \"delisted\": [], \"bench_return_pct\": 5.1871, \"excess_vs_bench_pts\": -4.2634, \"sp500_return_pct\": -8.1746, \"excess_vs_sp500_pts\": 9.0983}"
+  "summary": "{\"start\": \"2026-06-30\", \"end\": \"2026-11-06\", \"days\": 94, \"return_pct\": 0.9237, \"ann_return_pct\": null, \"vol_pct\": 10.0434, \"sharpe\": 0.2977, \"sortino\": 0.4477, \"mdd_pct\": -5.0436, \"turnover_per_year\": 7.3484, \"trades\": 23, \"costs_usd\": 13.1, \"taxes_usd\": 0, \"delisted\": [], \"bench_return_pct\": 5.1871, \"excess_vs_bench_pts\": -4.2634, \"sp500_return_pct\": -8.1746, \"excess_vs_sp500_pts\": 9.0983, \"benchmark\": \"Plan mix\", \"gate\": {\"luck_bar\": 0.1, \"family_size\": 1, \"luck_alone\": 0.846, \"retire_pts\": -5.4, \"events\": 13, \"min_events\": 30, \"bars\": true, \"checkpoints\": 0, \"verdict\": null, \"score\": -1.02, \"luck\": 0.846, \"tracking_error_pct\": 6.9, \"band_pts\": 5.4, \"obs\": 93, \"next_checkpoint\": {\"day\": 182, \"on\": \"2026-12-29\"}}}"
  },
  "paper_trades": [
   {

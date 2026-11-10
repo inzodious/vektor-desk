@@ -2,29 +2,65 @@
  "as_of": "2026-11-06",
  "benchmark": "IWM",
  "gate_days": 182,
+ "step_days": 91,
+ "young_days": 60,
+ "luck_bar": 0.1,
  "note": null,
+ "groups": [
+  {
+   "benchmark": "IWM",
+   "rows": 1,
+   "racing": 1
+  }
+ ],
  "rows": [
   {
    "version": 1,
    "kind": "lane",
+   "benchmark": "IWM",
    "as_of": "2026-11-06",
    "open_positions": 1,
    "account": null,
    "reward_risk": null,
    "backtest": null,
+   "young": true,
    "id": "filings-lane",
    "name": "Filings lane: buy small caps Claude scores +1 or better",
    "status": "paper",
    "started": "2026-11-05",
    "days_live": 2,
-   "days_to_eligible": 180,
-   "eligible_on": "2027-05-06",
-   "waiting_on": "time",
+   "checkpoint_day": 182,
+   "checkpoint_on": "2027-05-06",
+   "days_to_checkpoint": 180,
    "return_pct": null,
    "bench_return_pct": null,
    "excess_pts": null,
    "max_drawdown_pct": null,
-   "trades": 1
+   "trades": 1,
+   "gate": {
+    "luck_bar": 0.1,
+    "family_size": 1,
+    "luck_alone": null,
+    "retire_pts": null,
+    "events": 1,
+    "min_events": 30,
+    "bars": null,
+    "checkpoints": 0,
+    "verdict": null,
+    "score": null,
+    "luck": null,
+    "tracking_error_pct": null,
+    "band_pts": null,
+    "obs": 0,
+    "next_checkpoint": {
+     "day": 182,
+     "on": "2027-05-06"
+    }
+   },
+   "score": null,
+   "luck": null,
+   "tracking_error_pct": null,
+   "band_pts": null
   }
  ]
 }
