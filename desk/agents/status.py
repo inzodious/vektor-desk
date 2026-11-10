@@ -3,7 +3,7 @@ from zoneinfo import ZoneInfo
 
 from desk.agents import store, switches
 from desk.agents.desks import DESKS, Desk
-from desk.agents.runner import FIRST_RUN
+from desk.agents.runner import FIRST_RUN, UNGUARDED
 from desk.agents.sources import Decisions, NotReady, RealDecisions
 from desk.config import Config
 from desk.runlock import running
@@ -52,7 +52,7 @@ def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None =
     for d in sorted(DESKS.values(), key=lambda d: (d.priority, d.name)):
         switch = switches.resolve(cfg, d.name, profile)
         enabled = switch["enabled"]
-        guarded = guard and d.name not in FIRST_RUN
+        guarded = guard and d.name not in UNGUARDED
         week = store.week_usage(cfg, d.name, now)
         desks.append(
             {
@@ -75,6 +75,6 @@ def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None =
         "enabled": on,
         "enabled_source": master["source"],
         "busy": busy,
-        "guard": {"on": guard, "allowed": list(FIRST_RUN), "ready": ready, "why": why},
+        "guard": {"on": guard, "allowed": list(UNGUARDED), "ready": ready, "why": why},
         "desks": desks,
     }

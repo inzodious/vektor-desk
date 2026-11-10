@@ -29,10 +29,10 @@ OK_JSON = {
 
 
 def test_registry_is_all_opus_and_jobs_only_for_live_desks():
-    assert set(DESKS) == {"plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts"}
+    assert set(DESKS) == {"plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts", "debrief"}
     assert {d.model for d in DESKS.values()} == {"opus"}
     assert {d.name for d in DESKS.values() if d.tools} == {"research", "scout", "strategy", "discounts"}
-    assert all(line.endswith(f"run {d.name}") for d in DESKS.values() if d.live for line in JOBS if d.name in line)
+    assert {cmd for _, cmd in JOBS if "run " in cmd} >= {f"python -m desk.agents run {d.name}" for d in DESKS.values() if d.schedules and d.name != "debrief"}
     with pytest.raises(KeyError):
         get("nope")
 
@@ -178,7 +178,7 @@ def test_status_api(cfg, app_client):
     assert tiles["plan_keeper"]["week"] == {"runs": 1, "turns": 1, "tokens": tiles["plan_keeper"]["last_run"]["tokens"], "cap": 10}
     assert client.put("/api/agents/tax/enabled", json={"enabled": False}).json() == {"desk": "tax", "enabled": False}
     assert client.put("/api/agents/nope/enabled", json={"enabled": False}).status_code == 404
-    assert crew(cfg)["desks"][1]["enabled"] is False
+    assert {d["desk"]: d for d in crew(cfg)["desks"]}["tax"]["enabled"] is False
 
 
 def test_schema_applies_through_the_seam(desk_db):
