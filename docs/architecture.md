@@ -94,7 +94,7 @@ Self-hosted **ntfy** (`binwiederhier/ntfy:v2.33.1`) runs as the `ntfy` service. 
 |---|---|---|
 | `alerts` | `desk-alerts` | Rule breaches, Preflight blocks, trigger hits, wash-sale windows |
 | `research` | `desk-research` | Research ready, the daily brief, proposals waiting |
-| `ops` | `desk-ops` | Stale or failing mirror, Claude token renewal, a stopped auto-deploy or failed nightly backup |
+| `ops` | `desk-ops` | Stale or failing mirror, a results review that didn't run, Claude token renewal, a stopped auto-deploy or failed nightly backup |
 
 Calling it from a package:
 
@@ -112,7 +112,7 @@ publish("alerts", "Plan keeper: rule breach", "Satellite cap passed. Open Decisi
 | Dedupe | Same `key` within 20 hours (`dedupe_hours=`) sends once; failed sends don't count, so the next try goes out |
 | Off switches | Settings toggles per topic (`PUT /api/notify/topics/{topic}`); demo mode logs `demo` and sends nothing; an empty `DESK_NTFY_URL` logs `off` |
 | Log | Every attempt goes to `notify_log` in `desk.db`; `GET /api/notify/recent` and `GET /api/notify/topics` read it |
-| Ops check | `python -m desk.notify ops` at 9:20 and 18:20, after the mirror pulls; once a day per mirror state, once a week for the token |
+| Ops check | `python -m desk.notify ops` at 9:20 and 18:20, after the mirror pulls; once a day per mirror state and per review state, once a week for the token |
 
 The fallback, if self-hosting ever gets in the way, is the public ntfy.sh with a long random topic. It's simpler, but the text then passes through a third party.
 
@@ -155,7 +155,7 @@ The same pattern as Hemline: `deploy/deploy.sh` runs as root on the NAS.
 - `now` pulls `main`, builds `vektor-desk:local` and `vektor-desk/caddy:local` stamped with the commit, backs up, runs `app.redeploy`, and waits for the API to report healthy at that commit. If it doesn't, it rolls back to the previous images. It refuses while a desk job holds a run lock.
 - `auto` does the same every 5 minutes when `main` has moved, waits out running jobs, and doesn't retry a failed commit until the next push.
 - `status` shows what's live, GitHub, container health, the tailnet address, backups and the desk's own status.
-- `check` tests the Claude sign-in, Firestore read access, the DNS record against the tailnet address and the certificate, and sends a test alert to `desk-ops`.
+- `check` tests the Claude sign-in, Firestore read access, the DNS record against the tailnet address and the certificate, says whether the results reviews are fresh (with each stage of today's run), and sends a test alert to `desk-ops`.
 - The cron jobs run a pinned copy at `/mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`, so a push to `main` never reaches root on its own. When `main`'s `deploy.sh` moves on, `status`, `check` and Settings → Box say how many `deploy.sh` commits the copy is behind, and the **Update box script** action copies it over once the checkout is clean, sits exactly at `origin/main` and the script parses (temp file and `mv`, then a `desk-ops` alert). Its output names the old commit, the new one and the commits between. `touch /mnt/Manifest/apps/vektor-desk/deploy.no-self-pin` turns the action off.
 - `auto` and `backup` send a high-priority `desk-ops` alert when they stop on an error; `now` doesn't, since you're watching it.
 - A change to `deploy/compose.yaml` isn't picked up by a redeploy. The deploy log, a `desk-ops` alert and Settings → Box say when it changed, and **Apply compose** hands it to TrueNAS (`midclt call app.update` with `custom_compose_config_string`) after a backup. It does that only when the checkout is clean at `origin/main`, the live build is main, no job is running, and the change doesn't widen what containers can do (table below). Otherwise Settings → Box shows one banner with the reason and a Copy button, and you paste it into Apps → vektor-desk → Edit yourself.
@@ -195,11 +195,15 @@ The API never runs a command. `POST /api/jobs/{name}/run` drops a request file i
 
 | Call | Answer |
 |---|---|
-| `GET /api/jobs` | `{now, scheduler_alive, cooldown_seconds: 300, pickup_seconds: 5, jobs: [...]}` |
-| One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes) |
+| `GET /api/jobs` | `{now, scheduler_alive, cooldown_seconds: 300, pickup_seconds: 5, stages: ["mirror", "engine", "review", "desks", "paper"], jobs: [...]}` |
+| One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes), `stage` (its step in today's run, or `null`) |
 | `last_run` | `null`, or `{trigger: schedule\|request, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, detail}`. `result` is `null` while it runs |
 | `POST /api/jobs/{name}/run` | `202 {ok: true, job, request_id, requested_at, message}` |
 | Refusals | `{ok: false, error, message, ...}`: `404 unknown_job`; `409 running` (`since`); `409 queued` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 scheduler_down` |
+
+**Today's run.** The Bridge strip walks `stages` in order and shows the jobs whose `stage` matches: `mirror`, `engine-daily`, `engine-review`, the Plan keeper, debrief and plan desks, and `engine-paper`. A package can set both fields itself with a dict entry in its `jobs.py`: `{"schedule", "command", "refreshes": ["debrief"], "stage": "desks"}`; otherwise the tables in `desk/jobrun.py` apply.
+
+**Reviews in health.** `/api/status` has `reviews: {state, due, last_ok, job, kinds, missing}`. `state` is `empty` before the first run, `ok` when `engine-review` finished (or the day pack in `period_reviews` was computed) since the last weekday 17:35 Eastern run that is at least 30 minutes old, `stale` when it didn't, and `failing` when the last run failed. `stale` and `failing` send one `desk-ops` alert a day.
 
 To follow a run, poll `GET /api/jobs` every few seconds. A queued job shows `queued: true`, then `running: true`, then `last_run.finished` with the same `request_id`. The cooldown is 5 minutes from the last accepted request, per job. Times are UTC, ISO 8601, ending in `Z`.
 
@@ -250,7 +254,7 @@ Each package under `desk/` plugs in through three optional modules, found on the
 |---|---|---|
 | `desk/<pkg>/api.py` | `router`, a FastAPI `APIRouter` with its own prefix | `desk/api/app.py`, which includes every router it finds |
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
-| `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command"}` dicts | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
+| `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command", "refreshes", "stage"}` dicts (only `schedule` and `command` are required) | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
 
 Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 

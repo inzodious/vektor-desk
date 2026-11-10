@@ -540,6 +540,7 @@ def journal(
     since: str | None = None,
     until: str | None = None,
     limit: int = 100,
+    now: datetime | None = None,
 ) -> dict:
     where = ["status NOT IN ('proposed', 'snoozed')"]
     args: list = []
@@ -556,7 +557,7 @@ def journal(
         args.append(until)
     limit = max(1, min(int(limit), 500))
     with session(cfg) as conn:
-        expire_due(conn, now_iso())
+        expire_due(conn, now_iso(_now(now)))
         rows = conn.execute(f"SELECT * FROM decisions WHERE {' AND '.join(where)} ORDER BY {stamp} DESC, rowid DESC LIMIT ?", (*args, limit)).fetchall()
         items = [to_dict(r) for r in rows]
         scores = _scores(conn, [d["id"] for d in items])

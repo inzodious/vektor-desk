@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime
 from desk import __version__
 from desk.config import Config
 from desk.db import connect
+from desk.review_health import reviews_status
 from desk.runlock import running
 
 
@@ -64,6 +65,7 @@ def status(cfg: Config | None = None, now: datetime | None = None) -> dict:
         "demo": cfg.demo,
         "mirror": mirror_status(cfg, now),
         "claude_token": token_status(cfg, now.date()),
+        "reviews": reviews_status(cfg, now),
         "running": running(cfg),
     }
 
