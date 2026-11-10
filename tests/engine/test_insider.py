@@ -2,6 +2,8 @@ import io
 import zipfile
 from datetime import UTC, date, datetime, timedelta
 
+import pytest
+
 from desk.db import connect
 from desk.engine import insider, schema
 from desk.engine.lab import library as features
@@ -419,4 +421,58 @@ def test_universe_ready_reads_the_lab_data(cfg):
         conn.execute("DELETE FROM smallcap_months")
     export(cfg, conn, {}, {})
     assert lab.universe_ready(cfg, "small_caps") is False
+    conn.close()
+
+
+# ---- Malformed symbols and refused batches ----
+
+
+class BadRes:
+    def __init__(self, status, body):
+        self.status_code, self.body, self.text = status, body, str(body)
+
+    def json(self):
+        return self.body
+
+
+class PickyAlpaca:
+    def __init__(self, bad=("BAD",)):
+        self.bad, self.calls = set(bad), []
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        symbols = params["symbols"].split(",")
+        self.calls.append(symbols)
+        if self.bad & set(symbols):
+            return BadRes(400, {"message": "invalid symbol: " + ",".join(sorted(self.bad & set(symbols)))})
+        return BadRes(200, {"bars": {s: [{"t": "2024-03-01T05:00:00Z", "o": 5, "h": 5, "l": 5, "c": 5.0, "v": 100, "vw": 5}] for s in symbols}})
+
+
+def test_symbols_are_cleaned_before_they_are_stored_or_sent(cfg):
+    good = {"smol": "SMOL", " 'ACME' ": "ACME", "NYSE:FBC": "FBC", "Acme Corp (ACME)": "ACME", "BRK/B": "BRK.B", "bf-b": "BF.B", '"XYZ"': "XYZ"}
+    assert {raw: insider.clean_symbol(raw) for raw in good} == good
+    for raw in ("--", "", None, "NONE", "N/A", "12345", "38141G104", "ACME CORP", "TOOLONGX", "NYSE:", "(none)"):
+        assert insider.clean_symbol(raw) is None
+    conn = desk(cfg)
+    with conn:
+        for i, sym in enumerate(("SMOL", "NYSE:FBC", "--", '"ACME"', "12345")):
+            buy(conn, f"a{i}", 9000 + i, sym, "2024-03-04")
+    assert insider.clean_stored(conn) == {"fixed": 2, "dropped": 2}
+    assert [r[0] for r in conn.execute("SELECT symbol FROM insider_buys ORDER BY symbol")] == ["ACME", "FBC", "SMOL"]
+    assert insider.clean_stored(conn) == {"fixed": 0, "dropped": 0}
+    conn.close()
+
+
+def test_a_refused_batch_is_skipped_and_named(cfg, monkeypatch):
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "paper-id")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "paper-secret")
+    conn = desk(cfg)
+    http = PickyAlpaca()
+    out = insider.fetch_history(conn, http, ["AAA", "BAD", "CCC", "DDD"], now=NOW, sleep=lambda s: None)
+    assert out["symbols"] == 4 and out["bars"] == 3 and out["skipped"] == ["BAD"]
+    assert out["skipped_why"] == "Alpaca 400 on /v2/stocks/bars: invalid symbol: BAD"
+    done = dict(conn.execute("SELECT symbol, bars FROM alpaca_history").fetchall())
+    assert done == {"AAA": 1, "BAD": 0, "CCC": 1, "DDD": 1} and all("BAD" not in c for c in http.calls[-1:])
+    assert insider.fetch_history(conn, http, ["AAA", "BAD", "CCC", "DDD"], now=NOW, sleep=lambda s: None) == {"symbols": 0, "bars": 0}
+    with pytest.raises(insider.alpaca.BadRequest, match="invalid symbol: BAD"):
+        insider.alpaca.fetch_bars(http, ["AAA", "BAD"], "2024-01-01", "2024-03-02", "raw", sleep=lambda s: None)
     conn.close()

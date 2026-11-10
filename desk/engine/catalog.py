@@ -10,6 +10,8 @@ BENCHMARK = "IVV"
 DIP_CASH = 0.20
 DIP_STEPS = (0.05, 0.10, 0.20)
 TECH_TILT = {"IVV": 0.50, "FTEC": 0.30, "SMH": 0.10, "VXUS": 0.10}
+SAFE_MIX = {"FXAIX": 0.40, "SCHD": 0.20, "FTIHX": 0.10, "FTEC": 0.10, "NLR": 0.05, "GRID": 0.05, "ICLN": 0.05, "UFO": 0.05}
+SAFE_NOTE = "Your October index plan, kept as one mix among several"
 REVERSION_PTS = 0.5
 FALLBACK = "IVV"
 PROXIES = {
@@ -43,7 +45,7 @@ ENTRIES = (
     {
         "id": "safe-mix",
         "name": "Safe mix",
-        "hypothesis": "The plan's fund weights, rebalanced when a fund drifts, is the steady way to compound deposits.",
+        "hypothesis": "Your October index plan (40% S&P 500, 20% SCHD, 10% international, 10% FTEC, 5% each NLR, GRID, ICLN, UFO), rebalanced on drift.",
     },
     {
         "id": "as-held",
@@ -96,15 +98,16 @@ def proxied(weights: dict[str, float], kinds: dict[str, str] | None = None) -> t
 # ---- Mixes ----
 
 
-def mixes(plan_targets: dict[str, float], held: dict[str, float], cash: float, kinds: dict[str, str] | None = None) -> dict[str, dict]:
+def mixes(held: dict[str, float], cash: float, kinds: dict[str, str] | None = None, safe: dict[str, float] | None = None) -> dict[str, dict]:
     out: dict[str, dict] = {}
-    if plan_targets:
-        w, notes = proxied(plan_targets, kinds)
-        out["safe-mix"] = {"weights": w, "cash": 0.0, "notes": notes, "source": dict(plan_targets)}
-        out["dip-buy"] = {"weights": w, "cash": DIP_CASH, "notes": notes, "source": dict(plan_targets), "steps": list(DIP_STEPS)}
+    source = dict(safe or SAFE_MIX)
+    w, notes = proxied(source, kinds if safe else None)
+    notes = ([] if safe else [SAFE_NOTE]) + notes
+    out["safe-mix"] = {"weights": w, "cash": 0.0, "notes": notes, "source": source}
+    out["dip-buy"] = {"weights": w, "cash": DIP_CASH, "notes": notes, "source": source, "steps": list(DIP_STEPS)}
     if held:
-        w, notes = proxied(held, kinds)
-        out["as-held"] = {"weights": w, "cash": round(max(0.0, min(1.0, cash)), 6), "notes": notes, "source": {s: round(v, 6) for s, v in held.items()}}
+        hw, held_notes = proxied(held, kinds)
+        out["as-held"] = {"weights": hw, "cash": round(max(0.0, min(1.0, cash)), 6), "notes": held_notes, "source": {s: round(v, 6) for s, v in held.items()}}
     out["tech-tilt"] = {"weights": dict(TECH_TILT), "cash": 0.0, "notes": [], "source": dict(TECH_TILT)}
     return {k: out[k] for k in NAMES if k in out}
 

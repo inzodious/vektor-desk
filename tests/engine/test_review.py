@@ -133,7 +133,7 @@ def seeded(cfg, monkeypatch):
         conn.execute(signal, ("a1", "ACME"))
         conn.execute(signal, ("a2", "OTHER"))
         conn.execute("INSERT INTO earnings (symbol, date, eps_estimate, eps_actual) VALUES ('ACME', '2026-11-03', 1.0, 1.2)")
-    catalog.sync(conn, catalog.mixes({"IVV": 0.8, "VXUS": 0.2}, {}, 0.0), now=NOW)
+    catalog.sync(conn, catalog.mixes({}, 0.0, safe={"IVV": 0.8, "VXUS": 0.2}), now=NOW)
     monkeypatch.setattr(review.broker, "history", lambda mirror, desk: (list(ACTIVITY), None))
     monkeypatch.setattr(review, "rules_in_force", lambda cfg, plan: (RULES, "profile"))
     monkeypatch.setattr("desk.decisions.risk.current", lambda cfg: {"band": 3, "label": "Balanced", "worst_year_loss_pct": 20})
