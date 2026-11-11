@@ -51,6 +51,8 @@ ARG DESK_BUILD=dev
 ENV DESK_BUILD=$DESK_BUILD
 LABEL org.opencontainers.image.revision=$DESK_BUILD \
       org.opencontainers.image.source=https://github.com/inzodious/vektor-desk
+# /work is the worker's cache when the image runs as `python -m desk.worker` on another machine (deploy/worker/compose.yaml).
+RUN mkdir -p /work && chown 568:568 /work
 USER 568:568
 VOLUME ["/data"]
 EXPOSE 8000
