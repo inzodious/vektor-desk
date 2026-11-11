@@ -188,6 +188,22 @@ Day, week, month and year results with a written debrief, and one plan per holdi
 | Plan → Stock plans cards, and the same block on the Symbol sheet | Design | ✅ |
 | "Today's run" strip on the Bridge; new jobs in Run now and in health | Design + Infra | ✅ |
 
+## Start the desk, low memory and the Horizon worker ✅
+
+One button fills the app, the NAS copes with little memory, and Horizon takes the heavy work until the NAS gets more RAM. Shipped as 1.3.0 on 2026-11-11.
+
+| Item | Owner | Status |
+|---|---|---|
+| Box unblock: backup false alarm, backup on the new build, held deploy retries | Infra | ✅ (#174) |
+| Start the desk chain and a readiness map for every page section (`/api/start`, `/api/readiness`) | Infra | ✅ (#175) |
+| Start banner, shared empty state with one action, setup chip | Design | ✅ (#176) |
+| H0: staged builds, memory and out-of-memory kills in plain words, low-memory mode (`/api/memory`) | Infra + Design | ✅ (#177, #180) |
+| Lab, lab export and insider history load fit the NAS; lab simulations cached by content | Statistics | ✅ (#178, #179) |
+| H1: worker key, heartbeat, leased jobs, lab data copy, checked results (`/api/workers`); only lab.db leaves the box | Infra | ✅ (#181, #182) |
+| Lab simulations as the first worker kind, offered day and night | Statistics | ✅ (#183, #185) |
+| Workers card and worker chip | Design | ✅ (#184) |
+| H1.7: images built on the worker, signed, pinned by fingerprint on main plus Approve builder; deploys settle ten minutes | Infra + Design | ✅ (#186 to #189); not switched on until he approves a builder |
+
 ## Next: Review rework
 
 From the outside review at 1.0.9 ([docs/review-2026-11.md](docs/review-2026-11.md), Gameplan). Rework threads may edit engine and interface files for their items; every PR goes through Lead.

@@ -4,6 +4,30 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.3.0 - 2026-11-11
+
+### Added
+
+- Start the desk: one button runs every job in order and says in plain words what stopped or was skipped; a desk that has never run opens on it with a live step list, and the top bar shows how many setup steps are left ([#175], [#176])
+- Every empty section says why it is empty and carries the one button that fills it ([#175], [#176])
+- Settings → Box shows the box's memory in plain words with a low-memory switch (Automatic, On, Off), what is waiting for a turn and what was stopped for memory; Jobs, Today's run and Start the desk say when something is waiting for its turn ([#177], [#180])
+- A second machine can join the desk as a worker: it takes heavy jobs off the NAS, works on a downloaded copy of the lab's data and sends results back for the NAS to check and write. Accounts and holdings never leave the box ([#181])
+- With a worker online, the strategy lab's simulations run there first, day and night; the NAS checks the answers and only computes what is missing ([#183], [#185])
+- Settings → Box has a Workers card: add a machine and get its key once with the commands to start it, see whether it is online or asleep, test it, remove it, and see where each job sent to it is and why. The top bar shows how the worker is doing ([#184])
+- A worker can build the desk's images so the NAS doesn't have to, once its key is listed on main and you tap Approve builder; the box checks the signature and the contents before loading, and builds for itself when the worker is off ([#186], [#187], [#188])
+
+### Changed
+
+- The strategy lab, its nightly export and the insider price-history load now fit the NAS's memory, with identical results: lab 3.1 GB to 184 MB and 30 times faster with three workers, export 695 MB to 54 MB, history load 1,055 MB to 134 MB ([#178])
+- Lab simulations are cached by content, so a stopped experiment resumes without redoing work ([#179])
+- The box builds one stage at a time, heavy jobs take turns in low-memory mode, and anything stopped for memory is named in plain words with one alert ([#177])
+- A new version waits until main has been quiet for ten minutes, so several merges become one restart; Deploy now skips the wait ([#186])
+- With no plan of your own loaded, the drift limit on Holdings reads "Not judged" and stays out of the rules count ([#173])
+
+### Fixed
+
+- A backup no longer fails on SQLite 3.40's false NULL report, the pre-deploy backup runs on the new build so a backup fix can deploy itself, and updating the box script retries a held-back deploy ([#174])
+
 ## 1.2.0 - 2026-11-11
 
 ### Changed
@@ -469,3 +493,18 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#169]: https://github.com/inzodious/vektor-desk/pull/169
 [#170]: https://github.com/inzodious/vektor-desk/pull/170
 [#171]: https://github.com/inzodious/vektor-desk/pull/171
+[#173]: https://github.com/inzodious/vektor-desk/pull/173
+[#174]: https://github.com/inzodious/vektor-desk/pull/174
+[#175]: https://github.com/inzodious/vektor-desk/pull/175
+[#176]: https://github.com/inzodious/vektor-desk/pull/176
+[#177]: https://github.com/inzodious/vektor-desk/pull/177
+[#178]: https://github.com/inzodious/vektor-desk/pull/178
+[#179]: https://github.com/inzodious/vektor-desk/pull/179
+[#180]: https://github.com/inzodious/vektor-desk/pull/180
+[#181]: https://github.com/inzodious/vektor-desk/pull/181
+[#183]: https://github.com/inzodious/vektor-desk/pull/183
+[#184]: https://github.com/inzodious/vektor-desk/pull/184
+[#185]: https://github.com/inzodious/vektor-desk/pull/185
+[#186]: https://github.com/inzodious/vektor-desk/pull/186
+[#187]: https://github.com/inzodious/vektor-desk/pull/187
+[#188]: https://github.com/inzodious/vektor-desk/pull/188
