@@ -214,3 +214,19 @@ test('board symbols read the right way round and long codes fit their tiles', as
   );
   expect(report.filter((r) => !r.fits || r.turned)).toEqual([]);
 });
+
+test('against the safe mix the Mix button and its gauge stay neutral', async ({ page }) => {
+  await page.goto('/?scenario=yardstick');
+  const mix = page.getByTestId('open-mix');
+  await expect(mix).toContainText('Mix · SCHD −20.0 pts');
+  await expect(mix).not.toHaveClass(/heads-up/);
+  await mix.click();
+  const drawer = page.getByRole('dialog', { name: 'Mix and instruments' });
+  await expect(drawer).toContainText('as a yardstick');
+  const card = drawer.getByTestId('instruments');
+  await expect(card).toContainText('Vs the safe mix');
+  await expect(card).toContainText('A yardstick, not a target');
+  await expect(card).not.toContainText('Rebalance');
+  await expect(drawer.locator('.drift-row.over')).toHaveCount(0);
+  await expect(drawer.locator('.drift-band')).toHaveCount(0);
+});

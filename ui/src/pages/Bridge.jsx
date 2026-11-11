@@ -11,7 +11,7 @@ import { CashDrawer, DiscountsDrawer, ExcessDrawer, HoldingsDrawer, MixDrawer, V
 import { LIVE_STATES, useLive, useSymbol } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { fundsFromMetrics, useMetrics, val } from '../lib/metrics.js';
-import { usePlanLimits } from '../lib/plan.js';
+import { driftTone, usePlanLimits, useReference } from '../lib/plan.js';
 import { dayLabel } from '../lib/charts.js';
 import { movers } from '../lib/bridge.js';
 import { QUALITY } from '../lib/quality.js';
@@ -44,6 +44,7 @@ export default function Bridge() {
   const m = useMetrics(HEAD_IDS);
   const plan = useMetrics('plan.*', 'scope=holding');
   const limits = usePlanLimits();
+  const reference = useReference();
   const spark = useApi('/api/engine/value');
   const [drill, setDrill] = useState(null);
   const queue = useApi('/api/decisions/queue', { every: 120000 });
@@ -151,7 +152,7 @@ export default function Bridge() {
               <Icon name="layers" />
               Holdings · {ctx.symbols.length}
             </button>
-            <button type="button" className={`btn sm ghost${worst && Math.abs(worst.drift) >= limits.driftPts ? ' heads-up' : ''}`} onClick={() => setDrill('mix')} data-testid="open-mix">
+            <button type="button" className={`btn sm ghost${worst && driftTone(reference, worst.drift, limits) ? ' heads-up' : ''}`} onClick={() => setDrill('mix')} data-testid="open-mix">
               <Icon name="gauge" />
               {worst ? `Mix · ${worst.symbol} ${worst.drift > 0 ? '+' : '−'}${Math.abs(worst.drift).toFixed(1)} pts` : 'Mix'}
             </button>
@@ -189,7 +190,7 @@ export default function Bridge() {
       <ValueDrawer open={drill === 'value'} onClose={closeDrill} accounts={accounts} total={live.value} symbols={ctx.symbols} />
       <ExcessDrawer open={drill === 'excess'} onClose={closeDrill} m={m} lastDay={live.holdings_date || m.asOf} />
       <HoldingsDrawer open={drill === 'holdings'} onClose={closeDrill} symbols={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} accounts={accounts} />
-      <MixDrawer open={drill === 'mix'} onClose={closeDrill} funds={funds} limits={limits} values={values} m={m} />
+      <MixDrawer open={drill === 'mix'} onClose={closeDrill} funds={funds} limits={limits} values={values} m={m} reference={reference} />
       <DiscountsDrawer open={drill === 'discounts'} onClose={closeDrill} api={discounts} />
       <CashDrawer open={drill === 'cash'} onClose={closeDrill} m={m} accounts={accounts} />
     </>

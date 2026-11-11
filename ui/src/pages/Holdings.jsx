@@ -10,7 +10,7 @@ import { FiPath } from '../plan/FiPath.jsx';
 import { LIVE_STATES, useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { fundsFromMetrics, useMetrics, val } from '../lib/metrics.js';
-import { planLimits } from '../lib/plan.js';
+import { driftTone, driftWords, planLimits, useReference } from '../lib/plan.js';
 import { dayLabel } from '../lib/charts.js';
 import { QUALITY } from '../lib/quality.js';
 import { plural, usd } from '../lib/format.js';
@@ -57,7 +57,7 @@ function Rules({ rules, m, version }) {
   );
 }
 
-function Funds({ funds, live, names }) {
+function Funds({ funds, live, names, words, tone }) {
   const maxW = Math.max(1, ...funds.map((f) => Math.max(f.weight ?? 0, f.target ?? 0)));
   return (
     <div className="card c7" style={{ '--i': 9 }}>
@@ -79,10 +79,10 @@ function Funds({ funds, live, names }) {
               </th>
               <th scope="col">Weight</th>
               <th scope="col" className="r">
-                Target
+                {words.target}
               </th>
               <th scope="col" className="r">
-                Drift
+                {words.gap}
               </th>
             </tr>
           </thead>
@@ -105,8 +105,8 @@ function Funds({ funds, live, names }) {
                       <i style={{ width: `${((f.weight ?? 0) / maxW) * 100}%` }} />
                     </span>
                   </td>
-                  <td className="r">{f.target != null ? `${f.target.toFixed(0)}%` : <span className="muted">No target</span>}</td>
-                  <td className={`r ${f.drift == null ? '' : Math.abs(f.drift) >= 5 ? 'dn' : ''}`}>{f.target != null ? fmtPts(f.drift) : '—'}</td>
+                  <td className="r">{f.target != null ? `${f.target.toFixed(0)}%` : <span className="muted">{words.judged ? 'No target' : 'Not in the mix'}</span>}</td>
+                  <td className={`r ${tone(f.drift) ? 'dn' : ''}`}>{f.target != null ? fmtPts(f.drift) : '—'}</td>
                 </tr>
               );
             })}
@@ -117,7 +117,7 @@ function Funds({ funds, live, names }) {
   );
 }
 
-function Deposits({ funds, deposits, mode, landed, deskValue }) {
+function Deposits({ funds, deposits, mode, landed, deskValue, words }) {
   const split = funds.filter((f) => f.next != null && f.next > 0);
   const total = split.reduce((a, f) => a + f.next, 0);
   const after = (f) => (deskValue && f.weight != null && f.target != null ? (((f.weight / 100) * deskValue + f.next) / (deskValue + total)) * 100 - f.target : null);
@@ -174,7 +174,7 @@ function Deposits({ funds, deposits, mode, landed, deskValue }) {
       {split.length ? (
         <>
           <p className="muted" style={{ fontSize: 12.5, marginBottom: 6 }}>
-            {usd(total)} split to pull every fund back toward its target.
+            {usd(total)} {words.split}
           </p>
           <div className="rows" data-testid="split">
             {split.map((f) => (
@@ -191,7 +191,7 @@ function Deposits({ funds, deposits, mode, landed, deskValue }) {
                 <span className="v">
                   {usd(f.next)}
                   <small>
-                    drift {fmtPts(f.drift)} → {fmtPts(after(f))}
+                    {words.step} {fmtPts(f.drift)} → {fmtPts(after(f))}
                   </small>
                 </span>
               </div>
@@ -214,6 +214,8 @@ export default function Holdings() {
   const rules = useApi('/api/decisions/rules');
   const deposits = useApi('/api/decisions/deposits');
   const limits = planLimits(profile.data, rules.data);
+  const reference = useReference();
+  const words = driftWords(reference, limits);
   const funds = useMemo(() => fundsFromMetrics(plan.rows), [plan.rows]);
   const values = useMemo(() => Object.fromEntries(ctx.symbols.map((s) => [s.symbol, s.value])), [ctx.symbols]);
   const p = profile.data?.profile || {};
@@ -277,7 +279,7 @@ export default function Holdings() {
             <b>{live?.value != null ? usd(live.value) : inMixV == null ? 'No targets yet' : `${inMixV.toFixed(1)}% on target funds`}</b>
             <span className="muted">
               {plural(ctx.symbols.length, 'holding')}
-              {driftV != null ? ` · largest drift ${driftV.toFixed(1)} pts` : ''}
+              {driftV != null ? ` · ${words.hero(driftV)}` : ''}
             </span>
           </>
         }
@@ -292,10 +294,10 @@ export default function Holdings() {
         }
       />
       <section className="kpis kpis-6">
-        <Kpi i={1} label="Largest drift" metric="plan.drift_max" value={driftV == null ? '—' : driftV.toFixed(1)} unit="pts" tone={driftV != null && driftV >= limits.driftPts ? 'watch' : undefined} line={`Rebalance at ${limits.driftPts}`} quality={drift?.quality} asOf={engineAsOf} />
+        <Kpi i={1} label={words.label} metric="plan.drift_max" value={driftV == null ? '—' : driftV.toFixed(1)} unit="pts" tone={driftTone(reference, driftV, limits)} line={words.line} quality={drift?.quality} asOf={engineAsOf} />
         <Kpi i={2} label="Next deposit" metric="plan.next_deposit" value={next ? usd(next) : '—'} line={next ? `${plural(funds.filter((f) => f.next > 0).length, 'fund')} get some` : profile.data?.deposits_mode === 'auto' ? 'None on a steady rhythm' : 'Nothing scheduled'} quality={nextModelled ? 'modelled' : undefined} asOf={engineAsOf} />
         <Kpi i={3} label="Rules" metric="plan.rules" value={ruleRows.length ? `${passing} of ${ruleRows.length}` : '—'} tone={ruleRows.length && passing < ruleRows.length ? 'watch' : undefined} line={ruleRows.length && passing === ruleRows.length ? 'All passing' : 'Some need a look'} asOf={engineAsOf} />
-        <Kpi i={4} label="In the mix" metric="plan.in_mix" value={inMixV == null ? '—' : inMixV.toFixed(1)} unit="%" line="Of the desk in funds with a target" quality={inMix?.quality} asOf={engineAsOf} />
+        <Kpi i={4} label="In the mix" metric="plan.in_mix" value={inMixV == null ? '—' : inMixV.toFixed(1)} unit="%" line={reference.judged ? 'Of the desk in funds with a target' : `Of the desk in funds ${reference.mix} holds`} quality={inMix?.quality} asOf={engineAsOf} />
         <Kpi i={5} label="Single stocks" metric="plan.single_stock" value={singleV == null ? '—' : singleV.toFixed(1)} unit="%" line={`Cap ${limits.satelliteCap}%`} quality={single?.quality} asOf={engineAsOf} />
         <Kpi i={6} label="FI progress" metric="fi.progress" value={fiV == null ? 'Not yet' : fiV.toFixed(1)} unit={fiV == null ? undefined : '%'} line={fiV == null ? 'Needs the FI path' : 'of the FI number'} quality={fiV == null ? undefined : fi?.quality} asOf={fiV == null ? null : engineAsOf} onOpen={() => document.querySelector('[data-testid="fi-path"]')?.scrollIntoView({ block: 'start' })} />
       </section>
@@ -313,18 +315,24 @@ export default function Holdings() {
             <Board rows={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} />
           </div>
         ) : null}
-        <div className="card c7" style={{ '--i': 7 }}>
+        <div className="card c7" style={{ '--i': 7 }} data-testid="drift-card" data-judged={reference.judged ? 'yes' : 'no'}>
           <div className="card-head">
-            <span className="tag mint">Drift</span>
+            <span className="tag mint">{words.tag}</span>
             <span className="acts">
-              <span className="chip">{plural(inPlan.length, 'fund')} with a target</span>
+              <span className="chip">{reference.judged ? `${plural(inPlan.length, 'fund')} with a target` : `${plural(inPlan.length, 'fund')} in the mix`}</span>
             </span>
           </div>
-          {inPlan.length ? <DriftRows rows={inPlan} band={limits.driftPts} values={values} /> : <p className="empty-hint">Targets show after the engine&apos;s first daily run.</p>}
+          {inPlan.length ? <DriftRows rows={inPlan} band={limits.driftPts} values={values} judged={reference.judged} target={words.target} gap={words.gap} /> : <p className="empty-hint">Targets show after the engine&apos;s first daily run.</p>}
+          {reference.note ? (
+            <p className="note" style={{ marginTop: 10 }} data-testid="reference-note">
+              <Icon name="info" />
+              <span>{reference.note}</span>
+            </p>
+          ) : null}
         </div>
         <Rules rules={ruleList} m={m} version={limits.rulesVersion} />
-        <Funds funds={funds} live={ctx.symbols} names={ctx.names} />
-        <Deposits funds={funds} deposits={Array.isArray(p.deposits) ? p.deposits : []} mode={profile.data?.deposits_mode} landed={deposits.data?.deposits} deskValue={ctx.live?.value} />
+        <Funds funds={funds} live={ctx.symbols} names={ctx.names} words={words} tone={(v) => driftTone(reference, v, limits)} />
+        <Deposits funds={funds} deposits={Array.isArray(p.deposits) ? p.deposits : []} mode={profile.data?.deposits_mode} landed={deposits.data?.deposits} deskValue={ctx.live?.value} words={words} />
         <FiPath />
       </section>
     </>

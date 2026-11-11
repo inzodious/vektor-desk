@@ -50,6 +50,8 @@ const SHOTS = [
   { name: 'plan', path: '/portfolio', fixtures: true, clock: MONDAY },
   { name: 'plan-demo', path: '/portfolio' },
   { name: 'bridge-mix', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('open-mix').click() },
+  { name: 'bridge-mix-yardstick', path: '/?scenario=yardstick', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('open-mix').click() },
+  { name: 'holdings-yardstick', path: '/portfolio?scenario=yardstick', fixtures: true, clock: MONDAY, full: true },
   { name: 'bridge-excess', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.locator('[data-kpi="bm.excess"]').click() },
   { name: 'lab', path: '/research/compare', fixtures: true, clock: MONDAY, full: true },
   { name: 'lab-funds', path: '/research/compare?ids=FXAIX,FTEC,VXUS', fixtures: true, clock: MONDAY, full: true },

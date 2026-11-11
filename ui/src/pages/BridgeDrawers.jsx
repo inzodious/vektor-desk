@@ -12,6 +12,7 @@ import { accountLabel } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { PERIODS, dayLabel, periodStart } from '../lib/charts.js';
 import { val } from '../lib/metrics.js';
+import { driftWords, referenceOf } from '../lib/plan.js';
 import { QUALITY } from '../lib/quality.js';
 import { pct, plural, usd } from '../lib/format.js';
 
@@ -183,7 +184,7 @@ export function HoldingsDrawer({ open, onClose, symbols, names, intraday, nav, a
 }
 
 // ---------- mix and instruments ----------
-export function MixDrawer({ open, onClose, funds, limits, values, m }) {
+export function MixDrawer({ open, onClose, funds, limits, values, m, reference = referenceOf(null) }) {
   const drift = val(m.get('plan.drift_max'));
   const single = val(m.get('plan.single_stock'));
   const debit = val(m.get('margin.debit'));
@@ -191,24 +192,30 @@ export function MixDrawer({ open, onClose, funds, limits, values, m }) {
   const fi = val(m.get('fi.progress'));
   const band = limits.driftPts;
   const cap = limits.satelliteCap;
+  const words = driftWords(reference, limits);
+  const span = words.judged ? band * 2 : Math.max(band * 2, Math.ceil(((drift || 0) * 1.25) / 5) * 5);
   const inMix = funds.filter((f) => f.target != null);
   const singles = funds.filter((f) => f.single != null);
   return (
-    <Panel open={open} onClose={onClose} title="Mix and instruments" sub="Each fund against its target in the safe mix, and the two dials the rules watch." crumbs={[{ label: 'Bridge', go: onClose }]}>
+    <Panel open={open} onClose={onClose} title="Mix and instruments" sub={words.judged ? 'Each fund against its target, and the two dials the rules watch.' : `Each fund against ${reference.mix}, as a yardstick, and the single-stock dial the rules watch.`} crumbs={[{ label: 'Bridge', go: onClose }]}>
       <div className="gauges" data-testid="instruments">
         <Gauge
-          label="Largest drift"
+          label={words.label}
           unit="PTS"
           value={drift}
           min={0}
-          max={band * 2}
-          zones={[
-            { from: 0, to: band * 0.6, color: 'var(--mint)' },
-            { from: band * 0.6, to: band, color: 'var(--mustard)' },
-            { from: band, to: band * 2, color: 'var(--coral)' },
-          ]}
+          max={span}
+          zones={
+            words.judged
+              ? [
+                  { from: 0, to: band * 0.6, color: 'var(--mint)' },
+                  { from: band * 0.6, to: band, color: 'var(--mustard)' },
+                  { from: band, to: band * 2, color: 'var(--coral)' },
+                ]
+              : [{ from: 0, to: span, color: 'var(--sky)' }]
+          }
           reading={drift == null ? '—' : `${drift.toFixed(1)} pts`}
-          note={`Rebalance at ${band}`}
+          note={words.line}
         />
         <Gauge
           label="Single stocks"
@@ -230,8 +237,8 @@ export function MixDrawer({ open, onClose, funds, limits, values, m }) {
         {debit ? `Margin ${usd(debit)}, about ${usd(cost || 0)} interest a month.` : 'No margin balance, so no call distance to watch.'}
         {fi != null ? ` FI progress ${fi.toFixed(1)}%.` : ''}
       </p>
-      <span className="kicker">Drift by fund</span>
-      {inMix.length ? <DriftRows rows={inMix} band={band} values={values} onPick={(r) => onClose(r.symbol)} /> : <p className="empty-hint">Targets show after the engine&apos;s first daily run.</p>}
+      <span className="kicker">{words.rows}</span>
+      {inMix.length ? <DriftRows rows={inMix} band={band} values={values} onPick={(r) => onClose(r.symbol)} judged={words.judged} target={words.target} gap={words.gap} /> : <p className="empty-hint">Targets show after the engine&apos;s first daily run.</p>}
       <span className="kicker">Single stocks</span>
       {singles.length ? (
         <div className="rows" data-testid="singles">

@@ -5,18 +5,18 @@ import { usd } from '../lib/format.js';
 const fmtPct = (v, dg = 1) => (v == null ? '—' : `${v.toFixed(dg)}%`);
 const fmtPts = (v) => (v == null ? '—' : `${v < 0 ? '−' : v > 0 ? '+' : ''}${Math.abs(v).toFixed(1)} pts`);
 
-export function DriftRows({ rows, band = 5, onPick, values = {} }) {
+export function DriftRows({ rows, band = 5, onPick, values = {}, judged = true, target = 'Target', gap = 'Drift' }) {
   const [hover, setHover] = useState(null);
-  const top = Math.max(10, ...rows.map((r) => Math.max(r.weight ?? 0, (r.target ?? 0) + band))) * 1.08;
+  const top = Math.max(10, ...rows.map((r) => Math.max(r.weight ?? 0, (r.target ?? 0) + (judged ? band : 0)))) * 1.08;
   const X = (v) => `${(Math.max(0, v) / top) * 100}%`;
   return (
-    <div className="drift">
+    <div className="drift" data-judged={judged ? 'yes' : 'no'}>
       {rows.map((r) => {
-        const target = r.target ?? 0;
-        const lo = Math.max(0, target - band);
-        const hi = target + band;
-        const over = r.weight != null && (r.weight > hi || r.weight < lo);
-        const label = `${r.symbol}: ${fmtPct(r.weight)} against a ${fmtPct(target, 0)} target, ${fmtPts(r.drift)}${over ? ', outside the band' : ''}`;
+        const at = r.target ?? 0;
+        const lo = Math.max(0, at - band);
+        const hi = at + band;
+        const over = judged && r.weight != null && (r.weight > hi || r.weight < lo);
+        const label = judged ? `${r.symbol}: ${fmtPct(r.weight)} against a ${fmtPct(at, 0)} target, ${fmtPts(r.drift)}${over ? ', outside the band' : ''}` : `${r.symbol}: ${fmtPct(r.weight)} held, ${fmtPct(at, 0)} in the ${target.toLowerCase()}, ${fmtPts(r.drift)}`;
         return (
           <button
             type="button"
@@ -31,13 +31,13 @@ export function DriftRows({ rows, band = 5, onPick, values = {} }) {
             <span className="drift-name">{r.symbol}</span>
             <span className="drift-track" aria-hidden="true">
               <span className="drift-line" />
-              {r.target != null ? <span className="drift-band" style={{ left: X(lo), width: `calc(${X(hi)} - ${X(lo)})` }} /> : null}
-              {r.target != null ? <span className="drift-target" style={{ left: X(target) }} /> : null}
+              {judged && r.target != null ? <span className="drift-band" style={{ left: X(lo), width: `calc(${X(hi)} - ${X(lo)})` }} /> : null}
+              {r.target != null ? <span className="drift-target" style={{ left: X(at) }} /> : null}
               {r.weight != null ? <span className="drift-dot" style={{ left: `calc(${X(r.weight)} - 7px)` }} /> : null}
             </span>
             <span className="drift-num">
               {fmtPct(r.weight)}
-              <small>{r.target == null ? 'No target' : fmtPts(r.drift)}</small>
+              <small>{r.target == null ? (judged ? 'No target' : 'Not in it') : fmtPts(r.drift)}</small>
             </span>
           </button>
         );
@@ -49,16 +49,20 @@ export function DriftRows({ rows, band = 5, onPick, values = {} }) {
         </span>
         <span>
           <i style={{ '--c': 'var(--ink)', width: 2, height: 12 }} />
-          Target
+          {target}
         </span>
-        <span>
-          <i className="band" />
-          Band ±{band} pts
-        </span>
-        <span>
-          <i className="dot" style={{ '--c': 'var(--mustard)' }} />
-          Outside band
-        </span>
+        {judged ? (
+          <>
+            <span>
+              <i className="band" />
+              Band ±{band} pts
+            </span>
+            <span>
+              <i className="dot" style={{ '--c': 'var(--mustard)' }} />
+              Outside band
+            </span>
+          </>
+        ) : null}
       </div>
       {hover ? (
         <Tip
@@ -66,8 +70,8 @@ export function DriftRows({ rows, band = 5, onPick, values = {} }) {
           head={hover.r.symbol}
           rows={[
             { color: 'var(--teal)', label: 'Actual', value: fmtPct(hover.r.weight) },
-            { label: 'Target', value: fmtPct(hover.r.target, 0) },
-            { label: 'Drift', value: fmtPts(hover.r.drift) },
+            { label: target, value: fmtPct(hover.r.target, 0) },
+            { label: gap, value: fmtPts(hover.r.drift) },
             ...(values[hover.r.symbol] != null ? [{ label: 'Value', value: usd(values[hover.r.symbol]) }] : []),
           ]}
           hint="Click for the symbol sheet"

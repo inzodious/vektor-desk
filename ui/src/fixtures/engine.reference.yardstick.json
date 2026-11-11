@@ -1,0 +1,17 @@
+{
+ "as_of": "2026-11-06",
+ "source": "safe_mix",
+ "name": "Safe mix",
+ "weights": {
+  "FXAIX": 40,
+  "SCHD": 20,
+  "FTIHX": 10,
+  "FTEC": 10,
+  "NLR": 5,
+  "GRID": 5,
+  "ICLN": 5,
+  "UFO": 5
+ },
+ "judged": false,
+ "note": "No plan of your own is loaded, so drift and the benchmark are measured against the built-in safe mix. It is a yardstick, not a target, and the drift rule is not judged against it."
+}
