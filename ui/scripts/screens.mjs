@@ -77,6 +77,32 @@ const SHOTS = [
   { name: 'memory-jobs-turn', path: '/settings/box?scenario=low', fixtures: true, clock: MONDAY, el: 'jobs' },
   { name: 'memory-bridge-strip', path: '/?scenario=low', fixtures: true, clock: MONDAY },
   { name: 'memory-first-run-turn', path: '/settings/first-run?scenario=lowstart', fixtures: true, clock: MONDAY },
+  { name: 'workers-none', path: '/settings/box', fixtures: true, clock: MONDAY, el: 'workers' },
+  { name: 'workers-online', path: '/settings/box?scenario=horizon', fixtures: true, clock: MONDAY, el: 'workers' },
+  { name: 'workers-asleep', path: '/settings/box?scenario=asleep', fixtures: true, clock: MONDAY, el: 'workers' },
+  { name: 'workers-joined', path: '/settings/box?scenario=joined', fixtures: true, clock: MONDAY, el: 'workers' },
+  { name: 'workers-add', path: '/settings/box', fixtures: true, clock: MONDAY, el: 'workers', act: async (p) => p.getByTestId('worker-add').click() },
+  {
+    name: 'workers-key',
+    path: '/settings/box?scenario=joined',
+    fixtures: true,
+    clock: MONDAY,
+    el: 'workers',
+    act: async (p) => {
+      await p.route(/\/api\/workers(\?.*)?$/, async (route) => {
+        if (route.request().method() !== 'POST') return route.fallback();
+        const block = await (await route.fetch({ method: 'GET' })).json();
+        return route.fulfill({ status: 201, json: { ok: true, key: 'dwk_example_not_a_real_key', id: 'b2c3d4e5f607', name: 'Garage', desk_url: 'https://desk-lan.example.test', ...block } });
+      });
+      await p.getByTestId('worker-add').click();
+      await p.getByTestId('worker-name').fill('Garage');
+      await p.getByRole('button', { name: 'Make its key' }).click();
+      await p.getByTestId('worker-key').waitFor();
+    },
+  },
+  { name: 'workers-box-page', path: '/settings/box?scenario=horizon', fixtures: true, clock: MONDAY, full: true },
+  { name: 'workers-bridge-asleep', path: '/?scenario=asleep', fixtures: true, clock: MONDAY },
+  { name: 'workers-bridge-online', path: '/?scenario=horizon', fixtures: true, clock: MONDAY },
   { name: 'stale-mixes', path: '/strategies/mixes?scenario=loose', fixtures: true, clock: MONDAY },
   { name: 'blocked-stock-plans', path: '/portfolio/stocks?scenario=loose', fixtures: true, clock: MONDAY },
   { name: 'bridge-excess', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.locator('[data-kpi="bm.excess"]').click() },

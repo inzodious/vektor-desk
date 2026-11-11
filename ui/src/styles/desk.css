@@ -1520,7 +1520,7 @@ a.chip { text-decoration: none; }
 .setup-chip:hover { color: var(--ink); }
 .setup-chip svg { width: 15px; height: 15px; }
 .setup-chip .short { display: none; }
-@media (max-width: 1360px) {
+@media (max-width: 1420px) {
   .setup-chip .long { display: none; }
   .setup-chip .short { display: inline; }
 }
@@ -1577,4 +1577,32 @@ a.chip { text-decoration: none; }
 }
 @media (max-width: 560px) {
   .mem-opts { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- workers ---------- */
+.wk-list { margin-bottom: 8px; }
+.wk-act { display: flex; align-items: center; gap: 8px; }
+.wk-acts { margin-top: 4px; }
+.wk-acts .job-note { margin-top: 0; }
+.wk-form { max-width: 420px; }
+.wk-form label { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.wk-form input { font-family: inherit; }
+.wk-key { margin: 0 0 10px; background: var(--lilac-soft); }
+.wk-code { display: block; margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--board); color: var(--flap); font: 500 12px/1.5 ui-monospace, 'SFMono-Regular', Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-all; }
+.wk-jobs { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.wk-sub { display: block; font-size: 12.5px; color: var(--ink); }
+.worker-chip { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 14px 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--pill-bg); box-shadow: var(--shadow); color: var(--ink); font-weight: 700; font-size: 12.5px; white-space: nowrap; text-decoration: none; flex: none; }
+.worker-chip:hover { color: var(--teal-ink); }
+.worker-chip.watch { background: var(--mustard-soft); border-color: color-mix(in oklab, var(--mustard) 45%, transparent); color: var(--watch); box-shadow: none; }
+.worker-chip .pulse { width: 8px; height: 8px; }
+.gear-wrap { position: relative; display: inline-flex; flex: none; }
+.worker-dot { display: none; position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; border: 2px solid var(--paper); background: var(--ink-3); color: var(--card); font-size: 10px; font-weight: 800; line-height: 12px; text-align: center; text-decoration: none; }
+.worker-dot.ok { background: var(--mint); }
+.worker-dot.watch { background: var(--mustard); color: var(--ink); }
+@media (max-width: 1680px) {
+  .worker-chip { display: none; }
+  .worker-dot { display: block; }
+}
+@media (max-width: 640px) {
+  .wk-act { flex-direction: column; align-items: flex-end; }
 }

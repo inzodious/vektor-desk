@@ -1,0 +1,80 @@
+{
+ "now": "2026-11-09T16:42:00Z",
+ "summary": {
+  "state": "asleep",
+  "name": "Horizon",
+  "waiting": 2,
+  "words": "Horizon is asleep or off: last heard 3 hours ago. 2 jobs waiting."
+ },
+ "workers": [
+  {
+   "id": "a1b2c3d4e5f6",
+   "name": "Horizon",
+   "added_at": "2026-11-09T13:10:00Z",
+   "state": "asleep",
+   "last_seen": "2026-11-09T13:40:00Z",
+   "build": "a02ded6",
+   "host": "horizon",
+   "job_id": null,
+   "words": "Horizon is asleep or off: last heard 3 hours ago."
+  }
+ ],
+ "jobs": [
+  {
+   "id": "9f8e7d6c5b4a",
+   "kind": "lab.sims",
+   "title": "Lab simulations",
+   "state": "leased",
+   "queued_at": "2026-11-09T13:36:00Z",
+   "leased_at": "2026-11-09T13:36:20Z",
+   "finished_at": null,
+   "attempts": 1,
+   "seconds": null,
+   "peak_mb": null,
+   "where": "queue",
+   "why": "Horizon went quiet while running it. It goes back in line when a worker checks in."
+  },
+  {
+   "id": "8e7d6c5b4a39",
+   "kind": "lab.sims",
+   "title": "Lab simulations",
+   "state": "queued",
+   "queued_at": "2026-11-09T15:05:00Z",
+   "leased_at": null,
+   "finished_at": null,
+   "attempts": 0,
+   "seconds": null,
+   "peak_mb": null,
+   "where": "queue",
+   "why": "Waiting for Horizon, which is asleep or off (last heard 3 hours ago)."
+  },
+  {
+   "id": "6c5b4a392817",
+   "kind": "worker.check",
+   "title": "Check a database copy on the worker",
+   "state": "queued",
+   "queued_at": "2026-11-09T16:30:00Z",
+   "leased_at": null,
+   "finished_at": null,
+   "attempts": 0,
+   "seconds": null,
+   "peak_mb": null,
+   "where": "queue",
+   "why": "Waiting for Horizon, which is asleep or off (last heard 3 hours ago)."
+  },
+  {
+   "id": "0a1b2c3d4e5f",
+   "kind": "worker.check",
+   "title": "Check a database copy on the worker",
+   "state": "done",
+   "queued_at": "2026-11-09T13:12:00Z",
+   "leased_at": "2026-11-09T13:12:10Z",
+   "finished_at": "2026-11-09T13:12:14Z",
+   "attempts": 1,
+   "seconds": 0.4,
+   "peak_mb": 38,
+   "where": null,
+   "why": "The copy opened cleanly on the worker: 12 tables."
+  }
+ ]
+}

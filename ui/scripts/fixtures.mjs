@@ -252,3 +252,6 @@ await import('./never.mjs');
 
 // ---------- memory ----------
 await import('./memory.mjs');
+
+// ---------- workers ----------
+await import('./workers.mjs');

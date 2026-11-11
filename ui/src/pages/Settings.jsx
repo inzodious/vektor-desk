@@ -5,6 +5,7 @@ import { Subtabs } from '../components/Subtabs.jsx';
 import { Jobs } from '../settings/Jobs.jsx';
 import { Box } from '../settings/Box.jsx';
 import { Memory } from '../settings/Memory.jsx';
+import { Workers } from '../settings/Workers.jsx';
 import { Inbox } from '../settings/Inbox.jsx';
 import { Keys } from '../settings/Keys.jsx';
 import { ProfileEditor } from '../settings/ProfileEditor.jsx';
@@ -463,6 +464,7 @@ export default function Settings({ tab = 'desk' }) {
         {tab === 'box' ? (
           <>
             <Memory />
+            <Workers />
             <Jobs />
             <Box />
             <Token token={s.claude_token} />
