@@ -177,6 +177,8 @@ def test_a_builder_that_fails_says_so_and_the_box_stops_waiting(client, horizon,
     assert row["error"] == "docker build stopped: npm ERR!" and row["name"] == "Horizon"
     assert client.post("/api/build/hello", json={"public_key": pub, "protocol": 1}, headers=head).json()["want"] is None
     assert client.get("/api/build").json()["want"]["arrived"] == "failed"
+    words = client.get("/api/build").json()["words"]
+    assert "couldn't build 0123456, so the box builds that one here" in words and "is in;" not in words
 
 
 # ---- What he sees ----
