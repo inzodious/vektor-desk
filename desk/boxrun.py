@@ -12,6 +12,7 @@ from desk import memory
 from desk.config import Config
 from desk.jobrun import _read, _write, now_utc, parse_stamp, stamp
 from desk.runlock import run_dir
+from desk.worker import build
 
 PICKUP_SECONDS = 300
 ALIVE_WITHIN = timedelta(minutes=12)
@@ -47,6 +48,12 @@ ACTIONS = {
             "Apply compose",
             timedelta(minutes=10),
             "Backs up, then gives TrueNAS main's compose.yaml, unless the change widens what containers can do",
+        ),
+        Action(
+            "approve-builder",
+            "Approve builder",
+            timedelta(minutes=1),
+            "Trusts the builders listed in main's deploy/builders.txt, so the box takes the images they sign instead of building its own",
         ),
     )
 }
@@ -140,6 +147,7 @@ def describe(cfg: Config, now: datetime | None = None) -> dict:
         "script": _read(box_dir(cfg) / "script.json"),
         "compose": compose_state(cfg),
         "memory": memory.status(cfg, now),
+        "build": build.status(cfg, now),
         "actions": rows,
     }
 

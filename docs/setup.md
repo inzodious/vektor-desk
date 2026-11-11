@@ -80,7 +80,7 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
 
 ## After updates
 
-Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change still need a tap in Settings → Box, and `deploy.sh status`, the deploy log and a `desk-ops` alert all say when one is waiting:
+Deploys are automatic once `main` has been quiet for 10 minutes (Deploy now skips the wait). Two kinds of change still need a tap in Settings → Box, and `deploy.sh status`, the deploy log and a `desk-ops` alert all say when one is waiting:
 
 | When | Do |
 |---|---|
@@ -88,6 +88,7 @@ Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change 
 | Settings → Box says the box isn't checking in | The cron copy of `deploy.sh` is older than box actions: copy it by hand once (row above) |
 | An alert says auto-deploy stopped | The alert names the reason. If it was the backup, fix that and tap Settings → Box → Back up now: a good backup releases the deploy. For anything else, Settings → Box → Deploy now retries it. Updating the box script also retries it once. Until then the old version keeps running |
 | An alert says the desk ran out of memory | Settings → Box shows what was stopped and why. Low-memory mode switches itself on when the box has under 1.5 GB available: heavy jobs then run one at a time (docs/architecture.md, Memory). Deploy now retries a build that ran out of memory |
+| A builder is listed in `deploy/builders.txt` but not approved | Settings → Box → Approve builder (Horizon worker, Builds on Horizon) |
 | `deploy/compose.yaml` changed | Settings → Box → Apply compose. If the change widens what containers can do (a new image, host path, capability and so on; docs/architecture.md, Deploys), the panel shows why with a Copy button instead: read it, then Apps → `vektor-desk` → Edit, paste, save. `deploy.sh status` says which on its `Compose:` line |
 
 ## Horizon worker
@@ -108,6 +109,29 @@ DESK_BUILD=$(git rev-parse HEAD) DESK_WORKER_KEY=$KEY docker compose -f deploy/w
 | The desk deploys a new build | Nothing: the worker fetches the desk's code with each job |
 | `pyproject.toml` dependencies change | Run the last line again without `DESK_WORKER_KEY`; it rebuilds the image and keeps the key |
 | Remove it | `docker compose -f deploy/worker/compose.yaml down -v` there, and remove the worker in the app (`DELETE /api/workers/{id}`) |
+
+What this adds to that machine: the image `vektor-desk:worker`, the container `vektor-desk-worker`, the volume `worker_work` (its key and caches) and the network `worker_default`. Nothing is published on a port.
+
+### Builds on Horizon
+
+Optional, after the worker runs. The same machine builds the desk's image for each deploy, so the NAS doesn't have to (docs/architecture.md, Builds on another machine). The builder can run Docker on that machine, which is as good as root there. One time:
+
+```bash
+cd ~/Documents/Development/apps/vektor-desk && git pull --ff-only
+DESK_BUILD=$(git rev-parse HEAD) docker compose -f deploy/worker/compose.yaml --profile builder up -d --build
+sleep 20 && docker logs vektor-desk-builder 2>&1 | grep -m1 'key fingerprint'
+```
+
+| Then | Do |
+|---|---|
+| List it in `main` | Add one line to `deploy/builders.txt`: the 64-character fingerprint from the last command, a space, `Horizon`. A fingerprint is not a secret. Merge it |
+| Approve it | After that commit is live: Settings → Box → Approve builder (`POST /api/box/approve-builder/run`). The box pins the key Horizon sent, once its fingerprint matches the line in `main` |
+| Check it | `curl -fsS https://desk-lan.escape-vektor.com/api/build` says "Horizon builds the desk's images". After the next merge, `deploy.sh status` and the same call say the last image came from a builder |
+| Horizon is off or asleep | Nothing: the box builds the image itself, stage by stage |
+| The builder's code is old | The app says so. Run the middle line again from an updated checkout; the key stays in the volume |
+| Stop trusting it | Remove its line from `deploy/builders.txt`, merge, tap Approve builder. On Horizon: `docker compose -f deploy/worker/compose.yaml --profile builder down` |
+
+What this adds to that machine: the containers `vektor-desk-builder` and `vektor-desk-docker-cli` (runs once, copies the Docker client into a volume), the image `docker:27-cli`, the volume `worker_cli`, images named `vektor-desk:built-…` while a build runs, and Docker's build cache. The builder's private key is `builder/key.pem` in the `worker_work` volume and never leaves it.
 
 ## Home network
 
