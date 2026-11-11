@@ -2,7 +2,11 @@ import { etDate, etTime } from './format.js';
 
 export const HAND_COPY = 'install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh';
 export const QUEUED_TEXT = 'Queued, runs within 5 min';
+export const BUILDER_START = ['git pull --ff-only', 'DESK_BUILD=$(git rev-parse HEAD) docker compose -f deploy/worker/compose.yaml --profile builder up -d --build'].join('\n');
 const STALE_MS = 2 * 60 * 60 * 1000;
+const OWN_PLACE = ['update-script', 'apply-compose', 'approve-builder'];
+const BUILD_STATES = ['none', 'asking', 'approve', 'online', 'asleep'];
+const PRINT = /^[0-9a-f]{64}$/;
 
 // ---------- time ----------
 export function when(iso, now = new Date()) {
@@ -16,10 +20,11 @@ const short = (sha) => (sha ? String(sha).slice(0, 7) : null);
 
 // ---------- actions ----------
 export function splitBox(actions = []) {
-  const list = (actions || []).filter((a) => a.name !== 'update-script' && a.name !== 'apply-compose');
+  const list = (actions || []).filter((a) => !OWN_PLACE.includes(a.name));
   const update = (actions || []).find((a) => a.name === 'update-script') || null;
   const compose = (actions || []).find((a) => a.name === 'apply-compose') || null;
-  return { list, update, compose };
+  const approve = (actions || []).find((a) => a.name === 'approve-builder') || null;
+  return { list, update, compose, approve };
 }
 
 export function lastLine(run) {
@@ -85,4 +90,51 @@ export function composeView(c) {
     needs,
     copy: !!c.copy_available,
   };
+}
+
+// ---------- builds ----------
+export function shortKey(print) {
+  const p = String(print || '').slice(0, 16);
+  return p.match(/.{1,4}/g)?.join(' ') || '';
+}
+
+function sentences(words) {
+  const text = String(words || '').trim();
+  const cut = text.indexOf('. ');
+  return cut < 0 ? [text, null] : [text.slice(0, cut + 1), text.slice(cut + 2).trim() || null];
+}
+
+function names(list) {
+  return list.length > 1 ? `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}` : list[0];
+}
+
+export function buildView(build, action) {
+  if (!build || typeof build !== 'object' || !BUILD_STATES.includes(build.state)) return null;
+  const state = build.state;
+  if (state === 'none' && !build.host_seen) return null;
+  const listed = (build.listed || []).filter((l) => l && PRINT.test(l.fingerprint));
+  const isListed = (print) => listed.some((l) => l.fingerprint === print);
+  const asking = (build.asking || []).filter((a) => a && PRINT.test(a.fingerprint) && !isListed(a.fingerprint)).map((a) => ({ print: a.fingerprint, name: a.name || 'A machine', key: shortKey(a.fingerprint), line: `${a.fingerprint} ${a.name || 'builder'}` }));
+  const gone = (build.builders || []).filter((b) => b && !isListed(b.fingerprint)).map((b) => b.name || 'A builder');
+  const stale = gone.length ? `${names(gone)} ${gone.length > 1 ? 'are' : 'is'} no longer listed in main. Approve builder stops the box taking ${gone.length > 1 ? 'their' : 'its'} images.` : null;
+  const live = !!action && (action.running || action.queued || (!!action.last_run && !action.last_run.finished));
+  const tap = state === 'approve' || !!stale || listed.some((l) => !l.approved);
+  const [head, rest] = sentences(build.words);
+  return {
+    state,
+    tone: tap ? 'tap' : state === 'asking' ? 'ask' : 'calm',
+    head: head || 'Who builds the desk’s images',
+    rest,
+    asking,
+    stale,
+    approve: !!action && (tap || live),
+    script: build.host_seen ? null : 'The box needs its new script before it can list or approve a builder. Update box script comes first.',
+    start: state === 'none',
+  };
+}
+
+export function settleLine(build) {
+  const m = Math.round(Number(build?.settle_seconds) / 60);
+  if (!Number.isFinite(m) || m <= 0) return null;
+  return `A new version goes in by itself once main has been quiet for ${m} ${m === 1 ? 'minute' : 'minutes'}; Deploy now skips the wait.`;
 }

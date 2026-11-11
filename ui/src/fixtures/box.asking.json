@@ -1,0 +1,209 @@
+{
+ "now": "2026-11-09T16:42:00Z",
+ "host_alive": true,
+ "pickup_seconds": 300,
+ "script": {
+  "checked_at": "2026-11-09T16:40:00Z",
+  "pinned": true,
+  "current": true,
+  "behind": 0,
+  "from": null,
+  "to": null,
+  "off": false
+ },
+ "compose": {
+  "checked_at": "2026-11-09T16:40:00Z",
+  "state": "current",
+  "drift": [],
+  "escalations": [],
+  "missing_dirs": [],
+  "missing_files": [],
+  "can_apply": false,
+  "copy_available": false
+ },
+ "actions": [
+  {
+   "name": "redeploy",
+   "title": "Redeploy",
+   "what": "Recreates the containers on the live images, so edited settings take effect",
+   "cooldown_seconds": 300,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "status",
+   "title": "Status",
+   "what": "What's live, what's on GitHub, container health, backups",
+   "cooldown_seconds": 60,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "action": "status",
+    "request_id": "b06c0ffee0",
+    "started": "2026-11-09T16:20:00Z",
+    "finished": "2026-11-09T16:20:00Z",
+    "result": "ok",
+    "exit_code": 0,
+    "output": "Vektor Desk box status\nlive image   ghcr.io/inzodious/vektor-desk:main (synthetic)\ncontainers   api healthy, cron healthy\nbackups      newest Nov 9, 7:00 AM, 6 kept\ndisk         41% used on the apps pool"
+   },
+   "cooldown_until": "2026-11-09T16:43:00Z",
+   "can_run": false
+  },
+  {
+   "name": "check",
+   "title": "Check",
+   "what": "Claude sign-in, Firestore, addresses, Alpaca paper, a test phone alert",
+   "cooldown_seconds": 120,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "action": "check",
+    "request_id": "b05c0ffee0",
+    "started": "2026-11-09T15:02:00Z",
+    "finished": "2026-11-09T15:03:00Z",
+    "result": "ok",
+    "exit_code": 0,
+    "output": "Claude sign-in ok\nFirestore read ok\nAlpaca paper ok\nTest phone alert sent"
+   },
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "backup",
+   "title": "Back up now",
+   "what": "Copies every database and the inbox to the backup pool",
+   "cooldown_seconds": 1800,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "action": "backup",
+    "request_id": "b06c0ffee0",
+    "started": "2026-11-09T12:00:00Z",
+    "finished": "2026-11-09T12:04:00Z",
+    "result": "ok",
+    "exit_code": 0,
+    "output": "Backed up 6 databases and the inbox (synthetic sizes)"
+   },
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "restore-test",
+   "title": "Restore drill",
+   "what": "Unpacks the newest backup into a scratch folder and checks every database",
+   "cooldown_seconds": 1800,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "action": "restore-test",
+    "request_id": "b012c0ffee0",
+    "started": "2026-11-09T12:05:00Z",
+    "finished": "2026-11-09T12:09:00Z",
+    "result": "failed",
+    "exit_code": 1,
+    "output": "Unpacked the newest backup\nlab.db: integrity check found 1 problem (synthetic)"
+   },
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "logs",
+   "title": "Export logs",
+   "what": "Redacted service logs into data/run/logs",
+   "cooldown_seconds": 60,
+   "running": false,
+   "queued": true,
+   "queued_at": "2026-11-09T16:40:00Z",
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": false
+  },
+  {
+   "name": "update-script",
+   "title": "Update box script",
+   "what": "Copies main's deploy.sh over the one the cron jobs run, once the checkout is clean, at main and the script parses",
+   "cooldown_seconds": 300,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "action": "update-script",
+    "request_id": "b013c0ffee0",
+    "started": "2026-11-09T11:35:00Z",
+    "finished": "2026-11-09T11:35:00Z",
+    "result": "skipped",
+    "exit_code": 75,
+    "output": "The checkout is still catching up to main; trying again on the next pass"
+   },
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "deploy-now",
+   "title": "Deploy now",
+   "what": "Pulls main, backs up and restarts on it; also retries a commit auto-deploy is holding back",
+   "cooldown_seconds": 300,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "apply-compose",
+   "title": "Apply compose",
+   "what": "Backs up, then gives TrueNAS main's compose.yaml, unless the change widens what containers can do",
+   "cooldown_seconds": 600,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
+   "name": "approve-builder",
+   "title": "Approve builder",
+   "what": "Trusts the builders listed in main's deploy/builders.txt, so the box takes the images they sign instead of building its own",
+   "cooldown_seconds": 60,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  }
+ ],
+ "build": {
+  "state": "asking",
+  "words": "Horizon asks to build the desk's images (key 3d63 e070 5ff2 1e2b). It can once that key's fingerprint is in main's deploy/builders.txt and you tap Approve builder. The last image (716e203) came from this box.",
+  "builders": [],
+  "asking": [
+   {
+    "fingerprint": "3d63e0705ff21e2b0123456789abcdef0123456789abcdef0123456789abcdef",
+    "name": "Horizon",
+    "asked_at": "2026-11-09T16:40:00Z"
+   }
+  ],
+  "listed": [],
+  "want": null,
+  "last": {
+   "commit": "716e2031a4b5c6d7e8f9012345678901234abcde",
+   "how": "box",
+   "why": null,
+   "at": "2026-11-09T14:05:10Z"
+  },
+  "wait_seconds": 1200,
+  "settle_seconds": 600,
+  "host_seen": true
+ }
+}
