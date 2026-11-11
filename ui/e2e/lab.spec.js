@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 // ---------- compare ----------
 test('compare opens on you against both shadows with every view', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/lab');
+  await page.goto('/research/compare');
   await expect(page.getByTestId('slots').locator('.slot[data-slot]')).toHaveCount(3);
   await expect(page.locator('.ph-big')).toContainText('led over 1 year');
   await expect(page.getByTestId('growth').locator('svg')).toBeVisible();
@@ -20,7 +20,7 @@ test('compare opens on you against both shadows with every view', async ({ page 
 });
 
 test('funds show overlap with the first and a slot can be removed', async ({ page }) => {
-  await page.goto('/lab?ids=FXAIX,FTEC,VXUS');
+  await page.goto('/research/compare?ids=FXAIX,FTEC,VXUS');
   const overlap = page.getByTestId('overlap');
   await expect(overlap).toContainText('Overlap with FXAIX');
   await expect(overlap).toContainText('FTEC');
@@ -31,7 +31,7 @@ test('funds show overlap with the first and a slot can be removed', async ({ pag
 });
 
 test('adding an item takes a ticker or a quick pick and closes on Escape', async ({ page }) => {
-  await page.goto('/lab');
+  await page.goto('/research/compare');
   const add = page.getByRole('button', { name: 'Add an item' });
   await add.click();
   const pop = page.getByRole('dialog', { name: 'Add an item' });
@@ -49,7 +49,7 @@ test('adding an item takes a ticker or a quick pick and closes on Escape', async
 });
 
 test('the window combo lands in the URL', async ({ page }) => {
-  await page.goto('/lab');
+  await page.goto('/research/compare');
   await page.getByRole('button', { name: /^Window/ }).click();
   await page.getByRole('option', { name: '3 years' }).click();
   await expect(page).toHaveURL(/w=3Y/);
@@ -61,14 +61,14 @@ test('one item asks for another instead of calling the API', async ({ page }) =>
     called = true;
     return r.continue();
   });
-  await page.goto('/lab?ids=portfolio');
+  await page.goto('/research/compare?ids=portfolio');
   await expect(page.locator('.empty-hint').first()).toContainText('Compare needs two to five items');
   expect(called).toBe(false);
 });
 
 test('a refused comparison shows the server reason', async ({ page }) => {
   await page.route('**/api/compare**', (r) => r.fulfill({ status: 400, json: { detail: 'Unknown id: ZZZZ' } }));
-  await page.goto('/lab?ids=FXAIX,ZZZZ');
+  await page.goto('/research/compare?ids=FXAIX,ZZZZ');
   const alert = page.getByRole('alert');
   await expect(alert).toContainText("Can't compare that");
   await expect(alert).toContainText('Unknown id: ZZZZ');
@@ -77,7 +77,7 @@ test('a refused comparison shows the server reason', async ({ page }) => {
 // ---------- risk ----------
 test('risk shows the drop, six instruments and every chart', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/lab/risk');
+  await page.goto('/portfolio/risk');
   await expect(page.locator('.ph-big')).toContainText('below the high');
   await expect(page.getByTestId('risk-kpis').locator('[data-kpi]')).toHaveCount(6);
   await expect(page.getByTestId('risk-return').locator('[data-point]')).toHaveCount(7);
@@ -92,7 +92,7 @@ test('risk shows the drop, six instruments and every chart', async ({ page }) =>
 });
 
 test('a risk instrument opens its windows and closes on Escape', async ({ page }) => {
-  await page.goto('/lab/risk');
+  await page.goto('/portfolio/risk');
   await page.locator('[data-kpi="risk.vol"]').click();
   const panel = page.getByRole('dialog', { name: 'Volatility' });
   await expect(panel).toBeVisible();
@@ -102,7 +102,7 @@ test('a risk instrument opens its windows and closes on Escape', async ({ page }
 });
 
 test('charts flip to a table view', async ({ page }) => {
-  await page.goto('/lab/risk');
+  await page.goto('/portfolio/risk');
   const card = page.getByTestId('scenarios');
   await card.getByRole('button', { name: 'Table view' }).click();
   await expect(card.locator('table')).toContainText('Rates +2 points');
@@ -110,15 +110,15 @@ test('charts flip to a table view', async ({ page }) => {
 
 // ---------- boards ----------
 test('a saved board lists, opens and can be removed', async ({ page }) => {
-  await page.goto('/lab?ids=FXAIX,FTEC');
+  await page.goto('/research/compare?ids=FXAIX,FTEC');
   await page.getByTestId('save-board').click();
   await expect(page.getByTestId('save-board')).toHaveText('Saved to boards');
   await page.getByRole('link', { name: 'Boards', exact: true }).click();
   const link = page.getByRole('link', { name: /Compare FXAIX, FTEC/ });
   await expect(link).toBeVisible();
   await link.click();
-  await expect(page).toHaveURL(/\/lab\?ids=FXAIX%2CFTEC|\/lab\?ids=FXAIX,FTEC/);
-  await page.goto('/lab/boards');
+  await expect(page).toHaveURL(/\/research\/compare\?ids=FXAIX%2CFTEC|\/research\/compare\?ids=FXAIX,FTEC/);
+  await page.goto('/research/boards');
   await page.getByRole('button', { name: /^Remove Compare/ }).click();
   await expect(page.locator('.empty-hint')).toContainText('No boards yet');
 });

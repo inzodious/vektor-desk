@@ -20,9 +20,10 @@ export function Gauge({ value, min = 0, max = 10, zones = [], unit = '', label, 
     return { i, x0, y0, x1, y1 };
   });
   const has = value != null;
+  const Tag = onOpen ? 'button' : 'div';
   const [nx, ny] = pt(ang(has ? Math.max(min, Math.min(max, value)) : min), 58);
   return (
-    <button type="button" className="gauge" onClick={onOpen} aria-label={`${label}: ${reading}${note ? `, ${note}` : ''}`}>
+    <Tag {...(onOpen ? { type: 'button', onClick: onOpen } : { role: 'img' })} className={`gauge${onOpen ? '' : ' still'}`} aria-label={`${label}: ${reading}${note ? `, ${note}` : ''}`}>
       <svg viewBox="10 10 180 180" aria-hidden="true">
         <circle cx="100" cy="100" r="86" fill="var(--card)" stroke="var(--ink)" strokeWidth="3" />
         <circle cx="100" cy="100" r="78" fill="none" stroke="var(--line-2)" strokeWidth="1" />
@@ -42,6 +43,6 @@ export function Gauge({ value, min = 0, max = 10, zones = [], unit = '', label, 
       <b>{reading}</b>
       <small>{label}</small>
       {note ? <small className="gauge-note">{note}</small> : null}
-    </button>
+    </Tag>
   );
 }

@@ -33,21 +33,31 @@ For real shapes, run the API in demo mode (`DESK_DEMO=1`) and use `npm run dev`.
 
 ## Pages
 
-| Route | Phase | State |
-|---|---|---|
-| `/settings` | 1, 5 | Freshness, token and running jobs from `/api/status`; crew tiles with switches, kill switch, weekly usage and run log from `/api/agents` |
-| `/` Bridge | 2 to 5 | Live value, 7 KPIs with drawers, departures board, value versus the plan and S&P shadows, gauges, drift bullets, today's brief and the top three proposals |
-| `/plan` | 3, 5 | Plan KPIs, drift bullets, rules with desk.yaml version, funds, modelled deposit split with drift after, tax calendar with wash windows |
-| `/decisions` | 4 | Queue of proposal cards, detail with Preflight annunciator, override box, order ticket, sources and history; To place list |
-| `/decisions/journal` | 4, 10 | Stamped ledger with each row's latest score (30, 90 or 365 days), discipline streak, overrides against clean, unmatched trades with Log it |
-| `/research` | 6 | Dossier list, watchlist and market backdrop; open dossier with verdict, valuation range, thesis and bear case, price against the core fund, triggers, key numbers, filings and sources (`?s=` picks one) |
-| `/research/sources`, `/watchlist`, `/calendar` | 6 | Every cited source by kind; watchlist with add and remove; upcoming earnings, recent filings and insider trades, Treasury yields |
-| Console, symbol search | 6 | Robot button or `?open=console`: history, suggested questions, Tonight and Run now. `/` or the search button finds a symbol and opens its sheet, now with the dossier |
-| `/lab` Compare | 7 | Two to five slots (ticker, portfolio, account, shadow) in `?ids=`, window combo `?w=`; growth of 100, fund overlap, six small multiples, side-by-side table |
-| `/lab/risk` | 7 | Drop from the high, six risk KPIs with drawers, return against risk, correlation heatmap, drawdowns, scenario shocks, look-through and sectors, month-by-month heatmap |
-| `/lab/strategies` | 9 | Stage rail (draft, lab, paper, eligible), strategies with paper progress, rule tests with verdicts |
-| `/lab/strategies/:id` | 9 | Strategy: verdict lamps, holdout, paper portfolio and trades, walk-forward tiles, test years, horizons, setting, market and cost analyses, factor check. Rule test: setup, against never selling, every setting, horizons |
-| `/lab/boards` | 7 | Saved Compare and Risk views with their slicers, kept in this browser |
-| `/decisions/flight` | 10 | Total against the plan, a card per desk (record, 90% interval, chip), calibration by desk, groups by desk, kind, Preflight path or taken at 30, 90 or 365 days, saves, off-plan gap, every decided call |
-| `/lab/patterns` | 10 | Market context tiles with base rates, each holding against its own past, drawdown base rates, month-by-month seasonality, correlation shifts, your own buying habits |
-| `/lab/patterns/replay` | 10 | You versus the capped you: his own trades replayed under one rule at a time (`?rule=`), three lines on the same dollars, where the rule helped and hurt by name, what it did, every rule side by side, how he sized it. Opens from the card at the top of Patterns |
+Menu: Bridge, Results, Portfolio, Strategies, Decisions, Research, with Settings behind the gear. `/plan/*` and `/lab/*` redirect to the new routes.
+
+| Route | State |
+|---|---|
+| `/` Bridge | Live value, 4 KPIs with drawers, today's run, what changed (brief and movers) and steps due (queue and plan steps). Holdings board, mix and instruments, discount days and the shadow chart open in drawers |
+| `/results/:kind` | Day, week, month and year review with the debrief; `?end=` for older periods |
+| `/portfolio` Holdings | Six KPIs, departures board, drift bullets, rules with desk.yaml version, funds, modelled deposit split with drift after, FI path |
+| `/portfolio/stocks` | One plan card per holding with forms; `?symbol=` scrolls to a card |
+| `/portfolio/risk` | Drop from the high, six risk KPIs with drawers, return against risk, correlation heatmap, drawdowns, scenario shocks, look-through and sectors, month-by-month heatmap |
+| `/portfolio/tax` | Realized and unrealized gains by term, tax calendar with wash windows |
+| `/strategies` Race | Leaderboard, stage rail (draft, lab, paper, eligible), strategies with paper progress |
+| `/strategies/mixes` | Time to FI by monthly deposit, each mix's range of outcomes, hold or trim for conviction positions |
+| `/strategies/habits` | Replay card, rule tests, market context tiles with base rates, each holding against its own past, seasonality, correlation shifts, your own buying habits |
+| `/strategies/habits/replay` | You versus the capped you: your own trades replayed under one rule at a time (`?rule=`) |
+| `/strategies/:id` | Strategy: verdict lamps, holdout, paper portfolio and trades, walk-forward tiles, analyses, factor check. Rule test: setup, against never selling, every setting, horizons |
+| `/decisions` | Queue of proposal cards, detail with Preflight annunciator, override box, order ticket, sources and history; To place list |
+| `/decisions/journal` | Stamped ledger, 20 entries a page, filters for origin, status, kind and symbol in the URL; discipline streak, overrides against clean, unmatched trades with Log it |
+| `/decisions/flight` | Total against the safe mix, a card per desk, calibration, groups at 30, 90 or 365 days, saves, off-mix gap, every decided call |
+| `/research` | Dossier list, watchlist and market backdrop; open dossier (`?s=` picks one) |
+| `/research/sources`, `/watchlist`, `/calendar` | Every cited source by kind; watchlist with add and remove; earnings, filings, insider trades, Treasury yields |
+| `/research/compare` | Two to five slots (ticker, portfolio, account, shadow) in `?ids=`, window combo `?w=`; growth of 100, fund overlap, six small multiples, side-by-side table |
+| `/research/boards` | Saved Compare, Risk and My habits views with their slicers, kept in this browser |
+| `/settings` Desk | Desk profile and editor, Start here (Risk check, First run), version, build and theme |
+| `/settings/crew` | Crew tiles with switches, kill switch, weekly usage and run log |
+| `/settings/data` | Data freshness with the mirror tables drawer, inbox upload (`#inbox`), keys (`#keys`) |
+| `/settings/box` | Scheduled jobs (`#jobs`), box buttons, Claude token (`#token`) |
+| `/settings/risk`, `/settings/first-run` | Risk check with conviction holds; first-run checklist |
+| Console, symbol search | Robot button or `?open=console`; `/` or the search button finds a symbol and opens its sheet |

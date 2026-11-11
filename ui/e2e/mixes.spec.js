@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 test('mixes run safe to risky with bands, reward to risk and a fit badge', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/lab/mixes');
+  await page.goto('/strategies/mixes');
   const cards = page.locator('[data-mix]');
   await expect(cards).toHaveCount(4);
   expect(await cards.evaluateAll((els) => els.map((e) => e.dataset.rank))).toEqual(['2', '3', '4', '5']);
@@ -29,7 +29,7 @@ test('mixes run safe to risky with bands, reward to risk and a fit badge', async
 });
 
 test('time to FI leads the page: the deposit moves it far more than the mix', async ({ page }) => {
-  await page.goto('/lab/mixes');
+  await page.goto('/strategies/mixes');
   const head = page.getByTestId('fi-time');
   await expect(head.getByTestId('fi-big')).toContainText('About 32 years');
   await expect(head.getByTestId('fi-big')).toContainText('to $1M at $600 a month, around 2059');
@@ -48,7 +48,7 @@ test('time to FI leads the page: the deposit moves it far more than the mix', as
 });
 
 test('the lower-returns switch redraws the headline and every card', async ({ page }) => {
-  await page.goto('/lab/mixes');
+  await page.goto('/strategies/mixes');
   const safe = page.locator('[data-mix="safe-mix"]');
   const before = await safe.locator('.mix-kpis b').first().textContent();
   const flip = page.getByTestId('lower-switch');
@@ -69,7 +69,7 @@ test('the lower-returns switch redraws the headline and every card', async ({ pa
 });
 
 test('as held is a drifting hold, with the topped-up version beside it', async ({ page }) => {
-  await page.goto('/lab/mixes');
+  await page.goto('/strategies/mixes');
   const held = page.locator('[data-mix="as-held"]');
   await expect(held).toContainText('left to drift, new money to the safe mix');
   await expect(held.getByTestId('mix-variant')).toContainText('Topped back up to today’s weights');
@@ -78,7 +78,7 @@ test('as held is a drifting hold, with the topped-up version beside it', async (
 });
 
 test('a conviction hold shows hold, rebalance and trim side by side', async ({ page }) => {
-  await page.goto('/lab/mixes');
+  await page.goto('/strategies/mixes');
   const card = page.locator('[data-conviction="ACME"]');
   await expect(card).toContainText('ACME: hold, rebalance or trim');
   await expect(card).toContainText('24% of the book');
@@ -88,15 +88,15 @@ test('a conviction hold shows hold, rebalance and trim side by side', async ({ p
   await expect(card.locator('[data-policy="rebalance"]')).toContainText('held there');
   await expect(card.locator('[data-policy="trim"]')).toContainText('2% to 14%');
   await expect(card.locator('[data-policy="trim"] svg[role="img"] g[data-years]')).toHaveCount(4);
-  await page.goto('/lab/mixes?scenario=partial');
+  await page.goto('/strategies/mixes?scenario=partial');
   await expect(page.locator('[data-conviction="ACME"]')).toHaveAttribute('data-status', 'not_ready');
   await expect(page.locator('[data-conviction="ACME"]')).toContainText('Needs 36 months of ACME prices');
-  await page.goto('/lab/mixes?scenario=noprofile');
+  await page.goto('/strategies/mixes?scenario=noprofile');
   await expect(page.locator('[data-conviction]')).toHaveCount(0);
 });
 
 test('every band chart has a table view', async ({ page }) => {
-  await page.goto('/lab/mixes');
+  await page.goto('/strategies/mixes');
   const card = page.locator('[data-mix="safe-mix"]');
   await card.getByRole('button', { name: 'Table view' }).click();
   await expect(card.locator('tbody tr')).toHaveCount(5);
@@ -104,7 +104,7 @@ test('every band chart has a table view', async ({ page }) => {
 });
 
 test('a mix on paper links to its race', async ({ page }) => {
-  await page.goto('/lab/mixes');
+  await page.goto('/strategies/mixes');
   const race = page.locator('[data-mix="tech-tilt"]').getByTestId('mix-race');
   await expect(race).toContainText('Day 4 of 182');
   await race.click();
@@ -113,7 +113,7 @@ test('a mix on paper links to its race', async ({ page }) => {
 });
 
 test('without a risk band or FI goal the cards say what to set', async ({ page }) => {
-  await page.goto('/lab/mixes?scenario=noprofile');
+  await page.goto('/strategies/mixes?scenario=noprofile');
   const card = page.locator('[data-mix="safe-mix"]');
   await expect(card.getByRole('link', { name: 'Take the risk check' })).toHaveAttribute('href', '/settings/risk');
   await expect(card.getByTestId('mix-fi')).toHaveText('—');
@@ -123,9 +123,9 @@ test('without a risk band or FI goal the cards say what to set', async ({ page }
 });
 
 test('a mix short on history waits quietly, and a fresh desk explains', async ({ page }) => {
-  await page.goto('/lab/mixes?scenario=partial');
+  await page.goto('/strategies/mixes?scenario=partial');
   await expect(page.locator('[data-mix="tech-tilt"]')).toHaveAttribute('data-status', 'not_ready');
   await expect(page.locator('[data-mix="tech-tilt"]')).toContainText('has 14');
-  await page.goto('/lab/mixes?scenario=fresh');
+  await page.goto('/strategies/mixes?scenario=fresh');
   await expect(page.getByTestId('mixes-empty')).toContainText('after the first run');
 });

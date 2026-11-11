@@ -1,14 +1,6 @@
 import { accountLabel } from '../live/context.js';
 import { pct } from './format.js';
-
-export const LAB_TABS = [
-  { to: '/lab', label: 'Compare', end: true },
-  { to: '/lab/risk', label: 'Risk' },
-  { to: '/lab/mixes', label: 'Mixes' },
-  { to: '/lab/strategies', label: 'Strategies' },
-  { to: '/lab/patterns', label: 'Patterns' },
-  { to: '/lab/boards', label: 'Boards' },
-];
+import { movedPath } from './areas.js';
 
 export const WINDOWS = ['1M', '3M', '6M', 'YTD', '1Y', '3Y', '5Y', '10Y', 'MAX'].map((v) => ({ v, t: { '1M': '1 month', '3M': '3 months', '6M': '6 months', YTD: 'Year to date', '1Y': '1 year', '3Y': '3 years', '5Y': '5 years', '10Y': '10 years', MAX: 'All history' }[v] }));
 
@@ -18,7 +10,7 @@ export const DEFAULT_IDS = ['portfolio', 'shadow:plan_shadow', 'shadow:sp500_sha
 
 export const SPECIAL = [
   { v: 'portfolio', t: 'Your portfolio' },
-  { v: 'shadow:plan_shadow', t: 'Plan shadow' },
+  { v: 'shadow:plan_shadow', t: 'Safe mix shadow' },
   { v: 'shadow:sp500_shadow', t: 'S&P 500 shadow' },
 ];
 
@@ -149,11 +141,21 @@ export function scenarioItems(rows) {
 
 // ---------- saved boards ----------
 const KEY = 'desk.boards.v1';
+export const BOARD_VIEW = { '/research/compare': 'Compare', '/portfolio/risk': 'Risk', '/strategies/habits': 'My habits', '/strategies/habits/replay': 'Replay' };
+const BOARD_VIEWS = Object.keys(BOARD_VIEW);
 
 export function readBoards(store = globalThis.localStorage) {
   try {
     const v = JSON.parse(store?.getItem(KEY) || '[]');
-    return Array.isArray(v) ? v.filter((b) => b && typeof b.path === 'string' && b.path.startsWith('/lab')) : [];
+    if (!Array.isArray(v)) return [];
+    return v
+      .filter((b) => b && typeof b.path === 'string')
+      .map((b) => {
+        const [pathname, query = ''] = b.path.split('?');
+        const moved = movedPath(pathname, query ? `?${query}` : '', { board: true });
+        return moved ? { ...b, path: `${moved}${query ? `?${query}` : ''}` } : b;
+      })
+      .filter((b) => BOARD_VIEWS.some((p) => b.path === p || b.path.startsWith(`${p}?`)));
   } catch {
     return [];
   }

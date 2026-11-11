@@ -6,13 +6,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('a healthy engine shows no banner', async ({ page }) => {
-  await page.goto('/plan');
+  await page.goto('/portfolio');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByTestId('health-banner')).toHaveCount(0);
 });
 
 test('a failing engine says look, do not act, on every page', async ({ page }) => {
-  for (const path of ['/?scenario=fail', '/decisions?scenario=fail', '/lab/risk?scenario=fail']) {
+  for (const path of ['/?scenario=fail', '/decisions?scenario=fail', '/portfolio/risk?scenario=fail']) {
     await page.goto(path);
     const b = page.getByTestId('health-banner');
     await expect(b).toHaveAttribute('data-level', 'fail');
@@ -31,7 +31,7 @@ test('a warning lists every check and hides until the next run', async ({ page }
   await expect(b.locator('li')).toContainText('No lot export yet');
   await b.getByRole('button', { name: 'Hide until the next run' }).click();
   await expect(b).toHaveCount(0);
-  await page.goto('/plan?scenario=warn');
+  await page.goto('/portfolio?scenario=warn');
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
   await expect(page.getByTestId('health-banner')).toHaveCount(0);
 });

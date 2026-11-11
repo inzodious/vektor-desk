@@ -46,7 +46,7 @@ function Row({ r }) {
     <div className={`lb-row ${r.status}${fresh ? ' young' : ''}`} data-row={r.id} data-status={r.status} data-young={fresh ? 'true' : undefined}>
       <Rank r={r} />
       <span className="lb-main">
-        <span className="lb-name">{r.kind === 'strategy' ? <Link to={`/lab/strategies/${encodeURIComponent(r.id)}`}>{name}</Link> : r.kind === 'mix' ? <Link to="/lab/mixes">{name}</Link> : name}</span>
+        <span className="lb-name">{r.kind === 'strategy' ? <Link to={`/strategies/${encodeURIComponent(r.id)}`}>{name}</Link> : r.kind === 'mix' ? <Link to="/strategies/mixes">{name}</Link> : name}</span>
         <Track r={r} />
         <small>{trackText(r)}</small>
       </span>

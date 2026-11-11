@@ -1,7 +1,7 @@
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { HealthBanner } from './HealthBanner.jsx';
 import { Icon } from './Icon.jsx';
-import { AREAS } from '../lib/areas.js';
+import { AREAS, SETTINGS } from '../lib/areas.js';
 import { clockState } from '../lib/clock.js';
 import { useLive } from '../live/context.js';
 import { etTime } from '../lib/format.js';
@@ -35,6 +35,15 @@ export function ThemeButton() {
   );
 }
 
+// ---------- settings ----------
+export function SettingsButton() {
+  return (
+    <NavLink className="icon-btn gear-btn" to={SETTINGS.path} aria-label="Settings" title="Settings" data-testid="settings-open">
+      <Icon name="gear" />
+    </NavLink>
+  );
+}
+
 // ---------- nav ----------
 function NavLinks({ badges }) {
   const { pathname } = useLocation();
@@ -48,7 +57,7 @@ function NavLinks({ badges }) {
       </>
     );
     if (a.path === '/') {
-      const here = pathname === '/' || pathname === '/results' || pathname.startsWith('/results/');
+      const here = pathname === '/';
       return (
         <Link key={a.key} to="/" title={a.title} aria-current={here ? 'page' : undefined}>
           {inner}
@@ -84,6 +93,7 @@ export function Shell({ badges }) {
           <MarketClock />
           <ConsoleButton />
           <ThemeButton />
+          <SettingsButton />
         </div>
       </header>
       <main className="content" id="main" tabIndex={-1}>

@@ -4,7 +4,8 @@ import { Icon } from '../components/Icon.jsx';
 import { Subtabs } from '../components/Subtabs.jsx';
 import { useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
-import { PLAN_TABS, planCards, plansHead } from '../lib/stockPlans.js';
+import { PORTFOLIO_TABS } from '../lib/areas.js';
+import { planCards, plansHead } from '../lib/stockPlans.js';
 import { BareCard, PlanCard } from '../plan/PlanCard.jsx';
 
 export default function StockPlans() {
@@ -12,16 +13,16 @@ export default function StockPlans() {
   const facts = useApi('/api/engine/planfacts');
   const [params] = useSearchParams();
   const focus = (params.get('symbol') || '').toUpperCase();
-  const tabs = <Subtabs label="Plan views" tabs={PLAN_TABS} />;
+  const tabs = <Subtabs label="Portfolio views" tabs={PORTFOLIO_TABS} />;
   const d = plans.data;
 
-  if (!d && plans.loading) return <Hero kicker="Plan · Stock plans" title="Stock plans" art="plan" big={<b>Checking…</b>} foot={tabs} />;
+  if (!d && plans.loading) return <Hero kicker="Portfolio · Stock plans" title="Stock plans" art="plan" big={<b>Checking…</b>} foot={tabs} />;
 
   if (!d) {
     const missing = plans.error?.status === 404;
     return (
       <>
-        <Hero kicker="Plan · Stock plans" title="Stock plans" art="plan" big={<b>{missing ? 'Not yet' : 'No answer'}</b>} foot={tabs} />
+        <Hero kicker="Portfolio · Stock plans" title="Stock plans" art="plan" big={<b>{missing ? 'Not yet' : 'No answer'}</b>} foot={tabs} />
         {missing ? (
           <section className="card soon" data-testid="plans-soon">
             <p className="muted">Stock plans switch on with the next desk update.</p>
@@ -52,7 +53,7 @@ export default function StockPlans() {
   return (
     <>
       <Hero
-        kicker="Plan · Stock plans"
+        kicker="Portfolio · Stock plans"
         title="Stock plans"
         art="plan"
         big={

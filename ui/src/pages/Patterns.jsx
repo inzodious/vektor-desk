@@ -5,6 +5,7 @@ import { HBars } from '../components/HBars.jsx';
 import { Heatmap } from '../components/Heatmap.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { LabHero } from '../lab/parts.jsx';
+import { RuleTests } from '../lab/RuleTests.jsx';
 import { useApi } from '../lib/api.js';
 import { dayLabel, divergingColor } from '../lib/charts.js';
 import { baseRateText, fundingItems, patternValue, seasonGrid, setupItems } from '../lib/flight.js';
@@ -100,7 +101,7 @@ function ReplayTease() {
         {head ? <b className={head.tone}>{head.value}</b> : null}
         <span>{head ? `${head.line}, replaying your own trades` : 'Your trades replayed under a size cap, an exit rule, no margin and a longer hold'}</span>
       </span>
-      <Link className="btn sm" to="/lab/patterns/replay">
+      <Link className="btn sm" to="/strategies/habits/replay">
         <Icon name="swap" />
         {head ? 'Open the replay' : 'See the replay'}
       </Link>
@@ -130,7 +131,7 @@ export default function Patterns() {
 
   return (
     <>
-      <LabHero kicker="Patterns" title="Patterns" big={big} board="Patterns" />
+      <LabHero kicker="My habits" title="My habits" big={big} board="My habits" />
       {api.error && !d ? (
         <section className="card" role="alert">
           <div className="card-head">
@@ -145,6 +146,7 @@ export default function Patterns() {
       ) : (
         <>
           <ReplayTease />
+          <RuleTests />
           <section className="card" data-testid="market">
             <div className="card-head">
               <span className="tag">The market today</span>
@@ -221,7 +223,7 @@ export default function Patterns() {
           <section className="card" data-testid="behavior">
             <div className="card-head">
               <span className="tag coral">Your own habits</span>
-              <span className="chip">Your buys against the plan, 90 days</span>
+              <span className="chip">Your buys against the safe mix, 90 days</span>
             </div>
             <div className="mini-kpis">
               <div>
@@ -243,11 +245,11 @@ export default function Patterns() {
             <div className="grid hab">
               <div className="c6">
                 <span className="kicker">By what the stock did the month before</span>
-                <HBars items={setups} fmt={signedUsd} name="Average against the plan" labelW={140} table={false} empty="No scored buys of your own yet." />
+                <HBars items={setups} fmt={signedUsd} name="Average against the safe mix" labelW={140} table={false} empty="No scored buys of your own yet." />
               </div>
               <div className="c6">
                 <span className="kicker">By how you paid</span>
-                <HBars items={funding} fmt={signedUsd} name="Average against the plan" labelW={160} table={false} empty="Nothing to split yet." />
+                <HBars items={funding} fmt={signedUsd} name="Average against the safe mix" labelW={160} table={false} empty="Nothing to split yet." />
               </div>
             </div>
             {b?.note ? <p className="empty-hint">{b.note}</p> : null}

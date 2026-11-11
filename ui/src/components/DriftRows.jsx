@@ -37,7 +37,7 @@ export function DriftRows({ rows, band = 5, onPick, values = {} }) {
             </span>
             <span className="drift-num">
               {fmtPct(r.weight)}
-              <small>{r.target == null ? 'Not in plan' : fmtPts(r.drift)}</small>
+              <small>{r.target == null ? 'No target' : fmtPts(r.drift)}</small>
             </span>
           </button>
         );

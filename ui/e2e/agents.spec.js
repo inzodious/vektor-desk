@@ -23,7 +23,7 @@ test('no brief yet says so instead of guessing', async ({ page }) => {
 
 test('settings shows the crew, usage and run log', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/settings');
+  await page.goto('/settings/crew');
   const crew = page.getByTestId('crew');
   await expect(crew.locator('.crew-tile')).toHaveCount(8);
   await expect(crew.locator('.crew-tile[data-desk="risk"]')).toContainText('Not ready yet');
@@ -42,7 +42,7 @@ test('a desk switch sends the change and reloads', async ({ page }) => {
     sent = { method: route.request().method(), body: route.request().postDataJSON() };
     await route.fulfill({ json: { desk: 'scout', enabled: false } });
   });
-  await page.goto('/settings');
+  await page.goto('/settings/crew');
   await page.getByRole('switch', { name: 'Scout on' }).click();
   await expect.poll(() => sent).toEqual({ method: 'PUT', body: { enabled: false } });
 });
@@ -58,7 +58,7 @@ test('the kill switch pauses every desk', async ({ page }) => {
     off = route.request().url().includes('/%2A/') || route.request().url().includes('/*/');
     await route.fulfill({ json: { desk: '*', enabled: false } });
   });
-  await page.goto('/settings');
+  await page.goto('/settings/crew');
   await page.getByRole('switch', { name: 'All desks on' }).click();
   await expect(page.getByTestId('crew')).toContainText('All desks are paused');
   await expect(page.getByRole('switch', { name: 'All desks on' })).toHaveAttribute('aria-checked', 'false');
@@ -67,20 +67,23 @@ test('the kill switch pauses every desk', async ({ page }) => {
 
 test('a refused switch explains itself', async ({ page }) => {
   await page.route('**/api/agents/tax/enabled', (route) => route.fulfill({ status: 404, json: { detail: 'unknown desk tax' } }));
-  await page.goto('/settings');
+  await page.goto('/settings/crew');
   await page.getByRole('switch', { name: 'Tax desk on' }).click();
   await expect(page.getByTestId('crew').getByRole('alert')).toHaveText('unknown desk tax');
 });
 
-test('plan shows the tax calendar with wash windows and dates, plus a table view', async ({ page }) => {
+test('the Tax tab shows the tax calendar with wash windows and dates, plus a table view', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/plan');
+  await page.goto('/portfolio/tax');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tax');
+  await expect(page.locator('.kpi')).toHaveCount(4);
+  await expect(page.getByTestId('wash-open')).toHaveText('4 wash windows open');
   const cal = page.getByTestId('tax-calendar');
   await expect(cal.locator('[data-wash]')).toHaveCount(4);
   await expect(cal.locator('.tax-diamond')).toHaveCount(3);
   await expect(cal.locator('.tax-list li')).toHaveCount(3);
   await expect(cal).toContainText('Year-end tax window opens');
-  await expect(cal.locator('.mini-kpis')).toContainText('Needs a lot export');
+  await expect(page.locator('.kpi').first()).toContainText('Needs a lot export');
   await cal.getByRole('button', { name: 'Table view' }).click();
   await expect(cal.getByRole('row', { name: /FTEC window clears/ })).toBeVisible();
   const o = await overflow(page);

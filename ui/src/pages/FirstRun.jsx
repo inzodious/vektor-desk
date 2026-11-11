@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Hero } from '../components/Hero.jsx';
+import { Subtabs } from '../components/Subtabs.jsx';
+import { SETTINGS_TABS } from '../lib/areas.js';
 import { Icon } from '../components/Icon.jsx';
 import { postJson, useApi } from '../lib/api.js';
 import { countdown, firstRunScore, firstRunSteps } from '../lib/firstrun.js';
@@ -96,7 +98,7 @@ export default function FirstRun() {
       setRun((m) => ({ ...m, [step.id]: { phase: 'done', text: r?.message || 'Done.' } }));
       profile.reload();
     } catch (e) {
-      const text = e.status === 404 ? 'This button switches on with the next desk update.' : e.status === 409 ? 'You already have one. Open Settings to see it.' : e.message;
+      const text = e.status === 404 ? 'This button switches on with the next desk update.' : e.status === 409 ? 'You already have one. Open Settings → Desk to see it.' : e.message;
       setRun((m) => ({ ...m, [step.id]: { phase: 'refused', text } }));
     }
   };
@@ -117,6 +119,7 @@ export default function FirstRun() {
         }
         foot={
           <>
+            <Subtabs label="Settings views" tabs={SETTINGS_TABS} />
             {score.next ? <span className="chip watch">Next: {score.next.title}</span> : <span className="chip ok">All set</span>}
             {jobs.data && !alive ? <span className="chip watch">Scheduler off</span> : null}
           </>

@@ -1,4 +1,3 @@
-import { useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
 import { px } from '../lib/format.js';
 import { headLine, listWord, reasonText, valuationText, verdictWord } from '../lib/discounts.js';
@@ -6,7 +5,7 @@ import { signedPct } from '../lib/strategy.js';
 
 const SHOW = 4;
 
-function Row({ r }) {
+function Row({ r, onPick }) {
   const list = listWord(r.list);
   const v = verdictWord(r.case);
   const val = valuationText(r.valuation);
@@ -18,7 +17,7 @@ function Row({ r }) {
       </span>
       <span className="disc-main">
         <span className="disc-top">
-          <button type="button" className="sym sym-btn" data-sym={r.symbol}>
+          <button type="button" className="sym sym-btn" data-sym={r.symbol} onClick={onPick ? () => onPick(r.symbol) : undefined}>
             {r.symbol}
           </button>
           {r.name ? <small className="disc-name">{r.name}</small> : null}
@@ -59,18 +58,19 @@ function Row({ r }) {
   );
 }
 
-export function Discounts({ i = 7 }) {
-  const api = useApi('/api/engine/discounts');
+export function Discounts({ i = 7, api, plain = false, onPick }) {
   const d = api.data;
   const rows = d?.rows || [];
   if (api.error?.status === 404) return null;
   const line = headLine(d);
   return (
-    <div className="card c12 disc" style={{ '--i': i }} data-testid="discounts" data-count={rows.length}>
-      <div className="card-head">
-        <span className="tag coral">Discount days</span>
-        <span className="acts">{d?.as_of ? <span className="chip">{`Scan ${dayLabel(d.as_of)}${d.scanned ? ` · ${d.scanned} names` : ''}`}</span> : null}</span>
-      </div>
+    <div className={plain ? 'disc' : 'card c12 disc'} style={plain ? undefined : { '--i': i }} data-testid="discounts" data-count={rows.length}>
+      {plain ? null : (
+        <div className="card-head">
+          <span className="tag coral">Discount days</span>
+          <span className="acts">{d?.as_of ? <span className="chip">{`Scan ${dayLabel(d.as_of)}${d.scanned ? ` · ${d.scanned} names` : ''}`}</span> : null}</span>
+        </div>
+      )}
       {api.loading && !d ? (
         <p className="empty-hint">Checking the after-close scan…</p>
       ) : api.error && !d ? (
@@ -82,7 +82,7 @@ export function Discounts({ i = 7 }) {
           </p>
           <ul className="disc-rows">
             {rows.slice(0, SHOW).map((r) => (
-              <Row key={r.signal_id} r={r} />
+              <Row key={r.signal_id} r={r} onPick={onPick} />
             ))}
           </ul>
           {rows.length > SHOW ? (
@@ -90,7 +90,7 @@ export function Discounts({ i = 7 }) {
               <summary>{rows.length - SHOW} more from the last 10 days</summary>
               <ul className="disc-rows">
                 {rows.slice(SHOW).map((r) => (
-                  <Row key={r.signal_id} r={r} />
+                  <Row key={r.signal_id} r={r} onPick={onPick} />
                 ))}
               </ul>
             </details>

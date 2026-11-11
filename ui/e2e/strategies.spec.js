@@ -5,9 +5,9 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(MONDAY_MIDDAY);
 });
 
-test('the lab list shows stages, strategies with paper progress and rule tests', async ({ page }) => {
+test('the race lists stages and strategies with paper progress, and rule tests sit under My habits', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/lab/strategies');
+  await page.goto('/strategies');
   await expect(page.locator('.ph-big')).toContainText('on paper');
   await expect(page.getByTestId('stages').locator('[data-stage="paper"]')).toContainText('1');
   await expect(page.getByTestId('stages').locator('.stage.lit')).toHaveCount(2);
@@ -16,6 +16,10 @@ test('the lab list shows stages, strategies with paper progress and rule tests',
   await expect(list.locator('[data-strategy]').first()).toHaveAttribute('data-strategy', 'sector-momentum');
   await expect(list.locator('[data-strategy="sector-momentum"]')).toContainText('Day 129 of 182');
   await expect(list.locator('[data-strategy="sector-momentum"]')).toContainText('keep leading');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Race');
+  await expect(page.getByRole('navigation', { name: 'Strategies views' }).getByRole('link')).toHaveText(['Race', 'Mixes', 'My habits']);
+  await expect(page.getByTestId('rules')).toHaveCount(0);
+  await page.goto('/strategies/habits');
   await expect(page.getByTestId('rules').locator('[data-rule]')).toHaveCount(3);
   await expect(page.getByTestId('rules').locator('[data-rule="dip-margin"]')).toContainText('Hurts');
   expect(errors).toEqual([]);
@@ -23,17 +27,18 @@ test('the lab list shows stages, strategies with paper progress and rule tests',
 
 test('an empty lab says how to start', async ({ page }) => {
   await page.route('**/api/lab/strategies', (r) => r.fulfill({ json: { strategies: [], rules: [], features: [], grammar: {} } }));
-  await page.goto('/lab/strategies');
+  await page.goto('/strategies');
   await expect(page.getByTestId('strategies')).toContainText('Nothing in the lab yet');
-  await expect(page.getByTestId('rules')).toContainText('No rule tests yet');
   await expect(page.getByTestId('stages').locator('.stage.lit')).toHaveCount(0);
+  await page.goto('/strategies/habits');
+  await expect(page.getByTestId('rules')).toContainText('No rule tests yet');
 });
 
 test('a paper strategy shows its idea, verdict lamps, paper money and tear sheet', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/lab/strategies');
+  await page.goto('/strategies');
   await page.getByTestId('strategies').locator('[data-strategy="sector-momentum"]').click();
-  await expect(page).toHaveURL(/\/lab\/strategies\/sector-momentum$/);
+  await expect(page).toHaveURL(/\/strategies\/sector-momentum$/);
   await expect(page.getByRole('heading', { level: 1, name: 'Sector momentum' })).toBeVisible();
   await expect(page.getByTestId('spec')).toContainText('return over 126 days ranked high to low');
   await expect(page.getByTestId('verdict')).toContainText('Passed');
@@ -53,13 +58,13 @@ test('a paper strategy shows its idea, verdict lamps, paper money and tear sheet
 });
 
 test('a strategy still in the lab keeps its holdout sealed', async ({ page }) => {
-  await page.goto('/lab/strategies/low-vol-sectors');
+  await page.goto('/strategies/low-vol-sectors');
   await expect(page.getByTestId('verdict')).toContainText('stay sealed');
   await expect(page.getByTestId('paper')).toContainText('Not on paper');
 });
 
 test('a rule test compares every setting with never selling', async ({ page }) => {
-  await page.goto('/lab/strategies/dip-margin');
+  await page.goto('/strategies/dip-margin');
   await expect(page.getByRole('heading', { level: 1, name: 'Margin in a dip' })).toBeVisible();
   await expect(page.locator('.ph-big')).toContainText('Hurts');
   await expect(page.getByTestId('setup')).toContainText('$1,000 a month');
@@ -69,15 +74,15 @@ test('a rule test compares every setting with never selling', async ({ page }) =
 });
 
 test('a spec the lab sent back lists the reasons', async ({ page }) => {
-  await page.goto('/lab/strategies/pick-one');
+  await page.goto('/strategies/pick-one');
   await expect(page.locator('.ph-big')).toContainText('Sent back');
   await expect(page.getByTestId('rejected')).toContainText('hand-picked');
 });
 
 test('an unknown id says so and links back', async ({ page }) => {
   await page.route('**/api/lab/strategies/nobody', (r) => r.fulfill({ status: 404, json: { detail: 'No lab results for this id.' } }));
-  await page.goto('/lab/strategies/nobody');
+  await page.goto('/strategies/nobody');
   await expect(page.getByRole('alert')).toContainText('No lab results for this id.');
-  await page.getByRole('link', { name: 'All strategies' }).click();
-  await expect(page).toHaveURL(/\/lab\/strategies$/);
+  await page.getByRole('link', { name: 'The race' }).click();
+  await expect(page).toHaveURL(/\/strategies$/);
 });

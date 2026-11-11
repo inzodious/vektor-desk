@@ -2,8 +2,8 @@ import { kindName, originName } from './decisions.js';
 
 // ---------- words ----------
 export const CHIP = {
-  keep: { t: 'Keep it on', tone: 'ok', line: 'Ahead of the plan over its scored record' },
-  behind: { t: 'Behind the plan', tone: 'watch', line: 'Following the plan would have done better' },
+  keep: { t: 'Keep it on', tone: 'ok', line: 'Ahead of the safe mix over its scored record' },
+  behind: { t: 'Behind the safe mix', tone: 'watch', line: 'The safe mix alone would have done better' },
   too_early: { t: 'Too early', tone: '', line: 'Needs six months and ten scored calls' },
 };
 

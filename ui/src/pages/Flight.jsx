@@ -43,7 +43,7 @@ function DeskCard({ d, i }) {
         </span>
       </div>
       <b className={`desk-rec ${d.scored_90 ? tone(d.record_usd) : ''}`}>{d.scored_90 ? signed(d.record_usd) : '—'}</b>
-      <small className="muted">{d.scored_90 ? `against the plan over ${d.scored_90} scored ${d.scored_90 === 1 ? 'call' : 'calls'}, 90 days each` : 'No calls old enough to score yet'}</small>
+      <small className="muted">{d.scored_90 ? `against the safe mix over ${d.scored_90} scored ${d.scored_90 === 1 ? 'call' : 'calls'}, 90 days each` : 'No calls old enough to score yet'}</small>
       <Interval s={s} />
       <dl className="desk-facts">
         <div>
@@ -127,7 +127,7 @@ function Calibration({ desks }) {
         </table>
       </div>
       <p className="empty-hint" style={{ marginTop: 6 }}>
-        Dots on the dashed line mean a desk&apos;s confidence matches how often it beat the plan. Lower Brier is better; 0.25 is a coin flip.
+        Dots on the dashed line mean a desk&apos;s confidence matches how often it beat the safe mix. Lower Brier is better; 0.25 is a coin flip.
       </p>
     </>
   );
@@ -143,7 +143,7 @@ function Groups({ groups }) {
         <Combo label="Group" options={GROUP_BY} value={by} onChange={setBy} />
         <Combo label="Window" options={SCORE_WINDOWS} value={win} onChange={setWin} />
       </div>
-      <HBars items={items} fmt={signed} name="Against the plan" labelW={120} empty="Nothing scored at this window yet." />
+      <HBars items={items} fmt={signed} name="Against the safe mix" labelW={120} empty="Nothing scored at this window yet." />
     </>
   );
 }
@@ -221,7 +221,7 @@ export default function Flight() {
       <>
         <b className={tone(total)}>{signed(total)}</b>
         <span className="muted">
-          against the plan, {n} desk calls scored at 90 days
+          against the safe mix, {n} desk calls scored at 90 days
         </span>
       </>
     );
@@ -254,7 +254,7 @@ export default function Flight() {
         </section>
       ) : (
         <section className="card">
-          <p className="empty-hint">{api.loading ? 'Opening the record…' : 'No desk has a decided call yet. Every approve, dismiss and pass gets scored against the plan after 30, 90 and 365 days.'}</p>
+          <p className="empty-hint">{api.loading ? 'Opening the record…' : 'No desk has a decided call yet. Every approve, dismiss and pass gets scored against the safe mix after 30, 90 and 365 days.'}</p>
         </section>
       )}
       <section className="grid">
@@ -280,9 +280,9 @@ export default function Flight() {
                 <span className="tile-line">{d?.saves?.n ? `${d.saves.n} times saying no or holding off beat buying` : 'None scored yet'}</span>
               </div>
               <div>
-                <small>Off-plan gap</small>
+                <small>Off-mix gap</small>
                 <b className={tone(gap?.total_usd)}>{gap?.n ? signed(gap.total_usd) : '—'}</b>
-                <span className="tile-line">{gap?.n ? `${gap.n} calls outside the plan mix` : 'No off-plan calls scored'}</span>
+                <span className="tile-line">{gap?.n ? `${gap.n} calls outside the safe mix` : 'No off-mix calls scored'}</span>
               </div>
               <div>
                 <small>Decided calls</small>
@@ -296,7 +296,7 @@ export default function Flight() {
       <section className="card" data-testid="scored">
         <div className="card-head">
           <span className="tag">Every decided call</span>
-          <span className="chip">Same dollars into the plan mix instead</span>
+          <span className="chip">Same dollars into the safe mix instead</span>
         </div>
         {rows.length ? <Ledger rows={rows} /> : <p className="empty-hint">Calls score after the next close and fill in at 30, 90 and 365 days.</p>}
       </section>

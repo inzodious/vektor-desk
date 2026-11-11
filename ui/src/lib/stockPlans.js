@@ -1,10 +1,6 @@
 import { dayLabel, parseDay } from './charts.js';
 import { px, usd } from './format.js';
 
-export const PLAN_TABS = [
-  { to: '/plan', label: 'Overview', end: true },
-  { to: '/plan/stocks', label: 'Stock plans' },
-];
 export const ROLE = {
   core: { t: 'Core', tone: 'ok', hint: 'The base of the portfolio' },
   conviction: { t: 'Conviction', tone: 'lilac', hint: 'A stock you mean to keep long' },

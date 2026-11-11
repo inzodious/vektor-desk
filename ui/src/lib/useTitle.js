@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { AREAS } from './areas.js';
+import { AREAS, SETTINGS, movedPath } from './areas.js';
 
 export function titleFor(pathname) {
-  const area = AREAS.filter((a) => a.path !== '/').find((a) => pathname === a.path || pathname.startsWith(`${a.path}/`));
+  const at = movedPath(pathname) || pathname;
+  const area = [...AREAS, SETTINGS].filter((a) => a.path !== '/').find((a) => at === a.path || at.startsWith(`${a.path}/`));
   if (area) return `${area.title} · Vektor Desk`;
-  if (pathname === '/results' || pathname.startsWith('/results/')) return 'Results · Vektor Desk';
-  return pathname === '/' ? 'Bridge · Vektor Desk' : 'Vektor Desk';
+  return at === '/' ? 'Bridge · Vektor Desk' : 'Vektor Desk';
 }
 
 export function useTitle() {

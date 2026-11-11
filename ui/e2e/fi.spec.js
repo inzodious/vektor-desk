@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 // ---------- FI path ----------
 test('the FI path shows the odds, the date range and the fan', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/plan');
+  await page.goto('/portfolio');
   const card = page.getByTestId('fi-path');
   await expect(card).toHaveAttribute('data-state', 'ok');
   await expect(card.locator('[data-fi="number"]')).toContainText('$700,000');
@@ -31,14 +31,14 @@ test('the FI path shows the odds, the date range and the fan', async ({ page }) 
 });
 
 test('without a goal the FI path says where to set one', async ({ page }) => {
-  await page.goto('/plan?scenario=empty');
+  await page.goto('/portfolio?scenario=empty');
   const card = page.getByTestId('fi-path');
   await expect(card).toHaveAttribute('data-state', 'no_goal');
   await expect(card).toContainText('Set yearly spend and a target age in Escape Vektor');
 });
 
 test('without market history the goal still shows', async ({ page }) => {
-  await page.goto('/plan?scenario=history');
+  await page.goto('/portfolio?scenario=history');
   const card = page.getByTestId('fi-path');
   await expect(card).toHaveAttribute('data-state', 'no_history');
   await expect(card.locator('[data-fi="number"]')).toContainText('$700,000');
@@ -49,7 +49,7 @@ test('without market history the goal still shows', async ({ page }) => {
 // ---------- factors ----------
 test('factor exposure shows the portfolio lean and each holding', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/lab/risk');
+  await page.goto('/portfolio/risk');
   const card = page.getByTestId('factors');
   await expect(card.getByTestId('lean')).toContainText('Mostly the market');
   await expect(card.getByTestId('lean')).toContainText('covers 99% of value');
@@ -64,6 +64,6 @@ test('factor exposure shows the portfolio lean and each holding', async ({ page 
 });
 
 test('factor exposure waits for the factor library', async ({ page }) => {
-  await page.goto('/lab/risk?scenario=empty');
+  await page.goto('/portfolio/risk?scenario=empty');
   await expect(page.getByTestId('factors')).toContainText('No French factors yet.');
 });

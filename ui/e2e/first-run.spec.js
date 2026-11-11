@@ -17,7 +17,7 @@ test('the first-run checklist ticks off what is done and points at the next step
   await expect(fr.locator('[data-step="lots"]')).toHaveAttribute('data-state', 'todo');
   await expect(fr.locator('[data-step="risk"]')).toHaveAttribute('data-state', 'done');
   await expect(fr.locator('[data-step="risk"]').getByRole('link', { name: /Band 4/ })).toHaveAttribute('href', '/settings/risk');
-  await expect(fr.locator('[data-step="crew"]').getByRole('link', { name: /Open Desks/ })).toHaveAttribute('href', '/settings');
+  await expect(fr.locator('[data-step="crew"]').getByRole('link', { name: /Open Crew/ })).toHaveAttribute('href', '/settings/crew');
   await expect(fr.locator('code')).toHaveCount(0);
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);

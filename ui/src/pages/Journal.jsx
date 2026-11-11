@@ -1,16 +1,19 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
 import { Subtabs } from '../components/Subtabs.jsx';
 import { accountLabel } from '../live/context.js';
 import { postJson, useApi } from '../lib/api.js';
-import { DECISION_TABS, STATUS, kindName, latestScore, originName, reasonOf, scoreOf, scoresOn } from '../lib/decisions.js';
+import { DECISION_TABS, STATUS, journalPage, kindName, latestScore, originName, reasonOf, scoreOf, scoresOn } from '../lib/decisions.js';
 import { parseDay } from '../lib/charts.js';
 import { plural, usd } from '../lib/format.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SHOW_UNMATCHED = 5;
+const LIMIT = 500;
+const FILTERS = ['origin', 'status', 'kind', 'symbol'];
 
 function stampOf(day) {
   const d = parseDay(day);
@@ -23,8 +26,8 @@ function statusWord(d) {
 }
 
 // ---------- ledger ----------
-function Ledger({ days }) {
-  if (!days.length) return <p className="empty-hint">Nothing logged yet. Every approve, dismiss and pass lands here.</p>;
+function Ledger({ days, filtered }) {
+  if (!days.length) return <p className="empty-hint">{filtered ? 'Nothing matches those filters.' : 'Nothing logged yet. Every approve, dismiss and pass lands here.'}</p>;
   return days.map((g) => (
     <div className="ledger-day" key={g.day}>
       <span className="stamp-day">{stampOf(g.day)}</span>
@@ -51,7 +54,7 @@ function Ledger({ days }) {
               <span className="v">
                 {amount != null ? usd(amount) : '—'}
                 <small className={last == null ? '' : last.v >= 0 ? 'up' : 'dn'} data-score={last?.w}>
-                  {last == null ? (amount != null ? `Scores ${scoresOn(d)}` : '') : `${usd(last.v, { sign: true })} vs plan, ${last.t}`}
+                  {last == null ? (amount != null ? `Scores ${scoresOn(d)}` : '') : `${usd(last.v, { sign: true })} vs the safe mix, ${last.t}`}
                 </small>
               </span>
             </div>
@@ -155,22 +158,46 @@ function Unmatched({ trades, onLogged }) {
 
 // ---------- page ----------
 export default function Journal() {
-  const journal = useApi('/api/decisions/journal?limit=200');
+  const journal = useApi(`/api/decisions/journal?limit=${LIMIT}`);
+  const [params, setParams] = useSearchParams();
   const summary = useApi('/api/decisions/summary');
   const unmatched = useApi('/api/decisions/unmatched');
-  const [origin, setOrigin] = useState('all');
-  const [status, setStatus] = useState('all');
+  const origin = params.get('origin') || 'all';
+  const status = params.get('status') || 'all';
+  const kind = params.get('kind') || 'all';
+  const sym = params.get('symbol') || 'all';
+  const filtered = FILTERS.some((k) => params.get(k));
+  const set = (next) =>
+    setParams(
+      (p) => {
+        const n = new URLSearchParams(p);
+        Object.entries(next).forEach(([k, v]) => (v == null || v === 'all' || v === 1 ? n.delete(k) : n.set(k, String(v))));
+        if (!('page' in next)) n.delete('page');
+        return n;
+      },
+      { replace: true },
+    );
   const days = useMemo(() => journal.data?.days || [], [journal.data]);
   const items = useMemo(() => days.flatMap((g) => g.items), [days]);
   const origins = useMemo(() => [{ v: 'all', t: 'Everyone' }, ...[...new Set(items.map((d) => d.origin))].map((o) => ({ v: o, t: originName(o) }))], [items]);
   const statuses = useMemo(() => [{ v: 'all', t: 'Any status' }, ...[...new Set(items.map((d) => statusWord(d).t))].map((t) => ({ v: t, t }))], [items]);
+  const kinds = useMemo(() => [{ v: 'all', t: 'Any kind' }, ...[...new Set(items.map((d) => d.kind).filter(Boolean))].map((k) => ({ v: k, t: kindName(k) }))], [items]);
+  const symbols = useMemo(() => [{ v: 'all', t: 'Any symbol' }, ...[...new Set(items.map((d) => d.symbol).filter(Boolean))].sort().map((x) => ({ v: x, t: x }))], [items]);
   const shown = useMemo(
     () =>
       days
-        .map((g) => ({ ...g, items: g.items.filter((d) => (origin === 'all' || d.origin === origin) && (status === 'all' || statusWord(d).t === status)) }))
+        .map((g) => ({
+          ...g,
+          items: g.items.filter((d) => (origin === 'all' || d.origin === origin) && (status === 'all' || statusWord(d).t === status) && (kind === 'all' || d.kind === kind) && (sym === 'all' || d.symbol === sym)),
+        }))
         .filter((g) => g.items.length),
-    [days, origin, status],
+    [days, origin, status, kind, sym],
   );
+  const pg = journalPage(shown, params.get('page'));
+  const turn = (to) => {
+    set({ page: to });
+    document.querySelector('[data-testid="journal"]')?.scrollIntoView({ block: 'start' });
+  };
   const s = summary.data;
   const scored = (o) => items.filter((d) => !!d.override === o && scoreOf(d) != null).map((d) => scoreOf(d));
   const avg = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -221,15 +248,43 @@ export default function Journal() {
         foot={tabs}
       />
       <section className="grid">
-        <div className="card c8 top" style={{ '--i': 1 }}>
+        <div className="card c8 top" style={{ '--i': 1 }} data-testid="journal" data-page={pg.page} data-pages={pg.pages} data-total={pg.total}>
           <div className="card-head">
             <span className="tag coral">Decision journal</span>
             <span className="acts">
-              <Combo label="Origin" options={origins} value={origin} onChange={setOrigin} />
-              <Combo label="Status" options={statuses} value={status} onChange={setStatus} />
+              <span className="chip" data-testid="journal-count">
+                {filtered ? `${pg.total} of ${plural(items.length, 'entry', 'entries')}` : plural(items.length, 'entry', 'entries')}
+              </span>
+              {filtered ? (
+                <button className="link" type="button" onClick={() => set({ origin: null, status: null, kind: null, symbol: null })} data-testid="journal-clear">
+                  Clear filters
+                </button>
+              ) : null}
             </span>
           </div>
-          <Ledger days={shown} />
+          <div className="journal-filters" data-testid="journal-filters">
+            <Combo label="Origin" options={origins} value={origin} onChange={(v) => set({ origin: v })} />
+            <Combo label="Status" options={statuses} value={status} onChange={(v) => set({ status: v })} />
+            <Combo label="Kind" options={kinds} value={kind} onChange={(v) => set({ kind: v })} />
+            <Combo label="Symbol" options={symbols} value={sym} onChange={(v) => set({ symbol: v })} />
+          </div>
+          <Ledger days={pg.days} filtered={filtered} />
+          {pg.pages > 1 ? (
+            <nav className="pager" aria-label="Journal pages" data-testid="journal-pager">
+              <button className="btn sm ghost" type="button" disabled={pg.page <= 1} onClick={() => turn(pg.page - 1)}>
+                <Icon name="right" className="mirror" />
+                Newer
+              </button>
+              <span className="muted" aria-live="polite">
+                {pg.from}–{pg.to} of {pg.total} · page {pg.page} of {pg.pages}
+              </span>
+              <button className="btn sm ghost" type="button" disabled={pg.page >= pg.pages} onClick={() => turn(pg.page + 1)}>
+                Older
+                <Icon name="right" />
+              </button>
+            </nav>
+          ) : null}
+          {journal.data?.count >= LIMIT ? <p className="empty-hint">Showing the latest {LIMIT} entries.</p> : null}
         </div>
         <div className="stack c4">
           <div className="card" data-testid="streak">
@@ -259,19 +314,19 @@ export default function Journal() {
                 <div>
                   <small>Clean</small>
                   <b>{s.clean}</b>
-                  <span className={clAvg == null ? 'muted' : clAvg >= 0 ? 'up' : 'dn'}>{clAvg == null ? 'Not scored yet' : `${usd(clAvg, { sign: true })} avg vs plan`}</span>
+                  <span className={clAvg == null ? 'muted' : clAvg >= 0 ? 'up' : 'dn'}>{clAvg == null ? 'Not scored yet' : `${usd(clAvg, { sign: true })} avg vs the safe mix`}</span>
                 </div>
                 <div>
                   <small>Overrides</small>
                   <b>{s.overrides}</b>
-                  <span className={ovAvg == null ? 'muted' : ovAvg >= 0 ? 'up' : 'dn'}>{ovAvg == null ? 'Not scored yet' : `${usd(ovAvg, { sign: true })} avg vs plan`}</span>
+                  <span className={ovAvg == null ? 'muted' : ovAvg >= 0 ? 'up' : 'dn'}>{ovAvg == null ? 'Not scored yet' : `${usd(ovAvg, { sign: true })} avg vs the safe mix`}</span>
                 </div>
               </div>
             ) : (
               <p className="empty-hint">Counting…</p>
             )}
             <p className="empty-hint" style={{ marginTop: 6 }}>
-              Scores compare each call against the plan 30 days later.
+              Scores compare each call against the safe mix 30 days later.
             </p>
           </div>
           <Unmatched

@@ -5,21 +5,47 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(MONDAY_MIDDAY);
 });
 
-test('bridge shows live value, KPI tiles and the departures board', async ({ page }) => {
+test('bridge shows live value, four KPI tiles, what changed and the steps due', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');
   await expect(page.locator('.ph-big b')).toHaveText('$16,308');
-  await expect(page.locator('.kpi')).toHaveCount(7);
-  await expect(page.getByRole('table', { name: 'Live holdings' }).getByRole('row')).toHaveCount(6);
+  await expect(page.getByTestId('bridge-kpis').locator('.kpi')).toHaveCount(4);
+  await expect(page.locator('.kpi')).toHaveCount(4);
+  await expect(page.locator('main .grid > .card')).toHaveCount(3);
+  await expect(page.getByTestId('today-run')).toBeVisible();
+  await expect(page.getByTestId('brief')).toContainText('What changed');
+  await expect(page.getByTestId('steps-due')).toBeVisible();
   await expect(page.getByTestId('market-clock')).toHaveAttribute('data-feed', 'live');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
 });
 
+test('the Bridge fits one desktop screen and two phone screens', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('steps-due').locator('.sp-step').first()).toBeVisible();
+  await expect(page.getByTestId('today-run').locator('.run-stage')).toHaveCount(5);
+  const { height, wide } = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, wide: window.innerWidth }));
+  expect(height).toBeLessThanOrEqual(wide < 600 ? 844 * 2 : 1000);
+});
+
+test('the holdings drawer shows the departures board and links to Portfolio', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('open-holdings')).toContainText('Holdings · 5');
+  await page.getByTestId('open-holdings').click();
+  const drawer = page.getByRole('dialog', { name: 'Holdings' });
+  await expect(drawer.getByRole('table', { name: 'Live holdings' }).getByRole('row')).toHaveCount(6);
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  await drawer.getByTestId('to-portfolio').click();
+  await expect(page).toHaveURL(/\/portfolio$/);
+  await expect(page.getByTestId('holdings-board').getByRole('table', { name: 'Live holdings' })).toBeVisible();
+});
+
 test('a board row opens the symbol sheet, Escape closes it', async ({ page }) => {
   await page.goto('/');
-  const row = page.locator('.board-row[data-sym="FTEC"]');
+  await page.getByTestId('open-holdings').click();
+  const row = page.getByRole('dialog', { name: 'Holdings' }).locator('.board-row[data-sym="FTEC"]');
   await row.click();
   const sheet = page.getByRole('dialog', { name: 'FTEC symbol sheet' });
   await expect(sheet).toBeVisible();
@@ -42,7 +68,7 @@ test('the sheet opens from the URL and closes on an outside click', async ({ pag
 });
 
 test('board rows open from the keyboard', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/portfolio');
   await page.locator('.board-row[data-sym="ACME"]').focus();
   await page.keyboard.press('Enter');
   await expect(page.getByRole('dialog', { name: 'ACME symbol sheet' })).toBeVisible();
@@ -64,7 +90,7 @@ test('market value drawer lists movers and hands off to the symbol sheet', async
   await expect(page.getByRole('dialog', { name: 'FTEC symbol sheet' })).toBeVisible();
 });
 
-test('vs the plan drills into windows against both shadows', async ({ page }) => {
+test('vs the safe mix drills into windows against both shadows', async ({ page }) => {
   await page.goto('/');
   await page.locator('[data-kpi="bm.excess"]').click();
   const drawer = page.getByRole('dialog', { name: 'Against the shadows' });
@@ -74,41 +100,52 @@ test('vs the plan drills into windows against both shadows', async ({ page }) =>
   await expect(drawer).toBeHidden();
 });
 
-test('largest drift drills into drift bullets and hands off to a fund', async ({ page }) => {
+test('the mix button reads the largest drift and opens drift rows that hand off to a fund', async ({ page }) => {
   await page.goto('/');
-  await expect(page.locator('[data-kpi="plan.drift_max"] .v')).toContainText('1.3');
-  await page.locator('[data-kpi="plan.drift_max"]').click();
-  const drawer = page.getByRole('dialog', { name: 'Drift by fund' });
+  await expect(page.getByTestId('open-mix')).toContainText('1.3 pts');
+  await page.getByTestId('open-mix').click();
+  const drawer = page.getByRole('dialog', { name: 'Mix and instruments' });
   await expect(drawer.locator('.drift-row')).toHaveCount(4);
   await drawer.locator('.drift-row', { hasText: 'VXUS' }).click();
   await expect(page.getByRole('dialog', { name: 'VXUS symbol sheet' })).toBeVisible();
 });
 
-test('instruments show the drift and single stock gauges', async ({ page }) => {
+test('instruments show the drift and single stock gauges in the mix drawer', async ({ page }) => {
   await page.goto('/');
-  const card = page.locator('.card', { hasText: 'Instruments' });
+  await page.getByTestId('open-mix').click();
+  const card = page.getByRole('dialog', { name: 'Mix and instruments' }).getByTestId('instruments');
   await expect(card.locator('.gauge')).toHaveCount(2);
   await expect(card).toContainText('Rebalance at 5');
   await expect(card).toContainText('Cap 10%');
+  await expect(page.getByRole('dialog', { name: 'Mix and instruments' })).toContainText('FI progress 2.3%');
 });
 
 test('FI progress reads the FI number from the engine', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/portfolio');
   await expect(page.locator('[data-kpi="fi.progress"] .v')).toHaveText('2.3%');
   await expect(page.locator('[data-kpi="fi.progress"]')).toContainText('of the FI number');
 });
 
-test('value chart has a table view and period combo', async ({ page }) => {
+test('the shadows drawer has the value chart with a table view and period combo', async ({ page }) => {
   await page.goto('/');
-  const card = page.locator('.card', { hasText: 'Value versus the plan' });
-  await expect(card.getByRole('img', { name: 'Your value against the plan and S&P 500 shadows' })).toBeVisible();
+  await page.locator('[data-kpi="bm.excess"]').click();
+  const card = page.getByRole('dialog', { name: 'Against the shadows' }).getByTestId('shadow-chart');
+  await expect(card.getByRole('img', { name: 'Your value against the safe mix and S&P 500 shadows' })).toBeVisible();
   await expect(card.locator('.legend')).toContainText('S&P 500 shadow');
   await card.getByRole('button', { name: 'Table view' }).click();
-  await expect(card.getByRole('columnheader', { name: 'Plan shadow' })).toBeVisible();
+  await expect(card.getByRole('columnheader', { name: 'Safe mix shadow' })).toBeVisible();
   await card.getByRole('button', { name: 'Chart view' }).click();
   await card.getByRole('button', { name: /^Period/ }).click();
   await page.getByRole('option', { name: '3 months' }).click();
   await expect(card.getByRole('button', { name: /^Period/ })).toContainText('3 months');
+});
+
+test('what changed lists the day’s movers and each opens its sheet', async ({ page }) => {
+  await page.goto('/');
+  const movers = page.getByTestId('movers');
+  await expect(movers.locator('[data-sym]')).toHaveCount(3);
+  await movers.locator('[data-sym]').first().click();
+  await expect(page.getByRole('dialog', { name: /symbol sheet$/ })).toBeVisible();
 });
 
 test('stale quotes show as delayed', async ({ page }) => {
@@ -121,6 +158,7 @@ test('a closed market uses last closes', async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-11-07T16:00:00Z'));
   await page.goto('/?scenario=closed');
   await expect(page.getByTestId('market-clock')).toHaveAttribute('data-state', 'closed');
+  await page.getByTestId('open-holdings').click();
   await page.locator('.board-row[data-sym="FTEC"]').click();
   await expect(page.getByRole('dialog', { name: 'FTEC symbol sheet' }).getByText('Close Nov 6')).toBeVisible();
 });
@@ -136,28 +174,31 @@ test('bridge explains a dead API', async ({ page }) => {
   await expect(page.getByRole('alert')).toContainText("The desk API didn't answer");
 });
 
-test('bridge shows the top three proposals and acts on them', async ({ page }) => {
+test('steps due lists the queue first and approves or opens a proposal', async ({ page }) => {
   let hit = null;
-  await page.route('**/api/decisions/*/dismiss', async (route) => {
+  await page.route('**/api/decisions/*/approve', async (route) => {
     hit = route.request().url();
-    await route.fulfill({ json: { id: 'd_x', title: 'Hold off on new BND until the rate decision', status: 'dismissed' } });
+    await route.fulfill({ json: { id: 'd_x', title: 'Approved', status: 'approved' } });
   });
   await page.goto('/');
-  const q = page.getByTestId('bridge-queue');
-  await expect(q.locator('.prop')).toHaveCount(3);
-  await expect(q).toContainText('1 more in the queue');
-  await expect(q.locator('.prop', { hasText: 'ACME' }).getByRole('link', { name: 'Review' })).toBeVisible();
-  await q.getByRole('button', { name: /^Dismiss Hold off/ }).click();
-  await expect(q.getByRole('status')).toContainText('Dismissed');
-  expect(hit).toMatch(/\/dismiss$/);
-  await q.locator('.prop', { hasText: 'ACME' }).getByRole('link', { name: 'Review' }).click();
+  const q = page.getByTestId('steps-due');
+  await expect(q).toHaveAttribute('data-queue', '4');
+  await expect(q.locator('.sp-step')).toHaveCount(4);
+  await expect(q.locator('[data-due="decision"]').first()).toBeVisible();
+  await expect(q.locator('[data-due="step"]').first()).toBeVisible();
+  await q.locator('[data-due="decision"]', { hasText: 'ACME' }).getByRole('button', { name: 'Review' }).click();
   await expect(page).toHaveURL(/\/decisions\?d=/);
   await expect(page.getByTestId('detail').getByRole('heading', { level: 2 })).toHaveText('Buy $400 ACME');
+  await page.goBack();
+  const first = q.locator('[data-due="decision"]').filter({ has: page.getByRole('button', { name: 'Approve' }) }).first();
+  await first.getByRole('button', { name: 'Approve' }).click();
+  await expect(q.getByRole('status')).toContainText('Approved');
+  expect(hit).toMatch(/\/approve$/);
 });
 
 test('board symbols read the right way round and long codes fit their tiles', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/?scenario=long');
+  await page.goto('/portfolio?scenario=long');
   const board = page.locator('.board');
   await expect(board.locator('.board-row[data-sym="0999999"] .flap')).toHaveAttribute('aria-label', '0999999');
   await expect(board.locator('.board-row[data-sym="LONGSYMBOL"] .flap span')).toHaveCount(7);

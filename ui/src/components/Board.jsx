@@ -14,7 +14,7 @@ export function Flap({ text, size = 5 }) {
   );
 }
 
-export function Board({ rows, names = {}, intraday = {}, label = 'Live holdings', nav = false }) {
+export function Board({ rows, names = {}, intraday = {}, label = 'Live holdings', nav = false, onPick }) {
   return (
     <div className="board" role="table" aria-label={label}>
       <div className="board-row head" role="row">
@@ -35,7 +35,24 @@ export function Board({ rows, names = {}, intraday = {}, label = 'Live holdings'
         const up = (r.day_change ?? 0) >= 0;
         const series = intraday[r.symbol]?.map((p) => p.price);
         return (
-          <div className="board-row" role="row" key={r.symbol} data-sym={r.symbol} tabIndex={0} aria-label={`${r.symbol}, open symbol sheet`}>
+          <div
+            className="board-row"
+            role="row"
+            key={r.symbol}
+            data-sym={r.symbol}
+            tabIndex={0}
+            aria-label={`${r.symbol}, open symbol sheet`}
+            onClick={onPick ? () => onPick(r.symbol) : undefined}
+            onKeyDown={
+              onPick
+                ? (e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    onPick(r.symbol);
+                  }
+                : undefined
+            }
+          >
             <span role="cell">
               <Flap text={r.symbol} />
             </span>

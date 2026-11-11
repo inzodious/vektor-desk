@@ -98,7 +98,7 @@ export default function Compare() {
 
   return (
     <>
-      <LabHero kicker="Compare" title="Compare" big={big} board={`Compare ${ids.map(idLabel).join(', ')} · ${win}`} />
+      <LabHero area="research" kicker="Compare" title="Compare" big={big} board={`Compare ${ids.map(idLabel).join(', ')} · ${win}`} />
       <section className="lab-bar">
         <Slots ids={ids} onRemove={(id) => set({ ids: ids.filter((x) => x !== id) })} onAdd={(id) => set({ ids: [...ids, id] })} />
         <Combo label="Window" options={WINDOWS} value={win} onChange={(w) => set({ w })} />

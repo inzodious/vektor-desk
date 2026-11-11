@@ -199,7 +199,7 @@ function MixCard({ r, i, fi, profile, race, lower, max, year }) {
         {[backtestLine(r.backtest), fee, r.proxy_note].filter(Boolean).join(' · ')}
       </p>
       {race ? (
-        <Link className="mix-race" to="/lab/strategies" data-testid="mix-race">
+        <Link className="mix-race" to="/strategies" data-testid="mix-race">
           <Icon name="flag" />
           On paper: {trackText(race)}
         </Link>

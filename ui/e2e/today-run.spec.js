@@ -37,13 +37,13 @@ test('a stopped scheduler is called out and All jobs opens Settings at the jobs 
   const card = page.getByTestId('today-run');
   await expect(card.getByTestId('run-head')).toHaveText('Scheduler isn’t answering');
   await card.getByTestId('run-jobs').click();
-  await expect(page).toHaveURL(/\/settings#jobs$/);
+  await expect(page).toHaveURL(/\/settings\/box#jobs$/);
   await expect(page.getByTestId('jobs')).toBeInViewport();
 });
 
 test('the strip stays off the Bridge when the jobs API is missing', async ({ page }) => {
   await page.route('**/api/jobs*', (route) => route.fulfill({ status: 404, json: { detail: 'Not Found' } }));
   await page.goto('/');
-  await expect(page.getByTestId('discounts')).toBeVisible();
+  await expect(page.getByTestId('steps-due')).toBeVisible();
   await expect(page.getByTestId('today-run')).toHaveCount(0);
 });

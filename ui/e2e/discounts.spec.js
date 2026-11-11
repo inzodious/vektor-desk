@@ -5,10 +5,12 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(MONDAY_MIDDAY);
 });
 
-test('the bridge shows discount days with the research case', async ({ page }) => {
+test('the bridge opens discount days with the research case', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');
-  const card = page.getByTestId('discounts');
+  await expect(page.getByTestId('open-discounts')).toContainText('Discounts · 5');
+  await page.getByTestId('open-discounts').click();
+  const card = page.getByRole('dialog', { name: 'Discount days' }).getByTestId('discounts');
   await expect(card).toHaveAttribute('data-count', '5');
   await expect(card.getByTestId('disc-lede')).toContainText('5 names on sale · 2 you hold · 1 with a case to buy');
   await expect(card.locator('.disc-rows').first().locator('.disc-row')).toHaveCount(4);
@@ -27,20 +29,24 @@ test('the bridge shows discount days with the research case', async ({ page }) =
 
 test('a discount symbol opens its sheet', async ({ page }) => {
   await page.goto('/');
+  await page.getByTestId('open-discounts').click();
   await page.getByTestId('discounts').locator('[data-disc="MSFT"] [data-sym]').click();
   await expect(page.getByRole('dialog', { name: 'MSFT symbol sheet' })).toBeVisible();
 });
 
 test('a quiet week says what the scan looks for', async ({ page }) => {
   await page.goto('/?scenario=quiet');
+  await expect(page.getByTestId('open-discounts')).toHaveText('Discounts');
+  await page.getByTestId('open-discounts').click();
   const card = page.getByTestId('discounts');
   await expect(card.getByTestId('disc-empty')).toContainText('No discounts in the last 10 days.');
   await expect(card.getByTestId('disc-empty')).toContainText('52-week high');
 });
 
-test('the card stays away until the engine serves the scan', async ({ page }) => {
+test('the button stays away until the engine serves the scan', async ({ page }) => {
   await page.route(/\/api\/engine\/discounts/, (route) => route.fulfill({ status: 404, json: { detail: 'Not Found' } }));
   await page.goto('/');
   await expect(page.getByTestId('brief')).toBeVisible();
-  await expect(page.getByTestId('discounts')).toHaveCount(0);
+  await expect(page.getByTestId('open-holdings')).toBeVisible();
+  await expect(page.getByTestId('open-discounts')).toHaveCount(0);
 });

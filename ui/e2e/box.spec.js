@@ -39,7 +39,7 @@ function fakeBox(page, { fail = [] } = {}) {
 // ---------- settings ----------
 test('box lists each chore with how it last went', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const card = page.getByTestId('box');
   await expect(card).toHaveAttribute('data-alive', 'true');
   await expect(card.locator('.job-list .box-row')).toHaveCount(6);
@@ -59,7 +59,7 @@ test('box lists each chore with how it last went', async ({ page }) => {
 
 test('a box chore goes queued, running, then done', async ({ page }) => {
   const asked = fakeBox(page);
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const row = page.getByTestId('box').locator('[data-box="redeploy"]');
   await row.getByRole('button', { name: 'Redeploy now' }).click();
   await expect(row).toHaveAttribute('data-state', 'queued');
@@ -72,7 +72,7 @@ test('a box chore goes queued, running, then done', async ({ page }) => {
 
 test('a failed box chore points at its output', async ({ page }) => {
   fakeBox(page, { fail: ['check'] });
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const row = page.getByTestId('box').locator('[data-box="check"]');
   await row.getByRole('button', { name: 'Check now' }).click();
   await expect(row).toContainText('Check didn’t finish. The output below says why.', { timeout: 15000 });
@@ -82,31 +82,31 @@ test('a failed box chore points at its output', async ({ page }) => {
 
 test('a box refusal shows the reason on the row', async ({ page }) => {
   await page.route('**/api/box/*/run', (route) => route.fulfill({ status: 429, headers: { 'Retry-After': '120' }, json: { ok: false, error: 'cooldown', message: 'Backup ran recently.', cooldown_until: '2026-11-09T17:10:00Z', retry_after: 120 } }));
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const row = page.getByTestId('box').locator('[data-box="backup"]');
   await row.getByRole('button', { name: 'Back up now now' }).click();
   await expect(row.locator('.job-note')).toHaveText('Ran a moment ago. Try again at 12:10 PM.');
 });
 
 test('the script row offers Update box script only when behind', async ({ page }) => {
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const s = page.getByTestId('box-script');
   await expect(s).toHaveAttribute('data-state', 'behind');
   await expect(s).toContainText('2 commits behind main');
   await expect(s).toContainText('a1b2c3d → f9e8d7c');
   await expect(s.locator('[data-box="update-script"]')).toContainText('the box checkout is still catching up to main');
   await expect(s.getByRole('button', { name: 'Update box script now' })).toBeEnabled();
-  await page.goto('/settings?scenario=current');
+  await page.goto('/settings/box?scenario=current');
   await expect(page.getByTestId('box-script-chip')).toHaveText('Script current');
   await expect(page.getByTestId('box-script')).toHaveCount(0);
-  await page.goto('/settings?scenario=off');
+  await page.goto('/settings/box?scenario=off');
   await expect(page.getByTestId('box-script')).toHaveAttribute('data-state', 'off');
   await expect(page.getByTestId('box-script').getByTestId('box-hand')).toContainText('install -m 700');
   await expect(page.locator('[data-box="update-script"]')).toHaveCount(0);
 });
 
 test('a quiet box shows the one-time step and holds the buttons', async ({ page }) => {
-  await page.goto('/settings?scenario=down');
+  await page.goto('/settings/box?scenario=down');
   const card = page.getByTestId('box');
   await expect(card).toHaveAttribute('data-alive', 'false');
   await expect(card.getByText('Box not checking in')).toBeVisible();
@@ -122,7 +122,7 @@ test('a safe compose change offers Apply compose', async ({ page }) => {
     asked = route.request().url().split('/').slice(-2)[0];
     route.fulfill({ status: 202, json: { ok: true, action: asked, request_id: 'req-c', requested_at: '2026-11-09T16:42:00Z', message: 'Starts within 5 minutes.' } });
   });
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const c = page.getByTestId('box-compose');
   await expect(c).toHaveAttribute('data-state', 'apply');
   await expect(c).toContainText('What changed: cron: environment; api: healthcheck');
@@ -134,7 +134,7 @@ test('a safe compose change offers Apply compose', async ({ page }) => {
 test('a compose change that widens access asks for eyes and copies the file', async ({ page, context }) => {
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.route('**/api/box/compose.yaml', (route) => route.fulfill({ status: 200, contentType: 'text/yaml', body: 'services:\n  cron:\n    image: synthetic\n' }));
-  await page.goto('/settings?scenario=off');
+  await page.goto('/settings/box?scenario=off');
   const c = page.getByTestId('box-compose');
   await expect(c).toHaveAttribute('data-state', 'eyes');
   await expect(c.getByTestId('compose-needs').locator('li')).toHaveCount(2);
@@ -145,7 +145,7 @@ test('a compose change that widens access asks for eyes and copies the file', as
 });
 
 test('no compose banner when the box matches main', async ({ page }) => {
-  await page.goto('/settings?scenario=current');
+  await page.goto('/settings/box?scenario=current');
   await expect(page.getByTestId('box')).toBeVisible();
   await expect(page.getByTestId('box-compose')).toHaveCount(0);
 });

@@ -1,7 +1,18 @@
-import { Panel } from '../components/Panel.jsx';
+import { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Board } from '../components/Board.jsx';
+import { Combo } from '../components/Combo.jsx';
 import { DriftRows } from '../components/DriftRows.jsx';
+import { Gauge } from '../components/Gauge.jsx';
+import { Icon } from '../components/Icon.jsx';
+import { LineChart } from '../components/LineChart.jsx';
+import { Panel } from '../components/Panel.jsx';
+import { Discounts } from '../research/Discounts.jsx';
 import { accountLabel } from '../live/context.js';
+import { useApi } from '../lib/api.js';
+import { PERIODS, dayLabel, periodStart } from '../lib/charts.js';
 import { val } from '../lib/metrics.js';
+import { QUALITY } from '../lib/quality.js';
 import { pct, plural, usd } from '../lib/format.js';
 
 const WINDOWS = [
@@ -75,16 +86,61 @@ export function ValueDrawer({ open, onClose, accounts, total, symbols }) {
   );
 }
 
-export function ExcessDrawer({ open, onClose, m }) {
+// ---------- against the shadows ----------
+function useSeries(scope, scopeId, start) {
+  return useApi(`/api/engine/series?id=value&scope=${scope}&scope_id=${scopeId}${start ? `&start=${start}` : ''}`);
+}
+
+function ShadowChart({ lastDay }) {
+  const [period, setPeriod] = useState('1Y');
+  const start = periodStart(period, lastDay);
+  const mine = useSeries('portfolio', 'all', start);
+  const mix = useSeries('shadow', 'plan_shadow', start);
+  const spx = useSeries('shadow', 'sp500_shadow', start);
+  const chart = useMemo(() => {
+    const rows = (mine.data?.rows || []).filter((r) => !start || r.date >= start);
+    const x = rows.map((r) => r.date);
+    const pick = (data) => {
+      const map = new Map((data?.rows || []).map((r) => [r.date, r.value]));
+      return x.map((d) => map.get(d) ?? null);
+    };
+    return {
+      x,
+      series: [
+        { name: 'You', short: 'You', color: 'var(--s1)', values: rows.map((r) => r.value), width: 2.5 },
+        { name: 'Safe mix shadow', short: 'Safe mix', color: 'var(--s3)', values: pick(mix.data) },
+        { name: 'S&P 500 shadow', short: 'S&P 500', color: 'var(--s5)', values: pick(spx.data), dash: true },
+      ],
+    };
+  }, [mine.data, mix.data, spx.data, start]);
+  const q = [mine.data?.quality, mix.data?.quality].find((x) => x && x !== 'ok');
+  const last = chart.x.length - 1;
+  const gap = last >= 0 && chart.series[1].values[last] != null ? chart.series[0].values[last] - chart.series[1].values[last] : null;
+  return (
+    <div data-testid="shadow-chart">
+      <div className="drawer-bar">
+        <Combo label="Period" options={PERIODS} value={period} onChange={setPeriod} />
+        {q ? <span className="chip lilac">{QUALITY[q] || q}</span> : null}
+      </div>
+      <p className="muted" style={{ fontSize: 12.5, margin: '6px 0 4px' }}>
+        Same deposits on the same days, so the gap is choices, not cash.{gap != null ? ` You are ${usd(Math.abs(gap))} ${gap >= 0 ? 'ahead of' : 'behind'} the safe mix.` : ''}
+      </p>
+      {mine.loading && !mine.data ? <p className="empty-hint">Loading the value history…</p> : <LineChart label="Your value against the safe mix and S&P 500 shadows" height={210} x={chart.x} series={chart.series} fmtY={(v) => usd(v)} />}
+    </div>
+  );
+}
+
+export function ExcessDrawer({ open, onClose, m, lastDay }) {
   return (
     <Panel open={open} onClose={onClose} title="Against the shadows" sub="Your value minus a shadow that got the same deposits on the same days." crumbs={[{ label: 'Bridge', go: onClose }]}>
+      <ShadowChart lastDay={lastDay} />
       <div className="tscroll">
         <table className="t">
           <thead>
             <tr>
               <th scope="col">Window</th>
               <th scope="col" className="r">
-                vs plan
+                vs safe mix
               </th>
               <th scope="col" className="r">
                 vs S&amp;P 500
@@ -113,20 +169,72 @@ export function ExcessDrawer({ open, onClose, m }) {
   );
 }
 
-export function DriftDrawer({ open, onClose, funds, band, values }) {
+// ---------- holdings ----------
+export function HoldingsDrawer({ open, onClose, symbols, names, intraday, nav, accounts }) {
   return (
-    <Panel open={open} onClose={onClose} title="Drift by fund" sub="Actual weight against the plan target. Pick a fund for its symbol sheet." crumbs={[{ label: 'Bridge', go: onClose }]}>
-      <DriftRows rows={funds.filter((f) => f.target != null)} band={band} values={values} onPick={(r) => onClose(r.symbol)} />
+    <Panel open={open} onClose={onClose} kind="sheet" title="Holdings" sub={`${plural(symbols.length, 'holding')} across ${plural(accounts.length, 'account')}. Pick a row for its symbol sheet.`} crumbs={[{ label: 'Bridge', go: onClose }]}>
+      <Board rows={symbols} names={names} intraday={intraday} nav={nav} onPick={(sym) => onClose(sym)} />
+      <Link className="btn sm ghost" style={{ justifySelf: 'start' }} to="/portfolio" data-testid="to-portfolio">
+        Open Portfolio
+        <Icon name="right" />
+      </Link>
     </Panel>
   );
 }
 
-export function SinglesDrawer({ open, onClose, funds, cap }) {
+// ---------- mix and instruments ----------
+export function MixDrawer({ open, onClose, funds, limits, values, m }) {
+  const drift = val(m.get('plan.drift_max'));
+  const single = val(m.get('plan.single_stock'));
+  const debit = val(m.get('margin.debit'));
+  const cost = val(m.get('margin.cost_month'));
+  const fi = val(m.get('fi.progress'));
+  const band = limits.driftPts;
+  const cap = limits.satelliteCap;
+  const inMix = funds.filter((f) => f.target != null);
   const singles = funds.filter((f) => f.single != null);
   return (
-    <Panel open={open} onClose={onClose} title="Single stocks" sub={`Share of the desk in individual stocks. The cap is ${cap}%.`} crumbs={[{ label: 'Bridge', go: onClose }]}>
+    <Panel open={open} onClose={onClose} title="Mix and instruments" sub="Each fund against its target in the safe mix, and the two dials the rules watch." crumbs={[{ label: 'Bridge', go: onClose }]}>
+      <div className="gauges" data-testid="instruments">
+        <Gauge
+          label="Largest drift"
+          unit="PTS"
+          value={drift}
+          min={0}
+          max={band * 2}
+          zones={[
+            { from: 0, to: band * 0.6, color: 'var(--mint)' },
+            { from: band * 0.6, to: band, color: 'var(--mustard)' },
+            { from: band, to: band * 2, color: 'var(--coral)' },
+          ]}
+          reading={drift == null ? '—' : `${drift.toFixed(1)} pts`}
+          note={`Rebalance at ${band}`}
+        />
+        <Gauge
+          label="Single stocks"
+          unit="%"
+          value={single}
+          min={0}
+          max={cap * 2}
+          zones={[
+            { from: 0, to: cap * 0.7, color: 'var(--mint)' },
+            { from: cap * 0.7, to: cap, color: 'var(--mustard)' },
+            { from: cap, to: cap * 2, color: 'var(--coral)' },
+          ]}
+          reading={single == null ? '—' : `${single.toFixed(1)}%`}
+          note={`Cap ${cap}%`}
+        />
+      </div>
+      <p className="muted instrument-line" style={{ marginTop: 0 }}>
+        <Icon name="shield" />
+        {debit ? `Margin ${usd(debit)}, about ${usd(cost || 0)} interest a month.` : 'No margin balance, so no call distance to watch.'}
+        {fi != null ? ` FI progress ${fi.toFixed(1)}%.` : ''}
+      </p>
+      <span className="kicker">Drift by fund</span>
+      {inMix.length ? <DriftRows rows={inMix} band={band} values={values} onPick={(r) => onClose(r.symbol)} /> : <p className="empty-hint">Targets show after the engine&apos;s first daily run.</p>}
+      <span className="kicker">Single stocks</span>
       {singles.length ? (
-        <div className="rows">
+        <div className="rows" data-testid="singles">
           {singles.map((f) => (
             <button type="button" className="row row-btn" key={f.symbol} onClick={() => onClose(f.symbol)}>
               <span className="l">
@@ -142,6 +250,16 @@ export function SinglesDrawer({ open, onClose, funds, cap }) {
       ) : (
         <p className="empty-hint">No single stocks held.</p>
       )}
+    </Panel>
+  );
+}
+
+// ---------- discount days ----------
+export function DiscountsDrawer({ open, onClose, api }) {
+  const d = api.data;
+  return (
+    <Panel open={open} onClose={onClose} title="Discount days" sub={d?.as_of ? `After-close scan ${dayLabel(d.as_of)}${d.scanned ? ` · ${d.scanned} names` : ''}` : 'Names that fell hard, each with a research case.'} crumbs={[{ label: 'Bridge', go: onClose }]}>
+      <Discounts api={api} plain onPick={(sym) => onClose(sym)} />
     </Panel>
   );
 }

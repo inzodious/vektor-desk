@@ -6,7 +6,7 @@ const DOW = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
 export const STAGES = [
   { id: 'mirror', title: 'Accounts', blurb: 'Balances and activity come in', match: (n) => n === 'mirror' },
-  { id: 'engine', title: 'Numbers', blurb: 'Values, drift, risk and plan checks', match: (n) => n === 'engine-daily' },
+  { id: 'engine', title: 'Numbers', blurb: 'Values, drift, risk and rule checks', match: (n) => n === 'engine-daily' },
   { id: 'review', title: 'Review', blurb: 'The day’s results, packed up', match: (n) => /^engine-reviews?$/.test(n) },
   { id: 'desks', title: 'Desks', blurb: 'Agent desks read the day', match: (n) => /^agents-run-(plan_keeper|debrief|plans)$/.test(n) },
   { id: 'paper', title: 'Paper', blurb: 'Paper strategies place their trades', match: (n) => n === 'engine-paper' },

@@ -349,7 +349,7 @@ export function PaperCard({ pack, i }) {
       <div className="card-head">
         <span className="tag sky">Paper race</span>
         <span className="acts">
-          <Link className="link" to="/lab/strategies">
+          <Link className="link" to="/strategies">
             Leaderboard
           </Link>
         </span>
@@ -438,7 +438,7 @@ export function FirstRun({ note }) {
           the Bridge
         </Link>
         , or run it now from{' '}
-        <Link className="link" to="/settings#jobs">
+        <Link className="link" to="/settings/box#jobs">
           Settings → Jobs
         </Link>
         .

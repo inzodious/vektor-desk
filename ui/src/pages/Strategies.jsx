@@ -4,7 +4,7 @@ import { LabHero } from '../lab/parts.jsx';
 import { Leaderboard } from '../lab/Leaderboard.jsx';
 import { useApi } from '../lib/api.js';
 import { plural } from '../lib/format.js';
-import { PAPER_DAYS, dayOf, RULE_WORD, STAGES, paperProgress, paramText, signedPts, splitStrategies, stageCounts, statusOf, verdictOf } from '../lib/strategy.js';
+import { PAPER_DAYS, dayOf, STAGES, paperProgress, signedPts, splitStrategies, stageCounts, statusOf } from '../lib/strategy.js';
 
 // ---------- stage rail ----------
 function StageRail({ counts }) {
@@ -27,7 +27,7 @@ function StrategyRow({ s }) {
   const st = statusOf(s.status);
   const prog = paperProgress(s.paper);
   return (
-    <Link className="row strat-row" to={`/lab/strategies/${encodeURIComponent(s.id)}`} data-strategy={s.id}>
+    <Link className="row strat-row" to={`/strategies/${encodeURIComponent(s.id)}`} data-strategy={s.id}>
       <span className="l">
         <span className="desk-ico sm">
           <Icon name="flag" />
@@ -55,39 +55,18 @@ function StrategyRow({ s }) {
   );
 }
 
-function RuleRow({ r }) {
-  const v = verdictOf(r.verdict);
-  return (
-    <Link className="row strat-row" to={`/lab/strategies/${encodeURIComponent(r.id)}`} data-rule={r.id}>
-      <span className="l">
-        <span className="desk-ico sm">
-          <Icon name="swap" />
-        </span>
-        <span style={{ minWidth: 0 }}>
-          <b>{RULE_WORD[r.rule] || r.rule}</b>
-          <small>
-            {r.id} · best: {paramText(r.best)}
-          </small>
-        </span>
-      </span>
-      <span className={`chip ${v.tone}`}>{v.t}</span>
-    </Link>
-  );
-}
-
 // ---------- page ----------
 export default function Strategies() {
   const api = useApi('/api/lab/strategies');
   const d = api.data;
   const list = splitStrategies(d);
-  const rules = d?.rules || [];
   const counts = stageCounts(list);
 
   const big = d ? (
     <>
       <b>{counts.paper + counts.eligible}</b>
       <span className="muted">
-        {counts.eligible ? `on paper or eligible · ${plural(list.length, 'strategy', 'strategies')}` : `on paper · ${plural(list.length, 'strategy', 'strategies')}, ${plural(rules.length, 'rule test')}`}
+        {counts.eligible ? 'on paper or eligible' : 'on paper'} · {plural(list.length, 'strategy', 'strategies')}
       </span>
     </>
   ) : (
@@ -96,7 +75,7 @@ export default function Strategies() {
 
   return (
     <>
-      <LabHero kicker="Strategies" title="Strategy lab" big={big} />
+      <LabHero kicker="Race" title="Race" big={big} />
       {api.error && !d ? (
         <section className="card" role="alert">
           <div className="card-head">
@@ -106,7 +85,7 @@ export default function Strategies() {
               Retry
             </button>
           </div>
-          <p className="muted">The lab list comes back as soon as it does.</p>
+          <p className="muted">The race comes back as soon as it does.</p>
         </section>
       ) : (
         <>
@@ -129,21 +108,6 @@ export default function Strategies() {
               )}
             </div>
             <div className="stack c4">
-              <div className="card" data-testid="rules">
-                <div className="card-head">
-                  <span className="tag mustard">Rule tests</span>
-                  <span className="chip">Your habits, replayed</span>
-                </div>
-                {rules.length ? (
-                  <div className="rows">
-                    {rules.map((r) => (
-                      <RuleRow r={r} key={`${r.id}-${r.version}`} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="empty-hint">{api.loading ? 'Opening the ledger…' : 'No rule tests yet. Rebalance bands, steering deposits, harvesting and margin can each be replayed on your plan mix.'}</p>
-                )}
-              </div>
               <div className="card">
                 <div className="card-head">
                   <span className="tag mint">How the lab stays honest</span>

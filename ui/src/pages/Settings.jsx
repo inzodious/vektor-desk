@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Navigate, useLocation } from 'react-router-dom';
 import { Hero } from '../components/Hero.jsx';
+import { Subtabs } from '../components/Subtabs.jsx';
 import { Jobs } from '../settings/Jobs.jsx';
 import { Box } from '../settings/Box.jsx';
 import { Inbox } from '../settings/Inbox.jsx';
@@ -15,6 +16,7 @@ import { useTheme } from '../lib/theme.js';
 import { ago, count, etStamp, etTime, plural } from '../lib/format.js';
 import { MIRROR, THEMES, TOKEN, daysLabel, mirrorLine, summary, tokenLine } from '../lib/status.js';
 import { originName } from '../lib/decisions.js';
+import { SETTINGS_TABS, settingsTabFor } from '../lib/areas.js';
 import { defaultsText, keyWord, profileSource } from '../lib/profile.js';
 
 // ---------- cards ----------
@@ -22,7 +24,7 @@ function Freshness({ mirror, onOpen }) {
   const m = MIRROR[mirror.state] || MIRROR.error;
   const tables = mirror.tables ? Object.keys(mirror.tables).length : 0;
   return (
-    <div className="card c6" style={{ '--i': 1 }}>
+    <div className="card c12" style={{ '--i': 1 }} data-testid="freshness">
       <div className="card-head">
         <span className="tag sky">Data freshness</span>
         {tables ? (
@@ -71,7 +73,7 @@ function Token({ token }) {
   const t = TOKEN[token.state] || TOKEN.unknown;
   const pctLeft = token.days_left == null ? 0 : Math.max(0, Math.min(100, (token.days_left / 365) * 100));
   return (
-    <div className="card c6" style={{ '--i': 2 }}>
+    <div className="card c12" id="token" style={{ '--i': 2 }} data-testid="token">
       <div className="card-head">
         <span className="tag mustard">Claude token</span>
         <span className={`chip ${t.tone}`}>{t.chip}</span>
@@ -158,7 +160,7 @@ function MirrorTables({ mirror, open, onClose }) {
   const total = rows.reduce((a, [, n]) => a + n, 0);
   const m = MIRROR[mirror.state] || MIRROR.error;
   return (
-    <Panel open={open} onClose={onClose} title="Mirror tables" sub="Read-only copy of Escape Vektor. The desk never writes back." crumbs={[{ label: 'Settings', go: onClose }, { label: 'Data freshness', go: onClose }]}>
+    <Panel open={open} onClose={onClose} title="Mirror tables" sub="Read-only copy of Escape Vektor. The desk never writes back." crumbs={[{ label: 'Settings', go: onClose }, { label: 'Data', go: onClose }]}>
       <div className="mini-kpis">
         <div>
           <small>State</small>
@@ -307,16 +309,59 @@ function Profile({ api }) {
   );
 }
 
+// ---------- start here ----------
+function StartHere() {
+  const risk = useApi('/api/decisions/risk');
+  const c = risk.data?.current;
+  return (
+    <div className="card c6" style={{ '--i': 3 }} data-testid="start-here">
+      <div className="card-head">
+        <span className="tag coral">Start here</span>
+      </div>
+      <Link className="rule rule-btn" to="/settings/risk" data-testid="risk-link">
+        <span style={{ color: 'var(--teal-ink)' }}>
+          <Icon name="gauge" />
+        </span>
+        <span>
+          <b>Risk check</b>
+          <small>{c ? `Band ${c.band} · ${c.label}` : 'Eight questions set the band every strategy is measured against'}</small>
+        </span>
+        <span className={`chip ${c ? 'ok' : 'watch'}`}>{c ? 'Taken' : 'Not taken'}</span>
+      </Link>
+      <Link className="rule rule-btn" to="/settings/first-run" data-testid="first-run-link">
+        <span style={{ color: 'var(--teal-ink)' }}>
+          <Icon name="send" />
+        </span>
+        <span>
+          <b>First run</b>
+          <small>Box setup step by step, all from buttons</small>
+        </span>
+        <span className="chip info">Checklist</span>
+      </Link>
+    </div>
+  );
+}
+
 // ---------- page ----------
-export default function Settings() {
+const TAB_WORD = { desk: 'Desk', crew: 'Crew', data: 'Data', box: 'Box' };
+
+export function SettingsTabs() {
+  return <Subtabs label="Settings views" tabs={SETTINGS_TABS} />;
+}
+
+export default function Settings({ tab = 'desk' }) {
+  const { hash } = useLocation();
   const status = useApi('/api/status', { every: 30000 });
-  const health = useApi('/api/health');
-  const agents = useApi('/api/agents/status', { every: 60000 });
-  const runs = useApi('/api/agents/runs?limit=8', { every: 120000 });
-  const profile = useApi('/api/decisions/profile/status');
+  const health = useApi(tab === 'desk' ? '/api/health' : null);
+  const agents = useApi(tab === 'crew' ? '/api/agents/status' : null, { every: 60000 });
+  const runs = useApi(tab === 'crew' ? '/api/agents/runs?limit=8' : null, { every: 120000 });
+  const profile = useApi(tab === 'desk' ? '/api/decisions/profile/status' : null);
   const [drawer, setDrawer] = useState(false);
   const [checkedAt, setCheckedAt] = useState(() => new Date());
   const s = status.data;
+  const tabs = <SettingsTabs />;
+  const kicker = `Settings · ${TAB_WORD[tab]}`;
+  const moved = tab === 'desk' ? settingsTabFor(hash) : null;
 
   const refresh = () => {
     setCheckedAt(new Date());
@@ -324,10 +369,12 @@ export default function Settings() {
     health.reload();
   };
 
+  if (moved) return <Navigate to={`${moved}${hash}`} replace />;
+
   if (!s && status.loading) {
     return (
       <>
-        <Hero kicker="Settings" title="Settings" art="settings" big={<b>Checking…</b>} foot={<span className="chip">Asking the desk API</span>} />
+        <Hero kicker={kicker} title="Settings" art="settings" big={<b>Checking…</b>} foot={tabs} />
         <section className="card" aria-busy="true">
           <p className="muted">Checking data freshness and the Claude token…</p>
         </section>
@@ -338,7 +385,7 @@ export default function Settings() {
   if (!s) {
     return (
       <>
-        <Hero kicker="Settings" title="Settings" art="settings" big={<b>No answer</b>} foot={<span className="chip watch">Desk API offline</span>} />
+        <Hero kicker={kicker} title="Settings" art="settings" big={<b>No answer</b>} foot={tabs} />
         <section className="card" role="alert">
           <div className="card-head">
             <span className="tag coral">The desk API didn&apos;t answer</span>
@@ -360,7 +407,7 @@ export default function Settings() {
   return (
     <>
       <Hero
-        kicker={`Settings · desk v${s.version}`}
+        kicker={`${kicker} · desk v${s.version}`}
         title="Settings"
         art="settings"
         big={
@@ -373,38 +420,54 @@ export default function Settings() {
         }
         foot={
           <>
-            <span className={`chip ${mt.tone}`}>Mirror · {mt.chip}</span>
-            <span className={`chip ${tt.tone}`}>Token · {tt.chip}</span>
-            <Link className="chip info" to="/settings/first-run" data-testid="first-run-link">
-              First-run checklist
+            {tabs}
+            <Link className={`chip ${mt.tone}`} to="/settings/data">
+              Mirror · {mt.chip}
             </Link>
-            <Link className="chip info" to="/settings/risk" data-testid="risk-link">
-              Risk check
+            <Link className={`chip ${tt.tone}`} to="/settings/box#token">
+              Token · {tt.chip}
             </Link>
             {s.demo ? <span className="sample">Demo data</span> : null}
             {status.error ? <span className="chip watch">Last check failed · showing {etTime(checkedAt)}</span> : null}
           </>
         }
       />
-      <section className="grid">
-        <Freshness mirror={s.mirror} onOpen={() => setDrawer(true)} />
-        <Token token={s.claude_token} />
-        <About status={s} health={health.data} checkedAt={checkedAt} onRefresh={refresh} refreshing={status.loading} />
-        <Jobs />
-        <Box />
-        <Inbox />
-        <Keys />
-        <Profile api={profile} />
-        <Crew
-          status={agents}
-          reload={() => {
-            agents.reload();
-            runs.reload();
-          }}
-        />
-        <Usage status={agents} runs={runs} />
+      <section className="grid" data-testid="settings-tab" data-tab={tab}>
+        {tab === 'desk' ? (
+          <>
+            <Profile api={profile} />
+            <StartHere />
+            <About status={s} health={health.data} checkedAt={checkedAt} onRefresh={refresh} refreshing={status.loading} />
+          </>
+        ) : null}
+        {tab === 'crew' ? (
+          <>
+            <Crew
+              status={agents}
+              reload={() => {
+                agents.reload();
+                runs.reload();
+              }}
+            />
+            <Usage status={agents} runs={runs} />
+          </>
+        ) : null}
+        {tab === 'data' ? (
+          <>
+            <Freshness mirror={s.mirror} onOpen={() => setDrawer(true)} />
+            <Inbox />
+            <Keys />
+          </>
+        ) : null}
+        {tab === 'box' ? (
+          <>
+            <Jobs />
+            <Box />
+            <Token token={s.claude_token} />
+          </>
+        ) : null}
       </section>
-      <MirrorTables mirror={s.mirror} open={drawer} onClose={() => setDrawer(false)} />
+      {tab === 'data' ? <MirrorTables mirror={s.mirror} open={drawer} onClose={() => setDrawer(false)} /> : null}
     </>
   );
 }
