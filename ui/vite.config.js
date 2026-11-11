@@ -7,7 +7,7 @@ import react from '@vitejs/plugin-react';
 const FIXTURES = fileURLToPath(new URL('./src/fixtures/', import.meta.url));
 const DESK_INIT = fileURLToPath(new URL('../desk/__init__.py', import.meta.url));
 
-const SCENARIO_BASE = { starting: 'never', gaps: 'never' };
+const SCENARIO_BASE = { starting: 'never', gaps: 'never', lowstart: 'low' };
 
 function deskVersion() {
   try {

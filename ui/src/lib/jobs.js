@@ -102,6 +102,7 @@ export function jobState(job) {
   if (!job) return { state: 'unknown', line: '' };
   const last = job.last_run;
   if (job.running) return { state: 'running', line: `Running since ${when(job.running_since) || 'just now'}` };
+  if (job.waiting) return { state: 'waiting', line: `Waiting for its turn${when(job.waiting_since) ? ` since ${when(job.waiting_since)}` : ''}: low-memory mode runs heavy jobs one at a time` };
   if (job.queued) return { state: 'queued', line: 'Starting in a few seconds' };
   if (!last) return { state: 'never', line: 'Hasn’t run since the desk started' };
   const at = when(last.finished || last.started);
@@ -137,6 +138,7 @@ export function refreshPlan(health, jobs = []) {
 export function refusalText(err) {
   const body = err?.body || {};
   if (body.error === 'cooldown') return `Asked for a moment ago. ${body.cooldown_until ? `Try again at ${when(body.cooldown_until)}.` : 'Try again in a few minutes.'}`;
+  if (body.error === 'waiting') return 'It’s already waiting for its turn. Low-memory mode runs heavy jobs one at a time.';
   if (body.error === 'scheduler_down') return 'The scheduler is taking a break, so nothing would pick this up. It’s back once the cron service runs.';
   if (body.error === 'unknown_job') return 'The desk doesn’t know that job any more. Refresh the page.';
   return err?.message || 'The desk didn’t take that. Try again in a moment.';
@@ -166,7 +168,7 @@ export async function runAndWait(name, { signal, poll = POLL_MS, onState } = {})
     if (!job) throw new ApiError(404, 'The desk doesn’t know that job any more.');
     onState?.(job);
     const last = job.last_run;
-    if (id ? last?.request_id === id && last.finished : !job.running && !job.queued) return last;
+    if (id ? last?.request_id === id && last.finished : !job.running && !job.queued && !job.waiting) return last;
   }
   throw new ApiError(0, 'Still going after 45 minutes. Settings › Jobs shows how it ends.');
 }

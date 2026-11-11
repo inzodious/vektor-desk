@@ -1,0 +1,24 @@
+{
+ "state": "ok",
+ "total_mb": 15360,
+ "available_mb": 6144,
+ "swap_mb": 0,
+ "cache_mb": 2048,
+ "scheduler": {
+  "limit_mb": 640,
+  "used_mb": 180
+ },
+ "low_memory": {
+  "on": false,
+  "mode": "auto",
+  "why": null,
+  "since": null,
+  "paused": [],
+  "low_mb": 1500,
+  "roomy_mb": 4000
+ },
+ "waiting": [],
+ "killed": [],
+ "host_seen": true,
+ "note": "The box has 6.0 GB of 15.0 GB free, and no swap. Its ZFS file cache holds 2.0 GB, which it hands back under pressure, but slowly."
+}

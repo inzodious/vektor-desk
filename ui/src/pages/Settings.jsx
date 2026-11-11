@@ -4,6 +4,7 @@ import { Hero } from '../components/Hero.jsx';
 import { Subtabs } from '../components/Subtabs.jsx';
 import { Jobs } from '../settings/Jobs.jsx';
 import { Box } from '../settings/Box.jsx';
+import { Memory } from '../settings/Memory.jsx';
 import { Inbox } from '../settings/Inbox.jsx';
 import { Keys } from '../settings/Keys.jsx';
 import { ProfileEditor } from '../settings/ProfileEditor.jsx';
@@ -461,6 +462,7 @@ export default function Settings({ tab = 'desk' }) {
         ) : null}
         {tab === 'box' ? (
           <>
+            <Memory />
             <Jobs />
             <Box />
             <Token token={s.claude_token} />

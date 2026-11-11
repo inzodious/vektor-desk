@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { HealthBanner } from './HealthBanner.jsx';
+import { MemoryStrip } from './MemoryStrip.jsx';
 import { Icon } from './Icon.jsx';
 import { AREAS, SETTINGS } from '../lib/areas.js';
 import { clockState } from '../lib/clock.js';
@@ -92,6 +93,7 @@ function NavLinks({ badges }) {
 
 export function Shell({ badges }) {
   const { view, epoch } = useStart();
+  const { pathname } = useLocation();
   const starting = view.mode === 'never' || view.mode === 'running';
   return (
     <>
@@ -119,6 +121,7 @@ export function Shell({ badges }) {
       </header>
       <main className="content" id="main" tabIndex={-1}>
         <StartBanner />
+        {pathname === '/' ? <MemoryStrip /> : null}
         {starting ? null : <HealthBanner />}
         <Fragment key={epoch}>
           <Outlet />
