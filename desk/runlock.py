@@ -68,7 +68,8 @@ def hold(name: str, command: list[str]) -> int:
 
     try:
         with job_lock(name):
-            return subprocess.call(command)  # noqa: S603
+            rc = subprocess.call(command)  # noqa: S603
+            return rc if rc >= 0 else 128 - rc
     except Busy as e:
         print(f"skipped: {e}", file=sys.stderr)
         return BUSY

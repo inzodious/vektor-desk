@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Vektor Desk on TrueNAS SCALE (docs/architecture.md, docs/setup.md). Run as root:
-#   deploy.sh now      pull main, build what changed, back up with the new build, restart the app; back to the previous images if it isn't
-#                      healthy. Waits for nothing: refuses while a desk job (mirror, engine, agent, lab) is running.
+#   deploy.sh now      pull main, build what changed one stage at a time (the box is short on memory), back up with the new build,
+#                      restart the app; back to the previous images if it isn't healthy. Waits for nothing: refuses while a desk
+#                      job (mirror, engine, agent, lab) is running.
 #   deploy.sh auto     what the auto-deploy cron job runs every 5 minutes: deploys when main has moved, quietly does nothing
 #                      otherwise, waits out a running job, and doesn't retry a commit that failed until the box script changes
 #   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
@@ -56,6 +57,8 @@ AUTO_NOTE=$ROOT/deploy-auto.note
 BACKUP_WHY=$ROOT/backup.why
 BUSY=75
 IMAGES=("vektor-desk:local=." "vektor-desk/caddy:local=deploy/caddy")
+MEMINFO=${DESK_MEMINFO:-/proc/meminfo}
+VMSTAT=${DESK_VMSTAT:-/proc/vmstat}
 
 # ---- Helpers ----
 
@@ -84,6 +87,20 @@ image_container() {
 running_image() { docker inspect -f '{{ .Image }}' "$1" 2>/dev/null || true; }
 backup_why() { head -c 200 "$BACKUP_WHY" 2>/dev/null | tr -d '\n' || true; }
 health() { docker inspect -f '{{ if .State.Health }}{{ .State.Health.Status }}{{ else }}{{ .State.Status }}{{ end }}' "$1" 2>/dev/null || echo missing; }
+
+stages() { sed -n 's/^FROM .* [Aa][Ss] \([A-Za-z0-9_.-]*\)[[:space:]]*$/\1/p' "$1/Dockerfile" 2>/dev/null | sed '$d' || true; }
+oom_kills() { awk '$1 == "oom_kill" { print $2 }' "$VMSTAT" 2>/dev/null || true; }
+free_mb() { awk '$1 == "MemAvailable:" { print int($2 / 1024) }' "$MEMINFO" 2>/dev/null || true; }
+
+build_failed() {
+  local image=$1 before=$2 after
+  after=$(oom_kills)
+  if [ -n "$before" ] && [ -n "$after" ] && [ "$after" -gt "$before" ]; then
+    STOPPED_ON=memory
+    die "the box ran out of memory building $image ($(free_mb) MB free now), so nothing was changed. Settings → Box shows what was stopped"
+  fi
+  die "$image didn't build; the live app wasn't touched. See $BUILD_LOG"
+}
 
 run_job() {
   local id state deadline=$((SECONDS + 300))
@@ -214,7 +231,7 @@ update_checkout() {
 }
 
 deploy() {
-  local state why before target pair image dir id live=1 built=() previous=() files code=vektor-desk:local
+  local state why before target pair image dir id stage kills live=1 built=() previous=() files code=vektor-desk:local
   state=$(app_state)
   if [ "$state" = RUNNING ] && why=$(busy); then
     die "a desk job is running: $why. Nothing was changed" "$BUSY"
@@ -230,10 +247,16 @@ deploy() {
     [ "$(image_build "$image")" = "$target" ] && continue
     built+=("$image")
     [ "$(image_build "${image%:*}:candidate")" = "$target" ] && continue
-    log "Building $image ${target:0:7}: $(repo log -1 --format=%s) (output in $BUILD_LOG)"
-    echo "==== $(date '+%F %T') build $image ${target:0:7}" >>"$BUILD_LOG"
+    log "Building $image ${target:0:7}, one stage at a time: $(repo log -1 --format=%s) (output in $BUILD_LOG)"
+    echo "==== $(date '+%F %T') build $image ${target:0:7} ($(free_mb) MB free)" >>"$BUILD_LOG"
+    kills=$(oom_kills)
+    for stage in $(stages "$SRC/$dir"); do
+      echo "---- stage $stage" >>"$BUILD_LOG"
+      docker build --target "$stage" --label vektor-desk.app=1 "$SRC/$dir" >>"$BUILD_LOG" 2>&1 || build_failed "$image" "$kills"
+    done
+    echo "---- image" >>"$BUILD_LOG"
     docker build --build-arg "DESK_BUILD=$target" --label vektor-desk.app=1 -t "${image%:*}:candidate" "$SRC/$dir" >>"$BUILD_LOG" 2>&1 ||
-      die "$image didn't build; the live app wasn't touched. See $BUILD_LOG"
+      build_failed "$image" "$kills"
   done
 
   if [ "$state" = MISSING ]; then
@@ -470,11 +493,14 @@ status() {
   if [ "${crons:-0}" -gt 0 ]; then echo "Auto-deploy: on"; else echo "Auto-deploy: off (docs/setup.md, step 8)"; fi
   if [ -s "$AUTO_FAILED" ] && [ "$(cat "$AUTO_WHY" 2>/dev/null)" = backup ]; then
     echo "             holding back $(cut -c1-7 "$AUTO_FAILED") because its backup failed; it retries after the next good backup (Settings → Box → Back up now), or tap Deploy now"
+  elif [ -s "$AUTO_FAILED" ] && [ "$(cat "$AUTO_WHY" 2>/dev/null)" = memory ]; then
+    echo "             holding back $(cut -c1-7 "$AUTO_FAILED") because the box ran out of memory building it; Settings → Box → Deploy now tries again"
   elif [ -s "$AUTO_FAILED" ]; then
     echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or Settings → Box → Deploy now"
   fi
   echo "Box script:  $(script_line)"
   compose_drift
+  echo "Memory:      $(docker exec vektor-desk-api python -m desk.memory line 2>/dev/null || echo "$(free_mb) MB free")"
   echo
   docker exec vektor-desk-api python -m desk.status 2>/dev/null || echo "(the desk's own status isn't answering)"
   echo
@@ -568,6 +594,51 @@ box_run() {
     '{action: $a, request_id: (if $id == "" then null else $id end), started: $s, finished: $f, result: $r, exit_code: $rc, output: $o}' | box_put "$dir" "$action.json"
 }
 
+memory_state() {
+  local names
+  names=$(mktemp)
+  docker ps -a --no-trunc --filter "name=^$APP-" --format '{{.ID}} {{.Names}}' >"$names" 2>/dev/null || true
+  { journalctl -k -o short-iso --since "-2 days" --no-pager 2>/dev/null || true; } | grep -F 'oom-kill:' | tail -n 60 |
+    python3 -c '
+import json
+import re
+import sys
+from datetime import datetime, timezone
+
+names = {}
+for line in open(sys.argv[1]):
+    parts = line.split()
+    if len(parts) == 2:
+        names[parts[0]] = parts[1]
+kills = []
+for line in sys.stdin:
+    found = re.search(r"oom-kill:constraint=(\w+)", line)
+    try:
+        at = datetime.strptime(line.split()[0], "%Y-%m-%dT%H:%M:%S%z")
+    except (ValueError, IndexError):
+        continue
+    if not found:
+        continue
+    task = re.search(r",task=([^,]+),pid=", line)
+    group = re.search(r"task_memcg=([^,\s]+)", line)
+    box = re.search(r"[0-9a-f]{64}", group.group(1)) if group else None
+    service = names.get(box.group(0), "") if box else ""
+    scope = "cap" if found.group(1) == "CONSTRAINT_MEMCG" else "box"
+    if scope == "cap" and not service:
+        continue
+    kills.append(
+        {
+            "at": at.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "process": re.sub(r"[^A-Za-z0-9_.:-]", "", task.group(1))[:32] if task else "",
+            "scope": scope,
+            "service": service.removeprefix(sys.argv[2] + "-"),
+        }
+    )
+print(json.dumps({"checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "kills": kills}))
+' "$names" "$APP" || true
+  rm -f "$names"
+}
+
 box_requests() {
   local dir action file id
   dir=$(box_dir) || {
@@ -577,6 +648,7 @@ box_requests() {
   date -u +%FT%TZ | box_put "$dir" host.alive
   script_state 2>/dev/null | box_put "$dir" script.json || true
   compose_state 2>/dev/null | box_put "$dir" compose.json || true
+  memory_state 2>/dev/null | box_put "$dir" memory.json || true
   box_keys "$dir" || true
   for action in $BOX_ACTIONS; do
     file=$dir/requests/$action.json

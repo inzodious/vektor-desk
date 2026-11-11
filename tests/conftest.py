@@ -12,6 +12,15 @@ from desk.db import apply_schemas, desk_conn
 from desk.demo import build_demo_mirror
 
 
+@pytest.fixture(autouse=True)
+def _roomy_box(monkeypatch):
+    from desk import scheduler
+
+    monkeypatch.setenv("DESK_LOW_MEMORY", "off")
+    monkeypatch.setitem(scheduler._LOW, "on", False)
+    monkeypatch.setitem(scheduler._LOW, "checked", None)
+
+
 @pytest.fixture
 def cfg(tmp_path) -> Config:
     return Config(data_dir=tmp_path, project="demo-project", uid="user-1", claude_token_expires="2027-11-01")

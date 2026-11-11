@@ -87,6 +87,7 @@ Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change 
 | `deploy.sh` changed | Settings → Box → Update box script (the panel shows it when the copy is behind). Once, while the copy is older than this button, or with `deploy.no-self-pin` set, copy it by hand: `install -m 700 /mnt/Manifest/apps/vektor-desk-src/deploy/deploy.sh /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh` |
 | Settings → Box says the box isn't checking in | The cron copy of `deploy.sh` is older than box actions: copy it by hand once (row above) |
 | An alert says auto-deploy stopped | The alert names the reason. If it was the backup, fix that and tap Settings → Box → Back up now: a good backup releases the deploy. For anything else, Settings → Box → Deploy now retries it. Updating the box script also retries it once. Until then the old version keeps running |
+| An alert says the desk ran out of memory | Settings → Box shows what was stopped and why. Low-memory mode switches itself on when the box has under 1.5 GB available: heavy jobs then run one at a time (docs/architecture.md, Memory). Deploy now retries a build that ran out of memory |
 | `deploy/compose.yaml` changed | Settings → Box → Apply compose. If the change widens what containers can do (a new image, host path, capability and so on; docs/architecture.md, Deploys), the panel shows why with a Copy button instead: read it, then Apps → `vektor-desk` → Edit, paste, save. `deploy.sh status` says which on its `Compose:` line |
 
 ## Home network
