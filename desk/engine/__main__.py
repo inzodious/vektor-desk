@@ -16,6 +16,7 @@ from desk.db import connect
 from desk.engine import ENGINE_VERSION, broker, core, discounts, earnings, filings, french, insider, lane, paper_exec, review, schema, triggers, universe
 from desk.engine.backfill import never_fetched, run_backfill
 from desk.engine.holdings import rebuild
+from desk.engine.kinds import offer_queue
 from desk.engine.lab import data as lab_data
 from desk.engine.lab import paper
 from desk.engine.live import refresh_quotes
@@ -195,7 +196,7 @@ def run_lab_export(cfg: Config) -> dict:
 
     def work(desk):
         exported = lab_data.export(cfg, desk, kinds, targets)
-        return {**exported, **paper.run(cfg, desk)}
+        return {**exported, **paper.run(cfg, desk), "worker": offer_queue(cfg)}
 
     return _with_desk(cfg, "lab-export", work)
 
