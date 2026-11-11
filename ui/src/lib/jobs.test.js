@@ -42,6 +42,15 @@ describe('job state', () => {
     expect(jobState({ last_run: { result: 'failed', finished: '2026-11-09T05:43:00Z', error: 'the price feed timed out' } }).line).toMatch(/: the price feed timed out$/);
   });
 
+  it('says when a job is waiting for its turn', () => {
+    const turn = jobState({ waiting: true, waiting_since: '2026-11-09T22:35:02Z', last_run: { result: 'ok', finished: '2026-11-06T22:36:00Z' } });
+    expect(turn.state).toBe('waiting');
+    expect(turn.line).toMatch(/^Waiting for its turn since .*: low-memory mode runs heavy jobs one at a time$/);
+    expect(jobState({ waiting: true, waiting_since: null }).line).toBe('Waiting for its turn: low-memory mode runs heavy jobs one at a time');
+    expect(jobState({ running: true, waiting: true }).state).toBe('running');
+    expect(refusalText({ body: { error: 'waiting' } })).toMatch(/already waiting for its turn/);
+  });
+
   it('splits data jobs from the rest', () => {
     const { main, rest } = splitJobs([{ name: 'agents-queue' }, { name: 'engine-daily' }, { name: 'mirror' }]);
     expect(main.map((j) => j.name)).toEqual(['mirror', 'engine-daily']);

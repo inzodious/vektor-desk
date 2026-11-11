@@ -4,14 +4,15 @@ import { useApi } from '../lib/api.js';
 import { cooldownText, jobState, jobWord, refusalText, runAndWait, scheduleWords, splitJobs } from '../lib/jobs.js';
 import { plural } from '../lib/format.js';
 
-const busy = (d) => (d?.jobs || []).some((j) => j.running || j.queued);
+const busy = (d) => (d?.jobs || []).some((j) => j.running || j.queued || j.waiting);
 
 function JobRow({ job, alive, mine, onRun }) {
   const word = jobWord(job);
   const st = jobState(job);
-  const live = st.state === 'running' || st.state === 'queued' || mine?.phase === 'waiting';
+  const turn = st.state === 'waiting';
+  const live = st.state === 'running' || st.state === 'queued' || turn || mine?.phase === 'waiting';
   const cool = cooldownText(job);
-  const shown = mine?.phase === 'done' ? 'ok' : mine?.phase === 'failed' ? 'failed' : live ? 'running' : st.state;
+  const shown = turn ? 'waiting' : mine?.phase === 'done' ? 'ok' : mine?.phase === 'failed' ? 'failed' : live ? 'running' : st.state;
   return (
     <div className="job-row" data-job={job.name} data-state={shown}>
       <span className={`job-dot ${shown}`} aria-hidden="true" />
@@ -26,7 +27,9 @@ function JobRow({ job, alive, mine, onRun }) {
         ) : null}
       </span>
       <span className="job-act">
-        {live ? (
+        {turn ? (
+          <span className="chip">Waiting</span>
+        ) : live ? (
           <span className="chip ok">
             <i className="pulse" style={{ width: 6, height: 6 }} />
             {st.state === 'queued' || (mine?.phase === 'waiting' && !job.running) ? 'Starting' : 'Running'}
@@ -57,8 +60,12 @@ export function Jobs() {
     if (ready && window.location.hash === '#jobs') card.current?.scrollIntoView({ block: 'start' });
   }, [ready]);
   const alive = !!d?.scheduler_alive;
-  const { main, rest } = splitJobs(d?.jobs);
+  const split = splitJobs(d?.jobs);
+  const main = [...split.main, ...split.rest.filter((j) => j.waiting)];
+  const rest = split.rest.filter((j) => !j.waiting);
   const running = (d?.jobs || []).filter((j) => j.running || j.queued).length;
+  const turns = (d?.jobs || []).filter((j) => j.waiting && !j.running).length;
+  const low = d?.low_memory?.on ? d.low_memory : null;
 
   const set = (name, v) => setMine((m) => ({ ...m, [name]: v }));
   const run = async (job) => {
@@ -84,6 +91,11 @@ export function Jobs() {
         <span className="tag mint">Jobs</span>
         <span className="acts">
           {running ? <span className="chip ok">{plural(running, 'job')} running</span> : null}
+          {turns ? (
+            <span className="chip" data-testid="jobs-turns">
+              {turns} waiting for a turn
+            </span>
+          ) : null}
           {d ? <span className={`chip ${alive ? '' : 'watch'}`}>{alive ? 'Scheduler on' : 'Scheduler off'}</span> : null}
         </span>
       </div>
@@ -100,6 +112,12 @@ export function Jobs() {
           ) : (
             <p className="muted job-lede">Everything runs on its own schedule. Run now when you want fresh numbers sooner.</p>
           )}
+          {low ? (
+            <p className="note job-low" data-testid="jobs-low">
+              <Icon name="info" />
+              <span>Low-memory mode is on, so heavy jobs run one at a time and the rest wait for their turn. {low.why || ''}</span>
+            </p>
+          ) : null}
           <div className="job-list">{rows(main)}</div>
           {rest.length ? (
             <details className="job-more">

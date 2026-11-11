@@ -45,6 +45,7 @@ export function StartProvider({ children }) {
   const raw = posted && api.data?.state !== 'running' && api.data?.started_at !== posted.started_at ? posted : api.data || posted;
   const view = useMemo(() => startView(raw), [raw]);
   const readiness = useMemo(() => readinessMap(ready.data), [ready.data]);
+  const memory = raw?.memory || ready.data?.memory || null;
   const was = useRef(null);
   const reloadStart = api.reload;
   const reloadReady = ready.reload;
@@ -96,8 +97,8 @@ export function StartProvider({ children }) {
   const hidden = view.mode === 'partial' && Boolean(finishedAt) && hiddenAt === finishedAt;
 
   const value = useMemo(
-    () => ({ view, readiness, known: Boolean(ready.data || ready.error), begin, busy, error, justDone, dismiss, hide, hidden, refresh, reloadSetup, setup: setup.score, epoch }),
-    [view, readiness, ready.data, ready.error, begin, busy, error, justDone, dismiss, hide, hidden, refresh, reloadSetup, setup.score, epoch],
+    () => ({ view, readiness, known: Boolean(ready.data || ready.error), begin, busy, error, justDone, dismiss, hide, hidden, refresh, reloadSetup, setup: setup.score, epoch, memory, recheck: reloadStart }),
+    [view, readiness, ready.data, ready.error, begin, busy, error, justDone, dismiss, hide, hidden, refresh, reloadSetup, setup.score, epoch, memory, reloadStart],
   );
   return <StartContext.Provider value={value}>{children}</StartContext.Provider>;
 }

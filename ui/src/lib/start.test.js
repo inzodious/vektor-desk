@@ -6,7 +6,8 @@ import done from '../fixtures/start.json';
 import gaps from '../fixtures/readiness.gaps.json';
 import ready from '../fixtures/readiness.json';
 import { firstRunScore } from './firstrun.js';
-import { gapOf, gapWords, needsYou, readinessMap, setupChip, startRefusal, startView, stepTook, stepWord } from './start.js';
+import turns from '../fixtures/start.lowstart.json';
+import { gapOf, gapWords, inTurn, needsYou, readinessMap, setupChip, startRefusal, startView, stepTook, stepWord } from './start.js';
 
 describe('start the desk', () => {
   it('shows nothing when the desk does not serve the chain', () => {
@@ -58,6 +59,14 @@ describe('start the desk', () => {
     expect(needsYou(prices)).toBe(false);
     expect(needsYou(loose.steps.find((s) => s.id === 'debrief'))).toBe(true);
     expect(needsYou(loose.steps.find((s) => s.id === 'discounts'))).toBe(true);
+  });
+
+  it('says a running step is waiting for its turn', () => {
+    const step = turns.steps.find((s) => s.state === 'running');
+    expect(inTurn(step)).toBe(true);
+    expect(stepWord(step)).toEqual({ t: 'Waiting its turn', tone: '' });
+    expect(inTurn({ state: 'running', waiting: true })).toBe(true);
+    expect(inTurn({ state: 'ok', detail: 'Waiting for its turn: x' })).toBe(false);
   });
 });
 

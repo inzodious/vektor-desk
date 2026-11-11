@@ -1,0 +1,183 @@
+{
+ "now": "2026-11-11T14:00:00Z",
+ "start": {
+  "state": "done",
+  "needs_start": false
+ },
+ "sections": [
+  {
+   "key": "bridge.value",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "bridge.brief",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.day",
+   "state": "stale",
+   "why": "It’s waiting for its turn: low-memory mode runs heavy jobs one at a time.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.week",
+   "state": "stale",
+   "why": "It’s waiting for its turn: low-memory mode runs heavy jobs one at a time.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.month",
+   "state": "stale",
+   "why": "It’s waiting for its turn: low-memory mode runs heavy jobs one at a time.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.year",
+   "state": "stale",
+   "why": "It’s waiting for its turn: low-memory mode runs heavy jobs one at a time.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.debrief",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.holdings",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.stock_plans",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.risk",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.tax",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.race",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.mixes",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.habits",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "decisions.queue",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "decisions.journal",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "research.feed",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "research.boards",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "settings.risk_check",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  }
+ ],
+ "memory": {
+  "state": "tight",
+  "low_memory": true,
+  "killed": 3,
+  "note": "The box has 512 MB of 15.0 GB free, and no swap. Its ZFS file cache holds 6.0 GB, which it hands back under pressure, but slowly. Low-memory mode is on: the lab and the eval session are paused, and heavy jobs run one at a time. Waiting for a turn: Engine review. Stopped for memory in the last two days: 3. Latest: Agents run debrief was stopped: it needed more memory than the scheduler is allowed."
+ }
+}

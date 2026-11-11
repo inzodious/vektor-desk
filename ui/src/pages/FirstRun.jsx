@@ -7,6 +7,7 @@ import { Icon } from '../components/Icon.jsx';
 import { postJson, useApi } from '../lib/api.js';
 import { countdown, firstRunScore, firstRunSteps } from '../lib/firstrun.js';
 import { jobWord, refusalText, runAndWait } from '../lib/jobs.js';
+import { MemoryStrip } from '../components/MemoryStrip.jsx';
 import { StartPanel } from '../start/StartDesk.jsx';
 import { useStart } from '../start/context.js';
 
@@ -131,6 +132,7 @@ export default function FirstRun() {
         }
       />
       <StartPanel always />
+      <MemoryStrip />
       <section className="card fr" data-testid="first-run" data-done={score.done} data-total={score.total}>
         <div className="card-head">
           <span className="tag mint">Launch sequence</span>

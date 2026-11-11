@@ -1,0 +1,29 @@
+{
+ "state": "unknown",
+ "total_mb": null,
+ "available_mb": null,
+ "swap_mb": null,
+ "cache_mb": null,
+ "scheduler": null,
+ "low_memory": {
+  "on": false,
+  "mode": "auto",
+  "why": null,
+  "since": null,
+  "paused": [],
+  "low_mb": 1500,
+  "roomy_mb": 4000
+ },
+ "waiting": [],
+ "killed": [
+  {
+   "at": "2026-11-09T19:03:22Z",
+   "kind": "job",
+   "name": "agents-run-debrief",
+   "scope": "cap",
+   "words": "Agents run debrief was stopped: it needed more memory than the scheduler is allowed."
+  }
+ ],
+ "host_seen": false,
+ "note": "The box’s memory can’t be read from here. Stopped for memory in the last two days: 1. Latest: Agents run debrief was stopped: it needed more memory than the scheduler is allowed."
+}
