@@ -3,21 +3,26 @@ import hashlib
 import json
 import os
 import re
-import sqlite3
 from pathlib import Path
 
 from desk import jobrun
-from desk.backup import _source
 from desk.config import Config
 from desk.worker import home
 
 SHA = re.compile(r"^[0-9a-f]{64}$")
 CHUNK = 1 << 20
-AS_BYTES = frozenset({"lab"})
+ONLY = "lab"
+REFUSED = "Only the lab's data can be sent to a worker. Your accounts, holdings and the Escape Vektor copy never leave this box."
+NOT_YET = "The lab data hasn't been exported yet."
 
 
 def sources(cfg: Config) -> dict[str, Path]:
-    return {"lab": cfg.data_dir / "lab" / "data" / "lab.db", "desk": cfg.desk_db, "mirror": cfg.mirror_db}
+    return {ONLY: cfg.data_dir / "lab" / "data" / "lab.db"}
+
+
+def allowed(cfg: Config, names: tuple[str, ...] | list[str]) -> None:
+    if not names or any(name not in sources(cfg) for name in names):
+        raise PermissionError(REFUSED)
 
 
 def folder(cfg: Config) -> Path:
@@ -43,9 +48,10 @@ def _stat(db: Path) -> list:
 
 
 def take(cfg: Config, name: str) -> dict:
-    db = sources(cfg).get(name)
-    if db is None or not db.is_file():
-        raise FileNotFoundError(f"There is no {name} database to copy yet.")
+    allowed(cfg, (name,))
+    db = sources(cfg)[name]
+    if not db.is_file():
+        raise FileNotFoundError(NOT_YET)
     out = folder(cfg)
     out.mkdir(parents=True, exist_ok=True)
     index = out / f"{name}.latest.json"
@@ -53,22 +59,10 @@ def take(cfg: Config, name: str) -> dict:
     last = jobrun._read(index) or {}
     if last.get("stat") == stat and path_of(cfg, str(last.get("sha256"))):
         return {"name": name, "sha256": last["sha256"], "bytes": last["bytes"]}
-    raw = out / f".{name}.{os.getpid()}.db"
     packed = out / f".{name}.{os.getpid()}.gz"
     try:
-        if name in AS_BYTES:
-            source = db
-        else:
-            source = raw
-            src = _source(db)
-            dst = sqlite3.connect(raw)
-            try:
-                src.backup(dst, pages=4096)
-            finally:
-                dst.close()
-                src.close()
         digest, size = hashlib.sha256(), 0
-        with source.open("rb") as f, gzip.open(packed, "wb", compresslevel=1) as z:
+        with db.open("rb") as f, gzip.open(packed, "wb", compresslevel=1) as z:
             while chunk := f.read(CHUNK):
                 digest.update(chunk)
                 size += len(chunk)
@@ -76,7 +70,6 @@ def take(cfg: Config, name: str) -> dict:
         sha = digest.hexdigest()
         os.replace(packed, out / f"{sha}.db.gz")
     finally:
-        raw.unlink(missing_ok=True)
         packed.unlink(missing_ok=True)
     jobrun._write(index, {"stat": stat, "sha256": sha, "bytes": size, "taken_at": jobrun.stamp(jobrun.now_utc())})
     return {"name": name, "sha256": sha, "bytes": size}
@@ -117,5 +110,5 @@ def unpack(packed: Path, target: Path, sha: str) -> None:
 def current(cfg: Config, copy: dict) -> bool:
     try:
         return take(cfg, str(copy.get("name")))["sha256"] == copy.get("sha256")
-    except (OSError, sqlite3.Error):
+    except OSError:
         return False

@@ -39,4 +39,4 @@ def accept_check(cfg: Config, job: dict, result: Path) -> str:
     return "; ".join(f"{r['name']} passed the full check ({r['tables']} tables, {r['rows']:,} rows)" for r in rows) + "."
 
 
-KINDS = [Kind(CHECK, "Check a database copy on the worker", run_check, accept_check)]
+KINDS = [Kind(CHECK, "Check the lab data copy on the worker", run_check, accept_check)]

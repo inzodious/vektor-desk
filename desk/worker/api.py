@@ -161,10 +161,10 @@ def remove_worker(worker_id: str, request: Request) -> JSONResponse:
 @router.post("/api/worker/check")
 def ask_check(request: Request) -> JSONResponse:
     cfg = request.app.state.cfg
-    name = next((n for n in ("lab", "desk") if snapshots.sources(cfg)[n].is_file()), None)
-    if name is None:
-        return JSONResponse({"ok": False, "error": "no_data", "message": "There is no database to send yet."}, status_code=409, headers=NO_STORE)
-    job = offer(cfg, CHECK, {}, (name,), key=None)
+    try:
+        job = offer(cfg, CHECK, {}, (snapshots.ONLY,), key=None)
+    except FileNotFoundError:
+        return JSONResponse({"ok": False, "error": "no_data", "message": snapshots.NOT_YET}, status_code=409, headers=NO_STORE)
     return JSONResponse({"ok": True, "job": job["id"]} | describe(cfg), status_code=202, headers=NO_STORE)
 
 

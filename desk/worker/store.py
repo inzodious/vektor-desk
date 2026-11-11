@@ -191,6 +191,7 @@ def get(cfg: Config, job_id: str) -> dict | None:
 
 def enqueue(cfg: Config, kind: str, inputs: dict, copies: list[dict], key: str | None = None, again: bool = False, now: datetime | None = None) -> dict:
     now = now or jobrun.now_utc()
+    snapshots.allowed(cfg, [str(c.get("name")) for c in copies])
     with open_db(cfg) as conn, writing(conn):
         if key is not None:
             states = OPEN if again else (*OPEN, "done")
@@ -242,6 +243,8 @@ def lease(cfg: Config, worker_id: str, known: set[str], now: datetime | None = N
             why = None
             if row["kind"] not in known:
                 why = "This build of the desk doesn't know that kind of job any more."
+            elif any(c.get("name") not in snapshots.sources(cfg) for c in json.loads(row["snapshots"])):
+                why = snapshots.REFUSED
             elif any(snapshots.path_of(cfg, str(c.get("sha256"))) is None for c in json.loads(row["snapshots"])):
                 why = "The database copy it was queued with is gone, so it can't be sent to a worker."
             if why:

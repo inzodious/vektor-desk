@@ -35,5 +35,6 @@ def home(cfg: Config) -> Path:
 def offer(cfg: Config, kind: str, inputs: dict, copies: tuple[str, ...] = ("lab",), key: str | None = None, again: bool = False) -> dict:
     from desk.worker import snapshots, store
 
+    snapshots.allowed(cfg, copies)
     taken = [snapshots.take(cfg, name) for name in copies]
     return store.enqueue(cfg, kind, inputs, taken, key, again)

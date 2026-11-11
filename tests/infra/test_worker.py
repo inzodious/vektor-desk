@@ -157,25 +157,58 @@ def test_a_copy_is_consistent_named_by_its_content_and_reused_until_the_database
     second = snapshots.take(cfg, "lab")
     assert second["sha256"] != first["sha256"] and not snapshots.current(cfg, first) and path.exists()
     assert snapshots.prune(cfg, keep=set()) == [first["sha256"]] and snapshots.path_of(cfg, second["sha256"])
-    with pytest.raises(FileNotFoundError):
-        snapshots.take(cfg, "mirror")
+    cfg.data_dir.joinpath("lab", "data", "lab.db").unlink()
+    with pytest.raises(FileNotFoundError, match="hasn't been exported yet"):
+        snapshots.take(cfg, "lab")
 
 
-def test_a_live_database_is_copied_through_sqlite_so_a_write_in_flight_cannot_tear_it(cfg):
-    conn = sqlite3.connect(cfg.desk_db)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT)")
-    conn.executemany("INSERT INTO notes (body) VALUES (?)", [("x" * 200,) for _ in range(500)])
-    conn.commit()
-    conn.execute("INSERT INTO notes (body) VALUES ('not committed')")
-    taken = snapshots.take(cfg, "desk")
-    conn.rollback()
-    conn.close()
-    out = cfg.data_dir / "copy.db"
-    snapshots.unpack(snapshots.path_of(cfg, taken["sha256"]), out, taken["sha256"])
-    copy = sqlite3.connect(out)
-    assert copy.execute("SELECT count(*) FROM notes").fetchone()[0] == 500 and copy.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+def test_only_the_lab_data_can_leave_the_box(client, horizon, cfg):
+    for path, table in ((cfg.desk_db, "lots"), (cfg.mirror_db, "holdings")):
+        conn = sqlite3.connect(path)
+        conn.execute(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY, body TEXT)")
+        conn.execute(f"INSERT INTO {table} (body) VALUES ('synthetic')")
+        conn.commit()
+        conn.close()
+    head = auth(horizon["key"])
+    assert list(snapshots.sources(cfg)) == ["lab"]
+    assert client.post("/api/worker/check").status_code == 409
+    assert client.post("/api/worker/check").json() == {"ok": False, "error": "no_data", "message": "The lab data hasn't been exported yet."}
+    lab_db(cfg)
+    for name in ("desk", "mirror", "../desk", ""):
+        with pytest.raises(PermissionError, match="Only the lab's data"):
+            snapshots.take(cfg, name)
+        with pytest.raises(PermissionError, match="Only the lab's data"):
+            offer(cfg, "worker.check", {}, (name,))
+        with pytest.raises(PermissionError, match="Only the lab's data"):
+            offer(cfg, "worker.check", {}, ("lab", name))
+        with pytest.raises(PermissionError, match="Only the lab's data"):
+            store.enqueue(cfg, "worker.check", {}, [{"name": name, "sha256": "0" * 64, "bytes": 1}])
+    with pytest.raises(PermissionError):
+        offer(cfg, "worker.check", {}, ())
+    assert store.recent(cfg) == []
+    for path in (cfg.desk_db, cfg.mirror_db):
+        sha = hashlib.sha256(path.read_bytes()).hexdigest()
+        assert client.get(f"/api/worker/snapshots/{sha}", headers=head).status_code == 404
+    for name in ("desk.db", "mirror.db", "..%2F..%2Fdesk.db"):
+        assert client.get(f"/api/worker/snapshots/{name}", headers=head).status_code == 404
+    kept = cfg.data_dir / "run" / "worker" / "snapshots"
+    assert not kept.exists() or [p.name for p in kept.iterdir()] == []
     assert snapshots.path_of(cfg, "../../etc/passwd") is None
+    taken = snapshots.take(cfg, "lab")
+    assert sorted(p.name for p in kept.iterdir()) == sorted([f"{taken['sha256']}.db.gz", "lab.latest.json"])
+
+
+def test_a_queued_job_naming_another_database_is_failed_not_sent(client, horizon, cfg):
+    lab_db(cfg)
+    job = offer(cfg, "worker.check", {}, ("lab",))
+    with store.open_db(cfg) as conn:
+        conn.execute(
+            "UPDATE jobs SET snapshots = ? WHERE id = ?", (json.dumps([{"name": "desk", "sha256": job["snapshots"][0]["sha256"], "bytes": 1}]), job["id"])
+        )
+        conn.commit()
+    assert client.get("/api/worker/next", headers=auth(horizon["key"])).status_code == 204
+    failed = store.get(cfg, job["id"])
+    assert failed["state"] == "failed" and failed["error"].startswith("Only the lab's data can be sent to a worker.")
 
 
 def test_the_code_bundle_is_the_desk_package_without_caches(cfg):
@@ -208,7 +241,7 @@ def test_a_job_is_leased_run_returned_and_saved_by_the_scheduler(client, horizon
     client.post("/api/worker/beat", json={"job_id": job["id"]}, headers=head)
     running = client.get("/api/workers").json()
     assert running["jobs"][0]["where"] == "worker" and running["jobs"][0]["why"].startswith("Running on Horizon, started")
-    assert running["workers"][0]["words"] == "Horizon is online, working on: Check a database copy on the worker."
+    assert running["workers"][0]["words"] == "Horizon is online, working on: Check the lab data copy on the worker."
     assert client.get("/api/worker/next", headers=head).json()["job"]["attempts"] == 2
     result = packed({"files": [{"name": "lab", "check": "ok", "tables": 1, "rows": 50}]})
     sent = client.post(f"/api/worker/jobs/{job['id']}/result", params={"ok": "1", "seconds": "2.34", "peak_mb": "41"}, content=result, headers=head)

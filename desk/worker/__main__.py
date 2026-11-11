@@ -52,12 +52,10 @@ def main(argv: list[str] | None = None) -> int:
         from desk.worker import offer, snapshots
         from desk.worker.kinds import CHECK
 
-        cfg = Config.from_env()
-        name = next((n for n in ("lab", "desk") if snapshots.sources(cfg)[n].is_file()), None)
-        if name is None:
-            print(json.dumps({"ok": True, "skipped": "There is no database to send yet."}))
-            return 0
-        print(json.dumps({"ok": True, "job": offer(cfg, CHECK, {}, (name,))["id"]}))
+        try:
+            print(json.dumps({"ok": True, "job": offer(Config.from_env(), CHECK, {}, (snapshots.ONLY,))["id"]}))
+        except FileNotFoundError:
+            print(json.dumps({"ok": True, "skipped": snapshots.NOT_YET}))
         return 0
     if args.cmd == "add":
         from desk.worker import store
