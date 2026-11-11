@@ -3,9 +3,10 @@ import hashlib
 import json
 import math
 import os
+import shutil
 import sqlite3
 from collections import namedtuple
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from functools import cache
 from pathlib import Path
 
@@ -21,10 +22,20 @@ CREATE TABLE IF NOT EXISTS sim_cache (
   body TEXT NOT NULL,
   stored_at TEXT NOT NULL
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS sim_answers (
+  job TEXT PRIMARY KEY,
+  snapshot TEXT NOT NULL,
+  at TEXT NOT NULL
+) WITHOUT ROWID;
 """
 STAGED = "sims-*.json.gz"
+OFFERS = "offers.sims"
 MAX_ROWS = 20_000
 MAX_BYTES = 200_000_000
+MAX_DAYS = 3_000_000
+WAIT_ENV = "DESK_LAB_WORKER_WAIT_MIN"
+WAIT_MIN = 20.0
+GZIP_MAGIC = b"\x1f\x8b"
 SPOT_CHECKS = 2
 FIELDS = ("key", "params", "start", "end", "cost_mult", "summary", "rets", "bench", "days")
 
@@ -115,7 +126,7 @@ def problems(body, snapshot: str, spec_hash: str) -> str | None:
 
 class Cache:
     def __init__(self, snapshot: str, conn: sqlite3.Connection | None = None, *, now: datetime | None = None):
-        self.snapshot, self.conn, self.mem = snapshot, conn, {}
+        self.snapshot, self.conn, self.mem, self.answers = snapshot, conn, {}, set()
         self.stamp = (now or datetime.now(UTC)).isoformat(timespec="seconds")
         self.hits = self.misses = 0
         if conn is not None:
@@ -145,11 +156,24 @@ class Cache:
             self.conn.executemany("INSERT OR IGNORE INTO sim_cache VALUES (?, ?, ?, ?)", ((r["key"], self.snapshot, _text(r), self.stamp) for r in rows))
             return self.conn.total_changes - before
 
+    def answer(self, job: str) -> None:
+        if self.conn is None:
+            self.answers.add(job)
+            return
+        with self.conn:
+            self.conn.execute("INSERT OR IGNORE INTO sim_answers VALUES (?, ?, ?)", (job, self.snapshot, self.stamp))
+
+    def answered(self, job: str) -> bool:
+        if self.conn is None:
+            return job in self.answers
+        return self.conn.execute("SELECT 1 FROM sim_answers WHERE job=? AND snapshot=?", (job, self.snapshot)).fetchone() is not None
+
     def prune(self) -> int:
         if self.conn is None:
             return 0
         with self.conn:
             gone = self.conn.execute("DELETE FROM sim_cache WHERE snapshot != ?", (self.snapshot,)).rowcount
+            self.conn.execute("DELETE FROM sim_answers WHERE snapshot != ?", (self.snapshot,))
         if gone:
             self.conn.execute("VACUUM")
         return gone
@@ -199,6 +223,27 @@ def stage(cfg: Config, result: dict) -> dict:
     return {"ok": True, "file": name, "rows": len(rows)}
 
 
+def stage_file(cfg: Config, path: Path) -> dict:
+    try:
+        size = path.stat().st_size
+        with open(path, "rb") as f:
+            head = f.read(2)
+            digest = hashlib.file_digest(f, "sha256") if head == GZIP_MAGIC else None
+    except OSError as e:
+        return {"ok": False, "error": f"the result file cannot be read ({e.__class__.__name__})"}
+    if digest is None:
+        return {"ok": False, "error": "the result is not a gzip file"}
+    if size > MAX_BYTES:
+        return {"ok": False, "error": "the result is too large"}
+    name = f"sims-{digest.hexdigest()[:24]}.json.gz"
+    folder = queue_dir(cfg)
+    folder.mkdir(parents=True, exist_ok=True)
+    tmp = folder / f".{name}.tmp"
+    shutil.copyfile(path, tmp)
+    os.replace(tmp, folder / name)
+    return {"ok": True, "file": name, "bytes": size}
+
+
 def staged(cfg: Config) -> list[Path]:
     folder = queue_dir(cfg)
     return sorted(folder.glob(STAGED)) if folder.exists() else []
@@ -212,3 +257,37 @@ def read_staged(path: Path) -> dict | None:
     except (OSError, ValueError, EOFError):
         return None
     return body if isinstance(body, dict) else None
+
+
+# ---- Offers (the engine tells the lab which queued files a worker was asked to simulate) ----
+
+
+def offers_path(cfg: Config) -> Path:
+    return queue_dir(cfg) / OFFERS
+
+
+def write_offers(cfg: Config, snapshot: str, files: dict[str, str], now: datetime) -> None:
+    path = offers_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{OFFERS}.tmp")
+    tmp.write_text(_text({"snapshot": snapshot, "offered_at": now.isoformat(timespec="seconds"), "files": files}))
+    os.replace(tmp, path)
+
+
+def wait_minutes() -> float:
+    try:
+        return max(0.0, float(os.environ.get(WAIT_ENV, "") or WAIT_MIN))
+    except ValueError:
+        return WAIT_MIN
+
+
+def open_offers(cfg: Config, snapshot: str, now: datetime) -> dict[str, str]:
+    try:
+        body = json.loads(offers_path(cfg).read_text())
+        at = datetime.fromisoformat(str(body["offered_at"]))
+        files = body["files"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+    if body.get("snapshot") != snapshot or not isinstance(files, dict) or not timedelta(0) <= now - at < timedelta(minutes=wait_minutes()):
+        return {}
+    return {str(name): str(key) for name, key in files.items()}

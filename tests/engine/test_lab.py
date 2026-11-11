@@ -1,3 +1,4 @@
+import gzip
 import json
 import random
 import sqlite3
@@ -8,7 +9,7 @@ import pytest
 
 from desk.agents.sources import RealLab
 from desk.db import connect
-from desk.engine import gate, lab, schema
+from desk.engine import gate, kinds, lab, schema
 from desk.engine.__main__ import run_holdings, run_lab_export
 from desk.engine.lab import library as features
 from desk.engine.lab import paper, runner, simcache, stats
@@ -16,6 +17,8 @@ from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, ledge
 from desk.engine.lab.runner import ledger, process_queue
 from desk.engine.lab.sim import _year_tax, simulate
 from desk.engine.lab.spec import SETS, SpecError, parse, resolve, variants
+from desk.worker import registry, store
+from desk.worker.__main__ import apply as worker_apply
 from tests.engine.test_preflight import seed
 
 NOW = datetime(2025, 1, 2, 7, 0, tzinfo=UTC)
@@ -477,3 +480,74 @@ def test_the_cache_is_dropped_when_the_lab_data_changes(cfg):
     out = process_queue(cfg, now=NOW)
     assert out["cache"]["computed"] > 0 and cached(cfg) == [simcache.snapshot_hash(data_path(cfg))]
     assert not sqlite3.connect(ledger_path(cfg)).execute("SELECT 1 FROM sqlite_master WHERE name='sim_cache'").fetchone()
+
+
+# ---- A worker on another machine ----
+
+
+def worker_round(cfg):
+    known = registry()
+    job = store.lease(cfg, store.workers(cfg)[0]["id"], set(known))
+    out = known[job["kind"]].run(job["inputs"], {"lab": data_path(cfg)})
+    path = store.result_path(cfg, job["id"])
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(path, "wt", encoding="utf-8") as f:
+        json.dump(out, f)
+    assert store.returned(cfg, job["id"], True, 1.0, 100, None) == "returned"
+    return job, worker_apply(cfg)
+
+
+def test_queued_experiments_go_to_an_online_worker_and_come_back_checked(cfg, monkeypatch):
+    write_lab_db(cfg)
+    queue(cfg, experiment(), "001-exp.json")
+    queue(cfg, {"request": "finalize", "strategy_id": "sector-momentum", "version": 1}, "002-fin.json")
+    assert kinds.offer_queue(cfg, now=NOW)["offered"] == 0 and not simcache.offers_path(cfg).exists()
+    made = store.add_worker(cfg, "Horizon")
+    store.beat(cfg, made["id"], {}, now=NOW)
+    assert kinds.offer_queue(cfg, now=NOW) == {"offered": 1, "wait_minutes": 20.0}
+    assert kinds.offer_queue(cfg, now=NOW)["offered"] == 1 and len(store.in_state(cfg, "queued")) == 1
+    held = process_queue(cfg, now=NOW + timedelta(minutes=1))
+    assert held == {"ok": True, "done": [], "waiting_for_worker": ["001-exp.json", "002-fin.json"]}
+    job, applied = worker_round(cfg)
+    assert applied["saved"] == 1 and store.get(cfg, job["id"])["state"] == "done" and len(simcache.staged(cfg)) == 1
+    real, calls = runner._job, []
+    monkeypatch.setattr(runner, "_job", lambda args: calls.append(args) or real(args))
+    out = process_queue(cfg, now=NOW + timedelta(minutes=2))
+    assert [d["status"] for d in out["done"]] == ["experiment", "finalize"] and out["sims"][0]["status"] == "stored" and "job" not in out["sims"][0]
+    assert out["cache"]["computed"] == 0 and len(calls) == simcache.SPOT_CHECKS and "waiting_for_worker" not in out
+
+
+def test_the_lab_stops_waiting_for_a_worker_that_never_answers(cfg):
+    write_lab_db(cfg)
+    queue(cfg, experiment(), "001-exp.json")
+    made = store.add_worker(cfg, "Horizon")
+    store.beat(cfg, made["id"], {}, now=NOW)
+    assert kinds.offer_queue(cfg, now=NOW)["offered"] == 1
+    assert process_queue(cfg, now=NOW + timedelta(minutes=19))["waiting_for_worker"] == ["001-exp.json"]
+    out = process_queue(cfg, now=NOW + timedelta(minutes=20))
+    assert [d["status"] for d in out["done"]] == ["experiment"] and out["cache"]["computed"] > 0 and "waiting_for_worker" not in out
+
+
+def test_a_worker_result_is_staged_by_path_without_being_read(cfg, tmp_path):
+    write_lab_db(cfg)
+    result = tmp_path / "result.json.gz"
+    with gzip.open(result, "wt", encoding="utf-8") as f:
+        json.dump(runner.sims(data_path(cfg), experiment()), f)
+    out = simcache.stage_file(cfg, result)
+    assert out["ok"] and out["bytes"] == result.stat().st_size and [p.name for p in simcache.staged(cfg)] == [out["file"]] and result.exists()
+    plain = tmp_path / "plain.json"
+    plain.write_text("{}")
+    assert simcache.stage_file(cfg, plain) == {"ok": False, "error": "the result is not a gzip file"}
+    assert not simcache.stage_file(cfg, tmp_path / "missing.gz")["ok"]
+    with pytest.raises(ValueError, match="not a gzip file"):
+        kinds.accept(cfg, {}, plain)
+    assert process_queue(cfg, now=NOW)["sims"][0]["status"] == "stored"
+
+
+def test_a_large_worker_answer_is_cut_to_what_fits(cfg, monkeypatch):
+    write_lab_db(cfg)
+    whole = runner.sims(data_path(cfg), experiment())
+    monkeypatch.setattr(simcache, "MAX_DAYS", 5000)
+    part = runner.sims(data_path(cfg), experiment())
+    assert part["partial"] and 0 < len(part["rows"]) < len(whole["rows"]) and "partial" not in whole
+    assert sum(len(r["days"]) for r in part["rows"]) <= 5000 and all(r in whole["rows"] for r in part["rows"])

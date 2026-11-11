@@ -1060,6 +1060,15 @@ The NAS containers are small (cron 640 MB, lab 1,536 MB, API 256 MB), so no job 
 
 On the synthetic database the heaviest experiment (French industries, 781 simulations) is 17 MB gzipped; with it staged the lab computes nothing and finishes in 8 s against 12.
 
+**With a worker (Horizon).** `desk/engine/kinds.py` registers the job kind `lab.sims` with Infrastructure's worker protocol (`docs/architecture.md`).
+
+| Step | Where | What happens |
+|---|---|---|
+| Offer | NAS, end of `lab-export` (00:55) | If a worker is online, every queued experiment the lab has not run becomes a `lab.sims` job keyed by `simcache.job_key`, with the fresh `lab.db` as its copy. `lab/queue/offers.sims` records which files were offered and when. No worker online: nothing is offered and nothing waits |
+| Run | Worker | `runner.sims` on its downloaded copy. An answer over 3 million simulated days is cut short and marked `partial`; the lab computes the rest |
+| Accept | NAS, `worker-apply` | `simcache.stage_file` copies the gzip into `lab/queue/` unread, so it costs no memory in the scheduler |
+| Use | Lab | An offered file, and everything queued after it, waits up to `DESK_LAB_WORKER_WAIT_MIN` (20) minutes from the offer for its answer; `waiting_for_worker` in the run's output names them. When the answer arrives it is checked as above and used, good or bad. When it does not, the lab runs the queue itself |
+
 **Rules for new jobs.** Iterate cursors, do not `fetchall` a bar table. Write downloads in batches inside the loop that fetches them. A second run of a job must be a no-op, not a double write.
 
 ## Stack and tests

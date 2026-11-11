@@ -565,13 +565,23 @@ def sims(path: Path, request: dict) -> dict:
         body = run_experiment(None, scratch, data, request, now=EPOCH, cache=cache)
     finally:
         scratch.close()
-    return out | {"status": body["kind"], "rows": cache.rows()}
+    rows, days = [], 0
+    for r in cache.rows():
+        days += len(r["days"])
+        if days > simcache.MAX_DAYS or len(rows) >= simcache.MAX_ROWS:
+            return out | {"status": body["kind"], "rows": rows, "partial": True}
+        rows.append(r)
+    return out | {"status": body["kind"], "rows": rows}
 
 
 def ingest(cfg: Config, data: LabData, cache: Cache) -> list[dict]:
     done = []
     for path in simcache.staged(cfg):
-        done.append({"file": path.name, **_ingest_one(data, cache, simcache.read_staged(path))})
+        result = simcache.read_staged(path)
+        row = {"file": path.name, **_ingest_one(data, cache, result)}
+        if result is not None and isinstance(result.get("request"), dict):
+            row["job"] = simcache.job_key(cache.snapshot, result["request"])
+        done.append(row)
         path.unlink(missing_ok=True)
     return done
 
@@ -610,15 +620,25 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
     if not data_path(cfg).exists():
         load(data_path(cfg))
     conn = ledger(cfg)
-    done, cache = [], None
+    done, cache, held, staged = [], None, [], []
     try:
         waiting = [p for p in sorted(folder.glob("*.json")) if not conn.execute("SELECT 1 FROM queue_done WHERE file=?", (p.name,)).fetchone()]
         if not waiting and not simcache.staged(cfg):
             return {"ok": True, "done": []}
-        data = load(data_path(cfg))
         cache = simcache.open_cache(cfg, simcache.snapshot_hash(data_path(cfg)), now=now)
+        offers = simcache.open_offers(cfg, cache.snapshot, now)
+        if waiting and not simcache.staged(cfg) and waiting[0].name in offers and not cache.answered(offers[waiting[0].name]):
+            return {"ok": True, "done": [], "waiting_for_worker": [p.name for p in waiting]}
+        data = load(data_path(cfg))
         staged = ingest(cfg, data, cache)
+        for s in staged:
+            if s.get("job"):
+                cache.answer(s.pop("job"))
+        offered = {name for name, key in offers.items() if not cache.answered(key)}
         for path in waiting:
+            if path.name in offered:
+                held = [p.name for p in waiting[waiting.index(path) :]]
+                break
             try:
                 request = json.loads(path.read_text())
             except (OSError, ValueError):
@@ -645,4 +665,6 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
         out["sims"] = staged
     if cache.hits or cache.misses:
         out["cache"] = {"hits": cache.hits, "computed": cache.misses}
+    if held:
+        out["waiting_for_worker"] = held
     return out
