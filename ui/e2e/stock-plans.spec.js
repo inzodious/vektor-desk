@@ -21,9 +21,9 @@ async function catchWrites(page, answer = {}) {
 
 test('each holding with a plan gets a card: role, weight, zones, steps and the thesis', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/plan');
-  await page.getByRole('navigation', { name: 'Plan views' }).getByRole('link', { name: 'Stock plans' }).click();
-  await expect(page).toHaveURL(/\/plan\/stocks$/);
+  await page.goto('/portfolio');
+  await page.getByRole('navigation', { name: 'Portfolio views' }).getByRole('link', { name: 'Stock plans' }).click();
+  await expect(page).toHaveURL(/\/portfolio\/stocks$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Stock plans');
   await expect(page.getByTestId('plans-count')).toHaveText('3 plans');
   await expect(page.locator('.ph-big')).toContainText('1 approved · 2 drafts wait on you · 2 without a plan');
@@ -56,7 +56,7 @@ test('each holding with a plan gets a card: role, weight, zones, steps and the t
 
 test('a step added to an approved plan goes straight on, sent with the plan whole', async ({ page }) => {
   const sent = await catchWrites(page);
-  await page.goto('/plan/stocks');
+  await page.goto('/portfolio/stocks');
   const card = page.locator('[data-plan="FXAIX"]');
   await card.getByTestId('plan-add-step').click();
   const form = card.getByTestId('step-form');
@@ -88,7 +88,7 @@ test('a step added to an approved plan goes straight on, sent with the plan whol
 
 test('a step added to a draft joins the draft and waits for Approve', async ({ page }) => {
   const sent = await catchWrites(page);
-  await page.goto('/plan/stocks');
+  await page.goto('/portfolio/stocks');
   const card = page.locator('[data-plan="ACME"]');
   await card.getByTestId('plan-add-step').click();
   const form = card.getByTestId('step-form');
@@ -105,7 +105,7 @@ test('a step added to a draft joins the draft and waits for Approve', async ({ p
 
 test('approve, discard, done and remove each make one call', async ({ page }) => {
   const sent = await catchWrites(page);
-  await page.goto('/plan/stocks');
+  await page.goto('/portfolio/stocks');
   const acme = page.locator('[data-plan="ACME"]');
   await acme.getByTestId('plan-approve').click();
   await expect(acme.getByTestId('plan-msg')).toHaveText('ACME plan v9 is approved and in force.');
@@ -133,7 +133,7 @@ test('approve, discard, done and remove each make one call', async ({ page }) =>
 
 test('a holding without a plan starts from the engine’s zones', async ({ page }) => {
   const sent = await catchWrites(page);
-  await page.goto('/plan/stocks');
+  await page.goto('/portfolio/stocks');
   const row = page.locator('[data-bare="FTEC"]');
   await row.getByTestId('bare-write').click();
   await expect(row.getByTestId('plan-ruler').locator('[data-key="add"]')).toContainText('Suggested add');
@@ -154,7 +154,7 @@ test('a holding without a plan starts from the engine’s zones', async ({ page 
 test('editing a plan saves a draft and shows the desk’s reasons when it refuses', async ({ page }) => {
   let refuse = true;
   const sent = await catchWrites(page, () => (refuse ? { status: 422, json: { detail: 'weight_band: max_pct can’t pass the single-stock cap of 10' } } : {}));
-  await page.goto('/plan/stocks');
+  await page.goto('/portfolio/stocks');
   const card = page.locator('[data-plan="ACME"]');
   await card.getByTestId('plan-edit').click();
   const form = card.getByTestId('plan-form');
@@ -173,7 +173,7 @@ test('editing a plan saves a draft and shows the desk’s reasons when it refuse
 });
 
 test('before the Plan desk’s first run the page says so and still lets him write one', async ({ page }) => {
-  await page.goto('/plan/stocks?scenario=fresh');
+  await page.goto('/portfolio/stocks?scenario=fresh');
   await expect(page.getByTestId('plans-count')).toHaveText('No plans yet');
   await expect(page.getByTestId('plans-first')).toContainText('Nothing is in force until you approve it.');
   await expect(page.getByTestId('plan-card')).toHaveCount(0);
@@ -182,13 +182,13 @@ test('before the Plan desk’s first run the page says so and still lets him wri
 
 test('an older desk without stock plans explains itself', async ({ page }) => {
   await page.route('**/api/decisions/plans**', (r) => r.fulfill({ status: 404, json: { detail: 'Not Found' } }));
-  await page.goto('/plan/stocks');
+  await page.goto('/portfolio/stocks');
   await expect(page.locator('.ph-big')).toContainText('Not yet');
   await expect(page.getByTestId('plans-soon')).toContainText('switch on with the next desk update');
 });
 
 test('Ask the Plan desk opens the Console set to that holding', async ({ page }) => {
-  await page.goto('/plan/stocks');
+  await page.goto('/portfolio/stocks');
   await page.locator('[data-plan="ACME"]').getByTestId('plan-ask').click();
   const dlg = page.getByRole('dialog', { name: 'Console' });
   await expect(dlg.getByRole('button', { name: /^Desk/ })).toContainText('Plan desk');
@@ -197,7 +197,7 @@ test('Ask the Plan desk opens the Console set to that holding', async ({ page })
 });
 
 test('the symbol sheet carries the same block and links to the plan', async ({ page }) => {
-  await page.goto('/plan/stocks');
+  await page.goto('/portfolio/stocks');
   await page.locator('[data-plan="FXAIX"] .sp-name [data-sym]').click();
   const sheet = page.getByTestId('sheet-plan');
   await expect(sheet).toHaveAttribute('data-status', 'approved');
@@ -209,19 +209,23 @@ test('the symbol sheet carries the same block and links to the plan', async ({ p
   await expect(page.getByTestId('sheet-plan')).toHaveAttribute('data-status', 'none');
   await expect(page.getByTestId('sheet-plan')).toContainText('No plan for BND yet.');
   await page.getByTestId('sheet-plan').getByRole('link', { name: 'Write a plan' }).click();
-  await expect(page).toHaveURL(/\/plan\/stocks\?symbol=BND$/);
+  await expect(page).toHaveURL(/\/portfolio\/stocks\?symbol=BND$/);
 });
 
-test('the Bridge lists the coming plan steps and any no-buy window', async ({ page }) => {
+test('steps due on the Bridge lists the coming plan steps and any no-buy window', async ({ page }) => {
   await page.goto('/');
-  const card = page.getByTestId('plan-steps-card');
-  await expect(card).toHaveAttribute('data-count', '3');
-  await expect(card.locator('.sp-step').first()).toContainText('Review the ACME plan');
+  const card = page.getByTestId('steps-due');
+  await expect(card).toHaveAttribute('data-steps', '3');
+  await expect(card.locator('[data-due="step"]').first()).toContainText('Review the ACME plan');
   await expect(card.getByTestId('no-buy')).toContainText('No ACME buys while its loss sale is planned.');
-  await card.locator('[data-step="harvest-2026"]').getByRole('link', { name: 'Open' }).click();
-  await expect(page).toHaveURL(/\/plan\/stocks\?symbol=ACME$/);
+  await card.locator('[data-due="step"]').first().getByRole('link', { name: 'Open' }).click();
+  await expect(page).toHaveURL(/\/portfolio\/stocks\?symbol=ACME$/);
   await expect(page.locator('[data-plan="ACME"]')).toBeInViewport();
+  await page.goto('/');
+  await card.getByTestId('due-plans').click();
+  await expect(page).toHaveURL(/\/portfolio\/stocks$/);
   await page.goto('/?scenario=fresh');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Bridge');
-  await expect(page.getByTestId('plan-steps-card')).toHaveCount(0);
+  await expect(page.getByTestId('steps-due')).toHaveAttribute('data-steps', '0');
+  await expect(page.getByTestId('steps-due').locator('[data-due="step"]')).toHaveCount(0);
 });

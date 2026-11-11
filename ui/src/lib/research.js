@@ -6,6 +6,8 @@ export const RESEARCH_TABS = [
   { to: '/research/sources', label: 'Sources' },
   { to: '/research/watchlist', label: 'Watchlist' },
   { to: '/research/calendar', label: 'Calendar' },
+  { to: '/research/compare', label: 'Compare' },
+  { to: '/research/boards', label: 'Boards' },
 ];
 
 export const VERDICT = {

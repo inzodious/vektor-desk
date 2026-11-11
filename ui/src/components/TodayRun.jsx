@@ -16,7 +16,7 @@ export function TodayRun({ i = 7 }) {
           <span className={`chip ${run.tone}`} data-testid="run-head">
             {run.head}
           </span>
-          <Link className="link" to="/settings#jobs" data-testid="run-jobs">
+          <Link className="link" to="/settings/box#jobs" data-testid="run-jobs">
             All jobs
           </Link>
         </span>

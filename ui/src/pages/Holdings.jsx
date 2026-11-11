@@ -3,12 +3,11 @@ import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Kpi } from '../components/Kpi.jsx';
 import { Subtabs } from '../components/Subtabs.jsx';
-import { PLAN_TABS } from '../lib/stockPlans.js';
+import { Board } from '../components/Board.jsx';
+import { PORTFOLIO_TABS } from '../lib/areas.js';
 import { DriftRows } from '../components/DriftRows.jsx';
-import { TaxCalendar } from '../components/TaxCalendar.jsx';
 import { FiPath } from '../plan/FiPath.jsx';
-import { todayEt } from '../lib/tax.js';
-import { useLive } from '../live/context.js';
+import { LIVE_STATES, useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { fundsFromMetrics, useMetrics, val } from '../lib/metrics.js';
 import { planLimits } from '../lib/plan.js';
@@ -17,7 +16,7 @@ import { QUALITY } from '../lib/quality.js';
 import { plural, usd } from '../lib/format.js';
 import { emptyText, moneyIn, rhythmText, seenText } from '../lib/deposits.js';
 
-const HEAD_IDS = 'plan.drift_max,plan.in_mix,plan.single_stock,plan.rules,tax.harvestable';
+const HEAD_IDS = 'plan.drift_max,plan.in_mix,plan.single_stock,plan.rules,fi.progress';
 const TILT = { growth: 'Growth tilt', balanced: 'Balanced', income: 'Income tilt' };
 const fmtPts = (v) => (v == null ? '—' : `${v < 0 ? '−' : v > 0 ? '+' : ''}${Math.abs(v).toFixed(1)} pts`);
 
@@ -106,7 +105,7 @@ function Funds({ funds, live, names }) {
                       <i style={{ width: `${((f.weight ?? 0) / maxW) * 100}%` }} />
                     </span>
                   </td>
-                  <td className="r">{f.target != null ? `${f.target.toFixed(0)}%` : <span className="muted">Not in plan</span>}</td>
+                  <td className="r">{f.target != null ? `${f.target.toFixed(0)}%` : <span className="muted">No target</span>}</td>
                   <td className={`r ${f.drift == null ? '' : Math.abs(f.drift) >= 5 ? 'dn' : ''}`}>{f.target != null ? fmtPts(f.drift) : '—'}</td>
                 </tr>
               );
@@ -152,7 +151,7 @@ function Deposits({ funds, deposits, mode, landed, deskValue }) {
       ) : (
         <p className="empty-hint" style={{ marginBottom: 8 }} data-testid="rhythm-empty">
           {emptyText(mode)}
-          {split.length ? ' The split below is modelled from the plan.' : ''}
+          {split.length ? ' The split below is modelled from your targets.' : ''}
         </p>
       )}
       {money.length ? (
@@ -206,66 +205,30 @@ function Deposits({ funds, deposits, mode, landed, deskValue }) {
   );
 }
 
-function Taxes({ m, calendar, wash }) {
-  const cell = (id, window, label) => {
-    const row = m.get(id, { window });
-    const v = val(row);
-    return (
-      <div key={id}>
-        <small>{label}</small>
-        <b>{v == null ? '—' : usd(v, { sign: true })}</b>
-        <span className="muted">{v == null ? 'Needs a lot export' : window === 'YTD' ? 'This year' : 'If sold today'}</span>
-      </div>
-    );
-  };
-  const events = (calendar.data?.events || []).filter((e) => !e.kind || e.kind === 'tax');
-  return (
-    <div className="card c12" style={{ '--i': 11 }} data-testid="tax-calendar">
-      <div className="card-head">
-        <span className="tag mustard">Tax calendar</span>
-        <span className="acts">{wash.data?.as_of ? <span className="chip">Wash windows as of {dayLabel(wash.data.as_of)}</span> : null}</span>
-      </div>
-      <div className="mini-kpis four">
-        {cell('tax.realized_st', 'YTD', 'Realized short term')}
-        {cell('tax.realized_lt', 'YTD', 'Realized long term')}
-        {cell('tax.unrealized_st', 'now', 'Unrealized short term')}
-        {cell('tax.unrealized_lt', 'now', 'Unrealized long term')}
-      </div>
-      {calendar.error && wash.error ? (
-        <p className="empty-hint">The tax calendar didn&apos;t load. It comes back with the desk API.</p>
-      ) : (
-        <TaxCalendar events={events} windows={wash.data?.windows || []} today={todayEt()} />
-      )}
-    </div>
-  );
-}
-
 // ---------- page ----------
-export default function Plan() {
+export default function Holdings() {
   const ctx = useLive();
   const m = useMetrics(HEAD_IDS);
   const plan = useMetrics('plan.*', 'scope=holding');
   const profile = useApi('/api/decisions/profile');
   const rules = useApi('/api/decisions/rules');
-  const tax = useMetrics('tax.*');
-  const calendar = useApi('/api/decisions/calendar');
   const deposits = useApi('/api/decisions/deposits');
-  const wash = useApi('/api/engine/wash');
   const limits = planLimits(profile.data, rules.data);
   const funds = useMemo(() => fundsFromMetrics(plan.rows), [plan.rows]);
   const values = useMemo(() => Object.fromEntries(ctx.symbols.map((s) => [s.symbol, s.value])), [ctx.symbols]);
   const p = profile.data?.profile || {};
   const ruleList = rules.data?.rules || p.rules || [];
   const engineAsOf = m.asOf ? `engine ${dayLabel(m.asOf)}` : null;
+  const tabs = <Subtabs label="Portfolio views" tabs={PORTFOLIO_TABS} />;
 
   if (m.loading || plan.loading) {
-    return <Hero kicker="Plan" title="Plan" art="plan" big={<b>Checking…</b>} foot={<span className="chip">Reading the plan</span>} />;
+    return <Hero kicker="Portfolio · Holdings" title="Holdings" art="plan" big={<b>Checking…</b>} foot={tabs} />;
   }
 
   if (m.error && plan.error) {
     return (
       <>
-        <Hero kicker="Plan" title="Plan" art="plan" big={<b>No answer</b>} foot={<span className="chip watch">Desk API offline</span>} />
+        <Hero kicker="Portfolio · Holdings" title="Holdings" art="plan" big={<b>No answer</b>} foot={tabs} />
         <section className="card" role="alert">
           <div className="card-head">
             <span className="tag coral">The desk API didn&apos;t answer</span>
@@ -281,7 +244,7 @@ export default function Plan() {
               Retry
             </button>
           </div>
-          <p className="muted">The plan comes back as soon as it does.</p>
+          <p className="muted">Holdings come back as soon as it does.</p>
         </section>
       </>
     );
@@ -290,7 +253,7 @@ export default function Plan() {
   const drift = m.get('plan.drift_max');
   const inMix = m.get('plan.in_mix');
   const single = m.get('plan.single_stock');
-  const harvest = m.get('tax.harvestable');
+  const fi = m.get('fi.progress');
   const ruleRows = m.all('plan.rules', 'rule');
   const passing = ruleRows.filter((r) => r.value >= 1).length;
   const next = funds.reduce((a, f) => a + (f.next || 0), 0);
@@ -298,24 +261,29 @@ export default function Plan() {
   const driftV = val(drift);
   const inMixV = val(inMix);
   const singleV = val(single);
-  const harvestV = val(harvest);
+  const fiV = val(fi);
+  const live = ctx.live;
+  const trading = LIVE_STATES.includes(live?.state);
   const inPlan = funds.filter((f) => f.target != null);
 
   return (
     <>
       <Hero
-        kicker={`Plan · desk profile v${limits.version ?? '—'}`}
-        title="Plan"
+        kicker={`Portfolio · desk profile v${limits.version ?? '—'}`}
+        title="Holdings"
         art="plan"
         big={
           <>
-            <b>{inMixV == null ? 'No plan yet' : `${inMixV.toFixed(1)}% in the mix`}</b>
-            {driftV != null ? <span className="muted">largest drift {driftV.toFixed(1)} pts</span> : null}
+            <b>{live?.value != null ? usd(live.value) : inMixV == null ? 'No targets yet' : `${inMixV.toFixed(1)}% on target funds`}</b>
+            <span className="muted">
+              {plural(ctx.symbols.length, 'holding')}
+              {driftV != null ? ` · largest drift ${driftV.toFixed(1)} pts` : ''}
+            </span>
           </>
         }
         foot={
           <>
-            <Subtabs label="Plan views" tabs={PLAN_TABS} />
+            {tabs}
             {p.risk_level != null ? <span className="chip">Risk {p.risk_level} of 5</span> : null}
             {p.growth?.tilt ? <span className="chip">{TILT[p.growth.tilt] || p.growth.tilt}</span> : null}
             {p.growth?.horizon_years ? <span className="chip">{p.growth.horizon_years}-year horizon</span> : null}
@@ -327,24 +295,36 @@ export default function Plan() {
         <Kpi i={1} label="Largest drift" metric="plan.drift_max" value={driftV == null ? '—' : driftV.toFixed(1)} unit="pts" tone={driftV != null && driftV >= limits.driftPts ? 'watch' : undefined} line={`Rebalance at ${limits.driftPts}`} quality={drift?.quality} asOf={engineAsOf} />
         <Kpi i={2} label="Next deposit" metric="plan.next_deposit" value={next ? usd(next) : '—'} line={next ? `${plural(funds.filter((f) => f.next > 0).length, 'fund')} get some` : profile.data?.deposits_mode === 'auto' ? 'None on a steady rhythm' : 'Nothing scheduled'} quality={nextModelled ? 'modelled' : undefined} asOf={engineAsOf} />
         <Kpi i={3} label="Rules" metric="plan.rules" value={ruleRows.length ? `${passing} of ${ruleRows.length}` : '—'} tone={ruleRows.length && passing < ruleRows.length ? 'watch' : undefined} line={ruleRows.length && passing === ruleRows.length ? 'All passing' : 'Some need a look'} asOf={engineAsOf} />
-        <Kpi i={4} label="In the mix" metric="plan.in_mix" value={inMixV == null ? '—' : inMixV.toFixed(1)} unit="%" line="Of the desk in plan funds" quality={inMix?.quality} asOf={engineAsOf} />
+        <Kpi i={4} label="In the mix" metric="plan.in_mix" value={inMixV == null ? '—' : inMixV.toFixed(1)} unit="%" line="Of the desk in funds with a target" quality={inMix?.quality} asOf={engineAsOf} />
         <Kpi i={5} label="Single stocks" metric="plan.single_stock" value={singleV == null ? '—' : singleV.toFixed(1)} unit="%" line={`Cap ${limits.satelliteCap}%`} quality={single?.quality} asOf={engineAsOf} />
-        <Kpi i={6} label="Harvestable" metric="tax.harvestable" value={harvestV == null ? 'Not yet' : usd(harvestV)} line={harvestV == null ? 'Needs a lot export' : 'Losses past the threshold'} quality={harvestV == null ? undefined : harvest?.quality} asOf={harvestV == null ? null : engineAsOf} />
+        <Kpi i={6} label="FI progress" metric="fi.progress" value={fiV == null ? 'Not yet' : fiV.toFixed(1)} unit={fiV == null ? undefined : '%'} line={fiV == null ? 'Needs the FI path' : 'of the FI number'} quality={fiV == null ? undefined : fi?.quality} asOf={fiV == null ? null : engineAsOf} onOpen={() => document.querySelector('[data-testid="fi-path"]')?.scrollIntoView({ block: 'start' })} />
       </section>
       <section className="grid">
+        {ctx.symbols.length ? (
+          <div className="card c12" style={{ '--i': 7 }} data-testid="holdings-board">
+            <div className="card-head">
+              <span className="tag mustard">Departures board</span>
+              <span className="acts">
+                <span className="muted" style={{ fontSize: 12 }}>
+                  Pick a row for its symbol sheet
+                </span>
+              </span>
+            </div>
+            <Board rows={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} />
+          </div>
+        ) : null}
         <div className="card c7" style={{ '--i': 7 }}>
           <div className="card-head">
             <span className="tag mint">Drift</span>
             <span className="acts">
-              <span className="chip">{plural(inPlan.length, 'plan fund')}</span>
+              <span className="chip">{plural(inPlan.length, 'fund')} with a target</span>
             </span>
           </div>
-          {inPlan.length ? <DriftRows rows={inPlan} band={limits.driftPts} values={values} /> : <p className="empty-hint">The plan mix shows after the engine&apos;s first daily run.</p>}
+          {inPlan.length ? <DriftRows rows={inPlan} band={limits.driftPts} values={values} /> : <p className="empty-hint">Targets show after the engine&apos;s first daily run.</p>}
         </div>
         <Rules rules={ruleList} m={m} version={limits.rulesVersion} />
         <Funds funds={funds} live={ctx.symbols} names={ctx.names} />
         <Deposits funds={funds} deposits={Array.isArray(p.deposits) ? p.deposits : []} mode={profile.data?.deposits_mode} landed={deposits.data?.deposits} deskValue={ctx.live?.value} />
-        <Taxes m={tax} calendar={calendar} wash={wash} />
         <FiPath />
       </section>
     </>

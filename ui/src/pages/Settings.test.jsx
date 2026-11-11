@@ -27,33 +27,48 @@ function serve(status, code = 200, jobList = jobs) {
   );
 }
 
-const page = () =>
+const page = (tab = 'desk') =>
   render(
     <MemoryRouter>
-      <Settings />
+      <Settings tab={tab} />
     </MemoryRouter>,
   );
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('Settings', () => {
-  it('shows a fresh desk', async () => {
+  it('shows a fresh desk on the Desk tab with the six settings entries', async () => {
     serve(ok);
     page();
     expect(await screen.findByText('All fresh')).toBeInTheDocument();
-    expect(screen.getByText(/Last good pull Nov 9, 8:00 AM ET · 3.7 hours ago/)).toBeInTheDocument();
-    expect(screen.getByText('359 days')).toBeInTheDocument();
+    expect(await screen.findByText('3f9c2ab')).toBeInTheDocument();
+    const tabs = screen.getByRole('navigation', { name: 'Settings views' });
+    expect([...tabs.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Desk', 'Crew', 'Data', 'Box', 'Risk check', 'First run']);
+    expect(screen.getByTestId('risk-link')).toHaveAttribute('href', '/settings/risk');
+    expect(screen.getByTestId('first-run-link')).toHaveAttribute('href', '/settings/first-run');
+    expect(screen.queryByText('Data freshness')).toBeNull();
+    expect(screen.queryByText('Claude token')).toBeNull();
+  });
+
+  it('keeps freshness on Data and the token and jobs on Box', async () => {
+    serve(ok);
+    const data = page('data');
+    expect(await screen.findByText(/Last good pull Nov 9, 8:00 AM ET · 3.7 hours ago/)).toBeInTheDocument();
+    expect(screen.queryByText('Claude token')).toBeNull();
+    data.unmount();
+    page('box');
+    expect(await screen.findByText('359 days')).toBeInTheDocument();
     expect(screen.getByText('Good to Nov 3, 2027')).toBeInTheDocument();
-    expect(screen.getByText('3f9c2ab')).toBeInTheDocument();
     expect(await screen.findByText('Scheduler on')).toBeInTheDocument();
     expect(screen.getByText('Daily numbers')).toBeInTheDocument();
+    expect(screen.queryByText('Data freshness')).toBeNull();
   });
 
   it('flags a stale mirror, a token to renew and a running job', async () => {
     serve(stale, 200, busyJobs);
-    page();
+    page('box');
     expect(await screen.findByText('2 to look at')).toBeInTheDocument();
-    expect(screen.getByText('Stale')).toBeInTheDocument();
+    expect(screen.getByText('Mirror · Stale')).toBeInTheDocument();
     expect(screen.getByText('Renew soon')).toBeInTheDocument();
     expect(await screen.findByText('1 job running')).toBeInTheDocument();
     expect(screen.getByText(/^Running since/)).toBeInTheDocument();
@@ -61,17 +76,19 @@ describe('Settings', () => {
 
   it('explains a failing pull and an expired token', async () => {
     serve(failing);
-    page();
+    const data = page('data');
     expect(await screen.findByText(/Firestore read timed out/)).toBeInTheDocument();
-    expect(screen.getByText('8 days over')).toBeInTheDocument();
+    data.unmount();
+    page('box');
+    expect(await screen.findByText('8 days over')).toBeInTheDocument();
     expect(screen.getByText(/Desks stay paused/)).toBeInTheDocument();
   });
 
   it('handles a desk that has never pulled', async () => {
     serve(empty);
-    page();
+    page('data');
     expect(await screen.findByText("The mirror hasn't run yet.")).toBeInTheDocument();
-    expect(screen.getByText('Not set')).toBeInTheDocument();
+    expect(screen.getByText('Token · Not set')).toBeInTheDocument();
     expect(screen.getByTestId('mirror-row')).toBeDisabled();
   });
 
@@ -84,7 +101,7 @@ describe('Settings', () => {
 
   it('opens the mirror tables drawer and closes it with Escape', async () => {
     serve(ok);
-    page();
+    page('data');
     fireEvent.click(await screen.findByTestId('mirror-row'));
     expect(screen.getByRole('dialog', { name: 'Mirror tables' })).toBeInTheDocument();
     expect(screen.getByText('transactions')).toBeInTheDocument();
@@ -94,7 +111,7 @@ describe('Settings', () => {
 
   it('shows the crew with a switch per desk and weekly usage', async () => {
     serve(ok);
-    page();
+    page('crew');
     expect(await screen.findByRole('switch', { name: 'All desks on' })).toBeInTheDocument();
     expect(screen.getByRole('switch', { name: 'Plan keeper on' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getAllByText('Ran fine').length).toBeGreaterThan(0);

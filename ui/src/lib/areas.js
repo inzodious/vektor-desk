@@ -1,10 +1,61 @@
 export const AREAS = [
-  { key: 'bridge', title: 'Bridge', short: 'Bridge', path: '/', art: 'bridge', kicker: 'Bridge · the whole desk at a glance', phase: '2 and 3', lands: 'The departures board, KPI row, drift bullets and gauges land here.' },
-  { key: 'research', title: 'Research', short: 'Research', path: '/research', art: 'research', kicker: 'Research · dossiers and sources', phase: '6', lands: 'Dossiers, sources, the watchlist and the Console land here.' },
-  { key: 'decisions', title: 'Decisions', short: 'Decide', path: '/decisions', art: 'decisions', kicker: 'Decisions · queue and journal', phase: '4', lands: 'The queue, Preflight lights, order ticket and Journal land here.' },
-  { key: 'plan', title: 'Plan', short: 'Plan', path: '/plan', art: 'plan', kicker: 'Plan · mix, drift and the road to FI', phase: '3', lands: 'Mix and drift lands first, the tax calendar in phase 5 and the FI path in phase 11.' },
-  { key: 'lab', title: 'Lab', short: 'Lab', path: '/lab', art: 'lab', kicker: 'Lab · compare, risk and patterns', phase: '7', lands: 'Compare, Risk and Saved boards land first, then the Strategy lab and Patterns.' },
-  { key: 'settings', title: 'Settings', short: 'Settings', path: '/settings', art: 'settings', kicker: 'Settings', phase: '1' },
+  { key: 'bridge', title: 'Bridge', short: 'Bridge', path: '/', art: 'bridge' },
+  { key: 'results', title: 'Results', short: 'Results', path: '/results', art: 'bridge' },
+  { key: 'portfolio', title: 'Portfolio', short: 'Portfolio', path: '/portfolio', art: 'plan' },
+  { key: 'strategies', title: 'Strategies', short: 'Strategies', path: '/strategies', art: 'lab' },
+  { key: 'decisions', title: 'Decisions', short: 'Decide', path: '/decisions', art: 'decisions' },
+  { key: 'research', title: 'Research', short: 'Research', path: '/research', art: 'research' },
 ];
 
-export const areaByKey = Object.fromEntries(AREAS.map((a) => [a.key, a]));
+export const SETTINGS = { key: 'settings', title: 'Settings', short: 'Settings', path: '/settings', art: 'settings' };
+
+export const areaByKey = Object.fromEntries([...AREAS, SETTINGS].map((a) => [a.key, a]));
+
+// ---------- subtabs ----------
+export const PORTFOLIO_TABS = [
+  { to: '/portfolio', label: 'Holdings', end: true },
+  { to: '/portfolio/stocks', label: 'Stock plans' },
+  { to: '/portfolio/risk', label: 'Risk' },
+  { to: '/portfolio/tax', label: 'Tax' },
+];
+
+export const STRATEGY_TABS = [
+  { to: '/strategies', label: 'Race', end: true },
+  { to: '/strategies/mixes', label: 'Mixes' },
+  { to: '/strategies/habits', label: 'My habits' },
+];
+
+export const SETTINGS_TABS = [
+  { to: '/settings', label: 'Desk', end: true },
+  { to: '/settings/crew', label: 'Crew' },
+  { to: '/settings/data', label: 'Data' },
+  { to: '/settings/box', label: 'Box' },
+  { to: '/settings/risk', label: 'Risk check' },
+  { to: '/settings/first-run', label: 'First run' },
+];
+
+// ---------- moved pages ----------
+const MOVED = [
+  ['/plan/stocks', '/portfolio/stocks'],
+  ['/plan', '/portfolio'],
+  ['/lab/risk', '/portfolio/risk'],
+  ['/lab/mixes', '/strategies/mixes'],
+  ['/lab/strategies', '/strategies'],
+  ['/lab/patterns/replay', '/strategies/habits/replay'],
+  ['/lab/patterns', '/strategies/habits'],
+  ['/lab/boards', '/research/boards'],
+];
+
+const SETTINGS_HASH = { '#jobs': '/settings/box', '#box': '/settings/box', '#token': '/settings/box', '#inbox': '/settings/data', '#keys': '/settings/data', '#crew': '/settings/crew' };
+
+export function movedPath(pathname, search = '', { board = false } = {}) {
+  if (pathname === '/lab' || pathname === '/lab/') return board || /[?&](ids|w)=/.test(search) ? '/research/compare' : '/strategies';
+  for (const [from, to] of MOVED) {
+    if (pathname === from || pathname.startsWith(`${from}/`)) return `${to}${pathname.slice(from.length)}`;
+  }
+  return null;
+}
+
+export function settingsTabFor(hash) {
+  return SETTINGS_HASH[hash] || null;
+}

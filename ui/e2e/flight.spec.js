@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 // ---------- flight record ----------
-test('flight record scores each desk against the plan', async ({ page }) => {
+test('flight record scores each desk against the safe mix', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/decisions/flight');
   await expect(page.locator('.ph-big')).toContainText('+$946');
@@ -14,7 +14,7 @@ test('flight record scores each desk against the plan', async ({ page }) => {
   const desks = page.getByTestId('desks');
   await expect(desks.locator('[data-desk]')).toHaveCount(4);
   await expect(desks.locator('[data-desk="scout"]')).toContainText('Keep it on');
-  await expect(desks.locator('[data-desk="plan_keeper"]')).toContainText('Behind the plan');
+  await expect(desks.locator('[data-desk="plan_keeper"]')).toContainText('Behind the safe mix');
   await expect(desks.locator('[data-desk="tax"]')).toContainText('No calls old enough');
   await expect(page.getByTestId('calibration').locator('[data-bin]')).toHaveCount(3);
   await expect(page.getByTestId('saves')).toContainText('$832');
@@ -45,7 +45,7 @@ test('an empty record says how scoring works', async ({ page }) => {
 // ---------- patterns ----------
 test('patterns show market context, holdings, drawdowns and habits', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/lab/patterns');
+  await page.goto('/strategies/habits');
   await expect(page.locator('.ph-big')).toContainText('S&P 500 below its high');
   await expect(page.getByTestId('market').locator('[data-pattern]')).toHaveCount(4);
   await expect(page.getByTestId('market').locator('[data-pattern="pat.mkt_drawdown"]')).toContainText('past cases were higher 12 months later');

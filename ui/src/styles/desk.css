@@ -1405,3 +1405,35 @@ tr.fl-you td { font-weight: 700; color: var(--ink); }
   .sp-row-head .chip { margin-left: 0; }
   .sp-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- menu regroup, settings gear, bridge diet ---------- */
+.gear-btn { text-decoration: none; }
+.gear-btn[aria-current='page'] { background: var(--ink); color: var(--card); border-color: transparent; }
+html.dark .gear-btn[aria-current='page'] { background: var(--mustard); color: #0d0e10; }
+.gauge.still { cursor: default; }
+.gauge.still:hover { border-color: var(--line); }
+.btn.ghost.heads-up { box-shadow: inset 0 0 0 1.5px var(--mustard); background: var(--mustard-soft); }
+.drawer-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.movers { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-top: 8px; margin-top: 2px; border-top: 1px dashed var(--line); }
+.movers .kicker { margin-right: 2px; }
+.due .sp-steps { margin-top: 2px; }
+.due .sp-step { grid-template-columns: 40px minmax(0, 1fr) auto; padding: 7px 6px; }
+.due .sp-step .desk-ico { justify-self: center; }
+.due .sp-step-main b { font-size: 13.5px; }
+.due .sp-step-side { flex-wrap: nowrap; grid-column: auto; }
+.due-warn { margin-top: 8px; padding-top: 8px; padding-bottom: 8px; }
+.rule-rows { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; }
+a.rule-btn { text-decoration: none; }
+a.chip { text-decoration: none; }
+@media (max-width: 860px) {
+  .rule-rows { grid-template-columns: minmax(0, 1fr); }
+  [data-testid='bridge-kpis'] .spark { display: none; }
+  .movers .kicker { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .movers { gap: 5px; }
+}
+@media (max-width: 480px) {
+  .brand b { display: none; }
+  .brand { padding-right: 5px; }
+}
+.journal-filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 2px 0 10px; }
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12.5px; }

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Hero } from '../components/Hero.jsx';
+import { Subtabs } from '../components/Subtabs.jsx';
+import { SETTINGS_TABS } from '../lib/areas.js';
 import { Icon } from '../components/Icon.jsx';
 import { Gauge } from '../components/Gauge.jsx';
 import { Panel } from '../components/Panel.jsx';
@@ -286,10 +288,8 @@ export default function RiskCheck() {
         }
         foot={
           <>
+            <Subtabs label="Settings views" tabs={SETTINGS_TABS} />
             {c ? <span className="chip ok">Stocks {c.equity_min_pct}–{c.equity_max_pct}%</span> : <span className="chip watch">Strategies wait for your band</span>}
-            <Link className="chip info" to="/settings/first-run">
-              First-run checklist
-            </Link>
           </>
         }
       />

@@ -46,7 +46,7 @@ function fakeScheduler(page, { fail = [] } = {}) {
 // ---------- settings ----------
 test('jobs list plain names, how each last went and when it runs', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const card = page.getByTestId('jobs');
   await expect(card).toHaveAttribute('data-alive', 'true');
   await expect(card.locator('.job-list').first().locator('.job-row')).toHaveCount(9);
@@ -67,7 +67,7 @@ test('jobs list plain names, how each last went and when it runs', async ({ page
 
 test('run now shows starting, running, then done', async ({ page }) => {
   const asked = fakeScheduler(page);
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const row = page.getByTestId('jobs').locator('[data-job="engine-daily"]');
   await row.getByRole('button', { name: 'Run Daily numbers now' }).click();
   await expect(row).toHaveAttribute('data-state', 'running');
@@ -79,7 +79,7 @@ test('run now shows starting, running, then done', async ({ page }) => {
 
 test('a failed run says so kindly', async ({ page }) => {
   fakeScheduler(page, { fail: ['engine-backfill'] });
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const row = page.getByTestId('jobs').locator('[data-job="engine-backfill"]');
   await row.getByRole('button', { name: /Run Backfill now/ }).click();
   await expect(row).toContainText('Backfill didn’t finish: Firestore said no.', { timeout: 15000 });
@@ -88,14 +88,14 @@ test('a failed run says so kindly', async ({ page }) => {
 
 test('a refusal shows the reason on the row', async ({ page }) => {
   await page.route('**/api/jobs/*/run', (route) => route.fulfill({ status: 503, json: { ok: false, error: 'scheduler_down', message: 'The cron service isn’t running.' } }));
-  await page.goto('/settings');
+  await page.goto('/settings/box');
   const row = page.getByTestId('jobs').locator('[data-job="engine-lots"]');
   await row.getByRole('button', { name: /Run Lots now/ }).click();
   await expect(row.locator('.job-note')).toContainText('taking a break');
 });
 
 test('with the scheduler off, run now is off and says why', async ({ page }) => {
-  await page.goto('/settings?scenario=down');
+  await page.goto('/settings/box?scenario=down');
   const card = page.getByTestId('jobs');
   await expect(card.getByTestId('scheduler-off')).toBeVisible();
   await expect(card.getByText('Scheduler off')).toBeVisible();

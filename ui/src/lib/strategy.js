@@ -47,7 +47,7 @@ const PARAM_WORD = {
 };
 
 export const BARS = [
-  { key: 'excess_interval', t: 'Beats the plan', line: 'Excess return interval above zero' },
+  { key: 'excess_interval', t: 'Beats its benchmark', line: 'Excess return interval above zero' },
   { key: 'deflated_sharpe', t: 'Deflated Sharpe', line: 'Still good after counting every variant tried' },
   { key: 'pbo', t: 'Overfit odds', line: 'Best in-sample pick holds out of sample' },
   { key: 'holdout', t: 'Holdout', line: 'Holds on the years it never saw' },

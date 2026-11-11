@@ -237,7 +237,7 @@ export default function Replay() {
 
   return (
     <>
-      <LabHero kicker="Patterns · Replay" title="Replay" big={big} board={ready ? 'Replay' : undefined} />
+      <LabHero kicker="My habits · Replay" title="Replay" big={big} board={ready ? 'Replay' : undefined} />
       {api.error && !d ? (
         <section className="card" role="alert">
           <div className="card-head">
@@ -261,7 +261,7 @@ export default function Replay() {
           </div>
           <p className="muted">{d?.reason || 'The replay runs with the nightly engine once your Fidelity history is in.'}</p>
           <p style={{ marginTop: 10 }}>
-            <Link className="btn sm" to="/settings#inbox">
+            <Link className="btn sm" to="/settings/data#inbox">
               <Icon name="pin" />
               Upload the history
             </Link>
@@ -281,8 +281,8 @@ export default function Replay() {
             </span>
           </p>
           <p className="replay-back">
-            <Link className="link" to="/lab/patterns">
-              Back to Patterns
+            <Link className="link" to="/strategies/habits">
+              Back to My habits
             </Link>
           </p>
         </>

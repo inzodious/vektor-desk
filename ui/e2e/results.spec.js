@@ -21,7 +21,7 @@ test('the day review leads with the change, the debrief and next steps', async (
   await expect(page.getByTestId('rs-ledger')).toContainText('No deposits, withdrawals or trades');
   await expect(page.getByTestId('rs-risk')).toContainText('One day is too short');
   const phone = test.info().project.name === 'phone';
-  await expect(page.getByRole('navigation', { name: phone ? 'Areas, phone' : 'Areas', exact: true }).getByRole('link', { name: 'Bridge' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.getByRole('navigation', { name: phone ? 'Areas, phone' : 'Areas', exact: true }).getByRole('link', { name: 'Results' })).toHaveAttribute('aria-current', 'page');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
@@ -87,11 +87,14 @@ test('an older desk without reviews explains itself, and unknown kinds go to Day
   await expect(page.getByTestId('rs-first')).toContainText('switch on with the next desk update');
 });
 
-test('the Bridge links to Results from the hero and the Review stage', async ({ page }) => {
+test('Results opens from the menu and from the Review stage on the Bridge', async ({ page }) => {
   await page.goto('/?scenario=evening');
   await page.getByTestId('run-results').click();
   await expect(page).toHaveURL(/\/results\/day/);
   await page.goto('/');
-  await page.getByTestId('results-link').click();
+  await expect(page.getByTestId('results-link')).toHaveCount(0);
+  const phone = test.info().project.name === 'phone';
+  await page.getByRole('navigation', { name: phone ? 'Areas, phone' : 'Areas', exact: true }).getByRole('link', { name: 'Results' }).click();
+  await expect(page).toHaveURL(/\/results\/day$/);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Results');
 });

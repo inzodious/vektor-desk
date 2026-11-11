@@ -3,11 +3,10 @@ import { Link, useParams } from 'react-router-dom';
 import { HBars } from '../components/HBars.jsx';
 import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
-import { Subtabs } from '../components/Subtabs.jsx';
+import { AreaTabs } from '../lab/parts.jsx';
 import { useApi } from '../lib/api.js';
 import { LAMP_COLOR, LAMP_WORD } from '../lib/decisions.js';
 import { px, usd } from '../lib/format.js';
-import { LAB_TABS } from '../lib/lab.js';
 import {
   PAPER_DAYS,
   RULE_WORD,
@@ -242,7 +241,7 @@ function VerdictCard({ final, windows }) {
           <Tiles
             items={[
               { k: 'Return', v: signedPct(h.return_pct), tone: tone(h.return_pct) },
-              { k: 'Against the plan', v: signedPts(h.excess_vs_bench_pts), tone: tone(h.excess_vs_bench_pts) },
+              { k: 'Against its benchmark', v: signedPts(h.excess_vs_bench_pts), tone: tone(h.excess_vs_bench_pts) },
               { k: 'Worst drop', v: signedPct(h.mdd_pct) },
             ]}
           />
@@ -317,7 +316,7 @@ function StrategyView({ v }) {
             cls="six"
             items={[
               { k: 'A year, averaged', v: signedPct(wf.ann_return_pct), tone: tone(wf.ann_return_pct) },
-              { k: 'Against the plan', v: signedPts(wf.excess_pts), tone: tone(wf.excess_pts), line: 'a year' },
+              { k: 'Against its benchmark', v: signedPts(wf.excess_pts), tone: tone(wf.excess_pts), line: 'a year' },
               { k: 'Sharpe', v: wf.sharpe == null ? '—' : wf.sharpe.toFixed(2) },
               { k: 'Worst drop', v: signedPct(wf.mdd_pct) },
               { k: 'Deflated Sharpe', v: t.deflated_sharpe == null ? '—' : t.deflated_sharpe.toFixed(2), line: 'chance the edge is real' },
@@ -331,9 +330,9 @@ function StrategyView({ v }) {
           <div className="card c6" data-testid="folds">
             <div className="card-head">
               <span className="tag">Each test year</span>
-              <span className="chip">Against the plan</span>
+              <span className="chip">Against its benchmark</span>
             </div>
-            <HBars items={foldItems(v.folds)} fmt={(x) => signedPts(x)} name="Against the plan" labelW={52} rowH={22} empty="No folds yet." />
+            <HBars items={foldItems(v.folds)} fmt={(x) => signedPts(x)} name="Against its benchmark" labelW={52} rowH={22} empty="No folds yet." />
             <p className="empty-hint" style={{ marginTop: 6 }}>
               Tuned on the three years before, then tested on a year it never saw.
             </p>
@@ -362,9 +361,9 @@ function StrategyView({ v }) {
             <div className="card c4" data-analysis="regimes">
               <div className="card-head">
                 <span className="tag mint">By market</span>
-                <span className="chip">Against the plan, a year</span>
+                <span className="chip">Against its benchmark, a year</span>
               </div>
-              <HBars items={regimes} fmt={(x) => signedPts(x)} name="Against the plan" labelW={120} table={false} />
+              <HBars items={regimes} fmt={(x) => signedPts(x)} name="Against its benchmark" labelW={120} table={false} />
             </div>
           ) : null}
           {costs.length ? (
@@ -372,7 +371,7 @@ function StrategyView({ v }) {
               <div className="card-head">
                 <span className="tag coral">If trading cost more</span>
               </div>
-              <HBars items={costs} fmt={(x) => signedPts(x)} name="Against the plan" labelW={96} table={false} />
+              <HBars items={costs} fmt={(x) => signedPts(x)} name="Against its benchmark" labelW={96} table={false} />
             </div>
           ) : null}
           {factor ? (
@@ -541,7 +540,7 @@ function RuleView({ v }) {
 
 // ---------- page ----------
 function heroLine(v) {
-  if (v.kind === 'rule') return `${(v.rule?.trials ?? ruleVariants(v.rule).length) || 0} settings replayed on your plan mix`;
+  if (v.kind === 'rule') return `${(v.rule?.trials ?? ruleVariants(v.rule).length) || 0} settings replayed on your own mix`;
   if (v.paper && v.status === 'paper') {
     const p = paperProgress(v.paper);
     return `day ${p.days} of ${PAPER_DAYS} · ${signedPts(v.paper.excess_pts)} against its benchmark`;
@@ -563,10 +562,10 @@ export default function Strategy() {
   const word = isRule ? verdictOf(v.status) : statusOf(v?.status);
   const foot = (
     <>
-      <Subtabs label="Lab views" tabs={LAB_TABS} />
-      <Link className="btn sm ghost" to="/lab/strategies">
+      <AreaTabs area="strategies" />
+      <Link className="btn sm ghost" to={isRule ? '/strategies/habits' : '/strategies'}>
         <Icon name="right" className="mirror" />
-        All strategies
+        {isRule ? 'My habits' : 'The race'}
       </Link>
     </>
   );
@@ -574,7 +573,7 @@ export default function Strategy() {
   if (api.error && !v)
     return (
       <>
-        <Hero kicker="Lab · Strategy" title={id} art="lab" foot={foot} />
+        <Hero kicker="Strategies · Strategy" title={id} art="lab" foot={foot} />
         <section className="card" role="alert">
           <div className="card-head">
             <span className="tag coral">{api.error.status === 404 ? 'Nothing in the lab by that name' : "The desk API didn't answer"}</span>
@@ -593,7 +592,7 @@ export default function Strategy() {
   return (
     <>
       <Hero
-        kicker={isRule ? 'Lab · Rule test' : 'Lab · Strategy'}
+        kicker={isRule ? 'Strategies · Rule test' : 'Strategies · Strategy'}
         title={title}
         art="lab"
         big={

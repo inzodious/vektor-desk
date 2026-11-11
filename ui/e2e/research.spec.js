@@ -213,7 +213,7 @@ test('calendar lists what is coming up and the yield lines', async ({ page }) =>
 });
 
 test('the symbol sheet shows the latest filing read and the lane chip only when the lane holds it', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/portfolio');
   await page.locator('.board-row[data-sym="ACME"]').click();
   const acme = page.getByRole('dialog', { name: 'ACME symbol sheet' });
   await expect(acme.getByTestId('filing-chip')).toHaveText('Leans good · 72% sure');
@@ -226,7 +226,7 @@ test('the symbol sheet shows the latest filing read and the lane chip only when 
   await expect(nova.getByTestId('filing-chip')).toHaveText('Leans bad · 61% sure');
   await expect(nova.getByTestId('filing-lane')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await page.goto('/');
+  await page.goto('/portfolio');
   await page.locator('.board-row[data-sym="FTEC"]').click();
   await expect(page.getByRole('dialog', { name: 'FTEC symbol sheet' }).getByTestId('sheet-dossier')).toBeVisible();
   await expect(page.getByTestId('sheet-filing')).toHaveCount(0);

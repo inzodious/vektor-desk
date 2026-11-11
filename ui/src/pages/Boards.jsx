@@ -3,15 +3,14 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
 import { LabHero } from '../lab/parts.jsx';
 import { etStamp, plural } from '../lib/format.js';
-import { readBoards, removeBoard } from '../lib/lab.js';
-
-const VIEW = { '/lab': 'Compare', '/lab/risk': 'Risk', '/lab/patterns': 'Patterns' };
+import { BOARD_VIEW, readBoards, removeBoard } from '../lib/lab.js';
 
 export default function Boards() {
   const [list, setList] = useState(() => readBoards());
   return (
     <>
       <LabHero
+        area="research"
         kicker="Saved boards"
         title="Saved boards"
         big={
@@ -42,7 +41,7 @@ export default function Boards() {
                           <Link to={b.path}>{b.name}</Link>
                         </b>
                         <small>
-                          {VIEW[path] || 'Lab'} · saved {etStamp(b.saved_at)}
+                          {BOARD_VIEW[path] || 'Board'} · saved {etStamp(b.saved_at)}
                         </small>
                       </span>
                     </span>
@@ -55,7 +54,7 @@ export default function Boards() {
               })}
             </div>
           ) : (
-            <p className="empty-hint">No boards yet. Set up a Compare or Risk view the way you like it, then press Save as a board.</p>
+            <p className="empty-hint">No boards yet. Set up a Compare, Risk or My habits view the way you like it, then press Save as a board.</p>
           )}
         </div>
         <div className="stack c4">

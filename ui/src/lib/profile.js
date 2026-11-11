@@ -11,7 +11,7 @@ const KEY_WORD = {
   'tax.wash_sale_accounts': 'Wash-sale accounts',
   'growth.horizon_years': 'Horizon',
   'growth.tilt': 'Tilt',
-  'growth.fi_target_from_plan': 'FI target from the plan',
+  'growth.fi_target_from_plan': 'FI target from Escape Vektor',
   'usage.overnight_window': 'Overnight window',
   'usage.weekly_runs': 'Weekly runs',
   'agents.enabled': 'Desks on or off',

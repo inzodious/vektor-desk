@@ -63,13 +63,13 @@ export default function Results() {
     </>
   );
 
-  if (!d && api.loading) return <Hero kicker="Bridge · Results" title="Results" art="bridge" big={<b>Checking…</b>} foot={tabs} />;
+  if (!d && api.loading) return <Hero kicker="Results" title="Results" art="bridge" big={<b>Checking…</b>} foot={tabs} />;
 
   if (!d) {
     const missing = api.error?.status === 404;
     return (
       <>
-        <Hero kicker="Bridge · Results" title="Results" art="bridge" big={<b>{missing ? 'Not yet' : 'No answer'}</b>} foot={tabs} />
+        <Hero kicker="Results" title="Results" art="bridge" big={<b>{missing ? 'Not yet' : 'No answer'}</b>} foot={tabs} />
         {missing ? (
           <FirstRun note="Results reviews switch on with the next desk update." />
         ) : (
@@ -91,7 +91,7 @@ export default function Results() {
   if (!pack) {
     return (
       <>
-        <Hero kicker="Bridge · Results" title="Results" art="bridge" big={<b>First run tonight</b>} foot={foot} />
+        <Hero kicker="Results" title="Results" art="bridge" big={<b>First run tonight</b>} foot={foot} />
         <FirstRun note={firstRunNote(index.data, d)} />
       </>
     );
@@ -100,7 +100,7 @@ export default function Results() {
   return (
     <>
       <Hero
-        kicker={`Bridge · Results · ${pack.label}`}
+        kicker={`Results · ${pack.label}`}
         title="Results"
         art="bridge"
         big={

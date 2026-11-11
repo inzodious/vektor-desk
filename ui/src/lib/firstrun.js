@@ -29,7 +29,7 @@ export function firstRunSteps({ status, jobs, health, profile, agents, board, ri
       title: 'Connect Claude',
       line: 'The desks think through the Claude Code CLI on your subscription.',
       state: !ready(status) ? 'loading' : token === 'ok' || token === 'renew' ? 'done' : 'todo',
-      action: { kind: 'link', to: '/settings#keys', label: token === 'ok' || token === 'renew' ? 'See the token' : 'Add the token' },
+      action: { kind: 'link', to: '/settings/data#keys', label: token === 'ok' || token === 'renew' ? 'See the token' : 'Add the token' },
     },
     {
       id: 'backfill',
@@ -41,7 +41,7 @@ export function firstRunSteps({ status, jobs, health, profile, agents, board, ri
     {
       id: 'daily',
       title: 'Run the daily numbers',
-      line: 'Values, drift, risk and the plan checks for today.',
+      line: 'Values, drift, risk and the rule checks for today.',
       state: !ready(health) ? 'loading' : h?.as_of && h.status !== 'fail' ? 'done' : 'todo',
       action: { kind: 'job', job: 'engine-daily', label: 'Run now' },
     },
@@ -57,7 +57,7 @@ export function firstRunSteps({ status, jobs, health, profile, agents, board, ri
       title: 'Bring in your tax lots',
       line: 'A Fidelity lot export unlocks tax-loss and wash-sale checks.',
       state: !ready(health) ? 'loading' : shares?.status === 'ok' && !/No lot export/i.test(shares?.detail || '') ? 'done' : 'todo',
-      action: { kind: 'link', to: '/settings#inbox', label: 'Upload it' },
+      action: { kind: 'link', to: '/settings/data#inbox', label: 'Upload it' },
     },
     {
       id: 'research',
@@ -71,14 +71,14 @@ export function firstRunSteps({ status, jobs, health, profile, agents, board, ri
       title: 'Wake the crew',
       line: 'Turn the desks on, then lift the first-run guard when Plan keeper and Tax have run.',
       state: !ready(agents) ? 'loading' : a?.enabled && a?.guard && !a.guard.on ? 'done' : 'todo',
-      action: { kind: 'link', to: '/settings', label: 'Open Desks' },
+      action: { kind: 'link', to: '/settings/crew', label: 'Open Crew' },
     },
     {
       id: 'race',
       title: 'Start the paper race',
       line: 'Strategies trade paper money for 182 days before any can go live.',
       state: !ready(board) ? 'loading' : (b?.rows || []).length ? 'done' : 'todo',
-      action: { kind: 'link', to: '/lab/strategies', label: 'See the race' },
+      action: { kind: 'link', to: '/strategies', label: 'See the race' },
     },
     {
       id: 'risk',

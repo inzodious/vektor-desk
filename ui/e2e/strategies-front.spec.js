@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 // ---------- leaderboard ----------
 test('the leaderboard groups racers under their own benchmark and ranks on lead against noise', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/lab/strategies');
+  await page.goto('/strategies');
   const board = page.getByTestId('leaderboard');
   await expect(board.getByTestId('lb-lede')).toContainText('Calm sectors has the firmest lead: +3.7 pts against Plan mix, 6% chance it’s luck.');
   await expect(board.locator('.card-head')).toContainText('Checked at day 182, then every 91 days');
@@ -39,17 +39,17 @@ test('the leaderboard groups racers under their own benchmark and ranks on lead 
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   await board.locator('[data-row="sector-momentum"]').getByRole('link').click();
-  await expect(page).toHaveURL(/\/lab\/strategies\/sector-momentum/);
+  await expect(page).toHaveURL(/\/strategies\/sector-momentum/);
   expect(errors).toEqual([]);
 });
 
 test('an empty leaderboard explains what starts it', async ({ page }) => {
-  await page.goto('/lab/strategies?scenario=empty');
+  await page.goto('/strategies?scenario=empty');
   await expect(page.getByTestId('lb-empty')).toContainText('The filings lane starts the morning after the first filing is scored.');
 });
 
 test('a brand-new racer shows too early, not zeros', async ({ page }) => {
-  await page.goto('/lab/strategies?scenario=early');
+  await page.goto('/strategies?scenario=early');
   const row = page.getByTestId('leaderboard').locator('[data-row="filings-lane"]');
   await expect(row).toContainText('Too early');
   await expect(page.getByTestId('lb-lede')).toContainText('just off the line');
@@ -59,7 +59,7 @@ test('a brand-new racer shows too early, not zeros', async ({ page }) => {
 
 // ---------- desks ----------
 test('desks show where each switch comes from and wait for the guard', async ({ page }) => {
-  await page.goto('/settings');
+  await page.goto('/settings/crew');
   const card = page.getByTestId('crew');
   await expect(card.getByText('Desks', { exact: true })).toBeVisible();
   await expect(card.getByTestId('guard')).toHaveAttribute('data-on', 'true');
@@ -76,7 +76,7 @@ test('lifting the guard asks once, warns, then calls the API', async ({ page }) 
     calls.push(route.request().postDataJSON());
     route.fulfill({ json: { guard: false, allowed: ['plan_keeper', 'tax'] } });
   });
-  await page.goto('/settings');
+  await page.goto('/settings/crew');
   const guard = page.getByTestId('guard');
   await guard.getByRole('button', { name: 'Lift the guard' }).click();
   await expect(guard.getByTestId('guard-why')).toContainText('Heads up: Tax desk hasn’t finished a run yet.');
@@ -95,7 +95,7 @@ test('a lifted guard can go back, and an app switch can follow desk.yaml again',
     calls.push(`${req.method()} ${new URL(req.url()).pathname}`);
     return route.fulfill({ json: {} });
   });
-  await page.goto('/settings?scenario=lifted');
+  await page.goto('/settings/crew?scenario=lifted');
   const card = page.getByTestId('crew');
   await expect(card.getByTestId('guard')).toContainText('Guard lifted.');
   await expect(card.locator('[data-desk="risk"]')).not.toContainText('When the guard lifts');

@@ -50,7 +50,7 @@ function MetricDrawer({ id, rows, onClose }) {
   const ids = id === 'risk.var95' ? ['risk.var95', 'risk.cvar95'] : id === 'risk.sharpe' ? ['risk.sharpe', 'risk.sortino'] : id === 'risk.vol' ? ['risk.vol', 'risk.downside_dev'] : id === 'risk.lookthrough' ? ['risk.lookthrough', 'risk.lookthrough_coverage'] : id === 'risk.eff_n' ? ['risk.eff_n', 'risk.top1', 'risk.top5'] : [id];
   const shown = rows.filter((m) => ids.includes(m.metric_id) && m.scope === 'portfolio').sort((a, b) => ids.indexOf(a.metric_id) - ids.indexOf(b.metric_id));
   return (
-    <Panel open={!!id} onClose={onClose} title={about[0]} sub={about[1]} crumbs={[{ label: 'Lab · Risk', go: onClose }]}>
+    <Panel open={!!id} onClose={onClose} title={about[0]} sub={about[1]} crumbs={[{ label: 'Portfolio · Risk', go: onClose }]}>
       <div className="tscroll">
         <table className="t">
           <thead>
@@ -88,7 +88,7 @@ function RiskReturn({ held }) {
   const many = useJsonMany(paths);
   const table = Object.values(many.data).flatMap((d) => d?.table || []);
   const pts = table.map((r) => ({
-    label: r.id === 'portfolio' ? 'You' : r.id === 'shadow:plan_shadow' ? 'Plan' : r.id,
+    label: r.id === 'portfolio' ? 'You' : r.id === 'shadow:plan_shadow' ? 'Safe mix' : r.id,
     sym: r.kind === 'symbol' ? r.id : undefined,
     x: r.vol_pct,
     y: r.return_pct,
@@ -120,7 +120,7 @@ function RiskReturn({ held }) {
               </span>
               <span>
                 <i className="dot" style={{ '--c': 'var(--s3)' }} />
-                Plan shadow
+                Safe mix shadow
               </span>
             </div>
           }
@@ -145,12 +145,12 @@ function Drawdowns({ start }) {
       </div>
       {a.x.length > 1 ? (
         <LineChart
-          label="Drawdown from the high, you and the plan shadow"
+          label="Drawdown from the high, you and the safe mix shadow"
           height={220}
           x={a.x}
           series={[
             { name: 'You', color: 'var(--s1)', values: drawdown(a.a) },
-            { name: 'Plan shadow', color: 'var(--s2)', values: drawdown(a.b) },
+            { name: 'Safe mix shadow', color: 'var(--s2)', values: drawdown(a.b) },
           ]}
           fmtY={(v) => P(v, 0)}
           fmtTip={(v) => P(v, 1)}
@@ -222,6 +222,7 @@ export default function Risk() {
   return (
     <>
       <LabHero
+        area="portfolio"
         kicker="Risk and statistics"
         title="Risk"
         board="Risk overview"

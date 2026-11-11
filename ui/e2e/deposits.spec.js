@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
 // ---------- deposits read from activity ----------
 test('auto deposits show the rhythm found in activity and money in', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/plan');
+  await page.goto('/portfolio');
   const card = page.getByTestId('deposits');
   await expect(card).toHaveAttribute('data-mode', 'auto');
   await expect(card.getByText('From your activity')).toBeVisible();
@@ -25,7 +25,7 @@ test('auto deposits show the rhythm found in activity and money in', async ({ pa
 });
 
 test('auto with no steady rhythm says activity does the talking', async ({ page }) => {
-  await page.goto('/plan?scenario=quiet');
+  await page.goto('/portfolio?scenario=quiet');
   const card = page.getByTestId('deposits');
   await expect(card.getByTestId('rhythm-empty')).toContainText('Deposits are read from your activity. None on a steady rhythm right now.');
   await expect(card.getByTestId('rhythm-empty')).not.toContainText('desk.yaml');
@@ -37,7 +37,7 @@ test('auto with no steady rhythm says activity does the talking', async ({ page 
 });
 
 test('a listed schedule still flags a deposit that has not landed', async ({ page }) => {
-  await page.goto('/plan?scenario=listed');
+  await page.goto('/portfolio?scenario=listed');
   const card = page.getByTestId('deposits');
   await expect(card).toHaveAttribute('data-mode', 'listed');
   await expect(card.getByText('From your activity')).toHaveCount(0);

@@ -5,7 +5,7 @@ import { etDate, etTime } from './format.js';
 const WORD = {
   mirror: ['Accounts', 'Pulls balances and activity from Escape Vektor'],
   'engine-quotes': ['Prices', 'Live quotes while the market is open'],
-  'engine-daily': ['Daily numbers', 'Values, drift, risk and the plan checks'],
+  'engine-daily': ['Daily numbers', 'Values, drift, risk and the rule checks'],
   'engine-backfill': ['Backfill', 'Fills in missing price history'],
   'engine-research': ['Research', 'Company facts and filings'],
   'engine-lookthrough': ['Fund breakdowns', 'What each fund holds'],

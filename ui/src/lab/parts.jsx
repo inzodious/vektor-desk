@@ -5,8 +5,9 @@ import { Icon } from '../components/Icon.jsx';
 import { Subtabs } from '../components/Subtabs.jsx';
 import { useLive } from '../live/context.js';
 import { useDismiss } from '../lib/useDismiss.js';
-import { LAB_TABS, MAX_SLOTS, SLOT_COLORS, SPECIAL, addBoard, idLabel, isSymbol } from '../lib/lab.js';
-import { cleanSymbol } from '../lib/research.js';
+import { MAX_SLOTS, SLOT_COLORS, SPECIAL, addBoard, idLabel, isSymbol } from '../lib/lab.js';
+import { RESEARCH_TABS, cleanSymbol } from '../lib/research.js';
+import { PORTFOLIO_TABS, STRATEGY_TABS } from '../lib/areas.js';
 
 // ---------- save as a board ----------
 export function SaveBoard({ name }) {
@@ -31,16 +32,29 @@ export function SaveBoard({ name }) {
   );
 }
 
-export function LabHero({ kicker, title, big, board }) {
+const HEROES = {
+  strategies: { word: 'Strategies', art: 'lab', tabs: STRATEGY_TABS },
+  portfolio: { word: 'Portfolio', art: 'plan', tabs: PORTFOLIO_TABS },
+  research: { word: 'Research', art: 'research', tabs: RESEARCH_TABS },
+};
+
+export function AreaTabs({ area }) {
+  const h = HEROES[area] || HEROES.strategies;
+  return <Subtabs label={`${h.word} views`} tabs={h.tabs} />;
+}
+
+export function LabHero({ area = 'strategies', kicker, title, big, board, extra }) {
+  const h = HEROES[area] || HEROES.strategies;
   return (
     <Hero
-      kicker={`Lab · ${kicker}`}
+      kicker={`${h.word} · ${kicker}`}
       title={title}
-      art="lab"
+      art={h.art}
       big={big}
       foot={
         <>
-          <Subtabs label="Lab views" tabs={LAB_TABS} />
+          <AreaTabs area={area} />
+          {extra}
           {board ? <SaveBoard name={board} /> : null}
         </>
       }

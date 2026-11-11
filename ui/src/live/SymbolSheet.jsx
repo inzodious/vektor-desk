@@ -153,7 +153,7 @@ function PlanBit({ symbol, onClose }) {
       <PlanBlock symbol={symbol} plan={plan} fact={fact} lotMethods={meta.data?.lot_methods} showNext />
       {!plan ? <p className="empty-hint">No plan for {symbol} yet. The zones above are a starting point from its monthly swing.</p> : null}
       <div className="sheet-acts">
-        <Link className="btn sm ghost" to={`/plan/stocks?symbol=${encodeURIComponent(symbol)}`} onClick={onClose}>
+        <Link className="btn sm ghost" to={`/portfolio/stocks?symbol=${encodeURIComponent(symbol)}`} onClick={onClose}>
           <Icon name="plan" />
           {plan ? 'Open the plan' : 'Write a plan'}
         </Link>

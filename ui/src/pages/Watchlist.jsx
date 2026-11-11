@@ -217,7 +217,7 @@ export default function Watchlist() {
               <Icon name="flag" />
               <span>
                 <b>No buy signal</b>
-                <small>Watching is not a plan change. New single stocks still trip the plan rules.</small>
+                <small>Watching changes nothing you hold. New single stocks still trip your rules.</small>
               </span>
               <span />
             </div>

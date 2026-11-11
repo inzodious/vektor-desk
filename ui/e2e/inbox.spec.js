@@ -12,7 +12,7 @@ test.beforeEach(async ({ page }) => {
 // ---------- settings ----------
 test('the inbox lists what is waiting', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/settings');
+  await page.goto('/settings/data');
   const card = page.getByTestId('inbox');
   await expect(card.getByText('2 files waiting')).toBeVisible();
   await expect(card.getByTestId('inbox-files').locator('li').first()).toContainText('lots-2026-11-09.csv');
@@ -41,7 +41,7 @@ test('uploading a lot export saves it and offers to read it now', async ({ page 
     if (asked && polls > 1) body.jobs = body.jobs.map((j) => (j.name === asked ? { ...j, last_run: { ...j.last_run, request_id: 'req-up', result: 'ok', finished: '2026-11-09T16:43:00Z' } } : j));
     route.fulfill({ json: body });
   });
-  await page.goto('/settings?scenario=empty');
+  await page.goto('/settings/data?scenario=empty');
   const card = page.getByTestId('inbox');
   await expect(card).toContainText('Nothing in the inbox yet.');
   await card.getByTestId('inbox-file').setInputFiles(CSV);
@@ -56,14 +56,14 @@ test('uploading a lot export saves it and offers to read it now', async ({ page 
 
 test('a duplicate upload says so', async ({ page }) => {
   await page.route('**/api/inbox/fidelity/*', (route) => route.fulfill({ status: 200, json: { ok: true, broker: 'fidelity', name: 'lots-2026-11-09.csv', size: 34, sha256: 'x', duplicate: true, import_job: 'engine-lots' } }));
-  await page.goto('/settings');
+  await page.goto('/settings/data');
   await page.getByTestId('inbox-file').setInputFiles(CSV);
   await expect(page.getByTestId('inbox-msg')).toHaveText('Already in the inbox as lots-2026-11-09.csv. Nothing new to save.');
 });
 
 test('a refused upload explains what to do', async ({ page }) => {
   await page.route('**/api/inbox/fidelity/*', (route) => route.fulfill({ status: 400, json: { ok: false, error: 'bad_csv', message: 'That .csv file has no comma-separated header line.' } }));
-  await page.goto('/settings');
+  await page.goto('/settings/data');
   await page.getByTestId('inbox-file').setInputFiles(CSV);
   await expect(page.getByTestId('inbox-msg')).toHaveAttribute('data-phase', 'refused');
   await expect(page.getByTestId('inbox-msg')).toContainText('no header line');
@@ -75,7 +75,7 @@ test('the wrong kind of file never leaves the browser', async ({ page }) => {
     sent = true;
     route.abort();
   });
-  await page.goto('/settings');
+  await page.goto('/settings/data');
   await page.getByTestId('inbox-file').setInputFiles({ name: 'statement.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4') });
   await expect(page.getByTestId('inbox-msg')).toContainText('Export the lots as CSV');
   expect(sent).toBe(false);
@@ -84,6 +84,6 @@ test('the wrong kind of file never leaves the browser', async ({ page }) => {
 test('first run sends the tax-lot step to the inbox', async ({ page }) => {
   await page.goto('/start');
   await page.getByTestId('first-run').locator('[data-step="lots"]').getByRole('link', { name: 'Upload it' }).click();
-  await expect(page).toHaveURL(/\/settings#inbox$/);
+  await expect(page).toHaveURL(/\/settings\/data#inbox$/);
   await expect(page.getByTestId('inbox')).toBeInViewport();
 });

@@ -65,12 +65,25 @@ Copy follows Escape Vektor's tone sheet. Desk-specific lines:
 
 | Piece | Behaviour |
 |---|---|
-| **Pill nav** | Bridge, Research, Decisions, Plan, Lab, Settings. Decisions carries a coral count of waiting items |
+| **Pill nav** | Bridge, Results, Portfolio, Strategies, Decisions, Research. Decisions carries a coral count of waiting items |
 | **Phone dock** | The same six at 390px, short labels ("Decide"), fixed to the bottom |
+| **Gear** | Settings sits behind a gear button in the top bar tools, not in the menu |
 | **Hero band** | Kicker, poster title, one headline number, subtabs, one or two actions; a small poster window on the right (art per area) |
-| **Subtabs** | Decisions: Queue, Journal, Flight record. Plan: Mix and drift, Deposits, Rules, Tax calendar, FI path. Research: Dossiers, Sources, Watchlist, Calendar. Lab: Compare, Risk, Patterns, Saved boards |
+| **Subtabs** | Results: Day, Week, Month, Year. Portfolio: Holdings, Stock plans, Risk, Tax. Strategies: Race, Mixes, My habits. Decisions: Queue, Journal, Flight record. Research: Dossiers, Sources, Watchlist, Calendar, Compare, Boards. Settings: Desk, Crew, Data, Box, Risk check, First run |
 | **Slicer row** | Sticky under the top bar. Combo boxes only (Account, Period, Versus, plus page filters), then data freshness and, in mockups, "Sample data". One row scopes everything on the page |
-| **Top bar tools** | Symbol search (`/`), market clock with a live pulse, Console (the robot), theme toggle |
+| **Top bar tools** | Symbol search (`/`), market clock with a live pulse, Console (the robot), theme toggle, Settings gear |
+
+Menu map, regrouped in November 2026 (review items U1 and U2). Old links redirect, keeping their query and hash.
+
+| Area | Route | Holds | Old route |
+|---|---|---|---|
+| Bridge | `/` | Today's run, what changed, steps due | `/` |
+| Results | `/results/day`, `week`, `month`, `year` | The period review and debrief | Bridge hero button |
+| Portfolio | `/portfolio`, `/stocks`, `/risk`, `/tax` | Holdings board, drift, funds, rules, deposits, FI path; stock plans; risk; tax calendar | `/plan`, `/plan/stocks`, `/lab/risk` |
+| Strategies | `/strategies`, `/mixes`, `/habits`, `/habits/replay`, `/:id` | The paper race and strategy list; mixes; patterns, rule tests and the replay; strategy detail | `/lab/strategies`, `/lab/mixes`, `/lab/patterns` |
+| Decisions | `/decisions`, `/journal`, `/flight` | Queue, Journal, Flight record | Same |
+| Research | `/research`, `/sources`, `/watchlist`, `/calendar`, `/compare`, `/boards` | Dossiers and the rest, plus Compare and Saved boards | `/lab`, `/lab/boards` |
+| Settings (gear) | `/settings`, `/crew`, `/data`, `/box`, `/risk`, `/first-run` | Desk: profile, start here, this desk. Crew: desks, usage, run log. Data: freshness, inbox, keys. Box: jobs, box buttons, token | `/settings` with `#jobs`, `#inbox`, `#keys` |
 
 Account combo lists All accounts, Individual, HSA and 401(k); the 401(k) row stays disabled with "Not linked yet" until Empower is connected. Period uses Escape Vektor's PeriodPicker values (1D, 1W, 1M, 3M, YTD, 1Y, Max). Versus switches the benchmark between the plan shadow and the S&P 500 shadow.
 
@@ -113,19 +126,28 @@ KPI ids are from the statistics output contract. Each value shows its `as_of` on
 
 ### Bridge
 
-Question: what changed, and does anything need me?
+Question: what changed, and does anything need me? Budget: one desktop screen (1440 by 1000) and two phone screens (review item U3).
 
 | Order | Card | Content |
 |---|---|---|
-| 1 | Hero band | Value, today in dollars and percent, largest drift, Clear the queue and Ask a desk |
-| 2 | KPI row (7) | `value.market` + `value.day_change`, `bm.excess` in dollars, `plan.drift_max`, `plan.single_stock`, `margin.debit` + `margin.cost_month`, `cash.ready` + `cash.pending`, `fi.progress` |
-| 3 | Brief + queue | Plan keeper's 3–5 line brief beside the top three proposals with approve, snooze and dismiss |
-| 4 | Live holdings | Departures board |
-| 5 | Value versus the plan | Lines: portfolio, plan shadow, S&P shadow, same deposits on the same days. Click a day for its contribution by holding |
-| 5 | Instruments | Cockpit gauges for drift (rebalance at 5 points) and satellite share (cap 10%), plus the margin-call distance in one line |
-| 6 | Mix, alerts, coming up | Drift bullets per sleeve, alerts (rule near breach, triggers, wash windows, stale data), dated events |
+| 1 | Hero band | Value, today in dollars and percent, Clear the queue, and three drawer buttons: Holdings, Mix, Discounts |
+| 2 | KPI row (4) | `value.market` + `value.day_change`, `bm.excess` against the safe mix, `cash.ready` + `cash.pending`, `margin.debit` + `margin.cost_month` |
+| 3 | Today's run | The five stages of the daily run |
+| 4 | What changed | Plan keeper's 3–5 line brief and today's three largest movers |
+| 4 | Steps due | Up to four rows: waiting proposals (Approve when all lights are clear, Review otherwise) and plan steps due in 14 days, plus any no-buy window |
 
-On a phone the order is the same, so the daily check is: glance at the hero, read the brief, clear the queue.
+Everything else is one tap away in a drawer:
+
+| Opens from | Drawer |
+|---|---|
+| Holdings button | Departures board; a row opens the Symbol sheet |
+| Mix button (mustard when a fund is outside its band) | Drift and single-stock gauges, margin line, drift bullets, single stocks |
+| Discounts button | Discount days with the research case for each |
+| Market value tile | Value by account, today by holding |
+| Vs the safe mix tile | Value against the safe mix and S&P 500 shadows, then the excess table by window |
+| Cash and Margin tiles | Cash ready, pending, margin cost, cash by account |
+
+On a phone the order is the same, so the daily check is: glance at the hero, read what changed, clear the steps due.
 
 ### Decisions
 
@@ -136,26 +158,46 @@ Question: what am I doing and why?
 - **Preflight annunciator**: six lamps on the board colour (concentration, drift after, funding, wash sales, lots and tax, plan rules), each with before → after. Any coral lamp opens the override box: one-line reason, "Go ahead anyway" or "Pass and log it". It never disables Approve.
 - **Order ticket**: stamped card (DRAFT or READY) with copy buttons per field for Fidelity; Approve, Snooze a day, Dismiss.
 - **Sources**: primary and web sources with dates; engine-only proposals say so.
-- **Journal**: stamped ledger (day stamp, symbol, kind, status chip, quoted reason, origin, amount and its 30-day score against the plan), with the discipline streak, overrides against clean decisions and unmatched Fidelity trades beside it.
+- **Journal**: 20 entries a page with Newer and Older, filters for origin, status, kind and symbol kept in the URL; stamped ledger (day stamp, symbol, kind, status chip, quoted reason, origin, amount and its 30-day score against the plan), with the discipline streak, overrides against clean decisions and unmatched Fidelity trades beside it.
 - **Flight record**: KPI row (`dec.score_by`, `dec.desk_record`, saves, `dec.offplan_gap`, `dec.lag`, `dec.brier`), diverging bars of each origin against the plan at 30 or 90 days (Scored at combo), a calibration line against the honest diagonal, and the desk record table with keep, behind and too-early chips.
 
-### Plan
+### Portfolio
 
-Question: what is the rulebook? KPI row (`plan.drift_max`, `plan.next_deposit`, `plan.rules`, `plan.adherence`, `tax.harvestable`, `fi.date_pctl`), then six cards: sleeve drift bullets (actual dot, target tick, band, amber when outside), funds grouped by sleeve with data bars, the deposit schedule and drift after each deposit, rules with pass or heads-up and their `desk.yaml` version, the tax calendar as a timeline with wash windows as bars, and the FI path as p10, p50 and p90 lines against the FI number (no band fill).
+Question: what do I hold, and is it inside the rules?
+
+| Tab | Content |
+|---|---|
+| Holdings | KPI row (`plan.drift_max`, `plan.next_deposit`, `plan.rules`, `plan.in_mix`, `plan.single_stock`, `fi.progress`), the departures board, drift bullets (actual dot, target tick, band, amber when outside), rules with pass or heads-up and their `desk.yaml` version, funds with data bars, the next deposit and drift after it, and the FI path as p10, p50 and p90 lines (no band fill) |
+| Stock plans | One plan card per holding |
+| Risk | The risk page below, moved from Lab |
+| Tax | Realized and unrealized gains by term, then the tax calendar as a timeline with wash windows as bars |
+
+Wording: there is no single plan. Targets belong to the safe mix, shadows are "safe mix shadow" and "S&P 500 shadow", and "plan" means a stock plan (review item U4).
 
 ### Research
 
 Question: what do I know about this? Dossier list and watchlist on the left; the open dossier on the right: verdict chip, valuation range strip with today's marker, thesis and bear case, price against its sleeve's core fund rebased to 100, "What would change the call" as flagged triggers, key engine numbers, filings and events, and sources (primary, web, his own notes). Request a deep dive and Refresh now open the Console with the request filled in.
 
-### Lab
+### Strategies, Risk and Compare
+
+Strategies opens on the Race (the paper leaderboard, the stage rail and the strategy list), then Mixes and My habits. Risk sits under Portfolio and Compare under Research.
 
 - **Compare**: slot chips (up to five, each keeps its colour, plus Add), growth of 100 with end labels, holdings overlap heatmap from N-PORT look-through, six small-multiple bar charts (1-year return, volatility, max drawdown, return per unit of risk, expense ratio, correlation to the S&P 500) and the side-by-side table. Small multiples instead of a combined chart because the metrics have different scales.
 - **Risk**: KPI row (`risk.vol`, `risk.sharpe`, `risk.beta`, `risk.eff_n`, `risk.lookthrough`, `risk.var95`), return against risk scatter (holdings, you, the plan), correlation heatmap, drawdown lines, scenario shocks in dollars, look-through top holdings (direct ones highlighted) and a month-by-holding return grid.
-- **Patterns**: market context KPIs, his own buys scored by type against plan buys (with sample sizes), drawdown base rates, correlation shifts and seasonality labelled "description, never a signal".
-- **Replay** (opens from the card at the top of Patterns, `/lab/patterns/replay`): "you versus the capped you". Rule and Level combos pick one rule; three lines (you, the rule, the S&P 500 on the same dollars), four tiles, the picks-or-size read for the cap rules and the tax tile for the holding rule; bars by name for where it helped and hurt, the largest things the rule did, every rule side by side in three groups (tap a bar to replay it) and six sizing tiles. Costs read in mustard, never red.
-- **Saved boards**: any Lab view with its slicers pinned by "Save as a board".
+- **My habits** (was Patterns): the replay card, rule tests, market context KPIs, his own buys scored by type against plan buys (with sample sizes), drawdown base rates, correlation shifts and seasonality labelled "description, never a signal".
+- **Replay** (opens from the card at the top of My habits, `/strategies/habits/replay`): "you versus the capped you". Rule and Level combos pick one rule; three lines (you, the rule, the S&P 500 on the same dollars), four tiles, the picks-or-size read for the cap rules and the tax tile for the holding rule; bars by name for where it helped and hurt, the largest things the rule did, every rule side by side in three groups (tap a bar to replay it) and six sizing tiles. Costs read in mustard, never red.
+- **Saved boards** (Research → Boards): a Compare, Risk or My habits view with its slicers pinned by "Save as a board". Boards saved under the old Lab routes move with them.
 
 ### Settings
+
+Behind the gear, in four tabs with Risk check and First run beside them (review item U2).
+
+| Tab | Cards |
+|---|---|
+| Desk | Desk profile with its editor, Start here (Risk check and First run), This desk (version, build, theme) |
+| Crew | Desks with switches and the kill switch, weekly usage and the run log |
+| Data | Data freshness with the mirror tables drawer, inbox upload, keys |
+| Box | Scheduled jobs, box buttons, Claude token |
 
 Data freshness and the token card read `/api/status` (mirror state and age, token days left). Desk profile dials (risk level, satellite cap, harvest threshold, horizon, tilt, lot method, industry focus) with the profile version; global kill switch; weekly usage per desk against its cap; the crew (six desks with model, last and next run, turns used and an on/off switch); data freshness including the Claude token renewal date; phone alert toggles.
 

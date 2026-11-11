@@ -137,3 +137,19 @@ export function oneLine(text) {
   const first = text.split(/(?<=[.!?])\s/)[0];
   return first.length > 160 ? `${first.slice(0, 157)}…` : first;
 }
+
+// ---------- journal paging ----------
+export const JOURNAL_PAGE = 20;
+
+export function journalPage(days = [], page = 1, size = JOURNAL_PAGE) {
+  const flat = days.flatMap((g) => g.items.map((d) => ({ day: g.day, d })));
+  const pages = Math.max(1, Math.ceil(flat.length / size));
+  const at = Math.min(Math.max(1, Math.floor(Number(page)) || 1), pages);
+  const out = [];
+  flat.slice((at - 1) * size, at * size).forEach(({ day, d }) => {
+    if (!out.length || out[out.length - 1].day !== day) out.push({ day, items: [] });
+    out[out.length - 1].items.push(d);
+  });
+  const from = flat.length ? (at - 1) * size + 1 : 0;
+  return { days: out, page: at, pages, total: flat.length, from, to: Math.min(at * size, flat.length) };
+}

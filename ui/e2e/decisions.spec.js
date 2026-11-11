@@ -127,7 +127,7 @@ test('journal shows the stamped ledger, streak and unmatched trades', async ({ p
   await expect(page.locator('.stamp-day').first()).toBeVisible();
   await expect(page.locator('.ledger-row[data-status="dismissed"]', { hasText: '“Too small to bother with”' }).first()).toBeVisible();
   await expect(page.locator('.ledger-row[data-status="approved"]').first()).toContainText('To place');
-  await expect(page.locator('.ledger-row [data-score="90D"]').first()).toContainText('vs plan, 90 days');
+  await expect(page.locator('.ledger-row [data-score="90D"]').first()).toContainText('vs the safe mix, 90 days');
   await expect(page.getByTestId('streak')).toContainText('days without an unlogged trade');
   await expect(page.getByTestId('unmatched').locator('.um')).toHaveCount(5);
   await page.getByRole('button', { name: /^Show \d+ more$/ }).click();
@@ -139,6 +139,49 @@ test('journal shows the stamped ledger, streak and unmatched trades', async ({ p
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
+});
+
+test('the journal pages twenty entries at a time and keeps the page in the URL', async ({ page }) => {
+  await page.goto('/decisions/journal');
+  const card = page.getByTestId('journal');
+  await expect(card).toHaveAttribute('data-total', '84');
+  await expect(card).toHaveAttribute('data-pages', '5');
+  await expect(card.locator('.ledger-row')).toHaveCount(20);
+  await expect(card.getByTestId('journal-count')).toHaveText('84 entries');
+  const pager = card.getByTestId('journal-pager');
+  await expect(pager).toContainText('1–20 of 84 · page 1 of 5');
+  await expect(pager.getByRole('button', { name: 'Newer' })).toBeDisabled();
+  await pager.getByRole('button', { name: 'Older' }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(pager).toContainText('21–40 of 84 · page 2 of 5');
+  await page.goto('/decisions/journal?page=5');
+  await expect(card.locator('.ledger-row')).toHaveCount(4);
+  await expect(pager.getByRole('button', { name: 'Older' })).toBeDisabled();
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+});
+
+test('journal filters stack, reset the page and clear in one press', async ({ page }) => {
+  await page.goto('/decisions/journal?page=3');
+  const card = page.getByTestId('journal');
+  await card.getByRole('button', { name: /^Symbol/ }).click();
+  await page.getByRole('option', { name: 'NOVA' }).click();
+  await expect(page).toHaveURL(/symbol=NOVA/);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page).not.toHaveURL(/page=/);
+  await expect(card).toHaveAttribute('data-total', '14');
+  await expect(card.getByTestId('journal-count')).toHaveText('14 of 84 entries');
+  await expect(card.getByTestId('journal-pager')).toHaveCount(0);
+  await card.getByRole('button', { name: /^Origin/ }).click();
+  await page.getByRole('option', { name: 'You' }).click();
+  await expect(page).toHaveURL(/origin=you/);
+  await expect(card).toHaveAttribute('data-total', '6');
+  await page.reload();
+  await expect(card).toHaveAttribute('data-total', '6');
+  await expect(card.getByTestId('journal-count')).toHaveText('6 of 84 entries');
+  await card.getByTestId('journal-clear').click();
+  await expect(card).toHaveAttribute('data-total', '84');
+  await expect(page).not.toHaveURL(/symbol=/);
 });
 
 test('logging an unmatched trade posts the reason', async ({ page }) => {

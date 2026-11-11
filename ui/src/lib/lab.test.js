@@ -9,7 +9,7 @@ function memStore() {
 describe('ids', () => {
   it('labels specials, accounts and symbols', () => {
     expect(idLabel('portfolio')).toBe('Your portfolio');
-    expect(idLabel('shadow:plan_shadow')).toBe('Plan shadow');
+    expect(idLabel('shadow:plan_shadow')).toBe('Safe mix shadow');
     expect(idLabel('account:hsa-1')).toBe('HSA');
     expect(idLabel('FTEC')).toBe('FTEC');
   });
@@ -121,19 +121,34 @@ describe('metrics', () => {
 describe('saved boards', () => {
   it('adds newest first, replaces the same path and removes', () => {
     const store = memStore();
-    addBoard({ name: 'One', path: '/lab?ids=A,B' }, store, new Date('2026-11-07T10:00:00Z'));
-    addBoard({ name: 'Two', path: '/lab/risk' }, store, new Date('2026-11-07T11:00:00Z'));
-    const list = addBoard({ name: 'One again', path: '/lab?ids=A,B' }, store, new Date('2026-11-07T12:00:00Z'));
+    addBoard({ name: 'One', path: '/research/compare?ids=A,B' }, store, new Date('2026-11-07T10:00:00Z'));
+    addBoard({ name: 'Two', path: '/portfolio/risk' }, store, new Date('2026-11-07T11:00:00Z'));
+    const list = addBoard({ name: 'One again', path: '/research/compare?ids=A,B' }, store, new Date('2026-11-07T12:00:00Z'));
     expect(list.map((b) => b.name)).toEqual(['One again', 'Two']);
     expect(removeBoard(list[1].id, store).map((b) => b.name)).toEqual(['One again']);
   });
 
-  it('ignores junk and paths outside the lab', () => {
+  it('ignores junk and paths that are not a board view', () => {
     const store = memStore();
-    store.setItem('desk.boards.v1', JSON.stringify([{ path: '/settings' }, null, { name: 'ok', path: '/lab' }]));
-    expect(readBoards(store)).toEqual([{ name: 'ok', path: '/lab' }]);
+    store.setItem('desk.boards.v1', JSON.stringify([{ path: '/settings' }, null, { name: 'ok', path: '/portfolio/risk' }]));
+    expect(readBoards(store)).toEqual([{ name: 'ok', path: '/portfolio/risk' }]);
     store.setItem('desk.boards.v1', '{bad');
     expect(readBoards(store)).toEqual([]);
+  });
+
+  it('moves boards saved under the old Lab menu to their new pages', () => {
+    const store = memStore();
+    store.setItem(
+      'desk.boards.v1',
+      JSON.stringify([
+        { name: 'a', path: '/lab' },
+        { name: 'b', path: '/lab?ids=A,B&w=3Y' },
+        { name: 'c', path: '/lab/risk' },
+        { name: 'd', path: '/lab/patterns' },
+        { name: 'e', path: '/lab/patterns/replay?rule=stop-20' },
+      ]),
+    );
+    expect(readBoards(store).map((b) => b.path)).toEqual(['/research/compare', '/research/compare?ids=A,B&w=3Y', '/portfolio/risk', '/strategies/habits', '/strategies/habits/replay?rule=stop-20']);
   });
 
   it('reports a store that refuses writes', () => {
@@ -143,6 +158,6 @@ describe('saved boards', () => {
         throw new Error('full');
       },
     };
-    expect(addBoard({ name: 'x', path: '/lab' }, store)).toBeNull();
+    expect(addBoard({ name: 'x', path: '/research/compare' }, store)).toBeNull();
   });
 });
