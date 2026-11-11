@@ -182,6 +182,7 @@ The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free.
 | Deploy | Nothing: within 5 minutes of a push to `main`. Right away: `deploy.sh now` |
 | Status | `deploy.sh status`, or `https://desk.escape-vektor.com/api/status` |
 | Pull Escape Vektor now | Settings → Jobs → Run now, or `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
+| Fill an empty desk | **Start the desk** on the Bridge (Start the desk, below): every job in order, one tap |
 | Run any scheduled job now | Settings → Jobs (Run now, below); no SSH needed |
 | A key or setting changes | Settings → Keys (Secrets, above); saved and redeployed within 5 minutes |
 | Redeploy, deploy now, status, check, backup, restore drill, logs, update box script, apply compose | Settings → Box (Box actions, below); picked up within 5 minutes |
@@ -199,7 +200,7 @@ The API never runs a command. `POST /api/jobs/{name}/run` drops a request file i
 |---|---|
 | `GET /api/jobs` | `{now, scheduler_alive, cooldown_seconds: 300, pickup_seconds: 5, stages: ["mirror", "engine", "review", "desks", "paper"], jobs: [...]}` |
 | One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes), `stage` (its step in today's run, or `null`) |
-| `last_run` | `null`, or `{trigger: schedule\|request, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, detail}`. `result` is `null` while it runs |
+| `last_run` | `null`, or `{trigger: schedule\|request\|start, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, detail, note, error}`. `result` is `null` while it runs |
 | `POST /api/jobs/{name}/run` | `202 {ok: true, job, request_id, requested_at, message}` |
 | Refusals | `{ok: false, error, message, ...}`: `404 unknown_job`; `409 running` (`since`); `409 queued` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 scheduler_down` |
 
@@ -208,6 +209,49 @@ The API never runs a command. `POST /api/jobs/{name}/run` drops a request file i
 **Reviews in health.** `/api/status` has `reviews: {state, due, last_ok, job, kinds, missing}`. `state` is `empty` before the first run, `ok` when `engine-review` finished (or the day pack in `period_reviews` was computed) since the last weekday 17:35 Eastern run that is at least 30 minutes old, `stale` when it didn't, and `failing` when the last run failed. `stale` and `failing` send one `desk-ops` alert a day.
 
 To follow a run, poll `GET /api/jobs` every few seconds. A queued job shows `queued: true`, then `running: true`, then `last_run.finished` with the same `request_id`. The cooldown is 5 minutes from the last accepted request, per job. Times are UTC, ISO 8601, ending in `Z`.
+
+## Start the desk
+
+One tap runs everything a new or stale desk needs, in order. `POST /api/start` drops `data/run/start/request.json`; the scheduler in `cron` then starts each step's own job when the one before has finished, so the API still runs nothing and no cooldown applies. One chain at a time. The chain is kept in `data/run/start/chain.json` and survives a restart: a step that was cut off runs once more.
+
+| Step | Job | Skipped when |
+|---|---|---|
+| Pull your accounts | `mirror` | Never |
+| Fetch price history | `engine-backfill` | The `closes` health check is ok, or no pull has ever worked |
+| Run today's numbers | `engine-daily` | No pull has ever worked |
+| Fetch market history | `engine-french` | `french_returns` has rows |
+| Write the results review | `engine-review` | There are no numbers yet |
+| Scan for discounts | `engine-discounts` | There are no numbers yet |
+| Check your plan, Write the debrief, Draft your stock plans | `agents-run-plan_keeper`, `agents-run-debrief`, `agents-run-plans` | All desks or that desk are off, the first-run guard holds it, the Claude token has expired, or (debrief) there is no review |
+| Run the paper race | `engine-paper` | There are no numbers yet |
+
+| Call | Answer |
+|---|---|
+| `GET /api/start` | `{state: idle\|running\|done, needs_start, can_start, blocked, result: ok\|partial, summary, started_at, finished_at, last_ok_at, scheduler_alive, steps}` |
+| One step | `{id, title, state: waiting\|running\|ok\|failed\|skipped, detail, fix: {label, to}\|null, job, started_at, finished_at}` |
+| `POST /api/start` | `202` with the same body and `ok: true`; `409 running`; `503 scheduler_down` |
+
+- A failed step is recorded and the chain goes on. `detail` is what the job said last, in its own words; `fix` names the screen that sorts it out.
+- A job that exits 0 but says it skipped (`{"ok": true, "skipped": "..."}` as its last line) is shown as skipped with that reason. A desk run that ended disabled, guarded, over budget or failed is read from the crew status.
+- A job already running on its schedule when its turn comes counts as the step.
+- `needs_start` is true until a chain has finished with no failed step, or the desk already has accounts, numbers and a review. The UI shows the Start banner while it is true.
+
+**What a job said.** The scheduler now reads each job's output, passes it on to the container log, and keeps the last line. `last_run` gains `note` (the `skipped` text of a job that exited 0) and `error` (the `error` text, or the last line, of one that failed). Long token-like strings are masked and both are cut at 300 characters.
+
+## Readiness
+
+`GET /api/readiness` tells the UI, for each page section, whether it has data and the one thing that fills it. It asks the app's own endpoints (the ones the pages load) inside the process and reads job records, the crew status and the health checks; it runs no SQL of its own against another package's tables.
+
+| Field | Meaning |
+|---|---|
+| `start` | `{state, needs_start}`, copied from `/api/start` |
+| `sections[].key` | `bridge.value`, `bridge.brief`, `results.day`, `results.week`, `results.month`, `results.year`, `results.debrief`, `portfolio.holdings`, `portfolio.stock_plans`, `portfolio.risk`, `portfolio.tax`, `strategies.race`, `strategies.mixes`, `strategies.habits`, `decisions.queue`, `decisions.journal`, `research.feed`, `research.boards`, `settings.risk_check` |
+| `state` | `ready`, `empty`, `stale` (results only: the review is behind) or `blocked` (it needs him on another screen) |
+| `why` | One sentence; `null` when ready |
+| `action` | `null` when ready, otherwise exactly one of `{kind: start, label}`, `{kind: job, job, label}`, `{kind: link, to, label}` |
+| `next_auto`, `next_auto_text` | When the schedule next runs the job that fills it, e.g. `today at 5:35 PM` |
+
+How a section that isn't ready picks its action, first match wins: something it needs is missing (it takes that section's action); its desk is off, guarded or without a token (link to the screen); the desk still needs starting (`start`); the job is running, failed last time or said it skipped (the job again, or a link for a missing key); otherwise the job, with the next scheduled time. `research.boards` is always `ready` because boards live in the browser. A package can sharpen its own rows with `desk/<pkg>/readiness.py` (Package seams).
 
 ## Box actions
 
@@ -250,13 +294,14 @@ Every upload is logged in `data/run/inbox-uploads.log`, with its outcome, size a
 
 ## Package seams
 
-Each package under `desk/` plugs in through three optional modules, found on their own at startup:
+Each package under `desk/` plugs in through four optional modules, found on their own at startup:
 
 | Module | Exposes | Picked up by |
 |---|---|---|
 | `desk/<pkg>/api.py` | `router`, a FastAPI `APIRouter` with its own prefix | `desk/api/app.py`, which includes every router it finds |
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
 | `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command", "refreshes", "stage"}` dicts (only `schedule` and `command` are required) | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
+| `desk/<pkg>/readiness.py` | `sections(cfg)`, returning `{key: {state, why, action, next_auto, next_auto_text}}` for the readiness keys it wants to answer itself | `desk.readiness`, which lays those fields over its own answer |
 
 Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 

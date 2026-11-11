@@ -5,6 +5,7 @@ import shlex
 import signal
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -53,6 +54,8 @@ class Job:
     refreshes: tuple[str, ...] = ()
     stage: str = ""
     proc: subprocess.Popen | None = field(default=None, repr=False)
+    said: str = field(default="", repr=False)
+    pump: threading.Thread | None = field(default=None, repr=False)
     run: dict | None = field(default=None, repr=False)
 
     def due(self, t: datetime) -> bool:
@@ -143,9 +146,20 @@ def _record(cfg: Config | None, job: Job) -> None:
         jobrun.record(cfg, job.name, job.run)
 
 
+def _pump(job: Job, out) -> None:
+    for line in out:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+        if line.strip():
+            job.said = line.strip()[-2000:]
+
+
 def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = None) -> None:
     log(f"{job.line} start ({trigger}): {shlex.join(job.command)}")
-    job.proc = subprocess.Popen(job.command)  # noqa: S603
+    job.said = ""
+    job.proc = subprocess.Popen(job.command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1)  # noqa: S603
+    job.pump = threading.Thread(target=_pump, args=(job, job.proc.stdout), daemon=True)
+    job.pump.start()
     job.run = {
         "trigger": trigger,
         "request_id": request_id,
@@ -154,6 +168,8 @@ def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = N
         "result": None,
         "exit_code": None,
         "detail": None,
+        "note": None,
+        "error": None,
     }
     _record(cfg, job)
 
@@ -163,13 +179,18 @@ def reap(jobs: list[Job], cfg: Config | None = None) -> None:
         if job.proc is None or job.proc.poll() is None:
             continue
         rc = job.proc.returncode
+        if job.pump is not None:
+            job.pump.join(timeout=2)
         log(f"{job.line} exited {rc}")
         if job.run is not None:
             result = "ok" if rc == 0 else "skipped" if rc == BUSY else "failed"
+            said = jobrun.last_words(job.said)
             detail = None if rc == 0 else "another run held the lock" if rc == BUSY else f"exit {rc}; see docker logs vektor-desk-cron"
             job.run.update(finished=jobrun.stamp(jobrun.now_utc()), result=result, exit_code=rc, detail=detail)
+            job.run.update(note=said.get("skipped") if rc == 0 else None, error=said.get("error") if result == "failed" else None)
             _record(cfg, job)
         job.proc = None
+        job.pump = None
         job.run = None
 
 
@@ -209,6 +230,15 @@ def serve_requests(jobs: list[Job], cfg: Config) -> list[Job]:
     return started
 
 
+def run_chain(jobs: list[Job], cfg: Config) -> None:
+    try:
+        from desk import startrun
+
+        startrun.advance(cfg, jobs, lambda job, rid: start(job, cfg, "start", rid), lambda name: _busy(jobs, name))
+    except Exception as e:  # noqa: BLE001
+        log(f"start chain stopped on an error and will try again: {e!r}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m desk.scheduler", description="Runs every package's jobs.py and deploy/crontab in the desk's time zone.")
     parser.add_argument("crontab", nargs="?", default="/app/deploy/crontab")
@@ -239,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         jobrun.heartbeat(cfg)
         reap(jobs, cfg)
         serve_requests(jobs, cfg)
+        run_chain(jobs, cfg)
         wait = (t - datetime.now(zone)).total_seconds()
         if wait > 0:
             time.sleep(min(wait, jobrun.PICKUP_SECONDS))
