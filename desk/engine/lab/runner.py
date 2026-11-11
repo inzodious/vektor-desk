@@ -1,10 +1,10 @@
 import json
+import multiprocessing
 import os
 import sqlite3
 from collections import Counter, namedtuple
 from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, date, datetime, timedelta
-from pathlib import Path
 
 from desk.config import Config
 from desk.db import connect
@@ -204,12 +204,6 @@ _DATA: LabData | None = None
 _SPEC: Spec | None = None
 
 
-def _init(path: str, raw: dict, model: str):
-    global _DATA, _SPEC
-    _DATA = load(Path(path))
-    _SPEC = parse(raw, _DATA, model=model)
-
-
 def _job(args):
     params, start, end, cost_mult = args
     v = resolve(_SPEC, params)
@@ -218,12 +212,12 @@ def _job(args):
 
 
 def _run_many(cfg, data, spec, jobs: list[tuple]):
-    workers = max(1, int(os.environ.get("DESK_LAB_WORKERS", "1") or 1))
-    if workers > 1 and len(jobs) > 4:
-        with ProcessPoolExecutor(max_workers=workers, initializer=_init, initargs=(str(data_path(cfg)), spec.raw, spec.model)) as pool:
-            return list(pool.map(_job, jobs, chunksize=4))
     global _DATA, _SPEC
     _DATA, _SPEC = data, spec
+    workers = max(1, int(os.environ.get("DESK_LAB_WORKERS", "1") or 1))
+    if workers > 1 and len(jobs) > 4 and "fork" in multiprocessing.get_all_start_methods():
+        with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("fork")) as pool:
+            return list(pool.map(_job, jobs, chunksize=4))
     return [_job(j) for j in jobs]
 
 

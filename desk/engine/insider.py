@@ -5,6 +5,7 @@ import re
 import sqlite3
 import time
 import zipfile
+from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
 from statistics import median
 from xml.etree import ElementTree
@@ -23,6 +24,8 @@ QUARTERS_PER_RUN = 8
 FORM4_PER_RUN = 200
 HISTORY_START = "2016-01-01"
 HISTORY_PER_RUN = 300
+HISTORY_BATCH = 25
+SUBMISSION_FIELDS = ("ISSUERTRADINGSYMBOL", "FILING_DATE", "ISSUERCIK")
 SHARES_LAG_DAYS = 45
 CLUSTER_DAYS = 30
 CLUSTER_BUYERS = 2
@@ -73,17 +76,19 @@ def clean_symbol(raw) -> str | None:
     return text if TICKER.match(text) and text not in NOT_TICKERS else None
 
 
-def _tsv(z: zipfile.ZipFile, name: str) -> list[dict]:
+def _tsv(z: zipfile.ZipFile, name: str) -> Iterator[dict]:
     match = next((n for n in z.namelist() if n.upper().endswith(name.upper())), None)
     if match is None:
-        return []
+        return
     with z.open(match) as f:
-        return list(csv.DictReader(io.TextIOWrapper(f, encoding="utf-8", errors="replace"), delimiter="\t", quoting=csv.QUOTE_NONE))
+        yield from csv.DictReader(io.TextIOWrapper(f, encoding="utf-8", errors="replace"), delimiter="\t", quoting=csv.QUOTE_NONE)
 
 
 def parse_bulk(blob: bytes) -> list[tuple]:
     z = zipfile.ZipFile(io.BytesIO(blob))
-    subs = {r["ACCESSION_NUMBER"]: r for r in _tsv(z, "SUBMISSION.tsv") if str(r.get("DOCUMENT_TYPE") or "").strip() in FORMS}
+    subs = {
+        r["ACCESSION_NUMBER"]: {k: r.get(k) for k in SUBMISSION_FIELDS} for r in _tsv(z, "SUBMISSION.tsv") if str(r.get("DOCUMENT_TYPE") or "").strip() in FORMS
+    }
     owners: dict[str, list[tuple[int, str]]] = {}
     for r in _tsv(z, "REPORTINGOWNER.tsv"):
         who = role(r.get("RPTOWNER_RELATIONSHIP") or "")
@@ -319,23 +324,26 @@ def fetch_history(conn: sqlite3.Connection, http, symbols: list[str], *, now: da
         return {"symbols": 0, "bars": 0}
     end = (now - timedelta(minutes=alpaca.SIP_DELAY_MIN)).astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
     bad: list[tuple[str, str]] = []
-    raw = alpaca.fetch_bars(http, todo, HISTORY_START, end, "raw", sleep=sleep, skipped=bad)
-    refused = {s for s, _ in bad}
-    adj = alpaca.fetch_bars(http, [s for s in todo if s not in refused], HISTORY_START, end, "all", sleep=sleep, skipped=bad)
-    rows: dict[tuple[str, str], list] = {}
-    for sym, bars in raw.items():
-        for b in bars:
-            rows[(sym, alpaca._day(b["t"]))] = [sym, alpaca._day(b["t"]), b.get("o"), b.get("h"), b.get("l"), float(b["c"]), None, b.get("v"), b.get("vw")]
-    for sym, bars in adj.items():
-        for b in bars:
-            key = (sym, alpaca._day(b["t"]))
-            if key in rows:
-                rows[key][6] = float(b["c"])
-    stamp = now.isoformat(timespec="seconds")
-    with conn:
-        conn.executemany("INSERT OR IGNORE INTO alpaca_bars VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", [tuple(r) for r in rows.values()])
-        conn.executemany("INSERT OR REPLACE INTO alpaca_history VALUES (?, ?, ?, ?)", [(s, HISTORY_START, len(raw.get(s, [])), stamp) for s in todo])
-    out = {"symbols": len(todo), "bars": len(rows), "left": max(0, len([s for s in symbols if s not in done]) - len(todo))}
+    stamp, loaded = now.isoformat(timespec="seconds"), 0
+    for k in range(0, len(todo), HISTORY_BATCH):
+        part = todo[k : k + HISTORY_BATCH]
+        raw = alpaca.fetch_bars(http, part, HISTORY_START, end, "raw", sleep=sleep, skipped=bad)
+        refused = {s for s, _ in bad}
+        adj = alpaca.fetch_bars(http, [s for s in part if s not in refused], HISTORY_START, end, "all", sleep=sleep, skipped=bad)
+        rows: dict[tuple[str, str], list] = {}
+        for sym, bars in raw.items():
+            for b in bars:
+                rows[(sym, alpaca._day(b["t"]))] = [sym, alpaca._day(b["t"]), b.get("o"), b.get("h"), b.get("l"), float(b["c"]), None, b.get("v"), b.get("vw")]
+        for sym, bars in adj.items():
+            for b in bars:
+                key = (sym, alpaca._day(b["t"]))
+                if key in rows:
+                    rows[key][6] = float(b["c"])
+        with conn:
+            conn.executemany("INSERT OR IGNORE INTO alpaca_bars VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (tuple(r) for r in rows.values()))
+            conn.executemany("INSERT OR REPLACE INTO alpaca_history VALUES (?, ?, ?, ?)", [(s, HISTORY_START, len(raw.get(s, [])), stamp) for s in part])
+        loaded += len(rows)
+    out = {"symbols": len(todo), "bars": loaded, "left": max(0, len([s for s in symbols if s not in done]) - len(todo))}
     if bad:
         out |= {"skipped": sorted({s for s, _ in bad}), "skipped_why": bad[0][1]}
     return out
