@@ -153,8 +153,8 @@ def test_phone_alert_carries_the_headline(cfg, sent):
     go(cfg, [pack_row(), pack_row("week", "2026-11-13")])
     (args, kwargs), (wargs, wkwargs) = sent
     assert args[:3] == ("research", "Day review: 2026-11-10", ANSWER["headline"]) and args[3] == "low"
-    assert kwargs["key"] == "agents:debrief:day:2026-11-10" and kwargs["click"] == "/results"
-    assert wargs[1] == "Week review: 2026-11-13" and wargs[3] == "default"
+    assert kwargs["key"] == "agents:debrief:day:2026-11-10" and kwargs["click"] == "/results/day?end=2026-11-10"
+    assert wargs[1] == "Week review: 2026-11-13" and wargs[3] == "default" and wkwargs["click"] == "/results/week?end=2026-11-13"
 
 
 def test_long_text_is_trimmed_to_the_contract(cfg, sent):

@@ -193,7 +193,7 @@ def test_new_holding_gets_a_draft_with_checked_levels_and_no_margin(cfg, sent):
     assert all(set(s) <= set(plans.STEP_FIELDS) for s in plan["steps"])
     assert "draft saved" in store.runs(cfg, "plans")[0]["note"]
     ((args, kwargs),) = sent
-    assert args[:3] == ("research", "Stock plans: 1 draft to review", "TICKA") and kwargs["click"] == "/plan"
+    assert args[:3] == ("research", "Stock plans: 1 draft to review", "TICKA") and kwargs["click"] == "/portfolio/stocks"
 
 
 def test_bad_drafts_are_thrown_away_or_repaired(cfg, sent):
@@ -307,7 +307,7 @@ def test_pinned_steps_ride_in_every_draft(cfg, sent, monkeypatch):
     assert [p["id"] for p in payload(fake)["pinned_steps"]] == ["harvest-2026", "margin-repay"]
     steps = book.drafts[0]["plan"]["steps"]
     assert steps[0] == PINS["steps"][0] and steps[1] == PINS["steps"][1] and [s["kind"] for s in steps[2:]] == ["hold", "add"]
-    assert [k["key"] for _, k in sent] == [f"agents:request:{rid}"]
+    assert [(k["key"], k["click"]) for _, k in sent] == [(f"agents:request:{rid}", "/portfolio/stocks?symbol=TICKA")]
     done = store.get_request(cfg, rid)
     assert done["status"] == "done" and "TICKA (asked, new): draft saved." in done["answer"]
     assert [p["delivered"] for p in store.pinned_steps(cfg, "TICKA")] == [True, True]
