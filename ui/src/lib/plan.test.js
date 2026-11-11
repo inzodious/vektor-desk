@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import plan from '../fixtures/engine.reference.json';
 import yardstick from '../fixtures/engine.reference.yardstick.json';
-import { driftTone, driftWords, planLimits, referenceOf } from './plan.js';
+import { driftTone, driftWords, judgedRuleRows, planLimits, referenceOf, ruleState } from './plan.js';
 
 const limits = planLimits(null, null);
 
@@ -36,5 +36,30 @@ describe('what drift is measured against', () => {
     expect(w.hero(20)).toBe('up to 20.0 pts from the safe mix');
     expect(w.split).toBe('split the way the safe mix would, as a yardstick.');
     expect(driftTone(ref, 20, limits)).toBeUndefined();
+  });
+
+  it('says the drift rule is not judged against a yardstick, whatever the engine sent', () => {
+    const ref = referenceOf(yardstick);
+    const drift = { id: 'drift-max', kind: 'drift_max_pts', enabled: true };
+    const margin = { id: 'no-margin-buys', kind: 'no_margin_buys', enabled: true };
+    expect(ruleState(drift, null, ref)).toEqual({ tone: '', word: 'Not judged', icon: 'info', line: 'The safe mix is a yardstick, not a target' });
+    expect(ruleState(drift, 1, ref).word).toBe('Not judged');
+    expect(ruleState(margin, 1, ref)).toEqual({ tone: 'ok', word: 'Passing', icon: 'check' });
+    const rows = [
+      { scope_id: 'drift-max', value: 1 },
+      { scope_id: 'no-margin-buys', value: 1 },
+    ];
+    expect(judgedRuleRows(rows, [drift, margin], ref)).toEqual([rows[1]]);
+  });
+
+  it('keeps every rule word for a judged plan', () => {
+    const ref = referenceOf(plan);
+    const drift = { id: 'drift-max', kind: 'drift_max_pts', enabled: true };
+    expect(ruleState(drift, 1, ref).word).toBe('Passing');
+    expect(ruleState(drift, 0, ref)).toEqual({ tone: 'watch', word: 'Heads up', icon: 'flag' });
+    expect(ruleState(drift, null, ref)).toEqual({ tone: 'info', word: 'Not checked', icon: 'flag' });
+    expect(ruleState({ ...drift, enabled: false }, 1, ref).word).toBe('Off');
+    const rows = [{ scope_id: 'drift-max', value: 1 }];
+    expect(judgedRuleRows(rows, [drift], ref)).toBe(rows);
   });
 });

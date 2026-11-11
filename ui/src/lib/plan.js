@@ -42,6 +42,19 @@ export function driftWords(ref, limits) {
 
 export const driftTone = (ref, value, limits) => (ref.judged && value != null && Math.abs(value) >= limits.driftPts ? 'watch' : undefined);
 
+export function ruleState(rule, pass, ref) {
+  if (rule.enabled === false) return { tone: '', word: 'Off', icon: 'flag' };
+  if (rule.kind === 'drift_max_pts' && !ref.judged) return { tone: '', word: 'Not judged', icon: 'info', line: `${ref.mix.charAt(0).toUpperCase()}${ref.mix.slice(1)} is a yardstick, not a target` };
+  if (pass == null) return { tone: 'info', word: 'Not checked', icon: 'flag' };
+  return pass >= 1 ? { tone: 'ok', word: 'Passing', icon: 'check' } : { tone: 'watch', word: 'Heads up', icon: 'flag' };
+}
+
+export function judgedRuleRows(rows, rules, ref) {
+  if (ref.judged) return rows;
+  const drift = new Set((rules || []).filter((r) => r.kind === 'drift_max_pts').map((r) => r.id));
+  return rows.filter((r) => !drift.has(r.scope_id));
+}
+
 export function useReference() {
   const api = useApi('/api/engine/reference');
   return useMemo(() => referenceOf(api.data), [api.data]);

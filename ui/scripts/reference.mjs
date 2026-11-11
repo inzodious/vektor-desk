@@ -2,6 +2,7 @@ const NOTE = 'No plan of your own is loaded, so drift and the benchmark are meas
 const SAFE = { FXAIX: 40, SCHD: 20, FTIHX: 10, FTEC: 10, NLR: 5, GRID: 5, ICLN: 5, UFO: 5 };
 const NEXT = { SCHD: 300, FTIHX: 150, NLR: 50 };
 const REBASED = ['plan.target', 'plan.drift', 'plan.next_deposit', 'plan.drift_max'];
+const DRIFT_RULE = 'drift-max';
 const round = (v) => Math.round(v * 100) / 100;
 
 // ---------- reference: the plan, and the safe mix as a yardstick ----------
@@ -15,7 +16,7 @@ export function referenceFixtures(metrics) {
   const row = (metric_id, scope_id, value) => ({ ...like, metric_id, scope_id, value: round(value), quality: 'modelled' });
   const drift = Object.fromEntries(Object.entries(SAFE).map(([s, t]) => [s, (weight[s] || 0) - t]));
   const rebased = [
-    ...rows.filter((m) => !REBASED.includes(m.metric_id)),
+    ...rows.filter((m) => !REBASED.includes(m.metric_id) && !(m.metric_id === 'plan.rules' && m.scope_id === DRIFT_RULE)),
     ...Object.keys(SAFE)
       .filter((s) => weight[s] == null)
       .map((s) => ({ ...row('plan.weight', s, 0), quality: 'ok' })),

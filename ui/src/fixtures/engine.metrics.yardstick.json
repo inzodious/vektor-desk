@@ -3185,18 +3185,6 @@
   {
    "metric_id": "plan.rules",
    "scope": "rule",
-   "scope_id": "drift-max",
-   "window": "now",
-   "as_of": "2026-11-06",
-   "value": 1,
-   "unit": "count",
-   "n_obs": null,
-   "quality": "ok",
-   "engine_version": "0.1.0"
-  },
-  {
-   "metric_id": "plan.rules",
-   "scope": "rule",
    "scope_id": "no-margin-buys",
    "window": "now",
    "as_of": "2026-11-06",

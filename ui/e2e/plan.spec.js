@@ -72,6 +72,11 @@ test('with no plan loaded, drift reads as a comparison with the safe mix and pro
   await expect(page.getByRole('columnheader', { name: 'Gap' })).toBeVisible();
   await expect(page.locator('tr[data-sym="FXAIX"] td.dn')).toHaveCount(0);
   await expect(page.locator('tr[data-sym="VXUS"]')).toContainText('Not in the mix');
+  const rule = page.getByTestId('rules-card').locator('[data-rule="drift-max"]');
+  await expect(rule).toContainText('Not judged');
+  await expect(rule).toContainText('The safe mix is a yardstick, not a target');
+  await expect(rule).not.toContainText('Passing');
+  await expect(page.locator('.kpi', { hasText: 'Rules' })).toContainText('2 of 2');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
@@ -87,4 +92,6 @@ test('a loaded plan keeps the drift band, the tone and the rebalance line', asyn
   await expect(card.locator('.drift-band')).toHaveCount(4);
   await expect(card.locator('.drift-legend')).toContainText('Outside band');
   await expect(card.getByTestId('reference-note')).toHaveCount(0);
+  await expect(page.getByTestId('rules-card').locator('[data-rule="drift-max"]')).toContainText('Passing');
+  await expect(page.locator('.kpi', { hasText: 'Rules' })).toContainText('3 of 3');
 });
