@@ -1,17 +1,20 @@
+import hashlib
 import json
 import multiprocessing
 import os
 import sqlite3
-from collections import Counter, namedtuple
+from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
 
 from desk.config import Config
 from desk.db import connect
 from desk.engine import gate
-from desk.engine.lab import factors, rulebook, stats
+from desk.engine.lab import factors, rulebook, simcache, stats
 from desk.engine.lab.data import FRENCH_KIND, SMALL_CAPS, LabData, data_path, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
+from desk.engine.lab.simcache import Cache, Run
 from desk.engine.lab.spec import Spec, SpecError, Variant, parse, resolve, variants
 
 HOLDOUT_YEARS = 2
@@ -123,10 +126,11 @@ def _reject(conn, raw: dict, problems: list[str], now: datetime) -> dict:
 
 
 def _trial(conn, spec: Spec, v: Variant, window: str, kind: str, metrics: dict, now: datetime):
-    conn.execute(
-        "INSERT INTO strategy_trials (strategy_id, version, params, window, kind, metrics, run_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (spec.id, spec.version, v.key, window, kind, json.dumps(metrics), _stamp(now)),
-    )
+    row = (spec.id, spec.version, v.key, window, kind, json.dumps(metrics))
+    same = "SELECT 1 FROM strategy_trials WHERE strategy_id=? AND version=? AND params=? AND window=? AND kind=? AND metrics=?"
+    if conn.execute(same, row).fetchone():
+        return
+    conn.execute("INSERT INTO strategy_trials (strategy_id, version, params, window, kind, metrics, run_at) VALUES (?, ?, ?, ?, ?, ?, ?)", (*row, _stamp(now)))
 
 
 def family_ids(conn, strategy_id: str) -> list[str]:
@@ -199,7 +203,6 @@ def windows(data: LabData, date_range: dict, kind: str | None = None) -> dict:
     return {"start": start, "end": end, "holdout_start": holdout, "folds": folds, "clipped": str(date_range.get("end") or end) > end}
 
 
-Run = namedtuple("Run", "params summary rets bench days")
 _DATA: LabData | None = None
 _SPEC: Spec | None = None
 
@@ -211,7 +214,7 @@ def _job(args):
     return Run(params, stats.summary(res), stats.rets(res.values), stats.rets(res.bench), res.days)
 
 
-def _run_many(cfg, data, spec, jobs: list[tuple]):
+def _compute(data, spec, jobs: list[tuple]) -> list[Run]:
     global _DATA, _SPEC
     _DATA, _SPEC = data, spec
     workers = max(1, int(os.environ.get("DESK_LAB_WORKERS", "1") or 1))
@@ -219,6 +222,20 @@ def _run_many(cfg, data, spec, jobs: list[tuple]):
         with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("fork")) as pool:
             return list(pool.map(_job, jobs, chunksize=4))
     return [_job(j) for j in jobs]
+
+
+def _run_many(cfg, data, spec, jobs: list[tuple], cache: Cache | None = None) -> list[Run]:
+    if cache is None:
+        return _compute(data, spec, jobs)
+    keys = [cache.key(spec.hash, j) for j in jobs]
+    have = cache.get(keys)
+    todo = [(k, j) for k, j in zip(keys, jobs, strict=True) if k not in have]
+    cache.hits, cache.misses = cache.hits + len(jobs) - len(todo), cache.misses + len(todo)
+    if todo:
+        runs = _compute(data, spec, [j for _, j in todo])
+        cache.put([simcache.row(k, j, run) for (k, j), run in zip(todo, runs, strict=True)])
+        have |= {k: run for (k, _), run in zip(todo, runs, strict=True)}
+    return [have[k] for k in keys]
 
 
 def _ok(spec: Spec, summary: dict) -> bool:
@@ -245,7 +262,7 @@ def _stitch(pieces: list[Run]) -> tuple[list[str], list[float], list[float | Non
     return days, vals, bench
 
 
-def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) -> dict:
+def run_experiment(cfg: Config | None, conn, data: LabData, request: dict, *, now: datetime, cache: Cache | None = None) -> dict:
     raw = request.get("spec") or {}
     try:
         spec = parse(raw, data, model=str(request.get("model") or ""))
@@ -277,7 +294,7 @@ def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: date
     params = [v.params for v in grid_variants]
     folds, pieces, chosen = [], [], []
     for f in win["folds"]:
-        train = _run_many(cfg, data, spec, [(p, *f["train"], 1.0) for p in params])
+        train = _run_many(cfg, data, spec, [(p, *f["train"], 1.0) for p in params], cache)
         pick = _best(spec, train)
         with conn:
             for run in train:
@@ -286,14 +303,14 @@ def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: date
         if pick is None:
             folds.append(window | {"params": None, "note": "No variant met the constraints on this training window."})
             continue
-        (test,) = _run_many(cfg, data, spec, [(pick, *f["test"], 1.0)])
+        (test,) = _run_many(cfg, data, spec, [(pick, *f["test"], 1.0)], cache)
         with conn:
             _trial(conn, spec, resolve(spec, pick), f"{f['test'][0]}..{f['test'][1]}", "test", test.summary, now)
         train_sum = next(run.summary for run in train if run.params == pick)
         folds.append(window | {"params": pick, "train_sharpe": train_sum.get("sharpe"), "test": test.summary})
         pieces.append(test)
         chosen.append(json.dumps(pick, sort_keys=True))
-    full = _run_many(cfg, data, spec, [(p, win["start"], win["end"], 1.0) for p in params])
+    full = _run_many(cfg, data, spec, [(p, win["start"], win["end"], 1.0) for p in params], cache)
     with conn:
         for run in full:
             _trial(conn, spec, resolve(spec, run.params), f"{win['start']}..{win['end']}", "full", run.summary, now)
@@ -323,7 +340,7 @@ def run_experiment(cfg: Config, conn, data: LabData, request: dict, *, now: date
         "pbo": round(pbo, 4) if pbo is not None else None,
         "deploy_params": deploy,
         "factor_check": factor,
-        "analyses": _analyses(cfg, data, spec, request.get("analyses") or [], full, favorite, win, factor),
+        "analyses": _analyses(cfg, data, spec, request.get("analyses") or [], full, favorite, win, factor, cache),
         "caveats": spec.caveats + _caveats(spec, factor),
     }
     return _record(conn, spec, "experiment", body, now)
@@ -376,7 +393,7 @@ def _caveats(spec: Spec, factor: dict) -> list[str]:
     return out
 
 
-def _analyses(cfg, data, spec, wanted, full, favorite, win, factor) -> dict:
+def _analyses(cfg, data, spec, wanted, full, favorite, win, factor, cache=None) -> dict:
     out = {}
     if "param_sensitivity" in wanted:
         table = {}
@@ -385,7 +402,7 @@ def _analyses(cfg, data, spec, wanted, full, favorite, win, factor) -> dict:
                 table.setdefault(k, {}).setdefault(json.dumps(val), []).append(run.summary.get("sharpe") or 0.0)
         out["param_sensitivity"] = {k: {val: round(stats._mean(xs), 4) for val, xs in vals.items()} for k, vals in table.items()}
     if favorite is not None and "turnover_cost" in wanted:
-        rows = _run_many(cfg, data, spec, [(favorite, win["start"], win["end"], m) for m in (1.0, 2.0, 4.0)])
+        rows = _run_many(cfg, data, spec, [(favorite, win["start"], win["end"], m) for m in (1.0, 2.0, 4.0)], cache)
         out["turnover_cost"] = [
             {"cost_x": m, "excess_vs_bench_pts": run.summary.get("excess_vs_bench_pts")} for m, run in zip((1.0, 2.0, 4.0), rows, strict=True)
         ]
@@ -528,6 +545,60 @@ def _bars(spec: Spec, exp: dict, holdout: dict) -> dict:
     return bars
 
 
+# ---- Simulations as a job (pure: lab data + request in, rows out) ----
+
+
+EPOCH = datetime(2000, 1, 1, tzinfo=UTC)
+
+
+def sims(path: Path, request: dict) -> dict:
+    data = load(path)
+    snapshot = simcache.snapshot_hash(path)
+    out = {"kind": simcache.KIND, "key": simcache.job_key(snapshot, request), "snapshot": snapshot, "request": request, "rows": []}
+    if request.get("request") != "experiment":
+        return out | {"status": "nothing_to_simulate"}
+    scratch = sqlite3.connect(":memory:")
+    scratch.row_factory = sqlite3.Row
+    scratch.executescript(LEDGER)
+    cache = Cache(snapshot)
+    try:
+        body = run_experiment(None, scratch, data, request, now=EPOCH, cache=cache)
+    finally:
+        scratch.close()
+    return out | {"status": body["kind"], "rows": cache.rows()}
+
+
+def ingest(cfg: Config, data: LabData, cache: Cache) -> list[dict]:
+    done = []
+    for path in simcache.staged(cfg):
+        done.append({"file": path.name, **_ingest_one(data, cache, simcache.read_staged(path))})
+        path.unlink(missing_ok=True)
+    return done
+
+
+def _ingest_one(data: LabData, cache: Cache, result: dict | None) -> dict:
+    if result is None or not isinstance(result.get("rows"), list) or not isinstance(result.get("request"), dict):
+        return {"status": "unreadable"}
+    if result.get("snapshot") != cache.snapshot:
+        return {"status": "stale", "note": "Made from lab data that has since been replaced."}
+    request = result["request"]
+    try:
+        spec = parse(request.get("spec") or {}, data, model=str(request.get("model") or ""))
+    except SpecError as e:
+        return {"status": "rejected", "note": "; ".join(e.problems)[:300]}
+    rows = result["rows"][: simcache.MAX_ROWS]
+    for body in rows:
+        why = simcache.problems(body, cache.snapshot, spec.hash)
+        if why:
+            return {"status": "rejected", "note": why}
+    spot = sorted(rows, key=lambda r: hashlib.sha256((cache.snapshot + r["key"]).encode()).hexdigest())[: simcache.SPOT_CHECKS]
+    again = _compute(data, spec, [(r["params"], r["start"], r["end"], r["cost_mult"]) for r in spot])
+    for body, run in zip(spot, again, strict=True):
+        if simcache.row(body["key"], (body["params"], body["start"], body["end"], body["cost_mult"]), run) != body:
+            return {"status": "mismatch", "note": "A recomputed row differs, so none of the rows were kept."}
+    return {"status": "stored", "rows": len(rows), "new": cache.put(rows)}
+
+
 # ---- Queue ----
 
 
@@ -536,13 +607,18 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
     folder = lab_dir(cfg) / "queue"
     if not folder.exists():
         return {"ok": True, "done": []}
-    data = load(data_path(cfg))
+    if not data_path(cfg).exists():
+        load(data_path(cfg))
     conn = ledger(cfg)
-    done = []
+    done, cache = [], None
     try:
-        for path in sorted(folder.glob("*.json")):
-            if conn.execute("SELECT 1 FROM queue_done WHERE file=?", (path.name,)).fetchone():
-                continue
+        waiting = [p for p in sorted(folder.glob("*.json")) if not conn.execute("SELECT 1 FROM queue_done WHERE file=?", (p.name,)).fetchone()]
+        if not waiting and not simcache.staged(cfg):
+            return {"ok": True, "done": []}
+        data = load(data_path(cfg))
+        cache = simcache.open_cache(cfg, simcache.snapshot_hash(data_path(cfg)), now=now)
+        staged = ingest(cfg, data, cache)
+        for path in waiting:
             try:
                 request = json.loads(path.read_text())
             except (OSError, ValueError):
@@ -550,7 +626,7 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
             else:
                 kind = request.get("request")
                 if kind == "experiment":
-                    status = run_experiment(cfg, conn, data, request, now=now)["kind"]
+                    status = run_experiment(cfg, conn, data, request, now=now, cache=cache)["kind"]
                 elif kind == "finalize":
                     status = finalize(cfg, conn, data, request, now=now)["kind"]
                 elif kind == "rule":
@@ -562,4 +638,11 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
             done.append({"file": path.name, "status": status})
     finally:
         conn.close()
-    return {"ok": True, "done": done}
+        if cache is not None:
+            cache.close()
+    out = {"ok": True, "done": done}
+    if staged:
+        out["sims"] = staged
+    if cache.hits or cache.misses:
+        out["cache"] = {"hits": cache.hits, "computed": cache.misses}
+    return out

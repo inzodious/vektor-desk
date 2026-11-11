@@ -11,7 +11,7 @@ from desk.db import connect
 from desk.engine import gate, lab, schema
 from desk.engine.__main__ import run_holdings, run_lab_export
 from desk.engine.lab import library as features
-from desk.engine.lab import paper, runner, stats
+from desk.engine.lab import paper, runner, simcache, stats
 from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, ledger_path, load
 from desk.engine.lab.runner import ledger, process_queue
 from desk.engine.lab.sim import _year_tax, simulate
@@ -395,3 +395,85 @@ def test_export_keeps_the_first_source_for_a_bar(cfg):
         ("IWM", "2026-11-04", 7.0, 7.0, 70.0),
         ("SMOL", "2026-11-04", 5.0, 5.0, 50.0),
     ]
+
+
+# ---- Simulations as a repeatable job ----
+
+
+def cached(cfg) -> list[str]:
+    conn = sqlite3.connect(simcache.cache_path(cfg))
+    try:
+        return [r[0] for r in conn.execute("SELECT DISTINCT snapshot FROM sim_cache")]
+    finally:
+        conn.close()
+
+
+def test_a_second_run_of_an_experiment_reuses_every_simulation(cfg, monkeypatch):
+    write_lab_db(cfg)
+    queue(cfg, experiment(), "001-exp.json")
+    first = process_queue(cfg, now=NOW)
+    assert first["cache"]["computed"] > 0
+    conn = ledger(cfg)
+    body = conn.execute("SELECT body FROM lab_results WHERE kind='experiment'").fetchone()[0]
+    trials = conn.execute("SELECT count(*) FROM strategy_trials").fetchone()[0]
+    conn.execute("DELETE FROM queue_done")
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(runner, "_job", lambda args: pytest.fail("a cached simulation was run again"))
+    again = process_queue(cfg, now=NOW)
+    assert again["cache"] == {"hits": first["cache"]["hits"] + first["cache"]["computed"], "computed": 0}
+    conn = ledger(cfg)
+    assert conn.execute("SELECT body FROM lab_results WHERE kind='experiment'").fetchone()[0] == body
+    assert conn.execute("SELECT count(*) FROM strategy_trials").fetchone()[0] == trials
+    conn.close()
+
+
+def test_a_worker_result_is_checked_then_fills_the_cache(cfg, monkeypatch):
+    write_lab_db(cfg)
+    request = experiment()
+    result = runner.sims(data_path(cfg), request)
+    assert result["kind"] == "lab.sims" and result["status"] == "experiment" and result == runner.sims(data_path(cfg), request)
+    assert not ledger_path(cfg).exists()
+    assert all(simcache.problems(r, result["snapshot"], parse(SPEC).hash) is None for r in result["rows"])
+    staged = simcache.stage(cfg, result)
+    assert staged["ok"] and staged["rows"] == len(result["rows"]) and simcache.stage(cfg, result)["file"] == staged["file"]
+    queue(cfg, request, "001-exp.json")
+    calls = []
+    real = runner._job
+    monkeypatch.setattr(runner, "_job", lambda args: calls.append(args) or real(args))
+    out = process_queue(cfg, now=NOW)
+    assert out["sims"] == [{"file": staged["file"], "status": "stored", "rows": len(result["rows"]), "new": len(result["rows"])}]
+    assert len(calls) == simcache.SPOT_CHECKS and out["cache"]["computed"] == 0 and out["cache"]["hits"] >= len(result["rows"])
+    assert simcache.staged(cfg) == []
+    conn = ledger(cfg)
+    assert json.loads(conn.execute("SELECT body FROM lab_results WHERE kind='experiment'").fetchone()[0])["status"] == "ok"
+    conn.close()
+
+
+def test_worker_results_that_do_not_check_out_are_dropped(cfg):
+    write_lab_db(cfg)
+    request = experiment()
+    good = runner.sims(data_path(cfg), request)
+    bent = json.loads(json.dumps(good))
+    bent["rows"][0]["rets"][3] += 0.01
+    relabelled = json.loads(json.dumps(good))
+    relabelled["rows"][0]["params"] = {"top_n": 4, "lookback": 21}
+    for bad in (bent | {"rows": bent["rows"][:1]}, relabelled, good | {"snapshot": "0" * 64}, good | {"rows": [{"key": "x"}]}):
+        assert simcache.stage(cfg, bad)["ok"]
+    assert simcache.stage(cfg, {"kind": "other"}) == {"ok": False, "error": "not a lab.sims result"}
+    (simcache.queue_dir(cfg) / "sims-junk.json.gz").write_bytes(b"not gzip")
+    out = process_queue(cfg, now=NOW)
+    assert sorted(s["status"] for s in out["sims"]) == ["mismatch", "rejected", "rejected", "stale", "unreadable"]
+    assert cached(cfg) == []
+
+
+def test_the_cache_is_dropped_when_the_lab_data_changes(cfg):
+    write_lab_db(cfg)
+    queue(cfg, experiment(), "001-exp.json")
+    process_queue(cfg, now=NOW)
+    assert len(cached(cfg)) == 1
+    write_lab_db(cfg, end="2025-01-03")
+    queue(cfg, experiment(spec=SPEC | {"id": "other"}, grid={"top_n": [3], "lookback": [126]}), "002-exp.json")
+    out = process_queue(cfg, now=NOW)
+    assert out["cache"]["computed"] > 0 and cached(cfg) == [simcache.snapshot_hash(data_path(cfg))]
+    assert not sqlite3.connect(ledger_path(cfg)).execute("SELECT 1 FROM sqlite_master WHERE name='sim_cache'").fetchone()
