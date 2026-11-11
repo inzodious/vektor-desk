@@ -76,7 +76,7 @@ def test_auto_turns_on_under_the_floor_and_only_off_again_with_room(cfg, monkeyp
     assert memory.decide("auto", 3999, True)[0] is True and memory.decide("auto", 4000, True) == (False, None)
     assert memory.decide("auto", None, True)[0] is True and memory.decide("auto", None, False) == (False, None)
     state = memory.refresh(cfg, NOW, info=TIGHT, group={"limit_mb": 640, "used_mb": 300})
-    assert state["on"] is True and state["paused"] == ["lab", "eval"] and "512 MB free, under the 1.5 GB floor" in state["why"]
+    assert state["on"] is True and state["paused"] == ["lab"] and "512 MB free, under the 1.5 GB floor" in state["why"]
     assert state["scheduler"] == {"limit_mb": 640, "used_mb": 300}
     later = NOW + timedelta(minutes=30)
     kept = memory.refresh(cfg, later, info=TIGHT | {"available_mb": 3000}, group={})
@@ -97,7 +97,7 @@ def test_the_switch_wins_over_auto_and_is_logged(app_client, cfg, monkeypatch):
     assert client.get("/api/memory").json()["low_memory"]["mode"] == "auto"
     body = client.put("/api/memory/low", json={"mode": "on"}).json()
     assert body["ok"] is True and body["low_memory"]["on"] is True and body["low_memory"]["why"] == "You switched it on."
-    assert "Low-memory mode is on: the lab and the eval session are paused, and heavy jobs run one at a time." in body["note"]
+    assert "Low-memory mode is on: the lab is paused, and heavy jobs run one at a time." in body["note"]
     assert client.put("/api/memory/low", json={"mode": "off"}).json()["low_memory"] | {"since": None} == {
         "on": False,
         "mode": "off",

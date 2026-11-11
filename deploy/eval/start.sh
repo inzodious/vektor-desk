@@ -35,9 +35,4 @@ os.chmod(path, 0o600)
 PY
 mkdir -p "$HOME/logs"
 if [ -f "$LOG" ]; then mv -f "$LOG" "$LOG.1"; fi
-
-# ---- Paused while the box is in low-memory mode ----
-if python -c "import desk.memory" 2>/dev/null; then
-  exec python -m desk.memory hold --name "the eval session" --data "${EVAL_DATA:-/data}" -- claude remote-control --name vektor-desk-eval --debug-file "$LOG"
-fi
 exec claude remote-control --name vektor-desk-eval --debug-file "$LOG"
