@@ -228,7 +228,7 @@ One tap runs everything a new or stale desk needs, in order. `POST /api/start` d
 | Call | Answer |
 |---|---|
 | `GET /api/start` | `{state: idle\|running\|done, needs_start, can_start, blocked, result: ok\|partial, summary, started_at, finished_at, last_ok_at, scheduler_alive, memory: {state, low_memory, killed, note}, steps}` |
-| One step | `{id, title, state: waiting\|running\|ok\|failed\|skipped, detail, fix: {label, to}\|null, job, started_at, finished_at}` |
+| One step | `{id, title, state: waiting\|running\|ok\|failed\|skipped, detail, fix: {label, to}\|null, job, started_at, finished_at, waiting}`. `waiting` is true while the step's job is held for its turn in low-memory mode |
 | `POST /api/start` | `202` with the same body and `ok: true`; `409 running`; `503 scheduler_down` |
 
 - A failed step is recorded and the chain goes on. `detail` is what the job said last, in its own words; `fix` names the screen that sorts it out.
@@ -272,6 +272,31 @@ The NAS has 16 GB, no swap and most of it held outside the desk, so the desk wat
 
 State lives in `data/run/`: `low-memory.mode.json` (his choice), `low-memory.state.json` (the scheduler's verdict every 30 seconds; other containers trust it for 10 minutes, then read `/proc/meminfo` themselves), `waiting.json`, `oom.log`.
 
+## Workers
+
+A second machine on the home network (Horizon) can take heavy jobs off the NAS. It runs the same image as `python -m desk.worker` with two settings, the desk's LAN address and a worker key, and it only ever calls the desk: the NAS opens no connection to it and needs no SSH. It holds no broker, Claude or Firestore key, and only the NAS writes the desk's databases.
+
+| Step | How |
+|---|---|
+| Join | `POST /api/workers {name}` makes a key (`dwk_…`), shown once; the desk keeps only its SHA-256. Up to 4 workers. `DELETE /api/workers/{id}` removes one and its key stops working at once |
+| Heartbeat | The worker posts `/api/worker/beat` every 30 seconds with its build, host name and the job it is on. `online` until 2 minutes pass without one, then `asleep`; `never` before the first |
+| Queue | A package offers work with `desk.worker.offer(cfg, kind, inputs, copies=("lab",), key=...)` from a job in `cron`. That takes a copy of each database it names and queues the job in `data/run/worker/queue.db`. The same `key` is queued once, and a finished one is not repeated unless `again=True` |
+| Copy | The worker receives `lab.db` and nothing else; widening that needs Joshua's decision. `desk.db` and `mirror.db` (his accounts, holdings, lots and the Escape Vektor copy) never leave the box: `offer`, `enqueue`, `take` and the lease all refuse any other name in plain words. `desk.worker.snapshots.take(cfg, "lab")` copies `data/lab/data/lab.db` byte for byte (the export replaces that file whole, so its fingerprint is the lab's own snapshot hash), gzips it and names it by the SHA-256 of its content (`data/run/worker/snapshots/<sha>.db.gz`). An unchanged database reuses the last copy. `snapshots.current(cfg, copy)` says whether a job's copy is still the live data |
+| Lease | `GET /api/worker/next` hands the oldest queued job to the worker: `{job: {id, kind, key, inputs, attempts, snapshots: [{name, sha256, bytes, url}]}, code: {id, url}, build}`, or `204`. The worker downloads each copy once, checks its fingerprint and keeps it read-only |
+| Same code | The lease names the desk's own `desk` package (`/api/worker/code/{id}`). The worker runs the job with that code in a child process, so it follows every deploy without being rebuilt. Its image only has to carry the Python packages |
+| Result | `POST /api/worker/jobs/{id}/result?ok=1&seconds=…&peak_mb=…` with gzip-compressed JSON (64 MB limit), or `ok=0` with the reason as text. The API stores the file and runs nothing; it nudges the `worker-apply` job, and the scheduler in `cron` hands the file to the kind's `accept`, which checks it and writes. A refused result fails the job in plain words |
+| Gone quiet | A leased job whose worker stops beating for 2 minutes goes back in line. After 3 starts it fails. Jobs must be safe to run twice |
+
+| Call | Answer |
+|---|---|
+| `GET /api/workers` | `{now, summary: {state: online\|asleep\|never\|none, name, waiting, words}, workers: [{id, name, state, words, last_seen, build, host, job_id, added_at}], jobs: [...]}` |
+| One job | `{id, kind, title, state: queued\|leased\|returned\|done\|failed, where: queue\|worker\|here\|null, why, queued_at, leased_at, finished_at, attempts, seconds, peak_mb}`. `why` always says where it is waiting and why, or how it ended |
+| `POST /api/workers` | `201 {ok, id, name, key, desk_url, message}` plus the list; `422 bad_name`; `409 too_many` |
+| `POST /api/worker/check` | Queues the built-in `worker.check` (a full integrity check of the lab data copy on the worker), to prove the path end to end; `202 {ok, job}` plus the list, or `409 no_data` when the lab data hasn't been exported yet |
+| Worker calls | `Authorization: Bearer <key>`; `401` otherwise |
+
+A job kind is a `Kind(name, title, run, accept)` listed in `desk/<pkg>/kinds.py` (Package seams). `run(inputs, files)` executes on the worker and must depend only on its inputs and the database copies; `accept(cfg, job, result_path)` executes on the NAS, validates and writes, and returns a one-line note. What happens to work no worker takes is the kind's business: the lab computes whatever its cache is missing itself.
+
 ## Box actions
 
 Chores that need root on the NAS are requests the host picks up, the same way Run now works. `POST /api/box/{action}/run` drops `data/run/box/requests/{action}.json`. The auto-deploy cron job (`deploy.sh auto`, every 5 minutes, as root) then runs `deploy.sh {action}` for each request on its allowlist: `redeploy`, `status`, `check`, `backup`, `restore-test`, `logs`, `update-script`, `apply-compose` and `deploy-now`. It reads nothing from the request except a hex id. The redacted last 300 lines of output go to `data/run/box/{action}.json`.
@@ -313,16 +338,17 @@ Every upload is logged in `data/run/inbox-uploads.log`, with its outcome, size a
 
 ## Package seams
 
-Each package under `desk/` plugs in through four optional modules, found on their own at startup:
+Each package under `desk/` plugs in through five optional modules, found on their own at startup:
 
 | Module | Exposes | Picked up by |
 |---|---|---|
 | `desk/<pkg>/api.py` | `router`, a FastAPI `APIRouter` with its own prefix | `desk/api/app.py`, which includes every router it finds |
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
-| `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command", "refreshes", "stage", "heavy"}` dicts (only `schedule` and `command` are required) | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
+| `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command", "refreshes", "stage", "heavy", "title"}` dicts (only `schedule` and `command` are required; `title` is the name he sees in `/api/jobs` and in memory messages, default the job name in words) | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
+| `desk/<pkg>/kinds.py` | `KINDS`, a list of `desk.worker.Kind` | `desk.worker.registry`, on the NAS and inside the worker's child process |
 | `desk/<pkg>/readiness.py` | `sections(cfg)`, returning `{key: {state, why, action, next_auto, next_auto_text}}` for the readiness keys it wants to answer itself | `desk.readiness`, which lays those fields over its own answer |
 
-Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/start`, `/api/readiness`, `/api/memory/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
+Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/start`, `/api/readiness`, `/api/memory/...`, `/api/workers`, `/api/worker/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
 ## Web app
 

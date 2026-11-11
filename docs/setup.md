@@ -90,6 +90,25 @@ Deploys are automatic within 5 minutes of a push to `main`. Two kinds of change 
 | An alert says the desk ran out of memory | Settings → Box shows what was stopped and why. Low-memory mode switches itself on when the box has under 1.5 GB available: heavy jobs then run one at a time (docs/architecture.md, Memory). Deploy now retries a build that ran out of memory |
 | `deploy/compose.yaml` changed | Settings → Box → Apply compose. If the change widens what containers can do (a new image, host path, capability and so on; docs/architecture.md, Deploys), the panel shows why with a Copy button instead: read it, then Apps → `vektor-desk` → Edit, paste, save. `deploy.sh status` says which on its `Compose:` line |
 
+## Horizon worker
+
+Optional. A second machine on the home network runs the desk's heavy jobs (docs/architecture.md, Workers). It needs Docker and a checkout of this repo, and it reaches the desk at `https://desk-lan.escape-vektor.com` only. One time, in a shell on that machine:
+
+```bash
+cd ~/Documents/Development/apps/vektor-desk && git pull --ff-only
+KEY=$(curl -fsS -X POST https://desk-lan.escape-vektor.com/api/workers -H 'Content-Type: application/json' -d '{"name":"Horizon"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["key"])')
+DESK_BUILD=$(git rev-parse HEAD) DESK_WORKER_KEY=$KEY docker compose -f deploy/worker/compose.yaml up -d --build
+```
+
+| Then | Do |
+|---|---|
+| Check it joined | `curl -fsS https://desk-lan.escape-vektor.com/api/workers` shows Horizon as `online` within a minute; `docker logs vektor-desk-worker` shows what it is doing |
+| Prove the path | `curl -fsS -X POST https://desk-lan.escape-vektor.com/api/worker/check`, then read `/api/workers` again: the job goes `queued`, `leased`, `returned`, `done` |
+| The machine restarts or sleeps | Nothing: the container comes back by itself (`restart: unless-stopped`) and the desk shows it as asleep meanwhile. Its key stays in the `work` volume |
+| The desk deploys a new build | Nothing: the worker fetches the desk's code with each job |
+| `pyproject.toml` dependencies change | Run the last line again without `DESK_WORKER_KEY`; it rebuilds the image and keeps the key |
+| Remove it | `docker compose -f deploy/worker/compose.yaml down -v` there, and remove the worker in the app (`DELETE /api/workers/{id}`) |
+
 ## Home network
 
 Open the desk at home without Tailscale, the way Hemline has its own address. Caddy also answers on a second NAS address, `192.168.0.116`, under `https://desk-lan.escape-vektor.com`, with its own certificate. Your router doesn't forward it, so it's reachable only from the home network. Tailscale and `desk.escape-vektor.com` keep working when you're away.

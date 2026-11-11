@@ -18,6 +18,19 @@ def test_every_job_has_a_stable_unique_name():
         assert len(jobrun.catalogue(tax)["agents-run-tax"].schedules) == len(tax)
 
 
+def test_a_job_table_entry_can_name_itself(monkeypatch):
+    from types import SimpleNamespace
+
+    from desk import scheduler
+
+    table = [{"name": "run-debrief", "title": "Debrief desk", "schedule": "0 9 * * *", "command": "true"}, ("0 8 * * *", "python -m desk.agents triggers")]
+    monkeypatch.setattr(scheduler, "seams", lambda kind, only=None: {"agents": SimpleNamespace(JOBS=table)})
+    named, plain = scheduler.package_jobs()
+    assert (named.name, named.title) == ("agents-run-debrief", "Debrief desk")
+    assert plain.title == jobrun.job_title(plain.name)
+    assert jobrun.catalogue([named])["agents-run-debrief"].title == "Debrief desk"
+
+
 def test_get_jobs_lists_each_job_with_its_state(app_client, cfg):
     client = app_client(packages=["mirror", "engine"])
     body = client.get("/api/jobs").json()

@@ -1,0 +1,33 @@
+# Vektor Desk worker for a second machine on the home network (docs/setup.md, Horizon worker). It asks the desk for heavy
+# jobs, runs them on a copy of the data it downloads, and sends the results back. It holds no broker, Claude or Firestore
+# key: only its own worker key, kept in the `work` volume after the first start. One time, from the repo checkout:
+#   DESK_BUILD=$(git rev-parse HEAD) DESK_WORKER_KEY=dwk_... docker compose -f deploy/worker/compose.yaml up -d --build
+services:
+  worker:
+    build:
+      context: ../..
+      args:
+        DESK_BUILD: ${DESK_BUILD:-worker}
+    image: vektor-desk:worker
+    container_name: vektor-desk-worker
+    restart: unless-stopped
+    init: true
+    command: ["python", "-m", "desk.worker"]
+    environment:
+      DESK_URL: ${DESK_URL:-https://desk-lan.escape-vektor.com}
+      DESK_WORKER_KEY: ${DESK_WORKER_KEY:-}
+      DESK_WORKER_DIR: /work
+      DESK_LAB_WORKERS: ${DESK_LAB_WORKERS:-8}
+      HOME: /work
+    volumes:
+      - work:/work
+    # The image's health check calls the API, which doesn't run here.
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  work: {}
