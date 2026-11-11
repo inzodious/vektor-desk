@@ -82,3 +82,24 @@ def test_compose_runs_the_eval_start_script():
     svc = yaml.safe_load(COMPOSE.read_text())["services"]["eval"]
     assert svc["command"] == ["sh", "/src/deploy/eval/start.sh"]
     assert svc["environment"]["HOME"] == "/home/eval" and svc["working_dir"] == "/work"
+
+
+def test_start_runs_remote_control_under_the_low_memory_hold_when_the_image_has_it(tmp_path):
+    home, src, work, stub = tmp_path / "home", tmp_path / "src", tmp_path / "work", tmp_path / "bin"
+    (home / ".claude").mkdir(parents=True)
+    (home / ".claude" / ".credentials.json").write_text("{}")
+    (src / "deploy" / "eval").mkdir(parents=True)
+    (src / "deploy" / "eval" / "CLAUDE.md").write_text("# rules\n")
+    work.mkdir()
+    stub.mkdir()
+    held = tmp_path / "held"
+    (stub / "python").write_text(f'#!/bin/sh\ncase "$1" in\n  -c) exit 0 ;;\n  -m) echo "$*" > {held} ;;\n  *) exec {sys.executable} "$@" ;;\nesac\n')
+    (stub / "python").chmod(0o755)
+    env = {"HOME": str(home), "EVAL_SRC": str(src), "EVAL_WORK": str(work), "PATH": f"{stub}:/usr/bin:/bin"}
+    res = subprocess.run(["sh", str(START)], capture_output=True, text=True, env=env, timeout=30)
+    assert res.returncode == 0, res.stderr
+    log = home / "logs" / "remote-control.log"
+    assert held.read_text().split() == [
+        *"-m desk.memory hold --name the eval session --data /data -- claude remote-control --name vektor-desk-eval --debug-file".split(),
+        str(log),
+    ]

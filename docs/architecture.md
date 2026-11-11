@@ -74,7 +74,7 @@ The box is a Ryzen 5 5600GT (6 cores, 12 threads) with 15 GiB of RAM and no swap
 | tailscale, caddy | 96 MB each | same |
 | api | 256 MB | same |
 | cron (mirror, engine, one agent at a time) | 640 MB | 2 GB |
-| lab | 1.5 GB, 3 CPUs, 3 workers | 8 GB, 8 CPUs, 8 workers |
+| lab | 1.5 GB, 3 CPUs, 1 worker (each worker loads its own copy of the lab data) | 8 GB, 8 CPUs, 8 workers |
 
 - Heavy sweeps run from 1:00 to 6:00 ET and never alongside an agent run (`desk.runlock.job_lock`).
 - Disk: the Manifest NVMe has about 110 GiB free. The desk's budget is 20 GiB, with lab data under 5 GiB and run artifacts pruned after 30 days.
@@ -153,9 +153,9 @@ The service account can also read life-stack's `users/` data in the same Firebas
 
 The same pattern as Hemline: `deploy/deploy.sh` runs as root on the NAS.
 
-- `now` pulls `main` and builds `vektor-desk:candidate` and `vektor-desk/caddy:candidate`, stamped with the commit. It then backs up with the new build's code (`docker run` on the candidate image, no network), so a fix to the backup can unblock its own deploy, and only after a good backup tags the candidates `:local`, runs `app.redeploy`, and waits for the API to report healthy at that commit. If it doesn't, it rolls back to the images the containers were running, which it tagged `:previous` just before the swap. A failed backup changes no image, and the next try reuses the build. "Already live" means the running containers are at that commit, not just the image tags. It refuses while a desk job holds a run lock.
+- `now` pulls `main` and builds `vektor-desk:candidate` and `vektor-desk/caddy:candidate`, stamped with the commit. Each named stage of a Dockerfile is built on its own first (`node`, `ui`, `deps`), then the image, then Caddy, so BuildKit never runs the UI build and the Python install side by side on a box that is short on memory. A build that fails while the kernel's out-of-memory count went up says so, and the hold is marked `memory`. It then backs up with the new build's code (`docker run` on the candidate image, no network), so a fix to the backup can unblock its own deploy, and only after a good backup tags the candidates `:local`, runs `app.redeploy`, and waits for the API to report healthy at that commit. If it doesn't, it rolls back to the images the containers were running, which it tagged `:previous` just before the swap. A failed backup changes no image, and the next try reuses the build. "Already live" means the running containers are at that commit, not just the image tags. It refuses while a desk job holds a run lock.
 - `auto` does the same every 5 minutes when `main` has moved, waits out running jobs, and doesn't retry a failed commit until the next push. Three things release a held-back commit without SSH: **Deploy now** in Settings → Box (`deploy.sh deploy-now`), a new box script (**Update box script**; the hold remembers which script made it), and, when the hold came from a failed backup, the next good backup (nightly, or **Back up now**).
-- `status` shows what's live, GitHub, container health, the tailnet address, backups and the desk's own status.
+- `status` shows what's live, GitHub, container health, the tailnet address, backups, a `Memory:` line and the desk's own status.
 - `check` tests the Claude sign-in, Firestore read access, the DNS record against the tailnet address and the certificate, says whether the results reviews are fresh (with each stage of today's run), and sends a test alert to `desk-ops`.
 - The cron jobs run a pinned copy at `/mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`, so a push to `main` never reaches root on its own. When `main`'s `deploy.sh` moves on, `status`, `check` and Settings → Box say how many `deploy.sh` commits the copy is behind, and the **Update box script** action copies it over once the checkout is clean, sits exactly at `origin/main` and the script parses (temp file and `mv`, then a `desk-ops` alert). Its output names the old commit, the new one and the commits between. `touch /mnt/Manifest/apps/vektor-desk/deploy.no-self-pin` turns the action off.
 - `auto` and `backup` send a high-priority `desk-ops` alert when they stop on an error; `now` doesn't, since you're watching it. A failed backup's alert carries the reason (for example the database and table that failed its check). When `auto`'s deploy stops, the same run still checks in and runs box actions, so Settings → Box keeps working.
@@ -198,11 +198,11 @@ The API never runs a command. `POST /api/jobs/{name}/run` drops a request file i
 
 | Call | Answer |
 |---|---|
-| `GET /api/jobs` | `{now, scheduler_alive, cooldown_seconds: 300, pickup_seconds: 5, stages: ["mirror", "engine", "review", "desks", "paper"], jobs: [...]}` |
-| One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes), `stage` (its step in today's run, or `null`) |
-| `last_run` | `null`, or `{trigger: schedule\|request\|start, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, detail, note, error}`. `result` is `null` while it runs |
+| `GET /api/jobs` | `{now, scheduler_alive, cooldown_seconds: 300, pickup_seconds: 5, stages: ["mirror", "engine", "review", "desks", "paper"], low_memory: {on, why}, jobs: [...]}` |
+| One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `waiting`, `waiting_since` (its turn hasn't come in low-memory mode), `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes), `stage` (its step in today's run, or `null`) |
+| `last_run` | `null`, or `{trigger: schedule\|request\|start, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, detail, note, error, oom: cap\|box\|null}`. `result` is `null` while it runs; `trigger` is also `memory` for the alert job after a kill |
 | `POST /api/jobs/{name}/run` | `202 {ok: true, job, request_id, requested_at, message}` |
-| Refusals | `{ok: false, error, message, ...}`: `404 unknown_job`; `409 running` (`since`); `409 queued` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 scheduler_down` |
+| Refusals | `{ok: false, error, message, ...}`: `404 unknown_job`; `409 running` (`since`); `409 queued` (`since`); `409 waiting` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 scheduler_down` |
 
 **Today's run.** The Bridge strip walks `stages` in order and shows the jobs whose `stage` matches: `mirror`, `engine-daily`, `engine-review`, the Plan keeper, debrief and plan desks, and `engine-paper`. A package can set both fields itself with a dict entry in its `jobs.py`: `{"schedule", "command", "refreshes": ["debrief"], "stage": "desks"}`; otherwise the tables in `desk/jobrun.py` apply.
 
@@ -227,7 +227,7 @@ One tap runs everything a new or stale desk needs, in order. `POST /api/start` d
 
 | Call | Answer |
 |---|---|
-| `GET /api/start` | `{state: idle\|running\|done, needs_start, can_start, blocked, result: ok\|partial, summary, started_at, finished_at, last_ok_at, scheduler_alive, steps}` |
+| `GET /api/start` | `{state: idle\|running\|done, needs_start, can_start, blocked, result: ok\|partial, summary, started_at, finished_at, last_ok_at, scheduler_alive, memory: {state, low_memory, killed, note}, steps}` |
 | One step | `{id, title, state: waiting\|running\|ok\|failed\|skipped, detail, fix: {label, to}\|null, job, started_at, finished_at}` |
 | `POST /api/start` | `202` with the same body and `ok: true`; `409 running`; `503 scheduler_down` |
 
@@ -245,6 +245,7 @@ One tap runs everything a new or stale desk needs, in order. `POST /api/start` d
 | Field | Meaning |
 |---|---|
 | `start` | `{state, needs_start}`, copied from `/api/start` |
+| `memory` | `{state, low_memory, killed, note}`, copied from `/api/start` |
 | `sections[].key` | `bridge.value`, `bridge.brief`, `results.day`, `results.week`, `results.month`, `results.year`, `results.debrief`, `portfolio.holdings`, `portfolio.stock_plans`, `portfolio.risk`, `portfolio.tax`, `strategies.race`, `strategies.mixes`, `strategies.habits`, `decisions.queue`, `decisions.journal`, `research.feed`, `research.boards`, `settings.risk_check` |
 | `state` | `ready`, `empty`, `stale` (results only: the review is behind) or `blocked` (it needs him on another screen) |
 | `why` | One sentence; `null` when ready |
@@ -252,6 +253,24 @@ One tap runs everything a new or stale desk needs, in order. `POST /api/start` d
 | `next_auto`, `next_auto_text` | When the schedule next runs the job that fills it, e.g. `today at 5:35 PM` |
 
 How a section that isn't ready picks its action, first match wins: something it needs is missing (it takes that section's action); its desk is off, guarded or without a token (link to the screen); the desk still needs starting (`start`); the job is running, failed last time or said it skipped (the job again, or a link for a missing key); otherwise the job, with the next scheduled time. `research.boards` is always `ready` because boards live in the browser. A package can sharpen its own rows with `desk/<pkg>/readiness.py` (Package seams).
+
+## Memory
+
+The NAS has 16 GB, no swap and most of it held outside the desk, so the desk watches memory itself and says what it sees in plain words. Everything here runs inside the containers except one host report; nothing new reaches root.
+
+| Piece | What it does |
+|---|---|
+| `GET /api/memory` | `{state: ok\|tight\|unknown, total_mb, available_mb, swap_mb, cache_mb (ZFS file cache), scheduler: {limit_mb, used_mb}, low_memory, waiting: [{job, title, since}], killed: [{at, kind: job\|service\|outside, name, scope: cap\|box, words}], host_seen, note}`. The same block is `memory` in `/api/status` and `/api/box`; `/api/start` and `/api/readiness` carry the short form. `note` is the whole story in one or two sentences |
+| `low_memory` | `{on, mode: auto\|on\|off, why, since, paused: ["lab", "eval"], low_mb: 1500, roomy_mb: 4000}` |
+| `PUT /api/memory/low` | `{"mode": "auto"\|"on"\|"off"}`. Answers `{ok: true}` plus the memory block; `422 bad_mode`. Logged in `data/run/job-requests.log` |
+| Auto | The default. On when the box has under 1.5 GB available, off again only above 4 GB, so it doesn't flap. `DESK_LOW_MEMORY` sets the default before anyone picks |
+| Heavy jobs one at a time | While the mode is on, the scheduler starts a heavy job only when no other heavy job is running. The rest wait in order (`data/run/waiting.json`), whether they came from the schedule, Run now or Start the desk; a waiting job shows `waiting: true` and Start shows "Waiting for its turn". A job that runs every minute skips the minute instead of queueing. Light jobs never wait: `engine-quotes`, `engine-lots`, `notify-ops`, `decisions-sync`, `agents-triggers`. A `jobs.py` dict entry can set `"heavy": false` itself |
+| Lab and eval paused | Both run under `python -m desk.memory hold -- <command>`, which stops the service's process while the mode is on and starts it again when it goes off. The container stays up, so TrueNAS still sees a running app and deploys carry on. The lab needs one Apply compose; the eval session picks it up from `deploy/eval/start.sh` |
+| Out-of-memory kills | The scheduler compares its own cgroup's `memory.events` before and after each job. A failed job with a new kill gets `error` in plain words and `oom`: `cap` (it outgrew the scheduler's `mem_limit`) or `box` (the whole box ran out). A job killed with signal 9 counts as `box`. `desk.runlock` now passes a kill on as exit 137 |
+| Host report | `deploy.sh auto` writes `data/run/box/memory.json` every 5 minutes: the kernel's `oom-kill:` lines from the last two days, each with the time, process, `cap` or `box`, and the desk service it was in (matched by container id). A cap kill in another app's container is left out |
+| Alert | One `desk-ops` alert a day, sent straight after the first kill the scheduler sees (it starts `notify-ops`) and at the usual checks |
+
+State lives in `data/run/`: `low-memory.mode.json` (his choice), `low-memory.state.json` (the scheduler's verdict every 30 seconds; other containers trust it for 10 minutes, then read `/proc/meminfo` themselves), `waiting.json`, `oom.log`.
 
 ## Box actions
 
@@ -300,10 +319,10 @@ Each package under `desk/` plugs in through four optional modules, found on thei
 |---|---|---|
 | `desk/<pkg>/api.py` | `router`, a FastAPI `APIRouter` with its own prefix | `desk/api/app.py`, which includes every router it finds |
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
-| `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command", "refreshes", "stage"}` dicts (only `schedule` and `command` are required) | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
+| `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command", "refreshes", "stage", "heavy"}` dicts (only `schedule` and `command` are required) | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
 | `desk/<pkg>/readiness.py` | `sections(cfg)`, returning `{key: {state, why, action, next_auto, next_auto_text}}` for the readiness keys it wants to answer itself | `desk.readiness`, which lays those fields over its own answer |
 
-Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
+Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/start`, `/api/readiness`, `/api/memory/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
 ## Web app
 

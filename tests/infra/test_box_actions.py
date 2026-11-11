@@ -22,7 +22,7 @@ def alive(cfg, at=None):
 
 def test_get_box_lists_the_nine_actions(client, cfg):
     body = client.get("/api/box").json()
-    assert set(body) == {"now", "host_alive", "pickup_seconds", "script", "compose", "actions"}
+    assert set(body) == {"now", "host_alive", "pickup_seconds", "script", "compose", "memory", "actions"}
     assert body["host_alive"] is False and body["pickup_seconds"] == 300 and body["script"] is None and body["compose"] is None
     assert [a["name"] for a in body["actions"]] == [
         "redeploy",

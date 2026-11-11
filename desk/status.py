@@ -3,7 +3,7 @@ import sqlite3
 import sys
 from datetime import UTC, date, datetime
 
-from desk import __version__
+from desk import __version__, memory
 from desk.config import Config
 from desk.db import connect
 from desk.review_health import reviews_status
@@ -66,6 +66,7 @@ def status(cfg: Config | None = None, now: datetime | None = None) -> dict:
         "mirror": mirror_status(cfg, now),
         "claude_token": token_status(cfg, now.date()),
         "reviews": reviews_status(cfg, now),
+        "memory": memory.status(cfg, now),
         "running": running(cfg),
     }
 

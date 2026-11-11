@@ -170,3 +170,11 @@ def test_box_api_shows_compose_state_and_serves_the_file_to_copy(client, cfg):
     assert body["can_apply"] is False and body["copy_available"] is True and "compose" not in body
     text = client.get("/api/box/compose.yaml")
     assert text.status_code == 200 and text.text == "services: {}\n" and text.headers["content-type"].startswith("text/yaml")
+
+
+def test_the_low_memory_lab_command_and_worker_count_can_be_applied_from_the_app(tmp_path):
+    before = current()
+    before["services"]["lab"]["command"] = ["python", "-m", "desk.engine.lab"]
+    before["services"]["lab"]["environment"]["DESK_LAB_WORKERS"] = "3"
+    seen = report(box(tmp_path, before))
+    assert seen["state"] == "drift" and seen["escalations"] == [] and any("lab" in d for d in seen["drift"])

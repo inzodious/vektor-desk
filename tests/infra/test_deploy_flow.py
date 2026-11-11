@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import subprocess
@@ -44,6 +45,15 @@ restart_app() {
 docker() {
   case "$1" in
     build)
+      if [ "$2" = --target ]; then
+        echo "stage $3" >>"$S/calls"
+        if [ "$3" = "$(cat "$S/starved-stage" 2>/dev/null)" ]; then
+          echo "oom_kill 8" >"$S/vmstat"
+          return 1
+        fi
+        [ "$3" != "$(cat "$S/broken-stage" 2>/dev/null)" ] || return 1
+        return 0
+      fi
       echo "build $7" >>"$S/calls"
       echo "${3#DESK_BUILD=}" >"$S/tag.$(key "$7")"
       ;;
@@ -232,3 +242,85 @@ def test_auto_still_checks_in_and_runs_box_work_when_the_deploy_stops(tmp_path):
     assert (tmp_path / "calls").read_text().split() == ["auto-deploy"]
     assert (root / "data" / "run" / "box" / "host.alive").read_text().strip().endswith("Z")
     assert not (root / "data" / "run" / "logs" / "eval-debug.log").exists()
+
+
+def staged(tmp_path: Path) -> Box:
+    box = Box(tmp_path, running="aaa", local="aaa", head="bbb")
+    src = tmp_path / "src"
+    (src / "deploy" / "caddy").mkdir(parents=True)
+    shutil.copy(DEPLOY.parents[1] / "Dockerfile", src / "Dockerfile")
+    shutil.copy(DEPLOY.parent / "caddy" / "Dockerfile", src / "deploy" / "caddy" / "Dockerfile")
+    (box.dir / "vmstat").write_text("nr_free_pages 1\noom_kill 7\n")
+    (box.dir / "meminfo").write_text("MemTotal: 15728640 kB\nMemAvailable: 524288 kB\n")
+    box.env |= {"DESK_SRC": str(src), "DESK_VMSTAT": str(box.dir / "vmstat"), "DESK_MEMINFO": str(box.dir / "meminfo")}
+    return box
+
+
+def test_the_image_builds_one_stage_at_a_time_before_the_whole(tmp_path):
+    box = staged(tmp_path)
+    res = box.run()
+    assert res.returncode == 0, res.stdout + res.stderr
+    builds = [c for c in box.calls() if c.startswith(("stage", "build"))]
+    assert builds[:4] == ["stage node", "stage ui", "stage deps", "build vektor-desk:candidate"]
+    assert builds[-1] == "build vektor-desk/caddy:candidate" and all(c.startswith("stage") for c in builds[4:-1])
+    assert "one stage at a time" in box.log() and box.running() == "bbb"
+    log = (tmp_path / "root" / "deploy-build.log").read_text()
+    assert "(512 MB free)" in log and "---- stage ui" in log and "---- image" in log
+
+
+def test_a_build_the_box_ran_out_of_memory_for_says_so_and_touches_nothing(tmp_path):
+    box = staged(tmp_path)
+    (box.dir / "starved-stage").write_text("ui")
+    res = box.run("auto")
+    assert res.returncode == 1
+    assert "the box ran out of memory building vektor-desk:local (512 MB free now), so nothing was changed" in box.log()
+    assert "Auto-deploy stopped" in (box.dir / "alerts").read_text()
+    assert box.running() == "aaa" and "restart" not in box.calls() and "build vektor-desk:candidate" not in box.calls()
+    assert (tmp_path / "root" / "deploy-auto.failed.why").read_text().strip() == "memory"
+
+
+def test_a_build_that_breaks_for_another_reason_keeps_its_own_words(tmp_path):
+    box = staged(tmp_path)
+    (box.dir / "broken-stage").write_text("deps")
+    res = box.run()
+    assert res.returncode == 1 and "vektor-desk:local didn't build; the live app wasn't touched" in box.log()
+    assert "out of memory" not in box.log()
+
+
+HEAD = "truenas kernel: oom-kill:constraint="
+TAIL = ",nodemask=(null),cpuset=/,mems_allowed=0,"
+SCOPE = "/system.slice/docker-{cron}.scope"
+JOURNAL = f"""2026-11-11T14:03:22-0500 truenas kernel: node invoked oom-killer: gfp_mask=0xcc0(GFP_KERNEL), order=0, oom_score_adj=0
+2026-11-11T14:03:22-0500 {HEAD}CONSTRAINT_MEMCG{TAIL}oom_memcg={SCOPE},task_memcg={SCOPE},task=node,pid=4242,uid=568
+2026-11-11T15:10:00-0500 {HEAD}CONSTRAINT_NONE{TAIL}global_oom,task_memcg=/docker/{{lab}},task=python,pid=77,uid=568
+2026-11-11T15:20:00-0500 {HEAD}CONSTRAINT_NONE{TAIL}global_oom,task_memcg=/system.slice/smbd.service,task=smbd,pid=9,uid=0
+2026-11-11T15:30:00-0500 {HEAD}CONSTRAINT_MEMCG{TAIL}oom_memcg=/docker/{{other}},task_memcg=/docker/{{other}},task=java,pid=5,uid=0
+garbage oom-kill:constraint=CONSTRAINT_NONE without a time
+"""
+
+
+def test_the_host_reports_who_was_stopped_for_memory(tmp_path):
+    ids = {"cron": "a" * 64, "lab": "b" * 64, "other": "c" * 64}
+    (tmp_path / "journal").write_text(JOURNAL.format(**ids))
+    script = f"""source "{DEPLOY}"
+journalctl() {{ cat {tmp_path}/journal; }}
+docker() {{ printf '%s vektor-desk-cron\n%s vektor-desk-lab\n' {ids["cron"]} {ids["lab"]}; }}
+memory_state"""
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={"PATH": "/usr/local/bin:/usr/bin:/bin"}, timeout=30)
+    assert res.returncode == 0, res.stderr
+    report = json.loads(res.stdout)
+    assert report["checked_at"].endswith("Z")
+    assert report["kills"] == [
+        {"at": "2026-11-11T19:03:22Z", "process": "node", "scope": "cap", "service": "cron"},
+        {"at": "2026-11-11T20:10:00Z", "process": "python", "scope": "box", "service": "lab"},
+        {"at": "2026-11-11T20:20:00Z", "process": "smbd", "scope": "box", "service": ""},
+    ]
+
+
+def test_the_host_report_is_empty_not_broken_without_a_journal(tmp_path):
+    script = f"""source "{DEPLOY}"
+journalctl() {{ return 1; }}
+docker() {{ return 1; }}
+memory_state"""
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={"PATH": "/usr/local/bin:/usr/bin:/bin"}, timeout=30)
+    assert res.returncode == 0 and json.loads(res.stdout)["kills"] == []
