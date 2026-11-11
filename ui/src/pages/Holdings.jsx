@@ -10,7 +10,7 @@ import { FiPath } from '../plan/FiPath.jsx';
 import { LIVE_STATES, useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { fundsFromMetrics, useMetrics, val } from '../lib/metrics.js';
-import { driftTone, driftWords, planLimits, useReference } from '../lib/plan.js';
+import { driftTone, driftWords, judgedRuleRows, planLimits, ruleState, useReference } from '../lib/plan.js';
 import { dayLabel } from '../lib/charts.js';
 import { QUALITY } from '../lib/quality.js';
 import { plural, usd } from '../lib/format.js';
@@ -21,28 +21,26 @@ const TILT = { growth: 'Growth tilt', balanced: 'Balanced', income: 'Income tilt
 const fmtPts = (v) => (v == null ? '—' : `${v < 0 ? '−' : v > 0 ? '+' : ''}${Math.abs(v).toFixed(1)} pts`);
 
 // ---------- cards ----------
-function Rules({ rules, m, version }) {
+function Rules({ rules, m, version, reference }) {
   return (
-    <div className="card c5" style={{ '--i': 8 }}>
+    <div className="card c5" style={{ '--i': 8 }} data-testid="rules-card">
       <div className="card-head">
         <span className="tag coral">Rules</span>
         <span className="acts">{version != null ? <span className="chip">desk.yaml rules v{version}</span> : null}</span>
       </div>
       {rules.length ? (
         rules.map((r) => {
-          const pass = val(m.get('plan.rules', { scope: 'rule', scopeId: r.id }));
-          const on = r.enabled !== false;
-          const tone = !on ? '' : pass == null ? 'info' : pass >= 1 ? 'ok' : 'watch';
-          const word = !on ? 'Off' : pass == null ? 'Not checked' : pass >= 1 ? 'Passing' : 'Heads up';
+          const state = ruleState(r, val(m.get('plan.rules', { scope: 'rule', scopeId: r.id })), reference);
           return (
-            <div className="rule" key={r.id}>
-              <span style={{ color: `var(--${tone || 'ink-3'})` }}>
-                <Icon name={pass >= 1 ? 'check' : 'flag'} />
+            <div className="rule" key={r.id} data-rule={r.id}>
+              <span style={{ color: `var(--${state.tone || 'ink-3'})` }}>
+                <Icon name={state.icon} />
               </span>
               <span>
                 <b>{r.label || r.id}</b>
+                {state.line ? <small>{state.line}</small> : null}
               </span>
-              <span className={`chip ${tone}`}>{word}</span>
+              <span className={`chip ${state.tone}`}>{state.word}</span>
             </div>
           );
         })
@@ -256,7 +254,7 @@ export default function Holdings() {
   const inMix = m.get('plan.in_mix');
   const single = m.get('plan.single_stock');
   const fi = m.get('fi.progress');
-  const ruleRows = m.all('plan.rules', 'rule');
+  const ruleRows = judgedRuleRows(m.all('plan.rules', 'rule'), ruleList, reference);
   const passing = ruleRows.filter((r) => r.value >= 1).length;
   const next = funds.reduce((a, f) => a + (f.next || 0), 0);
   const nextModelled = funds.some((f) => f.next != null && f.quality === 'modelled');
@@ -330,7 +328,7 @@ export default function Holdings() {
             </p>
           ) : null}
         </div>
-        <Rules rules={ruleList} m={m} version={limits.rulesVersion} />
+        <Rules rules={ruleList} m={m} version={limits.rulesVersion} reference={reference} />
         <Funds funds={funds} live={ctx.symbols} names={ctx.names} words={words} tone={(v) => driftTone(reference, v, limits)} />
         <Deposits funds={funds} deposits={Array.isArray(p.deposits) ? p.deposits : []} mode={profile.data?.deposits_mode} landed={deposits.data?.deposits} deskValue={ctx.live?.value} words={words} />
         <FiPath />
