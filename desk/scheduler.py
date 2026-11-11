@@ -88,6 +88,7 @@ def make_job(
     refreshes: tuple[str, ...] = (),
     stage: str = "",
     heavy: bool | None = None,
+    title: str = "",
 ) -> Job:
     parts = timing.split()
     if len(parts) != 5:
@@ -102,7 +103,7 @@ def make_job(
         command=command,
         any_day=(parts[2] == "*", parts[4] == "*"),
         name=name,
-        title=jobrun.job_title(name),
+        title=title or jobrun.job_title(name),
         package=package,
         timing=" ".join(parts),
         lock=lock,
@@ -138,14 +139,16 @@ def package_jobs(only: list[str] | None = None) -> list[Job]:
             if isinstance(entry, dict):
                 timing, command, name = entry["schedule"], entry["command"], entry.get("name")
                 refreshes, stage = tuple(str(c) for c in entry.get("refreshes") or ()), str(entry.get("stage") or "")
-                heavy = bool(entry["heavy"]) if "heavy" in entry else None
+                heavy, title = bool(entry["heavy"]) if "heavy" in entry else None, str(entry.get("title") or "")
             else:
-                timing, command, name, refreshes, stage, heavy = entry[0], entry[1], None, (), "", None
+                timing, command, name, refreshes, stage, heavy, title = entry[0], entry[1], None, (), "", None, ""
             cmd = shlex.split(command) if isinstance(command, str) else list(command)
             lock = re.sub(r"[^A-Za-z0-9_-]+", "-", f"{pkg}-{name}")[:60] if name else lock_name(pkg, cmd)
             held = ["python", "-m", "desk.runlock", "--hold", lock, "--", *cmd]
             job_id = jobrun.job_name(pkg, cmd, name)
-            jobs.append(make_job(f"{pkg}.jobs[{i}]", timing, held, name=job_id, package=pkg, lock=lock, refreshes=refreshes, stage=stage, heavy=heavy))
+            jobs.append(
+                make_job(f"{pkg}.jobs[{i}]", timing, held, name=job_id, package=pkg, lock=lock, refreshes=refreshes, stage=stage, heavy=heavy, title=title)
+            )
     return jobs
 
 

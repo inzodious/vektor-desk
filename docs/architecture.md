@@ -228,7 +228,7 @@ One tap runs everything a new or stale desk needs, in order. `POST /api/start` d
 | Call | Answer |
 |---|---|
 | `GET /api/start` | `{state: idle\|running\|done, needs_start, can_start, blocked, result: ok\|partial, summary, started_at, finished_at, last_ok_at, scheduler_alive, memory: {state, low_memory, killed, note}, steps}` |
-| One step | `{id, title, state: waiting\|running\|ok\|failed\|skipped, detail, fix: {label, to}\|null, job, started_at, finished_at}` |
+| One step | `{id, title, state: waiting\|running\|ok\|failed\|skipped, detail, fix: {label, to}\|null, job, started_at, finished_at, waiting}`. `waiting` is true while the step's job is held for its turn in low-memory mode |
 | `POST /api/start` | `202` with the same body and `ok: true`; `409 running`; `503 scheduler_down` |
 
 - A failed step is recorded and the chain goes on. `detail` is what the job said last, in its own words; `fix` names the screen that sorts it out.
@@ -344,7 +344,7 @@ Each package under `desk/` plugs in through five optional modules, found on thei
 |---|---|---|
 | `desk/<pkg>/api.py` | `router`, a FastAPI `APIRouter` with its own prefix | `desk/api/app.py`, which includes every router it finds |
 | `desk/<pkg>/schema.py` | `SCHEMA` (idempotent SQL), optional `apply(conn)`, optional `DEPENDS = ("other_pkg",)` | `desk.db.apply_schemas`, run when the API and scheduler start (or `python -m desk.db`), one transaction per package, into `desk.db` |
-| `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command", "refreshes", "stage", "heavy"}` dicts (only `schedule` and `command` are required) | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
+| `desk/<pkg>/jobs.py` | `JOBS`, a list of `("15 8,17 * * *", "python -m desk.engine holdings")` tuples or `{"name", "schedule", "command", "refreshes", "stage", "heavy", "title"}` dicts (only `schedule` and `command` are required; `title` is the name he sees in `/api/jobs` and in memory messages, default the job name in words) | `desk.scheduler`; each job runs under a run lock named after the package and command, so deploys wait for it |
 | `desk/<pkg>/kinds.py` | `KINDS`, a list of `desk.worker.Kind` | `desk.worker.registry`, on the NAS and inside the worker's child process |
 | `desk/<pkg>/readiness.py` | `sections(cfg)`, returning `{key: {state, why, action, next_auto, next_auto_text}}` for the readiness keys it wants to answer itself | `desk.readiness`, which lays those fields over its own answer |
 

@@ -187,6 +187,7 @@ def test_the_start_chain_waits_its_turn_and_says_so(cfg, monkeypatch):
     seen = startrun.describe(cfg, jobs)
     step = next(s for s in seen["steps"] if s["job"] == "mirror")
     assert step["state"] == "running" and step["detail"] == "Waiting for its turn: low-memory mode runs heavy jobs one at a time."
+    assert step["waiting"] is True and not any(s["waiting"] for s in seen["steps"] if s["job"] != "mirror")
     assert seen["memory"]["low_memory"] is True and "Waiting for a turn: Mirror." in seen["memory"]["note"]
     scheduler.run_chain(jobs, cfg)
     assert mirror.proc is None

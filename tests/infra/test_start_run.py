@@ -85,7 +85,7 @@ def test_one_tap_runs_every_step_in_order_and_says_why_some_stopped(cfg, tmp_pat
     assert "ALPACA_API_KEY_ID" in got["paper"]["detail"] and got["paper"]["fix"] == {"label": "Add the Alpaca paper keys", "to": "/settings/data"}
     assert view["state"] == "done" and view["result"] == "partial" and view["summary"] == "6 of 9 steps done. 3 need you."
     assert chain["last_ok_at"] is None and jobrun.last_run(cfg, "mirror")["trigger"] == "start"
-    assert set(view["steps"][0]) == {"id", "title", "state", "detail", "fix", "job", "started_at", "finished_at"}
+    assert set(view["steps"][0]) == {"id", "title", "state", "detail", "fix", "job", "started_at", "finished_at", "waiting"}
 
 
 def test_a_clean_chain_clears_the_banner_and_a_new_one_can_start(cfg, tmp_path):
@@ -185,6 +185,7 @@ def test_the_api_serves_the_chain(cfg):
             "job": "mirror",
             "started_at": None,
             "finished_at": None,
+            "waiting": False,
         }
         assert client.post("/api/start").status_code == 503
         jobrun.heartbeat(cfg)
