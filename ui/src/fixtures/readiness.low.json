@@ -178,6 +178,6 @@
   "state": "tight",
   "low_memory": true,
   "killed": 3,
-  "note": "The box has 512 MB of 15.0 GB free, and no swap. Its ZFS file cache holds 6.0 GB, which it hands back under pressure, but slowly. Low-memory mode is on: the lab and the eval session are paused, and heavy jobs run one at a time. Waiting for a turn: Engine review. Stopped for memory in the last two days: 3. Latest: Agents run debrief was stopped: it needed more memory than the scheduler is allowed."
+  "note": "The box has 512 MB of 15.0 GB free, and no swap. Its ZFS file cache holds 6.0 GB, which it hands back under pressure, but slowly. Low-memory mode is on: heavy jobs run one at a time. Waiting for a turn: Engine review. Stopped for memory in the last two days: 3. Latest: Agents run debrief was stopped: it needed more memory than the scheduler is allowed."
  }
 }

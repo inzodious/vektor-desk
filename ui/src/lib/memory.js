@@ -26,7 +26,7 @@ export function modeChoices(low) {
   const roomy = size(low?.roomy_mb) || '4.0 GB';
   return [
     { mode: 'auto', title: 'Automatic', blurb: `On under ${floor} free, off again above ${roomy}` },
-    { mode: 'on', title: 'On', blurb: 'Heavy jobs take turns, and the lab and eval session pause' },
+    { mode: 'on', title: 'On', blurb: 'Heavy jobs run one at a time' },
     { mode: 'off', title: 'Off', blurb: 'Everything runs side by side' },
   ];
 }

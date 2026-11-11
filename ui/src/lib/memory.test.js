@@ -33,7 +33,7 @@ describe('memory', () => {
     expect(v).toMatchObject({ state: 'tight', head: '512 MB free of 15.0 GB', low: { on: true, mode: 'auto' } });
     expect(v.chip.tone).toBe('watch');
     expect(v.line).toBe('On right now. The box has 512 MB free, under the 1.5 GB floor.');
-    expect(v.paused).toBe('Paused until it is off: the strategy lab and the eval session.');
+    expect(v.paused).toBeNull();
     expect(v.waiting).toEqual([{ job: 'engine-review', title: 'Results review', since: '5:35 PM' }]);
     expect(v.killed).toHaveLength(3);
     expect(v.killed[0]).toMatchObject({ when: '2:03 PM', scope: 'cap', words: 'Agents run debrief was stopped: it needed more memory than the scheduler is allowed.' });
@@ -53,7 +53,9 @@ describe('memory', () => {
     expect(modeLine({ on: false, mode: 'off' }, 'tight')).toMatch(/^Off, and the box is tight on memory/);
     expect(modeLine({ on: false, mode: 'off' }, 'ok')).toBe('Off. Everything runs side by side.');
     expect(pausedLine({ on: false, paused: ['lab'] })).toBeNull();
+    expect(pausedLine({ on: true, paused: [] })).toBeNull();
     expect(pausedLine({ on: true, paused: ['lab'] })).toBe('Paused until it is off: the strategy lab.');
+    expect(pausedLine({ on: true, paused: ['lab', 'eval'] })).toBe('Paused until it is off: the strategy lab and the eval session.');
   });
 
   it('explains a refused switch', () => {

@@ -54,7 +54,7 @@ test('a box short on memory shows why the mode is on, what waits and what was st
   await expect(card.getByTestId('memory-chip')).toHaveText('Tight');
   await expect(card.getByTestId('memory-low-chip')).toBeVisible();
   await expect(card.getByTestId('memory-line')).toHaveText('On right now. The box has 512 MB free, under the 1.5 GB floor.');
-  await expect(card.getByTestId('memory-paused')).toHaveText('Paused until it is off: the strategy lab and the eval session.');
+  await expect(card.getByTestId('memory-paused')).toHaveCount(0);
   await expect(card.getByTestId('memory-waiting')).toContainText('Results review since 5:35 PM');
   await expect(card.getByTestId('memory-killed').locator('li')).toHaveCount(3);
   await expect(card.getByTestId('memory-killed')).toContainText('The box ran out of memory and stopped smbd, a program outside the desk.');
@@ -87,7 +87,7 @@ test('the memory link from another page lands on the card', async ({ page }) => 
 });
 
 // ---------- the switch ----------
-test('switching low-memory mode on saves at once and shows what pauses', async ({ page }) => {
+test('switching low-memory mode on saves at once and shows anything the desk pauses', async ({ page }) => {
   const asked = fakeMemory(page);
   await page.goto('/settings/box');
   const card = page.getByTestId('memory');
@@ -96,7 +96,7 @@ test('switching low-memory mode on saves at once and shows what pauses', async (
   await expect(card.getByTestId('memory-mode')).toHaveAttribute('data-mode', 'on');
   await expect(card).toHaveAttribute('data-low', 'true');
   await expect(card.getByTestId('memory-line')).toHaveText('On right now. You switched it on.');
-  await expect(card.getByTestId('memory-paused')).toBeVisible();
+  await expect(card.getByTestId('memory-paused')).toHaveText('Paused until it is off: the strategy lab and the eval session.');
   await card.locator('[data-choice="off"]').click();
   await expect(card.getByTestId('memory-mode')).toHaveAttribute('data-mode', 'off');
   await expect(card.getByTestId('memory-line')).toHaveText('Off. Everything runs side by side.');

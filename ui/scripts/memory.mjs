@@ -16,7 +16,7 @@ const KILLED = [
 ];
 const WAITING = [{ job: 'engine-review', title: 'Engine review', since: at('22:35:02') }];
 const LOW_NOTE =
-  'The box has 512 MB of 15.0 GB free, and no swap. Its ZFS file cache holds 6.0 GB, which it hands back under pressure, but slowly. Low-memory mode is on: the lab and the eval session are paused, and heavy jobs run one at a time. Waiting for a turn: Engine review. Stopped for memory in the last two days: 3. Latest: Agents run debrief was stopped: it needed more memory than the scheduler is allowed.';
+  'The box has 512 MB of 15.0 GB free, and no swap. Its ZFS file cache holds 6.0 GB, which it hands back under pressure, but slowly. Low-memory mode is on: heavy jobs run one at a time. Waiting for a turn: Engine review. Stopped for memory in the last two days: 3. Latest: Agents run debrief was stopped: it needed more memory than the scheduler is allowed.';
 
 const calm = {
   state: 'ok',
@@ -38,7 +38,7 @@ const low = {
   available_mb: 512,
   cache_mb: 6144,
   scheduler: { limit_mb: 640, used_mb: 300 },
-  low_memory: { on: true, mode: 'auto', why: WHY, since: at('20:00:00'), paused: ['lab', 'eval'], low_mb: 1500, roomy_mb: 4000 },
+  low_memory: { on: true, mode: 'auto', why: WHY, since: at('20:00:00'), paused: [], low_mb: 1500, roomy_mb: 4000 },
   waiting: WAITING,
   killed: KILLED,
   note: LOW_NOTE,
