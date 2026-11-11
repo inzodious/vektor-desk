@@ -9,7 +9,9 @@ const STEP_WORD = {
 const NEVER_LINE = 'One press pulls your accounts, runs today’s numbers and writes your first results. It takes a few minutes, and you can leave the page.';
 
 // ---------- steps ----------
-export const stepWord = (step) => STEP_WORD[step?.state] || STEP_WORD.waiting;
+const TURN = /^Waiting for its turn/;
+export const inTurn = (step) => step?.state === 'running' && (step.waiting === true || TURN.test(step.detail || ''));
+export const stepWord = (step) => (inTurn(step) ? { t: 'Waiting its turn', tone: '' } : STEP_WORD[step?.state] || STEP_WORD.waiting);
 export const needsYou = (step) => step?.state === 'failed' || (step?.state === 'skipped' && Boolean(step.fix));
 
 export function stepTook(step) {

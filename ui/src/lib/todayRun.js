@@ -15,6 +15,7 @@ export const STAGES = [
 export const STATE = {
   ok: { t: 'Done', tone: 'ok' },
   running: { t: 'Running', tone: 'info' },
+  turn: { t: 'Waiting for its turn', tone: '' },
   failed: { t: 'Needs a look', tone: 'watch' },
   waiting: { t: 'Later today', tone: '' },
   idle: { t: 'Not today', tone: '' },
@@ -72,10 +73,11 @@ export function jobToday(job, now) {
   const next = due.length ? Math.min(...due) : null;
   let state = 'idle';
   if (job.running || job.queued) state = 'running';
+  else if (job.waiting) state = 'turn';
   else if (ranToday && last.result === 'failed') state = 'failed';
   else if (next != null) state = 'waiting';
   else if (ranToday) state = 'ok';
-  return { job, title: jobWord(job).title, state, ranToday, at, result: last?.result || null, detail: last?.detail || null, next };
+  return { job, title: jobWord(job).title, state, ranToday, at, result: last?.result || null, detail: last?.detail || null, oom: last?.oom || null, next };
 }
 
 // ---------- stages ----------
@@ -89,8 +91,13 @@ function stageLine(state, rows) {
     const r = rows.find((x) => x.state === 'running');
     return many ? `${r.title} is running` : 'Running now';
   }
+  if (state === 'turn') {
+    const r = rows.find((x) => x.state === 'turn');
+    return many ? `${r.title} is waiting for its turn` : 'Waiting for its turn';
+  }
   if (state === 'failed') {
     const r = rows.find((x) => x.state === 'failed');
+    if (r.oom) return `${many ? `${r.title} was stopped` : 'Stopped'} for memory ${etTime(r.at)}`;
     return `${many ? `${r.title} didn’t` : 'Didn’t'} finish ${etTime(r.at)}`;
   }
   if (state === 'waiting') {
@@ -111,7 +118,7 @@ export function stageToday(stage, jobs, now) {
   let state = 'soon';
   if (rows.length) {
     const has = (s) => rows.some((r) => r.state === s);
-    state = has('running') ? 'running' : has('failed') ? 'failed' : has('waiting') ? 'waiting' : has('ok') ? 'ok' : 'idle';
+    state = has('running') ? 'running' : has('turn') ? 'turn' : has('failed') ? 'failed' : has('waiting') ? 'waiting' : has('ok') ? 'ok' : 'idle';
   }
   return { id: stage.id, title: stage.title, blurb: stage.blurb, state, word: STATE[state], line: stageLine(state, rows), jobs: rows.map((r) => r.job.name) };
 }
@@ -130,6 +137,7 @@ export function todayRun(data, fallbackNow = new Date()) {
   const done = live.filter((s) => s.state === 'ok').length;
   const failed = stages.filter((s) => s.state === 'failed').length;
   const running = stages.some((s) => s.state === 'running');
+  const turn = stages.some((s) => s.state === 'turn');
   let head = !live.length ? 'Quiet day' : done ? `${done} of ${live.length} done` : 'More to run today';
   let tone = '';
   if (data && data.scheduler_alive === false) {
@@ -140,6 +148,9 @@ export function todayRun(data, fallbackNow = new Date()) {
     tone = 'watch';
   } else if (running) {
     head = 'Running now';
+    tone = 'info';
+  } else if (turn) {
+    head = 'Waiting for a turn';
     tone = 'info';
   } else if (live.length && done === live.length) {
     head = 'All done today';

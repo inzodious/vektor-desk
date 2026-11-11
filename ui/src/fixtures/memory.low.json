@@ -1,0 +1,52 @@
+{
+ "state": "tight",
+ "total_mb": 15360,
+ "available_mb": 512,
+ "swap_mb": 0,
+ "cache_mb": 6144,
+ "scheduler": {
+  "limit_mb": 640,
+  "used_mb": 300
+ },
+ "low_memory": {
+  "on": true,
+  "mode": "auto",
+  "why": "The box has 512 MB free, under the 1.5 GB floor.",
+  "since": "2026-11-09T20:00:00Z",
+  "paused": [],
+  "low_mb": 1500,
+  "roomy_mb": 4000
+ },
+ "waiting": [
+  {
+   "job": "engine-review",
+   "title": "Engine review",
+   "since": "2026-11-09T22:35:02Z"
+  }
+ ],
+ "killed": [
+  {
+   "at": "2026-11-09T19:03:22Z",
+   "kind": "job",
+   "name": "agents-run-debrief",
+   "scope": "cap",
+   "words": "Agents run debrief was stopped: it needed more memory than the scheduler is allowed."
+  },
+  {
+   "at": "2026-11-09T18:10:00Z",
+   "kind": "service",
+   "name": "lab",
+   "scope": "cap",
+   "words": "The desk’s lab needed more memory than it is allowed, and python was stopped."
+  },
+  {
+   "at": "2026-11-08T17:20:00Z",
+   "kind": "outside",
+   "name": "smbd",
+   "scope": "box",
+   "words": "The box ran out of memory and stopped smbd, a program outside the desk."
+  }
+ ],
+ "host_seen": true,
+ "note": "The box has 512 MB of 15.0 GB free, and no swap. Its ZFS file cache holds 6.0 GB, which it hands back under pressure, but slowly. Low-memory mode is on: heavy jobs run one at a time. Waiting for a turn: Engine review. Stopped for memory in the last two days: 3. Latest: Agents run debrief was stopped: it needed more memory than the scheduler is allowed."
+}

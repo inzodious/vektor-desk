@@ -3,6 +3,7 @@ import midday from '../fixtures/jobs.json';
 import evening from '../fixtures/jobs.evening.json';
 import fresh from '../fixtures/jobs.fresh.json';
 import down from '../fixtures/jobs.down.json';
+import low from '../fixtures/jobs.low.json';
 import { clockText, etParts, jobToday, runsToday, stageToday, todayRun, STAGES } from './todayRun.js';
 
 const NOW = new Date('2026-11-09T16:42:00Z');
@@ -61,6 +62,18 @@ describe('today’s run', () => {
     expect(stage(run, 'review')).toMatchObject({ state: 'failed', line: 'Didn’t finish 5:36 PM' });
     expect(stage(run, 'desks')).toMatchObject({ state: 'ok', line: '1 ran, last 5:33 PM' });
     expect(run).toMatchObject({ head: '1 stage needs a look', tone: 'watch' });
+  });
+
+  it('shows a stage that is waiting for its turn, and one stopped for memory', () => {
+    const run = todayRun(low);
+    expect(stage(run, 'review')).toMatchObject({ state: 'turn', line: 'Waiting for its turn' });
+    expect(stage(run, 'review').word.t).toBe('Waiting for its turn');
+    expect(stage(run, 'desks')).toMatchObject({ state: 'running', line: 'Plan keeper desk is running' });
+    expect(run).toMatchObject({ head: 'Running now', tone: 'info' });
+    const quiet = todayRun({ ...low, jobs: low.jobs.map((j) => ({ ...j, running: false })) });
+    expect(stage(quiet, 'desks')).toMatchObject({ state: 'failed', line: 'Debrief desk was stopped for memory 2:03 PM' });
+    const only = todayRun({ ...low, jobs: low.jobs.map((j) => (j.name === 'agents-run-debrief' ? { ...j, last_run: null } : { ...j, running: false })) });
+    expect(only).toMatchObject({ head: 'Waiting for a turn', tone: 'info' });
   });
 
   it('says all done when nothing is left today', () => {

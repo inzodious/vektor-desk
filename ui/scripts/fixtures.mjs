@@ -249,3 +249,6 @@ await import('./fresh.mjs');
 // ---------- start the desk ----------
 for (const [name, body] of Object.entries(startFixtures())) save(name, body);
 await import('./never.mjs');
+
+// ---------- memory ----------
+await import('./memory.mjs');

@@ -39,7 +39,7 @@ function Action({ action, slim, onFilled }) {
   const go = async () => {
     setRun({ phase: 'running', text: null });
     try {
-      const last = await runAndWait(action.job, { signal: ctl.current.signal });
+      const last = await runAndWait(action.job, { signal: ctl.current.signal, onState: (job) => setRun({ phase: 'running', text: null, turn: Boolean(job.waiting) }) });
       const why = last?.error || last?.detail;
       if (last?.result === 'failed') {
         setRun({ phase: 'failed', text: `That didn’t finish${why ? `: ${why}` : '.'} Settings → Box has the rest.` });
@@ -62,7 +62,7 @@ function Action({ action, slim, onFilled }) {
       {run.phase === 'running' ? (
         <span className="chip ok" role="status" data-testid="empty-working">
           <i className="pulse" style={{ width: 6, height: 6 }} />
-          Working on it. You can leave the page.
+          {run.turn ? 'Waiting for its turn. You can leave the page.' : 'Working on it. You can leave the page.'}
         </span>
       ) : (
         <button className={`btn${slim ? ' sm' : ''}`} type="button" onClick={go} data-testid="empty-act">
