@@ -139,11 +139,12 @@ def status(cfg: Config, now: datetime | None = None) -> dict:
     else:
         state, words = "none", "The box builds its own images, one stage at a time."
     if wanted and builders and state == "online":
-        words += (
-            f" It is making {wanted['commit'][:7]} now."
-            if not arrived(cfg, wanted["commit"])
-            else f" Its image for {wanted['commit'][:7]} is in; the box takes it at its next check."
-        )
+        short_commit = wanted["commit"][:7]
+        words += {
+            None: f" It is making {short_commit} now.",
+            "image": f" Its image for {short_commit} is in; the box takes it at its next check.",
+            "failed": f" It couldn't build {short_commit}, so the box builds that one here at its next check.",
+        }[arrived(cfg, wanted["commit"])]
     if last and last.get("commit"):
         came = "a builder" if last.get("how") == "builder" else "this box"
         words += f" The last image ({str(last['commit'])[:7]}) came from {came}" + (f": {last['why']}." if last.get("why") else ".")
