@@ -42,7 +42,7 @@ test('box lists each chore with how it last went', async ({ page }) => {
   await page.goto('/settings/box');
   const card = page.getByTestId('box');
   await expect(card).toHaveAttribute('data-alive', 'true');
-  await expect(card.locator('.job-list .box-row')).toHaveCount(6);
+  await expect(card.locator('.job-list .box-row')).toHaveCount(7);
   await expect(card.locator('[data-box="redeploy"]')).toHaveAttribute('data-state', 'never');
   await expect(card.locator('[data-box="backup"]')).toHaveAttribute('data-state', 'ok');
   await expect(card.locator('[data-box="restore-test"]')).toHaveAttribute('data-state', 'failed');

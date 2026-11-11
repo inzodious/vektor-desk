@@ -255,3 +255,6 @@ await import('./memory.mjs');
 
 // ---------- workers ----------
 await import('./workers.mjs');
+
+// ---------- builds ----------
+await import('./builds.mjs');

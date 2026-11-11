@@ -6,6 +6,7 @@ describe('job words', () => {
   it('names jobs plainly', () => {
     expect(jobWord({ name: 'engine-quotes' }).title).toBe('Prices');
     expect(jobWord({ name: 'engine-lookthrough' }).title).toBe('Fund breakdowns');
+    expect(jobWord({ name: 'engine-lab-offer', title: 'Engine lab offer' }).title).toBe('Lab work to the worker');
     expect(jobWord({ name: 'agents-run-plan_keeper' }).title).toBe('Plan keeper desk');
     expect(jobWord({ name: 'brand-new', title: 'Brand new' }).title).toBe('Brand new');
   });
@@ -21,6 +22,8 @@ describe('job words', () => {
     expect(cronWords('0 2 * 1-11 0')).toBe('2 AM on Sundays, Jan to Nov');
     expect(cronWords('0 2 * 12 *')).toBe('2 AM in Dec');
     expect(cronWords('* * * * *')).toBe('Every minute');
+    expect(cronWords('* 1-5 * * *')).toBe('Every minute, 1 AM to 6 AM');
+    expect(cronWords('* 9-15 * * 1-5')).toBe('Every minute, 9 AM to 4 PM on weekdays');
     expect(cronWords('0 9 1,15 * *')).toBe('0 9 1,15 * *');
     expect(scheduleWords({ schedules: [] })).toBe('Only when asked');
   });

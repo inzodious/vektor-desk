@@ -443,6 +443,31 @@
    "stage": null
   },
   {
+   "name": "engine-lab-offer",
+   "title": "Lab work to the worker",
+   "package": "engine",
+   "schedules": [
+    "* 1-5 * * *"
+   ],
+   "running": false,
+   "running_since": null,
+   "queued": false,
+   "queued_at": null,
+   "last_run": {
+    "trigger": "schedule",
+    "request_id": null,
+    "started": "2026-11-09T10:59:00Z",
+    "finished": "2026-11-09T10:59:01Z",
+    "result": "ok",
+    "exit_code": 0,
+    "detail": null
+   },
+   "cooldown_until": null,
+   "can_run": true,
+   "refreshes": [],
+   "stage": null
+  },
+  {
    "name": "engine-french",
    "title": "Engine french",
    "package": "engine",

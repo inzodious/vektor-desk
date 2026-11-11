@@ -12,6 +12,7 @@ const WORD = {
   'engine-lots': ['Lots', 'Reads a new lot export from the inbox'],
   'engine-french': ['Factor library', 'Monthly factor returns for exposure'],
   'engine-lab-export': ['Lab export', 'Hands the strategy lab its data'],
+  'engine-lab-offer': ['Lab work to the worker', 'Hands new experiments to a worker that is awake'],
   'engine-review': ['Results review', 'Packs up the day, week, month and year'],
   'engine-paper': ['Paper trades', 'Paper strategies place their orders'],
   'engine-discounts': ['Discount scan', 'Looks for names on sale after the close'],
@@ -67,7 +68,11 @@ export function cronWords(line) {
   if (months === null) return line;
   const days = dow === '*' ? '' : dow === '1-5' ? ' on weekdays' : nums(dow)?.length === 1 ? ` on ${DOW[nums(dow)[0] % 7]}` : null;
   const step = /^\*\/(\d+)$/.exec(mi);
-  if (mi === '*' && hr === '*' && dom === '*' && !months && dow === '*') return 'Every minute';
+  if (mi === '*' && dom === '*' && days !== null) {
+    const range = /^(\d+)-(\d+)$/.exec(hr);
+    const span = hr === '*' ? '' : range ? `, ${clock(+range[1], 0)} to ${clock((+range[2] + 1) % 24, 0)}` : null;
+    if (span !== null) return `Every minute${span}${days}${months}`;
+  }
   if (step && dom === '*' && days !== null) {
     const range = /^(\d+)-(\d+)$/.exec(hr);
     const span = hr === '*' ? '' : range ? `, ${clock(+range[1], 0)} to ${clock(+range[2], 0)}` : null;
