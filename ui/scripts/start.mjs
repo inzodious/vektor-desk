@@ -49,9 +49,10 @@ function steps(states = {}) {
   });
 }
 
-const never = { state: 'idle', needs_start: true, can_start: true, blocked: null, result: null, summary: null, started_at: null, finished_at: null, last_ok_at: null, steps: steps() };
+const never = { scheduler_alive: true, state: 'idle', needs_start: true, can_start: true, blocked: null, result: null, summary: null, started_at: null, finished_at: null, last_ok_at: null, steps: steps() };
 
 const running = {
+  scheduler_alive: true,
   state: 'running',
   needs_start: true,
   can_start: false,
@@ -64,23 +65,24 @@ const running = {
   steps: steps({ accounts: ['ok', null, null, 17], prices: ['skipped', 'Price history is already complete.'], numbers: ['ok', null, null, 44], market: ['running'] }),
 };
 
+const DESKS_OFF = ['skipped', 'All desks are switched off.', { label: 'Switch the desks on', to: '/settings/crew' }];
 const LOOSE = {
   accounts: ['ok', null, null, 17],
   prices: ['skipped', 'Price history is already complete.'],
   numbers: ['ok', null, null, 44],
   market: ['ok', null, null, 38],
   review: ['ok', null, null, 9],
-  discounts: ['failed', 'It stopped with an error. Settings, Box, Collect logs shows why.', { label: 'Open Box', to: '/settings/box' }, 6],
-  plan_keeper: ['ok', null, null, 153],
-  debrief: ['skipped', 'The Debrief desk is switched off.', { label: 'Switch it on', to: '/settings/crew' }],
-  plans: ['skipped', 'The Claude token has expired, so no desk can write.', { label: 'Renew the token', to: '/settings/box' }],
-  paper: ['ok', null, null, 158],
+  discounts: ['failed', 'It stopped: the price feed timed out', { label: 'Open Box', to: '/settings/box' }, 6],
+  plan_keeper: DESKS_OFF,
+  debrief: DESKS_OFF,
+  plans: DESKS_OFF,
+  paper: ['skipped', 'ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set', { label: 'Add the Alpaca paper keys', to: '/settings/data' }],
 };
 const looseSteps = steps(LOOSE);
-const loose = { state: 'done', needs_start: true, can_start: true, blocked: null, result: 'partial', summary: '7 of 10 steps done. 3 need you.', started_at: at(0), finished_at: looseSteps.at(-1).finished_at, last_ok_at: null, steps: looseSteps };
+const loose = { scheduler_alive: true, state: 'done', needs_start: true, can_start: true, blocked: null, result: 'partial', summary: '5 of 10 steps done. 5 need you.', started_at: at(0), finished_at: looseSteps.at(-1).finished_at, last_ok_at: null, steps: looseSteps };
 
 const okSteps = steps(Object.fromEntries(STEPS.map(([id], i) => [id, id === 'prices' ? ['skipped', 'Price history is already complete.'] : ['ok', null, null, 12 + i * 9]])));
-const done = { state: 'done', needs_start: false, can_start: true, blocked: null, result: 'ok', summary: '10 of 10 steps done.', started_at: at(0), finished_at: okSteps.at(-1).finished_at, last_ok_at: okSteps.at(-1).finished_at, steps: okSteps };
+const done = { scheduler_alive: true, state: 'done', needs_start: false, can_start: true, blocked: null, result: 'ok', summary: '10 of 10 steps done.', started_at: at(0), finished_at: okSteps.at(-1).finished_at, last_ok_at: okSteps.at(-1).finished_at, steps: okSteps };
 
 // ---------- readiness ----------
 const START = { kind: 'start', label: 'Start the desk' };
@@ -89,24 +91,24 @@ const link = (to, label) => ({ kind: 'link', to, label });
 const row = (key, state = 'ready', why = null, action = null, next_auto = null, next_auto_text = null) => ({ key, state, why, action, next_auto, next_auto_text });
 const sections = (over = {}) => KEYS.map((k) => row(k, ...(over[k] || [])));
 const REVIEW_AT = ['2026-11-11T22:35:00Z', 'today at 5:35 PM'];
+const CREW = ['blocked', 'All desks are switched off.', link('/settings/crew', 'Switch the desks on')];
 const SAME = {
-  'results.debrief': ['blocked', 'The Debrief desk is switched off.', link('/settings/crew', 'Switch it on')],
+  'results.debrief': CREW,
   'portfolio.tax': ['blocked', 'Tax needs your Fidelity lot export.', link('/settings/data#inbox', 'Upload it')],
-  'research.boards': ['empty', 'You haven’t saved a board yet.', link('/research/compare', 'Open Compare')],
   'settings.risk_check': ['blocked', 'You haven’t answered the risk check yet.', link('/settings/risk', 'Answer it')],
 };
 
 const neverRows = {
   'bridge.value': ['empty', 'The desk hasn’t run yet, so there are no holdings to show.', START],
-  'bridge.brief': ['empty', 'The brief is written after the first run.', START],
+  'bridge.brief': CREW,
   ...Object.fromEntries(['day', 'week', 'month', 'year'].map((k) => [`results.${k}`, ['empty', 'No results yet: the review hasn’t run.', START, ...REVIEW_AT]])),
   'portfolio.holdings': ['empty', 'The desk hasn’t run yet.', START],
-  'portfolio.stock_plans': ['empty', 'No plans yet: the Plan desk hasn’t drafted any.', START, '2026-11-11T23:40:00Z', 'today at 6:40 PM'],
+  'portfolio.stock_plans': CREW,
   'portfolio.risk': ['empty', 'Risk needs today’s numbers and a year of prices.', START],
   'strategies.race': ['empty', 'No strategy is paper trading yet.', START],
   'strategies.mixes': ['empty', 'The bands are built with today’s numbers.', START],
   'strategies.habits': ['empty', 'Your habits are read from your own trades, once your accounts are in.', START],
-  'decisions.queue': ['empty', 'No proposals yet: the desks haven’t run.', START],
+  'decisions.queue': CREW,
   'research.feed': ['empty', 'No dossiers yet: the research fetch hasn’t run.', job('engine-research', 'Fetch it now'), '2026-11-12T05:40:00Z', 'tonight at 12:40 AM'],
   ...SAME,
 };
@@ -127,8 +129,9 @@ const gapRows = {
 };
 
 const looseRows = {
-  'results.debrief': SAME['results.debrief'],
-  'portfolio.stock_plans': ['blocked', 'The Claude token has expired, so the Plan desk can’t write new drafts.', link('/settings/box', 'Renew the token')],
+  'results.debrief': CREW,
+  'bridge.brief': CREW,
+  'portfolio.stock_plans': CREW,
   'strategies.mixes': ['stale', 'Market history is from October; the monthly fetch hasn’t run since.', job('engine-french', 'Fetch it now'), '2026-12-02T08:30:00Z', 'Dec 2 at 3:30 AM'],
 };
 

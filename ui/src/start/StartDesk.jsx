@@ -86,7 +86,16 @@ export function StartPanel({ always = false }) {
         <div className="sd-copy">
           <h2>{view.head}</h2>
           <p>{view.line}</p>
-          {view.blocked ? <small className="sd-warn">{view.blocked}</small> : null}
+          {view.blocked ? (
+            <small className="sd-warn" data-testid="start-blocked">
+              {view.blocked}{' '}
+              {view.blockedFix ? (
+                <Link className="link" to={view.blockedFix.to}>
+                  {view.blockedFix.label}
+                </Link>
+              ) : null}
+            </small>
+          ) : null}
           {error ? (
             <small className="sd-warn" role="alert" data-testid="start-error">
               {error}

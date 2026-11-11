@@ -18,11 +18,12 @@
   },
   {
    "key": "bridge.brief",
-   "state": "empty",
-   "why": "The brief is written after the first run.",
+   "state": "blocked",
+   "why": "All desks are switched off.",
    "action": {
-    "kind": "start",
-    "label": "Start the desk"
+    "kind": "link",
+    "to": "/settings/crew",
+    "label": "Switch the desks on"
    },
    "next_auto": null,
    "next_auto_text": null
@@ -74,11 +75,11 @@
   {
    "key": "results.debrief",
    "state": "blocked",
-   "why": "The Debrief desk is switched off.",
+   "why": "All desks are switched off.",
    "action": {
     "kind": "link",
     "to": "/settings/crew",
-    "label": "Switch it on"
+    "label": "Switch the desks on"
    },
    "next_auto": null,
    "next_auto_text": null
@@ -96,14 +97,15 @@
   },
   {
    "key": "portfolio.stock_plans",
-   "state": "empty",
-   "why": "No plans yet: the Plan desk hasn’t drafted any.",
+   "state": "blocked",
+   "why": "All desks are switched off.",
    "action": {
-    "kind": "start",
-    "label": "Start the desk"
+    "kind": "link",
+    "to": "/settings/crew",
+    "label": "Switch the desks on"
    },
-   "next_auto": "2026-11-11T23:40:00Z",
-   "next_auto_text": "today at 6:40 PM"
+   "next_auto": null,
+   "next_auto_text": null
   },
   {
    "key": "portfolio.risk",
@@ -163,11 +165,12 @@
   },
   {
    "key": "decisions.queue",
-   "state": "empty",
-   "why": "No proposals yet: the desks haven’t run.",
+   "state": "blocked",
+   "why": "All desks are switched off.",
    "action": {
-    "kind": "start",
-    "label": "Start the desk"
+    "kind": "link",
+    "to": "/settings/crew",
+    "label": "Switch the desks on"
    },
    "next_auto": null,
    "next_auto_text": null
@@ -194,13 +197,9 @@
   },
   {
    "key": "research.boards",
-   "state": "empty",
-   "why": "You haven’t saved a board yet.",
-   "action": {
-    "kind": "link",
-    "to": "/research/compare",
-    "label": "Open Compare"
-   },
+   "state": "ready",
+   "why": null,
+   "action": null,
    "next_auto": null,
    "next_auto_text": null
   },

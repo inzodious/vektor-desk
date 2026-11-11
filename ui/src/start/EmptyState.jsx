@@ -40,11 +40,17 @@ function Action({ action, slim, onFilled }) {
     setRun({ phase: 'running', text: null });
     try {
       const last = await runAndWait(action.job, { signal: ctl.current.signal });
+      const why = last?.error || last?.detail;
       if (last?.result === 'failed') {
-        setRun({ phase: 'failed', text: `That didn’t finish${last.detail ? `: ${last.detail}` : '.'} Settings → Box has the rest.` });
+        setRun({ phase: 'failed', text: `That didn’t finish${why ? `: ${why}` : '.'} Settings → Box has the rest.` });
         return;
       }
-      setRun({ phase: 'done', text: last?.result === 'skipped' ? `Skipped${last.detail ? `: ${last.detail}` : '.'}` : 'Done. Filling in now.' });
+      const skipped = last?.note || (last?.result === 'skipped' ? last.detail || 'Nothing to do right now.' : null);
+      if (skipped) {
+        setRun({ phase: 'refused', text: `It skipped this time: ${skipped}` });
+        return;
+      }
+      setRun({ phase: 'done', text: 'Done. Filling in now.' });
       onFilled?.();
       refresh();
     } catch (e) {

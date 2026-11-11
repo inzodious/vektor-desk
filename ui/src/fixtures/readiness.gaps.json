@@ -80,11 +80,11 @@
   {
    "key": "results.debrief",
    "state": "blocked",
-   "why": "The Debrief desk is switched off.",
+   "why": "All desks are switched off.",
    "action": {
     "kind": "link",
     "to": "/settings/crew",
-    "label": "Switch it on"
+    "label": "Switch the desks on"
    },
    "next_auto": null,
    "next_auto_text": null
@@ -207,13 +207,9 @@
   },
   {
    "key": "research.boards",
-   "state": "empty",
-   "why": "You haven’t saved a board yet.",
-   "action": {
-    "kind": "link",
-    "to": "/research/compare",
-    "label": "Open Compare"
-   },
+   "state": "ready",
+   "why": null,
+   "action": null,
    "next_auto": null,
    "next_auto_text": null
   },

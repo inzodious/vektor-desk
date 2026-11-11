@@ -23,14 +23,15 @@ export function stepTook(step) {
 // ---------- the chain ----------
 export function startView(data) {
   const steps = Array.isArray(data?.steps) ? data.steps : [];
-  if (!data || !steps.length) return { mode: 'none', show: false, steps: [], total: 0, ended: 0, share: 0, needs: [], canStart: false, head: null, line: null, button: null, blocked: null };
+  if (!data || !steps.length) return { mode: 'none', show: false, steps: [], total: 0, ended: 0, share: 0, needs: [], canStart: false, head: null, line: null, button: null, blocked: null, blockedFix: null };
   const total = steps.length;
   const ended = steps.filter((s) => ENDED.includes(s.state)).length;
   const at = steps.findIndex((s) => s.state === 'running');
   const needs = steps.filter(needsYou);
   const mode = data.state === 'running' ? 'running' : data.state === 'idle' ? 'never' : data.needs_start ? 'partial' : 'ok';
   const blocked = mode !== 'running' && data.can_start === false ? data.blocked?.message || 'The desk can’t start right now.' : null;
-  const base = { mode, steps, total, ended, share: total ? ended / total : 0, needs, canStart: data.can_start !== false && mode !== 'running', blocked, finishedAt: data.finished_at || null };
+  const blockedFix = blocked && data.blocked?.error === 'scheduler_down' ? { to: '/settings/box', label: 'Open Box' } : null;
+  const base = { mode, blockedFix, steps, total, ended, share: total ? ended / total : 0, needs, canStart: data.can_start !== false && mode !== 'running', blocked, finishedAt: data.finished_at || null };
   if (mode === 'running') {
     const now = at >= 0 ? `Step ${at + 1} of ${total}: ${steps[at].title}` : data.summary || `${ended} of ${total} steps done`;
     return { ...base, show: true, head: 'Starting the desk', line: `${now}. You can leave and come back.`, short: now, button: null };

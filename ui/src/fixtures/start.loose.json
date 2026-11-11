@@ -1,12 +1,13 @@
 {
+ "scheduler_alive": true,
  "state": "done",
  "needs_start": true,
  "can_start": true,
  "blocked": null,
  "result": "partial",
- "summary": "7 of 10 steps done. 3 need you.",
+ "summary": "5 of 10 steps done. 5 need you.",
  "started_at": "2026-11-11T14:02:10Z",
- "finished_at": "2026-11-11T14:09:55Z",
+ "finished_at": "2026-11-11T14:04:44Z",
  "last_ok_at": null,
  "steps": [
   {
@@ -63,7 +64,7 @@
    "id": "discounts",
    "title": "Scan for discounts",
    "state": "failed",
-   "detail": "It stopped with an error. Settings, Box, Collect logs shows why.",
+   "detail": "It stopped: the price feed timed out",
    "fix": {
     "label": "Open Box",
     "to": "/settings/box"
@@ -75,48 +76,54 @@
   {
    "id": "plan_keeper",
    "title": "Check your plan",
-   "state": "ok",
-   "detail": null,
-   "fix": null,
+   "state": "skipped",
+   "detail": "All desks are switched off.",
+   "fix": {
+    "label": "Switch the desks on",
+    "to": "/settings/crew"
+   },
    "job": "agents-run-plan_keeper",
-   "started_at": "2026-11-11T14:04:32Z",
-   "finished_at": "2026-11-11T14:07:05Z"
+   "started_at": null,
+   "finished_at": "2026-11-11T14:04:32Z"
   },
   {
    "id": "debrief",
    "title": "Write the debrief",
    "state": "skipped",
-   "detail": "The Debrief desk is switched off.",
+   "detail": "All desks are switched off.",
    "fix": {
-    "label": "Switch it on",
+    "label": "Switch the desks on",
     "to": "/settings/crew"
    },
    "job": "agents-run-debrief",
    "started_at": null,
-   "finished_at": "2026-11-11T14:07:09Z"
+   "finished_at": "2026-11-11T14:04:36Z"
   },
   {
    "id": "plans",
    "title": "Draft your stock plans",
    "state": "skipped",
-   "detail": "The Claude token has expired, so no desk can write.",
+   "detail": "All desks are switched off.",
    "fix": {
-    "label": "Renew the token",
-    "to": "/settings/box"
+    "label": "Switch the desks on",
+    "to": "/settings/crew"
    },
    "job": "agents-run-plans",
    "started_at": null,
-   "finished_at": "2026-11-11T14:07:13Z"
+   "finished_at": "2026-11-11T14:04:40Z"
   },
   {
    "id": "paper",
    "title": "Run the paper race",
-   "state": "ok",
-   "detail": null,
-   "fix": null,
+   "state": "skipped",
+   "detail": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set",
+   "fix": {
+    "label": "Add the Alpaca paper keys",
+    "to": "/settings/data"
+   },
    "job": "engine-paper",
-   "started_at": "2026-11-11T14:07:17Z",
-   "finished_at": "2026-11-11T14:09:55Z"
+   "started_at": null,
+   "finished_at": "2026-11-11T14:04:44Z"
   }
  ]
 }

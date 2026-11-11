@@ -35,6 +35,11 @@ describe('job state', () => {
     expect(failed.state).toBe('failed');
     expect(failed.line).toMatch(/^Didn’t finish .*: SEC answered 503$/);
     expect(jobState({ last_run: { result: 'ok', finished: '2026-11-09T13:01:00Z', trigger: 'request' } }).line).toMatch(/on request$/);
+    expect(jobState({ last_run: { result: 'ok', finished: '2026-11-09T13:01:00Z', trigger: 'start' } }).line).toMatch(/from Start the desk$/);
+    const skipped = jobState({ last_run: { result: 'ok', finished: '2026-11-09T13:01:00Z', trigger: 'start', note: 'Price history is already complete.' } });
+    expect(skipped.state).toBe('skipped');
+    expect(skipped.line).toMatch(/from Start the desk: Price history is already complete\.$/);
+    expect(jobState({ last_run: { result: 'failed', finished: '2026-11-09T05:43:00Z', error: 'the price feed timed out' } }).line).toMatch(/: the price feed timed out$/);
   });
 
   it('splits data jobs from the rest', () => {

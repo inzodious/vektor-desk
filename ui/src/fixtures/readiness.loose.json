@@ -15,9 +15,13 @@
   },
   {
    "key": "bridge.brief",
-   "state": "ready",
-   "why": null,
-   "action": null,
+   "state": "blocked",
+   "why": "All desks are switched off.",
+   "action": {
+    "kind": "link",
+    "to": "/settings/crew",
+    "label": "Switch the desks on"
+   },
    "next_auto": null,
    "next_auto_text": null
   },
@@ -56,11 +60,11 @@
   {
    "key": "results.debrief",
    "state": "blocked",
-   "why": "The Debrief desk is switched off.",
+   "why": "All desks are switched off.",
    "action": {
     "kind": "link",
     "to": "/settings/crew",
-    "label": "Switch it on"
+    "label": "Switch the desks on"
    },
    "next_auto": null,
    "next_auto_text": null
@@ -76,11 +80,11 @@
   {
    "key": "portfolio.stock_plans",
    "state": "blocked",
-   "why": "The Claude token has expired, so the Plan desk can’t write new drafts.",
+   "why": "All desks are switched off.",
    "action": {
     "kind": "link",
-    "to": "/settings/box",
-    "label": "Renew the token"
+    "to": "/settings/crew",
+    "label": "Switch the desks on"
    },
    "next_auto": null,
    "next_auto_text": null

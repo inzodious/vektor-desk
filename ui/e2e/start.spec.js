@@ -93,6 +93,16 @@ test('a refused start says why', async ({ page }) => {
   await expect(page.getByTestId('start-panel')).toHaveAttribute('data-mode', 'never');
 });
 
+test('with the scheduler off the button is off and says where to fix it', async ({ page }) => {
+  const down = { ...fixture('start.never'), scheduler_alive: false, can_start: false, blocked: { error: 'scheduler_down', message: 'The cron service isn’t running, so nothing would pick this up.' } };
+  await page.route(/\/api\/start(\?.*)?$/, (route) => route.fulfill({ json: down }));
+  await page.goto('/?scenario=never');
+  const panel = page.getByTestId('start-panel');
+  await expect(panel.getByTestId('start-desk')).toBeDisabled();
+  await expect(panel.getByTestId('start-blocked')).toContainText('The cron service isn’t running');
+  await expect(panel.getByTestId('start-blocked').getByRole('link', { name: 'Open Box' })).toHaveAttribute('href', '/settings/box');
+});
+
 test('other pages carry a slim strip while the desk has not run', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/portfolio?scenario=never');
@@ -126,13 +136,15 @@ test('a run with loose ends lists only the steps that need him, each with its fi
   await page.goto('/?scenario=loose');
   const panel = page.getByTestId('start-panel');
   await expect(panel).toHaveAttribute('data-mode', 'partial');
-  await expect(panel).toContainText('7 of 10 steps done. 3 need you.');
+  await expect(panel).toContainText('5 of 10 steps done. 5 need you.');
   await expect(panel.getByTestId('start-desk')).toHaveText(/Start again/);
   const steps = panel.locator('.sd-step');
-  await expect(steps).toHaveCount(3);
-  await expect(panel.locator('[data-step="discounts"]')).toContainText('It stopped with an error.');
+  await expect(steps).toHaveCount(5);
+  await expect(panel.locator('[data-step="discounts"]')).toContainText('It stopped: the price feed timed out');
   await expect(panel.locator('[data-step="discounts"]').getByTestId('start-fix')).toHaveAttribute('href', '/settings/box');
-  await expect(panel.locator('[data-step="debrief"]').getByTestId('start-fix')).toHaveText(/Switch it on/);
+  await expect(panel.locator('[data-step="debrief"]').getByTestId('start-fix')).toHaveText(/Switch the desks on/);
+  await expect(panel.locator('[data-step="paper"]').getByTestId('start-fix')).toHaveAttribute('href', '/settings/data');
+  await expect(panel.locator('[data-step="prices"]')).toHaveCount(0);
   await expect(panel.locator('[data-step="debrief"]').getByTestId('start-fix')).toHaveAttribute('href', '/settings/crew');
   await expect(page.locator('.kpis')).toHaveCount(1);
   const o = await overflow(page);
@@ -160,7 +172,8 @@ test('a section with data that is stale or blocked gets a one-line note and its 
   await page.goto('/portfolio/stocks?scenario=loose');
   const blocked = page.getByTestId('empty-state');
   await expect(blocked).toHaveAttribute('data-state', 'blocked');
-  await expect(blocked.getByTestId('empty-act')).toHaveAttribute('href', '/settings/box');
+  await expect(blocked).toContainText('All desks are switched off.');
+  await expect(blocked.getByTestId('empty-act')).toHaveAttribute('href', '/settings/crew');
   await expect(page.getByTestId('plan-card').first()).toBeVisible();
 });
 
@@ -196,6 +209,25 @@ test('an empty section runs its job in place and fills in', async ({ page }) => 
   expect(asked).toBe('engine-review');
 });
 
+test('a job that skips in place says why', async ({ page }) => {
+  let asked = null;
+  await page.route('**/api/jobs/*/run', (route) => {
+    asked = route.request().url().split('/').slice(-2)[0];
+    route.fulfill({ status: 409, json: { ok: false, error: 'running', message: 'Already running.' } });
+  });
+  await page.route(/\/api\/jobs(\?.*)?$/, async (route) => {
+    const res = await route.fetch();
+    const body = await res.json();
+    if (asked) body.jobs = body.jobs.map((j) => (j.name === asked ? { ...j, running: false, queued: false, last_run: { request_id: 'other', trigger: 'start', result: 'ok', note: 'No trading day has closed yet.', error: null, started: '2026-11-11T14:10:00Z', finished: '2026-11-11T14:10:02Z' } } : j));
+    route.fulfill({ json: body });
+  });
+  await page.goto('/results/month?scenario=gaps');
+  const empty = page.getByTestId('empty-state');
+  await empty.getByTestId('empty-act').click();
+  await expect(empty.getByTestId('empty-msg')).toHaveText('It skipped this time: No trading day has closed yet.', { timeout: 15000 });
+  expect(asked).toBe('engine-review');
+});
+
 test('a job that fails in place says so and keeps the button', async ({ page }) => {
   let asked = null;
   await page.route('**/api/jobs/*/run', (route) => {
@@ -205,7 +237,7 @@ test('a job that fails in place says so and keeps the button', async ({ page }) 
   await page.route(/\/api\/jobs(\?.*)?$/, async (route) => {
     const res = await route.fetch();
     const body = await res.json();
-    if (asked) body.jobs = body.jobs.map((j) => (j.name === asked ? { ...j, last_run: { request_id: 'req-bad', result: 'failed', detail: 'no prices for the period', started: '2026-11-11T14:10:00Z', finished: '2026-11-11T14:10:02Z' } } : j));
+    if (asked) body.jobs = body.jobs.map((j) => (j.name === asked ? { ...j, last_run: { request_id: 'req-bad', result: 'failed', error: 'no prices for the period', note: null, started: '2026-11-11T14:10:00Z', finished: '2026-11-11T14:10:02Z' } } : j));
     route.fulfill({ json: body });
   });
   await page.goto('/portfolio/risk?scenario=gaps');

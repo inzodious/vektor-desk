@@ -29,8 +29,8 @@ describe('start the desk', () => {
 
   it('keeps the loose ends in view after a partial run', () => {
     const v = startView(loose);
-    expect(v).toMatchObject({ mode: 'partial', show: true, button: 'Start again', line: '7 of 10 steps done. 3 need you.' });
-    expect(v.needs.map((s) => s.id)).toEqual(['discounts', 'debrief', 'plans']);
+    expect(v).toMatchObject({ mode: 'partial', show: true, button: 'Start again', line: '5 of 10 steps done. 5 need you.' });
+    expect(v.needs.map((s) => s.id)).toEqual(['discounts', 'plan_keeper', 'debrief', 'plans', 'paper']);
   });
 
   it('goes away once a run finished clean', () => {
@@ -39,7 +39,8 @@ describe('start the desk', () => {
 
   it('says why it cannot start', () => {
     const v = startView({ ...never, can_start: false, blocked: { error: 'scheduler_down', message: 'The scheduler is off.' } });
-    expect(v).toMatchObject({ canStart: false, blocked: 'The scheduler is off.' });
+    expect(v).toMatchObject({ canStart: false, blocked: 'The scheduler is off.', blockedFix: { to: '/settings/box', label: 'Open Box' } });
+    expect(startView(never).blockedFix).toBeNull();
     expect(startRefusal({ status: 503, body: { error: 'scheduler_down', message: 'The scheduler is off.' } })).toBe('The scheduler is off.');
     expect(startRefusal({ status: 409, body: { error: 'running' } })).toBeNull();
     expect(startRefusal({ status: 404, message: 'Not Found' })).toMatch(/next desk update/);
@@ -52,7 +53,7 @@ describe('start the desk', () => {
     expect(stepWord(prices).t).toBe('Skipped');
     expect(stepTook(prices)).toBeNull();
     expect(stepWord(market).t).toBe('Working');
-    expect(stepTook(loose.steps.find((s) => s.id === 'plan_keeper'))).toBe('2 min 33 s');
+    expect(stepTook(done.steps.find((s) => s.id === 'paper'))).toBe('1 min 33 s');
     expect(needsYou(prices)).toBe(false);
     expect(needsYou(loose.steps.find((s) => s.id === 'debrief'))).toBe(true);
     expect(needsYou(loose.steps.find((s) => s.id === 'discounts'))).toBe(true);
