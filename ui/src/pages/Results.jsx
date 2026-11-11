@@ -6,7 +6,7 @@ import { useApi } from '../lib/api.js';
 import { QUALITY } from '../lib/quality.js';
 import { KINDS, RESULT_TABS, changeText, firstRunNote, gainLine, periodPath, stateChip, stepper } from '../lib/results.js';
 import { Accounts, Debrief, DecisionsCard, Events, Ledger, Movers, NextSteps, Numbers, PaperCard, RiskCard, Versus } from '../results/cards.jsx';
-import { EmptyState } from '../start/EmptyState.jsx';
+import { EmptyState, GapNote } from '../start/EmptyState.jsx';
 
 const REVIEW_NOW = { kind: 'job', job: 'engine-review', label: 'Write it now' };
 
@@ -127,6 +127,7 @@ export default function Results() {
           </>
         }
       />
+      {end ? null : <GapNote k={`results.${kind}`} onFilled={api.reload} />}
       {pack.coverage && !pack.coverage.full ? (
         <p className="note rs-cover" role="note" data-testid="rs-cover">
           {pack.coverage.note || 'The desk’s history starts inside this period, so this covers what there is.'}

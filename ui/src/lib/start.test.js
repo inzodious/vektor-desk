@@ -35,6 +35,7 @@ describe('start the desk', () => {
 
   it('goes away once a run finished clean', () => {
     expect(startView(done)).toMatchObject({ mode: 'ok', show: false, head: 'The desk is up', needs: [] });
+    expect(startView({ ...never, needs_start: false })).toMatchObject({ mode: 'ok', show: false });
   });
 
   it('says why it cannot start', () => {

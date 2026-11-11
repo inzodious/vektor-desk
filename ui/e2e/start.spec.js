@@ -169,6 +169,15 @@ test('a section with data that is stale or blocked gets a one-line note and its 
   await expect(note).toContainText('Fills by itself Dec 2 at 3:30 AM.');
   await expect(note.getByTestId('empty-act')).toHaveText(/Fetch it now/);
   await expect(page.getByTestId('mixes')).toBeVisible();
+  await page.goto('/results/day?scenario=loose');
+  const behind = page.locator('[data-testid="empty-state"][data-key="results.day"]');
+  await expect(behind).toHaveAttribute('data-state', 'stale');
+  await expect(behind).toContainText('The last review is behind');
+  await expect(behind.getByTestId('empty-act')).toHaveText(/Write it now/);
+  await expect(page.getByTestId('results')).toBeVisible();
+  await page.goto('/results/day?end=2026-11-05&scenario=loose');
+  await expect(page.getByTestId('results')).toBeVisible();
+  await expect(page.locator('[data-testid="empty-state"][data-key="results.day"]')).toHaveCount(0);
   await page.goto('/portfolio/stocks?scenario=loose');
   const blocked = page.getByTestId('empty-state');
   await expect(blocked).toHaveAttribute('data-state', 'blocked');
@@ -293,6 +302,18 @@ test('First run leads with Start the desk and keeps the checklist under it', asy
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
+});
+
+test('a desk that already has its data gets no banner, even if Start the desk was never pressed', async ({ page }) => {
+  await page.route(/\/api\/start(\?.*)?$/, (route) => route.fulfill({ json: { ...fixture('start.never'), needs_start: false } }));
+  await page.goto('/');
+  await expect(page.locator('.kpis').first()).toBeVisible();
+  await expect(page.getByTestId('start-panel')).toHaveCount(0);
+  await page.goto('/portfolio');
+  await expect(page.locator('.kpis').first()).toBeVisible();
+  await expect(page.getByTestId('start-strip')).toHaveCount(0);
+  await page.goto('/settings/first-run');
+  await expect(page.getByTestId('start-panel')).toHaveAttribute('data-mode', 'ok');
 });
 
 test('a desk without the start and readiness answers looks as it did', async ({ page }) => {

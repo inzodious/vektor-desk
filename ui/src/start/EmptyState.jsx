@@ -103,10 +103,10 @@ export function EmptyState({ k, title, why, action, icon = 'compass', slim = fal
 }
 
 // ---------- a section with data that is stale or waiting on him ----------
-export function GapNote({ k }) {
+export function GapNote({ k, onFilled }) {
   const gap = useGap(k);
   if (!gap) return null;
-  return <EmptyState k={k} slim icon="info" />;
+  return <EmptyState k={k} slim icon="info" onFilled={onFilled} />;
 }
 
 // ---------- a whole page body behind one readiness key ----------

@@ -129,6 +129,7 @@ const gapRows = {
 };
 
 const looseRows = {
+  ...Object.fromEntries(['day', 'week', 'month', 'year'].map((k) => [`results.${k}`, ['stale', 'The last review is behind: today’s run hasn’t happened.', job('engine-review', 'Write it now'), ...REVIEW_AT]])),
   'results.debrief': CREW,
   'bridge.brief': CREW,
   'portfolio.stock_plans': CREW,

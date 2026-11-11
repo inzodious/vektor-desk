@@ -27,35 +27,51 @@
   },
   {
    "key": "results.day",
-   "state": "ready",
-   "why": null,
-   "action": null,
-   "next_auto": null,
-   "next_auto_text": null
+   "state": "stale",
+   "why": "The last review is behind: today’s run hasn’t happened.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": "2026-11-11T22:35:00Z",
+   "next_auto_text": "today at 5:35 PM"
   },
   {
    "key": "results.week",
-   "state": "ready",
-   "why": null,
-   "action": null,
-   "next_auto": null,
-   "next_auto_text": null
+   "state": "stale",
+   "why": "The last review is behind: today’s run hasn’t happened.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": "2026-11-11T22:35:00Z",
+   "next_auto_text": "today at 5:35 PM"
   },
   {
    "key": "results.month",
-   "state": "ready",
-   "why": null,
-   "action": null,
-   "next_auto": null,
-   "next_auto_text": null
+   "state": "stale",
+   "why": "The last review is behind: today’s run hasn’t happened.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": "2026-11-11T22:35:00Z",
+   "next_auto_text": "today at 5:35 PM"
   },
   {
    "key": "results.year",
-   "state": "ready",
-   "why": null,
-   "action": null,
-   "next_auto": null,
-   "next_auto_text": null
+   "state": "stale",
+   "why": "The last review is behind: today’s run hasn’t happened.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": "2026-11-11T22:35:00Z",
+   "next_auto_text": "today at 5:35 PM"
   },
   {
    "key": "results.debrief",

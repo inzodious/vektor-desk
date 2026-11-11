@@ -28,7 +28,7 @@ export function startView(data) {
   const ended = steps.filter((s) => ENDED.includes(s.state)).length;
   const at = steps.findIndex((s) => s.state === 'running');
   const needs = steps.filter(needsYou);
-  const mode = data.state === 'running' ? 'running' : data.state === 'idle' ? 'never' : data.needs_start ? 'partial' : 'ok';
+  const mode = data.state === 'running' ? 'running' : data.needs_start === false ? 'ok' : data.state === 'idle' ? 'never' : 'partial';
   const blocked = mode !== 'running' && data.can_start === false ? data.blocked?.message || 'The desk can’t start right now.' : null;
   const blockedFix = blocked && data.blocked?.error === 'scheduler_down' ? { to: '/settings/box', label: 'Open Box' } : null;
   const base = { mode, blockedFix, steps, total, ended, share: total ? ended / total : 0, needs, canStart: data.can_start !== false && mode !== 'running', blocked, finishedAt: data.finished_at || null };
