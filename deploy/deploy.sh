@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Vektor Desk on TrueNAS SCALE (docs/architecture.md, docs/setup.md). Run as root:
-#   deploy.sh now      pull main, build what changed, back up, restart the app; back to the previous images if it isn't
+#   deploy.sh now      pull main, build what changed, back up with the new build, restart the app; back to the previous images if it isn't
 #                      healthy. Waits for nothing: refuses while a desk job (mirror, engine, agent, lab) is running.
 #   deploy.sh auto     what the auto-deploy cron job runs every 5 minutes: deploys when main has moved, quietly does nothing
-#                      otherwise, waits out a running job, and doesn't retry a commit that failed
+#                      otherwise, waits out a running job, and doesn't retry a commit that failed until the box script changes
 #   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
 #   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
 #   deploy.sh restore-test  restore drill: unpacks the newest backup into a scratch folder and checks every database
@@ -50,6 +50,7 @@ PAPER_URL=https://paper-api.alpaca.markets
 LOCK=/run/vektor-desk-deploy.lock
 AUTO_FAILED=$ROOT/deploy-auto.failed
 AUTO_WHY=$ROOT/deploy-auto.failed.why
+AUTO_SCRIPT=$ROOT/deploy-auto.failed.script
 STOPPED_ON=deploy
 AUTO_NOTE=$ROOT/deploy-auto.note
 BACKUP_WHY=$ROOT/backup.why
@@ -146,13 +147,15 @@ tarball() {
 }
 
 backup() {
-  local staging=$ROOT/data/backup-staging out rc=0 why
+  local image=${1:-} staging=$ROOT/data/backup-staging out rc=0 why
   rm -f "$BACKUP_WHY"
   [ -d "$ROOT/data" ] || {
     echo "there's no $ROOT/data to back up" | tee "$BACKUP_WHY" >&2
     return 1
   }
-  if [ "$(docker inspect -f '{{ .State.Running }}' vektor-desk-cron 2>/dev/null)" = true ]; then
+  if [ -n "$image" ]; then
+    out=$(docker run --rm --network none --user 568:568 -v "$ROOT/data:/data" "$image" python -m desk.backup --out /data/backup-staging 2>&1) || rc=$?
+  elif [ "$(docker inspect -f '{{ .State.Running }}' vektor-desk-cron 2>/dev/null)" = true ]; then
     out=$(docker exec vektor-desk-cron python -m desk.backup --out /data/backup-staging 2>&1) || rc=$?
   else
     out=$(docker run --rm --user 568:568 -v "$ROOT/data:/data" vektor-desk:local python -m desk.backup --out /data/backup-staging 2>&1) || rc=$?
@@ -211,7 +214,7 @@ update_checkout() {
 }
 
 deploy() {
-  local state why before target pair image dir id live=1 built=() previous=() files
+  local state why before target pair image dir id live=1 built=() previous=() files code=vektor-desk:local
   state=$(app_state)
   if [ "$state" = RUNNING ] && why=$(busy); then
     die "a desk job is running: $why. Nothing was changed" "$BUSY"
@@ -251,7 +254,8 @@ deploy() {
     alert "Desk needs you" "compose.yaml changed. Open Settings, Box to apply it."
   fi
 
-  if ! files=$(backup); then
+  [ "$(image_build vektor-desk:candidate)" != "$target" ] || code=vektor-desk:candidate
+  if ! files=$(backup "$code"); then
     why=$(backup_why)
     STOPPED_ON=backup
     die "the backup failed${why:+ ($why)}, so nothing was changed"
@@ -315,7 +319,10 @@ auto_stopped() {
   if [ "$1" -eq 0 ] || [ "$1" -eq "$BUSY" ]; then return 0; fi
   printf '%s\n' "$AUTO_TARGET" >"$AUTO_FAILED"
   printf '%s\n' "$STOPPED_ON" >"$AUTO_WHY"
+  script_id >"$AUTO_SCRIPT"
 }
+
+script_id() { sha256sum "$SELF" 2>/dev/null | cut -c1-64 || true; }
 
 pinned_stale() { [ -f "$PINNED" ] && ! cmp -s "$PINNED" "$SRC/deploy/deploy.sh"; }
 
@@ -333,7 +340,11 @@ auto() {
     rm -f "$AUTO_NOTE"
     return 0
   fi
-  [ "$(cat "$AUTO_FAILED" 2>/dev/null)" != "$target" ] || return 0
+  if [ "$(cat "$AUTO_FAILED" 2>/dev/null)" = "$target" ]; then
+    [ "$(cat "$AUTO_SCRIPT" 2>/dev/null)" != "$(script_id)" ] || return 0
+    log "The box script changed since ${target:0:7} was held back, so auto-deploy tries it once more"
+    rm -f "$AUTO_FAILED" "$AUTO_WHY" "$AUTO_SCRIPT"
+  fi
   if why=$(busy); then
     note "Auto-deploy is waiting for ${target:0:7}: $why" || true
     return 0
