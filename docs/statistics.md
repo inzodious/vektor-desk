@@ -1064,10 +1064,10 @@ On the synthetic database the heaviest experiment (French industries, 781 simula
 
 | Step | Where | What happens |
 |---|---|---|
-| Offer | NAS, end of `lab-export` (00:55) | If a worker is online, every queued experiment the lab has not run becomes a `lab.sims` job keyed by `simcache.job_key`, with the fresh `lab.db` as its copy. `lab/queue/offers.sims` records which files were offered and when. No worker online: nothing is offered and nothing waits |
+| Offer | NAS: end of `lab-export` (00:55), then `lab-offer` each minute from 01:00 to 05:59 | If a worker is online, every queued experiment the lab has not run becomes a `lab.sims` job keyed by `simcache.job_key`, with the current `lab.db` as its copy. `lab/queue/offers.sims` records each file's key and first offer time, and when a worker was last seen. A file is offered once per `lab.db`; later passes keep its time. No worker online: nothing is offered and nothing waits |
 | Run | Worker | `runner.sims` on its downloaded copy. An answer over 3 million simulated days is cut short and marked `partial`; the lab computes the rest |
 | Accept | NAS, `worker-apply` | `simcache.stage_file` copies the gzip into `lab/queue/` unread, so it costs no memory in the scheduler. It runs within seconds of the worker's post |
-| Use | Lab | An offered file, and everything queued after it, waits up to `DESK_LAB_WORKER_WAIT_MIN` (10) minutes from the offer for its answer; `waiting_for_worker` in the run's output names them. When the answer arrives it is checked as above and used, good or bad. When it does not, the lab runs the queue itself |
+| Use | Lab | An offered file, and everything queued after it, waits up to `DESK_LAB_WORKER_WAIT_MIN` (10) minutes from its offer for the answer; `waiting_for_worker` in the run's output names them. An experiment queued in the last 3 minutes also waits if a worker was seen in the last 6, so the offer can reach it first. When the answer arrives it is checked as above and used, good or bad. When it does not, the lab runs the queue itself. A wait still open at 06:00 is finished before the lab stops for the day |
 
 **Rules for new jobs.** Iterate cursors, do not `fetchall` a bar table. Write downloads in batches inside the loop that fetches them. A second run of a job must be a no-op, not a double write.
 

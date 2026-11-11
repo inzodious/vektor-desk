@@ -37,6 +37,13 @@ def once(cfg: Config) -> dict:
         return {"ok": False, "error": str(e)}
 
 
+def tick(cfg: Config, holding: bool, now: datetime | None = None) -> tuple[dict | None, bool]:
+    if not (holding or in_window(cfg, now)):
+        return None, False
+    result = once(cfg)
+    return result, bool(result.get("waiting_for_worker"))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m desk.engine.lab", description="Vektor Desk strategy lab: runs queued experiments with no network.")
     parser.add_argument("--once", action="store_true", help="process the queue now and exit, ignoring the overnight window")
@@ -57,9 +64,11 @@ def main(argv: list[str] | None = None) -> int:
         result = once(cfg)
         print(json.dumps(result))
         return 0 if result.get("ok") else 1
+    holding = False
     while True:
-        if in_window(cfg):
-            print(json.dumps(once(cfg)), flush=True)
+        result, holding = tick(cfg, holding)
+        if result is not None:
+            print(json.dumps(result), flush=True)
         time.sleep(60)
 
 

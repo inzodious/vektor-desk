@@ -35,6 +35,8 @@ MAX_BYTES = 200_000_000
 MAX_DAYS = 3_000_000
 WAIT_ENV = "DESK_LAB_WORKER_WAIT_MIN"
 WAIT_MIN = 10.0
+GRACE_MIN = 3.0
+SEEN_MIN = 6.0
 GZIP_MAGIC = b"\x1f\x8b"
 SPOT_CHECKS = 2
 FIELDS = ("key", "params", "start", "end", "cost_mult", "summary", "rets", "bench", "days")
@@ -266,12 +268,20 @@ def offers_path(cfg: Config) -> Path:
     return queue_dir(cfg) / OFFERS
 
 
-def write_offers(cfg: Config, snapshot: str, files: dict[str, str], now: datetime) -> None:
+def write_offers(cfg: Config, snapshot: str, files: dict[str, dict], now: datetime) -> None:
     path = offers_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(f".{OFFERS}.tmp")
-    tmp.write_text(_text({"snapshot": snapshot, "offered_at": now.isoformat(timespec="seconds"), "files": files}))
+    tmp.write_text(_text({"snapshot": snapshot, "online_at": now.isoformat(timespec="seconds"), "files": files}))
     os.replace(tmp, path)
+
+
+def read_offers(cfg: Config) -> dict:
+    try:
+        body = json.loads(offers_path(cfg).read_text())
+    except (OSError, ValueError):
+        return {}
+    return body if isinstance(body, dict) and isinstance(body.get("files"), dict) else {}
 
 
 def wait_minutes() -> float:
@@ -281,13 +291,28 @@ def wait_minutes() -> float:
         return WAIT_MIN
 
 
-def open_offers(cfg: Config, snapshot: str, now: datetime) -> dict[str, str]:
+def _within(text: object, now: datetime, minutes: float) -> bool:
     try:
-        body = json.loads(offers_path(cfg).read_text())
-        at = datetime.fromisoformat(str(body["offered_at"]))
-        files = body["files"]
-    except (OSError, ValueError, KeyError, TypeError):
+        return timedelta(0) <= now - datetime.fromisoformat(str(text)) < timedelta(minutes=minutes)
+    except (TypeError, ValueError):
+        return False
+
+
+def open_offers(cfg: Config, snapshot: str, now: datetime) -> dict[str, str]:
+    body = read_offers(cfg)
+    if body.get("snapshot") != snapshot:
         return {}
-    if body.get("snapshot") != snapshot or not isinstance(files, dict) or not timedelta(0) <= now - at < timedelta(minutes=wait_minutes()):
-        return {}
-    return {str(name): str(key) for name, key in files.items()}
+    wait = wait_minutes()
+    return {str(name): str(e["key"]) for name, e in body["files"].items() if isinstance(e, dict) and e.get("key") and _within(e.get("at"), now, wait)}
+
+
+def worker_seen(cfg: Config, now: datetime) -> bool:
+    return _within(read_offers(cfg).get("online_at"), now, SEEN_MIN)
+
+
+def just_queued(path: Path, now: datetime) -> bool:
+    try:
+        age = now.timestamp() - path.stat().st_mtime
+        return -60 < age < min(GRACE_MIN, wait_minutes()) * 60 and json.loads(path.read_text()).get("request") == "experiment"
+    except (OSError, ValueError, AttributeError):
+        return False

@@ -627,16 +627,21 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
             return {"ok": True, "done": []}
         cache = simcache.open_cache(cfg, simcache.snapshot_hash(data_path(cfg)), now=now)
         offers = simcache.open_offers(cfg, cache.snapshot, now)
-        if waiting and not simcache.staged(cfg) and waiting[0].name in offers and not cache.answered(offers[waiting[0].name]):
+        seen = simcache.worker_seen(cfg, now)
+
+        def owed(path: Path) -> bool:
+            key = offers.get(path.name)
+            return not cache.answered(key) if key else seen and simcache.just_queued(path, now)
+
+        if waiting and not simcache.staged(cfg) and owed(waiting[0]):
             return {"ok": True, "done": [], "waiting_for_worker": [p.name for p in waiting]}
         data = load(data_path(cfg))
         staged = ingest(cfg, data, cache)
         for s in staged:
             if s.get("job"):
                 cache.answer(s.pop("job"))
-        offered = {name for name, key in offers.items() if not cache.answered(key)}
         for path in waiting:
-            if path.name in offered:
+            if owed(path):
                 held = [p.name for p in waiting[waiting.index(path) :]]
                 break
             try:
