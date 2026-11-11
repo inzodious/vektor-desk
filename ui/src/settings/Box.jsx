@@ -1,7 +1,8 @@
 import { useState } from 'react';
+import { Copy } from '../components/Copy.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { getText, postJson, useApi } from '../lib/api.js';
-import { HAND_COPY, QUEUED_TEXT, boxBusy, boxRefusal, boxState, composeView, cooldownText, lastLine, scriptView, splitBox } from '../lib/box.js';
+import { BUILDER_START, HAND_COPY, QUEUED_TEXT, boxBusy, boxRefusal, boxState, buildView, composeView, cooldownText, lastLine, scriptView, settleLine, splitBox } from '../lib/box.js';
 
 function HandCopy({ lede }) {
   const [copied, setCopied] = useState(false);
@@ -76,6 +77,36 @@ function Compose({ cv, action, alive, mine, onRun }) {
   );
 }
 
+function Builds({ bv, action, alive, mine, onRun }) {
+  return (
+    <div className={`box-script build ${bv.tone}`} data-testid="box-build" data-state={bv.state}>
+      <span>
+        <b data-testid="build-head">{bv.head}</b>
+        {bv.rest ? <small>{bv.rest}</small> : null}
+        {bv.stale ? <small data-testid="build-stale">{bv.stale}</small> : null}
+      </span>
+      {bv.asking.map((a) => (
+        <div className="build-ask" key={a.print} data-testid="build-ask">
+          <small>{bv.asking.length > 1 ? `${a.name}’s line for main, key ${a.key}:` : `${a.name}’s line for main:`}</small>
+          <code className="wk-code">{a.line}</code>
+          <Copy text={a.line} label="Copy the line" testid="build-ask-copy" />
+        </div>
+      ))}
+      {bv.asking.length ? <small>It goes into deploy/builders.txt on main as one line. Once that is merged and live, Approve builder shows up here.</small> : null}
+      {bv.script ? <small data-testid="build-script">{bv.script}</small> : null}
+      {action && (bv.approve || mine) ? <ActionRow a={action} alive={alive} mine={mine} onRun={onRun} /> : null}
+      {bv.start ? (
+        <details className="job-more build-start" data-testid="build-start">
+          <summary>Let a worker build them</summary>
+          <small>A worker like Horizon can build the images, so the NAS doesn’t have to. Start its builder once, in a terminal on that machine, from its vektor-desk folder. It shows up here within a minute, asking to be approved. The builder runs Docker on that machine, so start it only on one you trust.</small>
+          <pre className="wk-code">{BUILDER_START}</pre>
+          <Copy text={BUILDER_START} label="Copy the commands" testid="build-start-copy" />
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 function Output({ run }) {
   const out = typeof run?.output === 'string' ? run.output : Array.isArray(run?.output) ? run.output.join('\n') : '';
   if (!out.trim()) return null;
@@ -140,9 +171,11 @@ export function Box() {
   const api = useApi('/api/box', { every: (d) => (boxBusy(d) || pending ? 5000 : 60000) });
   const d = api.data;
   const alive = !!d?.host_alive;
-  const { list, update, compose } = splitBox(d?.actions);
+  const { list, update, compose, approve } = splitBox(d?.actions);
   const sv = scriptView(d?.script);
   const cv = composeView(d?.compose);
+  const bv = buildView(d?.build, approve);
+  const settle = settleLine(d?.build);
 
   const run = async (a) => {
     setMine((m) => ({ ...m, [a.name]: { phase: 'queued', id: null } }));
@@ -177,7 +210,9 @@ export function Box() {
           {!alive ? (
             <HandCopy lede="One hand step left, then never again: the box hasn’t checked in, so these buttons wait. Copy deploy.sh for the cron jobs once, from a TrueNAS shell:" />
           ) : (
-            <p className="muted job-lede">Chores for the NAS itself. The box picks each one up within 5 minutes and the result lands here.</p>
+            <p className="muted job-lede">
+              Chores for the NAS itself. The box picks each one up within 5 minutes and the result lands here.{settle ? <span data-testid="box-settle"> {settle}</span> : null}
+            </p>
           )}
           {sv && sv.state !== 'current' ? (
             <div className="box-script" data-testid="box-script" data-state={sv.state}>
@@ -189,6 +224,7 @@ export function Box() {
             </div>
           ) : null}
           {cv ? <Compose cv={cv} action={compose} alive={alive} mine={compose ? mine[compose.name] : null} onRun={run} /> : null}
+          {bv ? <Builds bv={bv} action={approve} alive={alive} mine={approve ? mine[approve.name] : null} onRun={run} /> : null}
           <div className="job-list">
             {list.map((a) => (
               <ActionRow key={a.name} a={a} alive={alive} mine={mine[a.name]} onRun={run} />

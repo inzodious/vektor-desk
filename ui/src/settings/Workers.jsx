@@ -1,31 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { Copy } from '../components/Copy.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { postJson, useApi } from '../lib/api.js';
 import { WORKERS_EVENT, nameProblem, startCommand, workerRefusal, workersBusy, workersView } from '../lib/workers.js';
 
 const tell = () => window.dispatchEvent(new Event(WORKERS_EVENT));
-
-// ---------- copy ----------
-function Copy({ text, label, testid }) {
-  const [state, setState] = useState(null);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setState('copied');
-    } catch {
-      setState('failed');
-    }
-  };
-  return (
-    <span className="key-acts">
-      <button className="btn sm" type="button" onClick={copy} data-testid={testid}>
-        <Icon name={state === 'copied' ? 'check' : 'copy'} />
-        {state === 'copied' ? 'Copied' : label}
-      </button>
-      {state === 'failed' ? <small className="job-note refused">Couldn’t copy. Select it and copy by hand.</small> : null}
-    </span>
-  );
-}
 
 // ---------- the key, once ----------
 function KeyOnce({ made, onDone }) {

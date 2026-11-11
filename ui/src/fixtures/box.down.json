@@ -90,6 +90,18 @@
    "can_run": true
   },
   {
+   "name": "deploy-now",
+   "title": "Deploy now",
+   "what": "Pulls main, backs up and restarts on it; also retries a commit auto-deploy is holding back",
+   "cooldown_seconds": 300,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
+  },
+  {
    "name": "apply-compose",
    "title": "Apply compose",
    "what": "Backs up, then gives TrueNAS main's compose.yaml, unless the change widens what containers can do",
@@ -100,6 +112,30 @@
    "last_run": null,
    "cooldown_until": null,
    "can_run": true
+  },
+  {
+   "name": "approve-builder",
+   "title": "Approve builder",
+   "what": "Trusts the builders listed in main's deploy/builders.txt, so the box takes the images they sign instead of building its own",
+   "cooldown_seconds": 60,
+   "running": false,
+   "queued": false,
+   "queued_at": null,
+   "last_run": null,
+   "cooldown_until": null,
+   "can_run": true
   }
- ]
+ ],
+ "build": {
+  "state": "none",
+  "words": "The box builds its own images, one stage at a time.",
+  "builders": [],
+  "asking": [],
+  "listed": [],
+  "want": null,
+  "last": null,
+  "wait_seconds": null,
+  "settle_seconds": null,
+  "host_seen": false
+ }
 }
