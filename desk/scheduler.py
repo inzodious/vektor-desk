@@ -12,12 +12,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from desk import jobrun
+from desk import jobrun, memory
 from desk.config import Config
 from desk.packages import seams
 from desk.runlock import BUSY
 
 RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
+LIGHT = frozenset({"engine-quotes", "engine-lots", "notify-ops", "decisions-sync", "agents-triggers"})
+ALERT_JOB = "notify-ops"
+MODE_EVERY = 30.0
+_LOW = {"on": False, "checked": None}
 
 
 def _field(text: str, low: int, high: int) -> frozenset[int]:
@@ -53,7 +57,10 @@ class Job:
     lock: str = ""
     refreshes: tuple[str, ...] = ()
     stage: str = ""
+    heavy: bool = True
     proc: subprocess.Popen | None = field(default=None, repr=False)
+    waiting: dict | None = field(default=None, repr=False)
+    group: dict | None = field(default=None, repr=False)
     said: str = field(default="", repr=False)
     pump: threading.Thread | None = field(default=None, repr=False)
     run: dict | None = field(default=None, repr=False)
@@ -71,7 +78,16 @@ class Job:
 
 
 def make_job(
-    label: str, timing: str, command: list[str], *, name: str = "", package: str = "", lock: str = "", refreshes: tuple[str, ...] = (), stage: str = ""
+    label: str,
+    timing: str,
+    command: list[str],
+    *,
+    name: str = "",
+    package: str = "",
+    lock: str = "",
+    refreshes: tuple[str, ...] = (),
+    stage: str = "",
+    heavy: bool | None = None,
 ) -> Job:
     parts = timing.split()
     if len(parts) != 5:
@@ -92,6 +108,7 @@ def make_job(
         lock=lock,
         refreshes=refreshes,
         stage=stage,
+        heavy=name not in LIGHT if heavy is None else heavy,
     )
 
 
@@ -121,13 +138,14 @@ def package_jobs(only: list[str] | None = None) -> list[Job]:
             if isinstance(entry, dict):
                 timing, command, name = entry["schedule"], entry["command"], entry.get("name")
                 refreshes, stage = tuple(str(c) for c in entry.get("refreshes") or ()), str(entry.get("stage") or "")
+                heavy = bool(entry["heavy"]) if "heavy" in entry else None
             else:
-                timing, command, name, refreshes, stage = entry[0], entry[1], None, (), ""
+                timing, command, name, refreshes, stage, heavy = entry[0], entry[1], None, (), "", None
             cmd = shlex.split(command) if isinstance(command, str) else list(command)
             lock = re.sub(r"[^A-Za-z0-9_-]+", "-", f"{pkg}-{name}")[:60] if name else lock_name(pkg, cmd)
             held = ["python", "-m", "desk.runlock", "--hold", lock, "--", *cmd]
             job_id = jobrun.job_name(pkg, cmd, name)
-            jobs.append(make_job(f"{pkg}.jobs[{i}]", timing, held, name=job_id, package=pkg, lock=lock, refreshes=refreshes, stage=stage))
+            jobs.append(make_job(f"{pkg}.jobs[{i}]", timing, held, name=job_id, package=pkg, lock=lock, refreshes=refreshes, stage=stage, heavy=heavy))
     return jobs
 
 
@@ -157,6 +175,8 @@ def _pump(job: Job, out) -> None:
 def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = None) -> None:
     log(f"{job.line} start ({trigger}): {shlex.join(job.command)}")
     job.said = ""
+    job.waiting = None
+    job.group = memory.cgroup() if cfg is not None else None
     job.proc = subprocess.Popen(job.command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1)  # noqa: S603
     job.pump = threading.Thread(target=_pump, args=(job, job.proc.stdout), daemon=True)
     job.pump.start()
@@ -170,11 +190,23 @@ def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = N
         "detail": None,
         "note": None,
         "error": None,
+        "oom": None,
     }
     _record(cfg, job)
 
 
+def _stopped_for_memory(job: Job, rc: int, cfg: Config | None) -> tuple[str, dict] | None:
+    if cfg is None or rc in (0, BUSY):
+        return None
+    group = memory.cgroup()
+    scope = memory.kill_scope(job.group, group)
+    if scope is None and rc in memory.KILLED:
+        scope = "box"
+    return (scope, group) if scope else None
+
+
 def reap(jobs: list[Job], cfg: Config | None = None) -> None:
+    alert = False
     for job in jobs:
         if job.proc is None or job.proc.poll() is None:
             continue
@@ -188,14 +220,86 @@ def reap(jobs: list[Job], cfg: Config | None = None) -> None:
             detail = None if rc == 0 else "another run held the lock" if rc == BUSY else f"exit {rc}; see docker logs vektor-desk-cron"
             job.run.update(finished=jobrun.stamp(jobrun.now_utc()), result=result, exit_code=rc, detail=detail)
             job.run.update(note=said.get("skipped") if rc == 0 else None, error=said.get("error") if result == "failed" else None)
+            stopped = _stopped_for_memory(job, rc, cfg)
+            if stopped is not None:
+                scope, group = stopped
+                job.run.update(error=memory.job_words(scope, group.get("limit_mb")), oom=scope)
+                log(f"{job.line} was stopped for memory ({scope})")
+                try:
+                    memory.record_kill(cfg, job.name, job.title, scope)
+                except OSError as e:
+                    log(f"couldn't note the memory stop: {e!r}")
+                alert = alert or job.name != ALERT_JOB
+                for other in jobs:
+                    if other is not job and other.proc is not None and other.group is not None:
+                        other.group = group
             _record(cfg, job)
         job.proc = None
         job.pump = None
         job.run = None
+        job.group = None
+    if alert:
+        teller = next((j for j in jobs if j.name == ALERT_JOB), None)
+        if teller is not None and not _busy(jobs, ALERT_JOB):
+            start(teller, cfg, "memory")
+
+
+# ---- Low-memory mode: heavy jobs one at a time ----
+
+
+def low(cfg: Config | None, every: float = MODE_EVERY) -> bool:
+    if cfg is None:
+        return False
+    last = _LOW["checked"]
+    if last is None or time.monotonic() - last >= every:
+        try:
+            _LOW.update(on=bool(memory.refresh(cfg).get("on")), checked=time.monotonic())
+        except Exception as e:  # noqa: BLE001
+            log(f"couldn't read the box's memory: {e!r}")
+            _LOW["checked"] = time.monotonic()
+    return bool(_LOW["on"])
+
+
+def _save_waiting(jobs: list[Job], cfg: Config) -> None:
+    rows = {j.name: j.waiting for j in jobs if j.waiting is not None}
+    try:
+        jobrun._write(memory.waiting_file(cfg), rows)
+    except OSError as e:
+        log(f"couldn't write the waiting list: {e!r}")
+
+
+def _heavy_running(jobs: list[Job]) -> bool:
+    return any(j.heavy and j.proc is not None for j in jobs)
+
+
+def launch(jobs: list[Job], job: Job, cfg: Config | None, trigger: str, request_id: str | None = None) -> str:
+    if not (job.heavy and low(cfg) and _heavy_running(jobs)):
+        start(job, cfg, trigger, request_id)
+        return "started"
+    if trigger == "schedule" and job.timing.startswith("* "):
+        return "skipped"
+    job.waiting = {"trigger": trigger, "request_id": request_id, "since": jobrun.stamp(jobrun.now_utc())}
+    log(f"{job.line} waits its turn: low-memory mode runs heavy jobs one at a time")
+    _save_waiting(jobs, cfg)
+    return "waiting"
+
+
+def drain(jobs: list[Job], cfg: Config | None) -> list[Job]:
+    started = []
+    queue = sorted((j for j in jobs if j.waiting is not None), key=lambda j: j.waiting["since"])
+    for job in queue:
+        if low(cfg) and _heavy_running(jobs):
+            break
+        ask = job.waiting
+        start(job, cfg, ask["trigger"], ask["request_id"])
+        started.append(job)
+    if started and cfg is not None:
+        _save_waiting(jobs, cfg)
+    return started
 
 
 def _busy(jobs: list[Job], name: str) -> bool:
-    return any(j.name == name and j.proc is not None for j in jobs)
+    return any(j.name == name and (j.proc is not None or j.waiting is not None) for j in jobs)
 
 
 def tick(jobs: list[Job], t: datetime, cfg: Config | None = None) -> list[Job]:
@@ -207,8 +311,8 @@ def tick(jobs: list[Job], t: datetime, cfg: Config | None = None) -> list[Job]:
         if _busy(jobs, job.name):
             log(f"{job.line} skipped: still running from last time")
             continue
-        start(job, cfg, "schedule")
-        started.append(job)
+        if launch(jobs, job, cfg, "schedule") == "started":
+            started.append(job)
     return started
 
 
@@ -225,8 +329,8 @@ def serve_requests(jobs: list[Job], cfg: Config) -> list[Job]:
         if _busy(jobs, name):
             log(f"run request for {name} dropped: it's running")
             continue
-        start(job, cfg, "request", str(req.get("id") or "")[:32] or None)
-        started.append(job)
+        if launch(jobs, job, cfg, "request", str(req.get("id") or "")[:32] or None) == "started":
+            started.append(job)
     return started
 
 
@@ -234,7 +338,7 @@ def run_chain(jobs: list[Job], cfg: Config) -> None:
     try:
         from desk import startrun
 
-        startrun.advance(cfg, jobs, lambda job, rid: start(job, cfg, "start", rid), lambda name: _busy(jobs, name))
+        startrun.advance(cfg, jobs, lambda job, rid: launch(jobs, job, cfg, "start", rid), lambda name: _busy(jobs, name))
     except Exception as e:  # noqa: BLE001
         log(f"start chain stopped on an error and will try again: {e!r}")
 
@@ -265,9 +369,12 @@ def main(argv: list[str] | None = None) -> int:
     log(f"{len(jobs)} jobs, time zone {zone.key}")
     t = datetime.now(zone).replace(second=0, microsecond=0) + timedelta(minutes=1)
     cfg = Config.from_env()
+    _save_waiting(jobs, cfg)
     while not stopping:
         jobrun.heartbeat(cfg)
         reap(jobs, cfg)
+        low(cfg)
+        drain(jobs, cfg)
         serve_requests(jobs, cfg)
         run_chain(jobs, cfg)
         wait = (t - datetime.now(zone)).total_seconds()

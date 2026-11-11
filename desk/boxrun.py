@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
+from desk import memory
 from desk.config import Config
 from desk.jobrun import _read, _write, now_utc, parse_stamp, stamp
 from desk.runlock import run_dir
@@ -138,6 +139,7 @@ def describe(cfg: Config, now: datetime | None = None) -> dict:
         "pickup_seconds": PICKUP_SECONDS,
         "script": _read(box_dir(cfg) / "script.json"),
         "compose": compose_state(cfg),
+        "memory": memory.status(cfg, now),
         "actions": rows,
     }
 

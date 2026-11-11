@@ -59,6 +59,24 @@ def ops_check(cfg: Config | None = None, now: datetime | None = None, session: r
         ):
             sent.append(f"reviews-{reviews['state']}")
 
+    box = report["memory"]
+    today = [e for e in box["killed"] if datetime.fromisoformat(e["at"].replace("Z", "+00:00")).astimezone(ZoneInfo(cfg.timezone)).date() == local]
+    if today:
+        mode = box["low_memory"]
+        tail = "Low-memory mode is on, so heavy jobs run one at a time." if mode["on"] else "Open Settings, Box to switch on low-memory mode."
+        if publish(
+            "ops",
+            "The desk ran out of memory",
+            f"{today[0]['words']} {tail}",
+            "high",
+            tags=["warning"],
+            click="/settings/box",
+            key=f"memory-{local.isoformat()}",
+            cfg=cfg,
+            session=session,
+        ):
+            sent.append("memory")
+
     token = report["claude_token"]
     if token["state"] in ("renew", "expired"):
         week = "{}-W{:02d}".format(*local.isocalendar()[:2])
