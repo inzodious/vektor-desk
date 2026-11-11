@@ -114,7 +114,7 @@ def alive_file(cfg: Config) -> Path:
 
 def _write(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
     tmp.write_text(json.dumps(data, sort_keys=True))
     os.replace(tmp, path)
 

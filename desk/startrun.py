@@ -377,7 +377,8 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None, known: Facts 
     turns = {w["job"] for w in box["waiting"]}
     steps = [{k: s.get(k) for k in keep} for s in chain["steps"]]
     for step in steps:
-        if step["state"] == "running" and step["job"] in turns:
+        step["waiting"] = step["state"] == "running" and step["job"] in turns
+        if step["waiting"]:
             step["detail"] = "Waiting for its turn: low-memory mode runs heavy jobs one at a time."
     return {
         "state": chain["state"],
