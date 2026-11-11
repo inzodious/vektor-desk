@@ -340,7 +340,7 @@ def test_paper_job_is_scheduled():
     from desk.engine.jobs import JOBS
 
     assert "paper" in engine_main.JOBS
-    assert sum(1 for _, c in JOBS if c == "python -m desk.engine paper") == 2
+    assert sum(1 for e in JOBS if not isinstance(e, dict) and e[1] == "python -m desk.engine paper") == 2
 
 
 # ---- Lane variants ----

@@ -1,16 +1,20 @@
 import gzip
 import json
+import os
 import random
 import sqlite3
 from array import array
 from datetime import UTC, date, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 import pytest
 
+from desk import scheduler
 from desk.agents.sources import RealLab
 from desk.db import connect
 from desk.engine import gate, kinds, lab, schema
 from desk.engine.__main__ import run_holdings, run_lab_export
+from desk.engine.lab import __main__ as lab_main
 from desk.engine.lab import library as features
 from desk.engine.lab import paper, runner, simcache, stats
 from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, ledger_path, load
@@ -505,7 +509,7 @@ def test_queued_experiments_go_to_an_online_worker_and_come_back_checked(cfg, mo
     made = store.add_worker(cfg, "Horizon")
     store.beat(cfg, made["id"], {}, now=NOW)
     assert kinds.offer_queue(cfg, now=NOW) == {"offered": 1, "wait_minutes": 10.0}
-    assert kinds.offer_queue(cfg, now=NOW)["offered"] == 1 and len(store.in_state(cfg, "queued")) == 1
+    assert kinds.offer_queue(cfg, now=NOW + timedelta(seconds=30))["offered"] == 0 and len(store.in_state(cfg, "queued")) == 1
     held = process_queue(cfg, now=NOW + timedelta(minutes=1))
     assert held == {"ok": True, "done": [], "waiting_for_worker": ["001-exp.json", "002-fin.json"]}
     job, applied = worker_round(cfg)
@@ -526,6 +530,106 @@ def test_the_lab_stops_waiting_for_a_worker_that_never_answers(cfg):
     assert process_queue(cfg, now=NOW + timedelta(minutes=9))["waiting_for_worker"] == ["001-exp.json"]
     out = process_queue(cfg, now=NOW + timedelta(minutes=10))
     assert [d["status"] for d in out["done"]] == ["experiment"] and out["cache"]["computed"] > 0 and "waiting_for_worker" not in out
+
+
+def test_offering_again_keeps_the_first_offer_time_and_adds_new_files(cfg):
+    write_lab_db(cfg)
+    queue(cfg, experiment(), "001-exp.json")
+    made = store.add_worker(cfg, "Horizon")
+    store.beat(cfg, made["id"], {}, now=NOW)
+    assert kinds.offer_queue(cfg, now=NOW)["offered"] == 1
+    queue(cfg, experiment(seed=8), "002-exp.json")
+    for minute in range(1, 10):
+        store.beat(cfg, made["id"], {}, now=NOW + timedelta(minutes=minute))
+        assert kinds.offer_queue(cfg, now=NOW + timedelta(minutes=minute))["offered"] == (1 if minute == 1 else 0)
+    body = simcache.read_offers(cfg)
+    assert body["online_at"] == (NOW + timedelta(minutes=9)).isoformat(timespec="seconds") and len(store.in_state(cfg, "queued")) == 2
+    assert [e["at"] for e in body["files"].values()] == [NOW.isoformat(timespec="seconds"), (NOW + timedelta(minutes=1)).isoformat(timespec="seconds")]
+    assert process_queue(cfg, now=NOW + timedelta(minutes=9, seconds=30))["waiting_for_worker"] == ["001-exp.json", "002-exp.json"]
+    out = process_queue(cfg, now=NOW + timedelta(minutes=10))
+    assert [d["file"] for d in out["done"]] == ["001-exp.json"] and out["waiting_for_worker"] == ["002-exp.json"]
+    assert list(simcache.open_offers(cfg, simcache.snapshot_hash(data_path(cfg)), NOW + timedelta(minutes=10))) == ["002-exp.json"]
+
+
+def stamp(cfg, name, at):
+    os.utime(cfg.data_dir / "lab" / "queue" / name, (at.timestamp(), at.timestamp()))
+
+
+def test_the_lab_holds_a_just_queued_experiment_while_a_worker_is_around(cfg, monkeypatch):
+    write_lab_db(cfg)
+    made = store.add_worker(cfg, "Horizon")
+    store.beat(cfg, made["id"], {}, now=NOW)
+    assert kinds.offer_queue(cfg, now=NOW) == {"offered": 0, "wait_minutes": 10.0} and simcache.worker_seen(cfg, NOW + timedelta(minutes=5))
+    queue(cfg, experiment(), "001-exp.json")
+    queue(cfg, {"request": "finalize", "strategy_id": "sector-momentum", "version": 1}, "002-fin.json")
+    stamp(cfg, "001-exp.json", NOW + timedelta(seconds=20))
+    stamp(cfg, "002-fin.json", NOW + timedelta(seconds=20))
+    held = process_queue(cfg, now=NOW + timedelta(seconds=40))
+    assert held == {"ok": True, "done": [], "waiting_for_worker": ["001-exp.json", "002-fin.json"]}
+    store.beat(cfg, made["id"], {}, now=NOW + timedelta(minutes=1))
+    assert kinds.offer_queue(cfg, now=NOW + timedelta(minutes=1))["offered"] == 1
+    worker_round(cfg)
+    real, calls = runner._job, []
+    monkeypatch.setattr(runner, "_job", lambda args: calls.append(args) or real(args))
+    out = process_queue(cfg, now=NOW + timedelta(minutes=2))
+    assert [d["status"] for d in out["done"]] == ["experiment", "finalize"] and out["sims"][0]["status"] == "stored"
+    assert out["cache"]["computed"] == 0 and len(calls) == simcache.SPOT_CHECKS
+
+
+def test_the_short_hold_ends_by_itself_and_needs_a_worker(cfg, monkeypatch):
+    write_lab_db(cfg)
+    queue(cfg, experiment(), "001-exp.json")
+    stamp(cfg, "001-exp.json", NOW)
+    assert [d["status"] for d in process_queue(cfg, now=NOW + timedelta(seconds=30))["done"]] == ["experiment"]
+    made = store.add_worker(cfg, "Horizon")
+    store.beat(cfg, made["id"], {}, now=NOW)
+    kinds.offer_queue(cfg, now=NOW)
+    queue(cfg, experiment(seed=8), "002-exp.json")
+    queue(cfg, {"request": "finalize", "strategy_id": "sector-momentum", "version": 1}, "003-fin.json")
+    stamp(cfg, "002-exp.json", NOW + timedelta(minutes=1))
+    stamp(cfg, "003-fin.json", NOW + timedelta(minutes=1))
+    assert process_queue(cfg, now=NOW + timedelta(minutes=3, seconds=59))["waiting_for_worker"] == ["002-exp.json", "003-fin.json"]
+    monkeypatch.setenv(simcache.WAIT_ENV, "0")
+    assert not simcache.just_queued(cfg.data_dir / "lab" / "queue" / "002-exp.json", NOW + timedelta(minutes=1))
+    monkeypatch.delenv(simcache.WAIT_ENV)
+    out = process_queue(cfg, now=NOW + timedelta(minutes=4))
+    assert [d["status"] for d in out["done"]] == ["experiment", "finalize"] and "waiting_for_worker" not in out
+    queue(cfg, experiment(seed=9), "004-exp.json")
+    stamp(cfg, "004-exp.json", NOW + timedelta(minutes=7))
+    assert not simcache.worker_seen(cfg, NOW + timedelta(minutes=7)) and len(process_queue(cfg, now=NOW + timedelta(minutes=7))["done"]) == 1
+    queue(cfg, {"request": "finalize", "strategy_id": "sector-momentum", "version": 1}, "005-fin.json")
+    stamp(cfg, "005-fin.json", NOW + timedelta(minutes=8))
+    kinds.offer_queue(cfg, now=NOW + timedelta(minutes=8))
+    assert "waiting_for_worker" not in process_queue(cfg, now=NOW + timedelta(minutes=8))
+
+
+def test_a_wait_that_straddles_the_end_of_the_lab_hours_is_finished(cfg, monkeypatch):
+    inside, outside = datetime(2025, 1, 2, 5, 59, tzinfo=ZoneInfo(cfg.timezone)), datetime(2025, 1, 2, 6, 3, tzinfo=ZoneInfo(cfg.timezone))
+    answers = iter(
+        [
+            {"ok": True, "done": [], "waiting_for_worker": ["001-exp.json"]},
+            {"ok": True, "done": [], "waiting_for_worker": ["001-exp.json"]},
+            {"ok": True, "done": [{}]},
+        ]
+    )
+    monkeypatch.setattr(lab_main, "once", lambda cfg: next(answers))
+    assert lab_main.tick(cfg, False, outside) == (None, False)
+    result, holding = lab_main.tick(cfg, False, inside)
+    assert holding and result["waiting_for_worker"]
+    assert lab_main.tick(cfg, holding, outside)[1] is True
+    assert lab_main.tick(cfg, True, outside) == ({"ok": True, "done": [{}]}, False)
+    assert lab_main.tick(cfg, False, outside) == (None, False)
+
+
+def test_the_offer_job_is_light_and_runs_through_the_lab_hours(cfg):
+    from desk.engine import __main__ as engine_main
+    from desk.engine.jobs import JOBS
+
+    (entry,) = [e for e in JOBS if isinstance(e, dict)]
+    assert entry == {"schedule": "* 1-5 * * *", "command": "python -m desk.engine lab-offer", "heavy": False, "title": "Lab work to the worker"}
+    assert engine_main.run_lab_offer(cfg) == {"ok": True, "offered": 0, "note": "No worker is online, so the lab runs its queue itself."}
+    (job,) = [j for j in scheduler.package_jobs(["engine"]) if j.name == "engine-lab-offer"]
+    assert job.heavy is False and job.title == "Lab work to the worker"
 
 
 def test_a_worker_result_is_staged_by_path_without_being_read(cfg, tmp_path):
