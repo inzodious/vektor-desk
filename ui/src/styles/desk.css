@@ -1598,7 +1598,7 @@ a.chip { text-decoration: none; }
 .gear-wrap { position: relative; display: inline-flex; flex: none; }
 .worker-dot { display: none; position: absolute; top: -3px; right: -3px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 999px; border: 2px solid var(--paper); background: var(--ink-3); color: var(--card); font-size: 10px; font-weight: 800; line-height: 12px; text-align: center; text-decoration: none; }
 .worker-dot.ok { background: var(--mint); }
-.worker-dot.watch { background: var(--mustard); color: var(--ink); }
+.worker-dot.watch { background: var(--mustard); color: var(--board); }
 @media (max-width: 1680px) {
   .worker-chip { display: none; }
   .worker-dot { display: block; }
