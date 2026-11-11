@@ -504,7 +504,7 @@ def test_queued_experiments_go_to_an_online_worker_and_come_back_checked(cfg, mo
     assert kinds.offer_queue(cfg, now=NOW)["offered"] == 0 and not simcache.offers_path(cfg).exists()
     made = store.add_worker(cfg, "Horizon")
     store.beat(cfg, made["id"], {}, now=NOW)
-    assert kinds.offer_queue(cfg, now=NOW) == {"offered": 1, "wait_minutes": 20.0}
+    assert kinds.offer_queue(cfg, now=NOW) == {"offered": 1, "wait_minutes": 10.0}
     assert kinds.offer_queue(cfg, now=NOW)["offered"] == 1 and len(store.in_state(cfg, "queued")) == 1
     held = process_queue(cfg, now=NOW + timedelta(minutes=1))
     assert held == {"ok": True, "done": [], "waiting_for_worker": ["001-exp.json", "002-fin.json"]}
@@ -523,8 +523,8 @@ def test_the_lab_stops_waiting_for_a_worker_that_never_answers(cfg):
     made = store.add_worker(cfg, "Horizon")
     store.beat(cfg, made["id"], {}, now=NOW)
     assert kinds.offer_queue(cfg, now=NOW)["offered"] == 1
-    assert process_queue(cfg, now=NOW + timedelta(minutes=19))["waiting_for_worker"] == ["001-exp.json"]
-    out = process_queue(cfg, now=NOW + timedelta(minutes=20))
+    assert process_queue(cfg, now=NOW + timedelta(minutes=9))["waiting_for_worker"] == ["001-exp.json"]
+    out = process_queue(cfg, now=NOW + timedelta(minutes=10))
     assert [d["status"] for d in out["done"]] == ["experiment"] and out["cache"]["computed"] > 0 and "waiting_for_worker" not in out
 
 

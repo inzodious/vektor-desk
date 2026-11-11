@@ -6,7 +6,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine.lab import runner, simcache
 from desk.engine.lab.data import data_path, ledger_path
-from desk.worker import Kind, offer, store
+from desk.worker import Kind, offer, online
 
 # ---- Lab simulations on a worker ----
 
@@ -55,7 +55,7 @@ def waiting(cfg: Config) -> list[tuple[str, dict]]:
 def offer_queue(cfg: Config, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     try:
-        if not any(w["state"] == "online" for w in store.workers(cfg, now)):
+        if not online(cfg, now):
             return {"offered": 0, "note": "No worker is online, so the lab runs its queue itself."}
         todo = waiting(cfg)
         if not todo or not data_path(cfg).exists():
