@@ -1,6 +1,7 @@
 import json
 import random
 import sqlite3
+from array import array
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -11,7 +12,7 @@ from desk.engine import gate, lab, schema
 from desk.engine.__main__ import run_holdings, run_lab_export
 from desk.engine.lab import library as features
 from desk.engine.lab import paper, runner, stats
-from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, ledger_path, load
+from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, ledger_path, load
 from desk.engine.lab.runner import ledger, process_queue
 from desk.engine.lab.sim import _year_tax, simulate
 from desk.engine.lab.spec import SETS, SpecError, parse, resolve, variants
@@ -338,3 +339,59 @@ def process_queue_needs_data(cfg):
     folder = cfg.data_dir / "lab" / "queue"
     folder.mkdir(parents=True, exist_ok=True)
     return process_queue(cfg)
+
+
+# ---- Memory: compact series, shared workers, streamed export ----
+
+
+def test_loaded_series_are_compact_and_find_days_like_a_dict(cfg):
+    days = write_lab_db(cfg, drop=("XLK",))
+    conn = sqlite3.connect(data_path(cfg))
+    conn.execute("DELETE FROM bars WHERE symbol='XLE' AND date=?", (days[10],))
+    conn.commit()
+    conn.close()
+    data = load(data_path(cfg))
+    spy, xle, xlk = data.series["SPY"], data.series["XLE"], data.series["XLK"]
+    assert isinstance(spy.adj, array) and isinstance(spy.open_adj, array) and isinstance(spy.volume, array)
+    assert spy.dates == days and spy.dates[5] is xle.dates[5] and len(spy.index) == len(days)
+    assert spy.index[days[10]] == 10 and spy.index.get(days[-1]) == len(days) - 1 and days[3] in spy.index
+    assert xle.index.get(days[10]) is None and xle.index[days[11]] == 10 and days[10] not in xle.index and len(xle.index) == len(days) - 1
+    assert xlk.index.get(days[-1]) is None and xlk.index.get("1999-01-04") is None and xlk.index.get(days[-401]) == len(days) - 401
+    assert list(xle.index) == xle.dates
+    with pytest.raises(KeyError):
+        xle.index[days[10]]
+
+
+def test_workers_share_the_loaded_data_and_match_one_worker(cfg, monkeypatch):
+    write_lab_db(cfg)
+    data = load(data_path(cfg))
+    spec = parse(SPEC, data)
+    jobs = [({"top_n": n, "lookback": k}, "2015-01-02", "2017-12-29", 1.0) for n in (1, 2, 3) for k in (63, 126)]
+    alone = runner._run_many(cfg, data, spec, jobs)
+    monkeypatch.setenv("DESK_LAB_WORKERS", "3")
+    monkeypatch.setattr(runner, "load", lambda path: pytest.fail("a worker reloaded the lab data"))
+    assert runner._run_many(cfg, data, spec, jobs) == alone
+
+
+def test_export_keeps_the_first_source_for_a_bar(cfg):
+    desk = connect(cfg.desk_db)
+    schema.apply(desk)
+    with desk:
+        desk.execute("INSERT INTO price_bars (symbol, date, open, close, adj_close, volume) VALUES ('IWM', '2026-11-02', 1, 2, 2, 10)")
+        desk.execute("INSERT INTO prices_daily VALUES ('IWM', '2026-11-02', 9, 9, 'mirror')")
+        desk.execute("INSERT INTO prices_daily VALUES ('IWM', '2026-11-03', 3, 3, 'mirror')")
+        desk.executemany("INSERT INTO alpaca_bars VALUES ('IWM', ?, 7, 7, 7, 7, 7, 70, 7)", [("2026-11-03",), ("2026-11-04",)])
+        desk.execute("INSERT INTO smallcap_months VALUES ('SMOL', '2026-11', 1e9, 1e6)")
+        desk.execute("INSERT INTO alpaca_bars VALUES ('SMOL', '2026-11-04', 5, 5, 5, 5, 5, 50, 5)")
+    result = export(cfg, desk, {}, {})
+    desk.close()
+    assert result["bars"] == 4 and result["small_caps"] == 1
+    out = sqlite3.connect(data_path(cfg))
+    got = out.execute("SELECT symbol, date, open, close, volume FROM bars ORDER BY symbol, date").fetchall()
+    out.close()
+    assert got == [
+        ("IWM", "2026-11-02", 1.0, 2.0, 10.0),
+        ("IWM", "2026-11-03", None, 3.0, None),
+        ("IWM", "2026-11-04", 7.0, 7.0, 70.0),
+        ("SMOL", "2026-11-04", 5.0, 5.0, 50.0),
+    ]
