@@ -49,6 +49,7 @@ test('the box says it builds its own images and how a worker can take over', asy
   await expect(b.locator('[data-box="approve-builder"]')).toHaveCount(0);
   await expect(page.getByTestId('box').locator('.job-list [data-box="approve-builder"]')).toHaveCount(0);
   await b.getByText('Let a worker build them').click();
+  await expect(b.getByTestId('build-start')).toContainText('Add the worker first (Workers, above). Then start its builder once');
   await expect(b.getByTestId('build-start').locator('pre')).toContainText(START);
   await b.getByTestId('build-start-copy').click();
   await expect(b.getByTestId('build-start-copy')).toHaveText('Copied');

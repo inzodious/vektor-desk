@@ -98,7 +98,7 @@ function Builds({ bv, action, alive, mine, onRun }) {
       {bv.start ? (
         <details className="job-more build-start" data-testid="build-start">
           <summary>Let a worker build them</summary>
-          <small>A worker like Horizon can build the images, so the NAS doesn’t have to. Start its builder once, in a terminal on that machine, from its vektor-desk folder. It shows up here within a minute, asking to be approved. The builder runs Docker on that machine, so start it only on one you trust.</small>
+          <small>A worker that has already joined, like Horizon, can build the images too, so the NAS doesn’t have to. Add the worker first (Workers, above). Then start its builder once, in a terminal on that machine, from its vektor-desk folder. It shows up here within a minute, asking to be approved. The builder runs Docker on that machine, so start it only on one you trust.</small>
           <pre className="wk-code">{BUILDER_START}</pre>
           <Copy text={BUILDER_START} label="Copy the commands" testid="build-start-copy" />
         </details>
