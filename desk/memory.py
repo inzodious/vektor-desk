@@ -22,7 +22,7 @@ LOW_MB = 1500
 ROOMY_MB = 4000
 TIGHT_MB = 1000
 MODES = ("auto", "on", "off")
-PAUSED = ("lab",)
+PAUSED: tuple[str, ...] = ()
 FRESH = timedelta(minutes=10)
 HOST_FRESH = timedelta(minutes=15)
 RECENT = timedelta(hours=48)
@@ -271,7 +271,9 @@ def note(info: dict | None, low: dict, queue: list[dict], events: list[dict]) ->
         if (info.get("cache_mb") or 0) >= 1024:
             words += f" Its ZFS file cache holds {gb(info['cache_mb'])}, which it hands back under pressure, but slowly."
     if low["on"]:
-        words += " Low-memory mode is on: the lab is paused, and heavy jobs run one at a time."
+        words += " Low-memory mode is on: heavy jobs run one at a time."
+        if low.get("paused"):
+            words += f" Paused: {', '.join(SERVICES.get(p, p) for p in low['paused'])}."
     if queue:
         words += f" Waiting for a turn: {', '.join(w['title'] for w in queue[:4])}{' and more' if len(queue) > 4 else ''}."
     if events:

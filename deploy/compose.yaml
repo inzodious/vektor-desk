@@ -125,7 +125,6 @@ services:
 
   # The strategy lab (docs/statistics.md): runs queued experiment specs overnight (DESK_LAB_HOURS, 1-6 ET) with no network,
   # reading only data/lab/data/lab.db, which the engine's lab-export job writes at 00:55, and writing data/lab/runs/ledger.db.
-  # desk.memory hold keeps it paused while the box is in low-memory mode (docs/architecture.md, Memory).
   lab:
     image: vektor-desk:local
     pull_policy: never
@@ -133,13 +132,13 @@ services:
     restart: unless-stopped
     init: true
     user: "568:568"
-    command: ["python", "-m", "desk.memory", "hold", "--name", "the lab", "--", "python", "-m", "desk.engine.lab"]
+    command: ["python", "-m", "desk.engine.lab"]
     network_mode: none
     # The image's health check calls the API, which a container with no network can't reach.
     healthcheck:
       disable: true
     environment:
-      DESK_LAB_WORKERS: "1"
+      DESK_LAB_WORKERS: "3"
     volumes:
       - /mnt/Manifest/apps/vektor-desk/data/lab/data:/data/lab/data:ro
       - /mnt/Manifest/apps/vektor-desk/data/lab/queue:/data/lab/queue
@@ -149,8 +148,7 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    # 3 CPUs, 1.5g and one worker on 16 GB of RAM (every worker loads its own copy of the lab data); 8 CPUs, 8g and
-    # DESK_LAB_WORKERS 8 after the upgrade.
+    # 3 CPUs and 1.5g on 16 GB of RAM; 8 CPUs, 8g and DESK_LAB_WORKERS 8 after the upgrade.
     cpus: 3
     mem_limit: 1536m
 

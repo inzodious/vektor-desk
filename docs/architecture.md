@@ -74,7 +74,7 @@ The box is a Ryzen 5 5600GT (6 cores, 12 threads) with 15 GiB of RAM and no swap
 | tailscale, caddy | 96 MB each | same |
 | api | 256 MB | same |
 | cron (mirror, engine, one agent at a time) | 640 MB | 2 GB |
-| lab | 1.5 GB, 3 CPUs, 1 worker (each worker loads its own copy of the lab data) | 8 GB, 8 CPUs, 8 workers |
+| lab | 1.5 GB, 3 CPUs, 3 workers | 8 GB, 8 CPUs, 8 workers |
 
 - Heavy sweeps run from 1:00 to 6:00 ET and never alongside an agent run (`desk.runlock.job_lock`).
 - Disk: the Manifest NVMe has about 110 GiB free. The desk's budget is 20 GiB, with lab data under 5 GiB and run artifacts pruned after 30 days.
@@ -261,11 +261,11 @@ The NAS has 16 GB, no swap and most of it held outside the desk, so the desk wat
 | Piece | What it does |
 |---|---|
 | `GET /api/memory` | `{state: ok\|tight\|unknown, total_mb, available_mb, swap_mb, cache_mb (ZFS file cache), scheduler: {limit_mb, used_mb}, low_memory, waiting: [{job, title, since}], killed: [{at, kind: job\|service\|outside, name, scope: cap\|box, words}], host_seen, note}`. The same block is `memory` in `/api/status` and `/api/box`; `/api/start` and `/api/readiness` carry the short form. `note` is the whole story in one or two sentences |
-| `low_memory` | `{on, mode: auto\|on\|off, why, since, paused: ["lab"], low_mb: 1500, roomy_mb: 4000}` |
+| `low_memory` | `{on, mode: auto\|on\|off, why, since, paused: [], low_mb: 1500, roomy_mb: 4000}` |
 | `PUT /api/memory/low` | `{"mode": "auto"\|"on"\|"off"}`. Answers `{ok: true}` plus the memory block; `422 bad_mode`. Logged in `data/run/job-requests.log` |
 | Auto | The default. On when the box has under 1.5 GB available, off again only above 4 GB, so it doesn't flap. `DESK_LOW_MEMORY` sets the default before anyone picks |
 | Heavy jobs one at a time | While the mode is on, the scheduler starts a heavy job only when no other heavy job is running. The rest wait in order (`data/run/waiting.json`), whether they came from the schedule, Run now or Start the desk; a waiting job shows `waiting: true` and Start shows "Waiting for its turn". A job that runs every minute skips the minute instead of queueing. Light jobs never wait: `engine-quotes`, `engine-lots`, `notify-ops`, `decisions-sync`, `agents-triggers`. A `jobs.py` dict entry can set `"heavy": false` itself |
-| Lab paused | The lab runs under `python -m desk.memory hold -- <command>`, which stops its process while the mode is on and starts it again when it goes off. The container stays up, so TrueNAS still sees a running app and deploys carry on. Needs one Apply compose. The eval session stays up: it is small when idle and is the only read-only window into the box. Which services pause is `PAUSED` in `desk/memory.py`, to be decided by measured size |
+| Pausing a service | Nothing pauses today: after #178 the lab fits. `python -m desk.memory hold -- <command>` is there for a service that measures too big: it stops the process while the mode is on and starts it again after, with the container left up so TrueNAS still sees a running app. A service is paused by listing it in `PAUSED` in `desk/memory.py` and wrapping its compose command |
 | Out-of-memory kills | The scheduler compares its own cgroup's `memory.events` before and after each job. A failed job with a new kill gets `error` in plain words and `oom`: `cap` (it outgrew the scheduler's `mem_limit`) or `box` (the whole box ran out). A job killed with signal 9 counts as `box`. `desk.runlock` now passes a kill on as exit 137 |
 | Host report | `deploy.sh auto` writes `data/run/box/memory.json` every 5 minutes: the kernel's `oom-kill:` lines from the last two days, each with the time, process, `cap` or `box`, and the desk service it was in (matched by container id). A cap kill in another app's container is left out |
 | Alert | One `desk-ops` alert a day, sent straight after the first kill the scheduler sees (it starts `notify-ops`) and at the usual checks |
