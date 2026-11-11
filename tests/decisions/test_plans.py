@@ -110,7 +110,7 @@ def test_saved_plan_has_the_pinned_shape(cfg):
     assert p["trim_rule"] == {"above_pct": 20, "to_pct": 15, "zone_low": 60, "zone_high": 75, "note": None}
     assert p["catalysts"] == [{"text": "Q4 results", "date": "2027-02-24"}, {"text": "Next launch", "date": None}]
     assert (p["weight_pct"], p["weight_as_of"], p["band_status"], p["conviction"], p["review_due"]) == (None, None, None, None, False)
-    assert p["warnings"] == ["ABCD has no conviction hold yet, so the single-stock cap still applies. Set one on the Plan screen."]
+    assert p["warnings"] == ["ABCD has no conviction hold yet, so the single-stock cap still applies. Set one in Settings → Risk check."]
     assert p["steps"][0] == HARVEST
     assert [(s["id"], s["status"], s["text"]) for s in p["steps"][1:]] == [
         ("repay-2026-11-18", "upcoming", "Pay off the margin debit"),

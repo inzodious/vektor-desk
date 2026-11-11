@@ -122,7 +122,7 @@ def test_edit_profile_refuses_bad_changes(cfg, yaml_file):
 
 
 def test_conviction_band_comes_from_risk_result(cfg, yaml_file):
-    with pytest.raises(risk.RiskError, match="risk questions first"):
+    with pytest.raises(risk.RiskError, match="risk questions in Settings → Risk check first"):
         risk.set_conviction(cfg, "abcd")
     assert risk.suggested_band(cfg) is None
     risk.save(cfg, MIDDLE, now=NOW)

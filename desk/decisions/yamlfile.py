@@ -52,7 +52,7 @@ def check_changes(changes) -> dict:
     if not isinstance(changes, dict) or not changes:
         raise EditError("changes must map profile sections to their new values")
     if "risk_level" in changes:
-        raise EditError("risk_level comes from the risk questions now; answer them on the Risk screen instead")
+        raise EditError("risk_level comes from the risk questions now; answer them in Settings → Risk check instead")
     unknown = sorted(k for k in changes if k not in EDITABLE)
     if unknown:
         raise EditError(f"unknown section {', '.join(unknown)}; editable sections are {', '.join(EDITABLE)}")
@@ -77,7 +77,7 @@ def edit_profile(cfg: Config, changes) -> dict:
     changes = check_changes(changes)
     path = profile_path(cfg)
     if not path.exists():
-        raise EditError("There's no desk.yaml yet. Create one first with Set up profile (POST /api/decisions/profile/init).", 409)
+        raise EditError("There's no desk.yaml yet. Write one from the first-run checklist in Settings (POST /api/decisions/profile/init).", 409)
     text = path.read_text()
     try:
         parse(text)
