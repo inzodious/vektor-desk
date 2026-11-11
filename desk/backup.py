@@ -12,6 +12,42 @@ from desk.packages import seams
 
 MIRROR_TABLES = ("rows", "row_history", "tables", "runs")
 TABLE = re.compile(r"CREATE TABLE IF NOT EXISTS\s+(\w+)", re.IGNORECASE)
+NULL_REPORT = re.compile(r"^NULL value in ([^.\s]+)\.([^.\s]+)$")
+CHECK_LINES = 1_000_000
+FALSE_ALARM = "SQLite reported NULLs in {columns} that aren't there (a known false alarm in SQLite 3.40 on WITHOUT ROWID tables); the copy is good"
+
+
+# ---- Integrity ----
+
+
+def _report(conn: sqlite3.Connection, pragma: str) -> list[str]:
+    return [str(r[0]) for r in conn.execute(f"PRAGMA {pragma}({CHECK_LINES})")]
+
+
+def _nulls(conn: sqlite3.Connection, table: str, column: str) -> int:
+    t, c = table.replace('"', '""'), column.replace('"', '""')
+    return conn.execute(f"""SELECT count(*) FROM "{t}" NOT INDEXED WHERE typeof("{c}") = 'null'""").fetchone()[0]  # noqa: S608
+
+
+def check(conn: sqlite3.Connection, pragma: str = "quick_check") -> tuple[str, list[str]]:
+    lines = _report(conn, pragma)
+    if lines == ["ok"]:
+        return "ok", []
+    problem = (lines[0] if lines else "no answer") + (f" (and {len(lines) - 1} more lines)" if len(lines) > 1 else "")
+    hits = [NULL_REPORT.match(line) for line in lines]
+    if not lines or len(lines) >= CHECK_LINES or not all(hits):
+        return problem, []
+    columns = sorted({(m[1], m[2]) for m in hits})
+    try:
+        real = [f"{t}.{c}" for t, c in columns if _nulls(conn, t, c)]
+    except sqlite3.Error:
+        return problem, []
+    if real:
+        return problem, []
+    return "ok", [f"{t}.{c}" for t, c in columns]
+
+
+# ---- Copies ----
 
 
 def _source(db: Path) -> sqlite3.Connection:
@@ -36,17 +72,22 @@ def snapshot(data_dir: Path, out_dir: Path) -> list[dict]:
         dst = sqlite3.connect(target)
         try:
             src.backup(dst)
-            check = dst.execute("PRAGMA quick_check").fetchone()[0]
+            verdict, false_alarm = check(dst)
         finally:
             dst.close()
             src.close()
-        if check != "ok":
-            raise sqlite3.DatabaseError(f"{db.name} copy failed its check: {check}")
-        done.append({"db": db.name, "bytes": target.stat().st_size})
+        if verdict != "ok":
+            raise sqlite3.DatabaseError(f"{db.name} copy failed its check: {verdict}")
+        done.append({"db": db.name, "bytes": target.stat().st_size} | ({"false_alarm": false_alarm} if false_alarm else {}))
     inbox = data_dir / "inbox"
     if inbox.is_dir():
         shutil.copytree(inbox, out_dir / "inbox")
     return done
+
+
+def notes(found: dict[str, dict] | list[dict]) -> list[str]:
+    rows = [{"db": name} | info for name, info in found.items()] if isinstance(found, dict) else found
+    return [f"{r['db']}: " + FALSE_ALARM.format(columns=", ".join(r["false_alarm"])) for r in rows if r.get("false_alarm")]
 
 
 def expected_desk_tables() -> dict[str, list[str]]:
@@ -61,12 +102,12 @@ def expected_desk_tables() -> dict[str, list[str]]:
 def _inspect(path: Path) -> dict:
     conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     try:
-        check = conn.execute("PRAGMA integrity_check").fetchone()[0]
+        verdict, false_alarm = check(conn, "integrity_check")
         names = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
         counts = {n: conn.execute(f'SELECT count(*) FROM "{n}"').fetchone()[0] for n in names}
     finally:
         conn.close()
-    return {"check": check, "tables": counts}
+    return {"check": verdict, "tables": counts, "false_alarm": false_alarm}
 
 
 def verify(folder: Path) -> dict:
@@ -95,7 +136,7 @@ def verify(folder: Path) -> dict:
     inbox = folder / "inbox"
     files = sum(1 for p in inbox.rglob("*") if p.is_file()) if inbox.is_dir() else 0
     summary = {name: {"tables": len(info["tables"]), "rows": sum(info["tables"].values())} for name, info in found.items()}
-    return {"ok": not problems, "problems": problems, "databases": summary, "inbox_files": files}
+    return {"ok": not problems, "problems": problems, "databases": summary, "inbox_files": files, "notes": notes(found)}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -121,7 +162,7 @@ def main(argv: list[str] | None = None) -> int:
     except (sqlite3.Error, OSError) as e:
         print(json.dumps({"ok": False, "error": str(e)}), file=sys.stderr)
         return 1
-    print(json.dumps({"ok": True, "out": str(out), "files": result}))
+    print(json.dumps({"ok": True, "out": str(out), "files": result, "notes": notes(result)}))
     return 0
 
 

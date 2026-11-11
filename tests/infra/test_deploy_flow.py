@@ -33,7 +33,7 @@ backup() {
     echo "$WHY" >"$BACKUP_WHY"
     return 1
   fi
-  echo "backup" >>"$S/calls"
+  echo "backup${1:+ $1}" >>"$S/calls"
   echo backup.tar.gz
 }
 restart_app() {
@@ -95,7 +95,7 @@ def test_deploy_backs_up_then_swaps_images_and_keeps_what_was_running_as_previou
     box = Box(tmp_path, running="aaa", local="aaa", head="bbb")
     res = box.run()
     assert res.returncode == 0, res.stdout + res.stderr
-    assert box.calls() == ["build vektor-desk:candidate", "build vektor-desk/caddy:candidate", "backup", "restart"]
+    assert box.calls() == ["build vektor-desk:candidate", "build vektor-desk/caddy:candidate", "backup vektor-desk:candidate", "restart"]
     assert box.running() == "bbb" and box.tag("vektor-desk:local") == "bbb" and box.tag("vektor-desk:previous") == "aaa"
     assert box.tag("vektor-desk:candidate") == "" and "Live: bbb" in box.log()
     again = box.run()
@@ -122,7 +122,7 @@ def test_a_build_that_was_tagged_but_never_started_still_goes_live(tmp_path):
     box.tag("vektor-desk:previous", "zzz")
     res = box.run()
     assert res.returncode == 0, res.stdout + res.stderr
-    assert "Already live" not in box.log() and box.calls() == ["backup", "restart"]
+    assert "Already live" not in box.log() and box.calls() == ["backup vektor-desk:local", "restart"]
     assert box.running() == "bbb" and box.tag("vektor-desk:previous") == "aaa"
 
 
@@ -138,7 +138,7 @@ def test_first_install_only_tags_the_images(tmp_path):
     box = Box(tmp_path, running="", local="", head="bbb", app="MISSING")
     res = box.run()
     assert res.returncode == 0, res.stdout + res.stderr
-    assert box.tag("vektor-desk:local") == "bbb" and "backup" not in box.calls() and "restart" not in box.calls()
+    assert box.tag("vektor-desk:local") == "bbb" and box.calls() == ["build vektor-desk:candidate", "build vektor-desk/caddy:candidate"]
 
 
 def test_redeploy_refuses_to_start_a_build_that_never_ran(tmp_path):
@@ -175,6 +175,37 @@ def test_a_commit_held_back_for_another_reason_waits_for_a_push_or_deploy_now(tm
     (box.dir / "bad-build").unlink()
     assert box.run("auto").returncode == 0 and box.running() == "aaa"
     assert box.run("deploy").returncode == 0 and box.running() == "bbb" and not (root / "deploy-auto.failed").exists()
+
+
+def test_a_new_box_script_retries_the_commit_an_older_script_held_back(tmp_path):
+    box = Box(tmp_path, running="aaa", local="aaa", head="bbb")
+    root = tmp_path / "root"
+    (box.dir / "bad-build").write_text("bbb")
+    assert box.run("auto").returncode == 1
+    assert len((root / "deploy-auto.failed.script").read_text().strip()) == 64
+    (box.dir / "bad-build").unlink()
+    assert box.run("auto").returncode == 0 and box.running() == "aaa"
+    (root / "deploy-auto.failed.script").unlink()
+    assert box.run("auto").returncode == 0 and box.running() == "bbb" and "The box script changed since bbb was held back" in box.log()
+    (tmp_path / "next").mkdir()
+    again = Box(tmp_path / "next", running="aaa", local="bbb", head="bbb")
+    for name, text in (("deploy-auto.failed", "bbb"), ("deploy-auto.failed.why", "backup"), ("deploy-auto.failed.script", "0" * 64)):
+        (tmp_path / "next" / "root" / name).write_text(text + "\n")
+    assert again.run("auto").returncode == 0 and again.running() == "bbb" and again.calls() == ["backup vektor-desk:local", "restart"]
+
+
+def test_the_pre_deploy_backup_runs_on_the_new_build_and_the_nightly_one_in_the_running_container(tmp_path):
+    root = tmp_path / "root"
+    (root / "data").mkdir(parents=True)
+    env = {"DESK_ROOT": str(root), "DESK_BACKUPS": str(tmp_path / "backups"), "PATH": "/usr/local/bin:/usr/bin:/bin"}
+    script = f"""source "{DEPLOY}"; LOG={tmp_path}/deploy.log
+docker() {{ if [ "$1" = inspect ]; then echo true; else echo "$*" >>{tmp_path}/docker; mkdir -p {root}/data/backup-staging; echo '{{"ok": true}}'; fi; }}
+backup vektor-desk:candidate >/dev/null && backup >/dev/null"""
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env, timeout=30)
+    assert res.returncode == 0, res.stdout + res.stderr
+    first, second = (tmp_path / "docker").read_text().splitlines()
+    assert first.startswith("run --rm --network none --user 568:568") and "vektor-desk:candidate python -m desk.backup --out /data/backup-staging" in first
+    assert second == "exec vektor-desk-cron python -m desk.backup --out /data/backup-staging"
 
 
 def test_backup_keeps_the_reason_for_the_alert(tmp_path):
