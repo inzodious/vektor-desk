@@ -295,7 +295,7 @@ def test_materiality_ranks_events():
 def test_jobs_are_scheduled():
     from desk.engine.jobs import JOBS
 
-    commands = {c for _, c in JOBS}
+    commands = {e["command"] if isinstance(e, dict) else e[1] for e in JOBS}
     assert {"python -m desk.engine universe", "python -m desk.engine filings"} <= commands
     assert {"universe", "filings"} <= set(engine_main.JOBS)
 

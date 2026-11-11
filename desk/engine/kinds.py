@@ -25,7 +25,7 @@ def accept(cfg: Config, job: dict, path) -> str:
 KINDS = [Kind(simcache.KIND, "Lab simulations", run, accept)]
 
 
-# ---- Offering queued experiments (engine side, after lab-export) ----
+# ---- Offering queued experiments (engine side: after lab-export, then each minute of the lab hours) ----
 
 
 def waiting(cfg: Config) -> list[tuple[str, dict]]:
@@ -57,16 +57,22 @@ def offer_queue(cfg: Config, *, now: datetime | None = None) -> dict:
     try:
         if not online(cfg, now):
             return {"offered": 0, "note": "No worker is online, so the lab runs its queue itself."}
-        todo = waiting(cfg)
-        if not todo or not data_path(cfg).exists():
+        if not data_path(cfg).exists():
             return {"offered": 0}
         snapshot = simcache.snapshot_hash(data_path(cfg))
-        files = {}
-        for name, request in todo:
+        before = simcache.read_offers(cfg)
+        kept = before["files"] if before.get("snapshot") == snapshot else {}
+        files, fresh = {}, 0
+        for name, request in waiting(cfg):
             key = simcache.job_key(snapshot, request)
+            old = kept.get(name)
+            if isinstance(old, dict) and old.get("key") == key and old.get("at"):
+                files[name] = old
+                continue
             offer(cfg, simcache.KIND, request, ("lab",), key=key)
-            files[name] = key
+            files[name] = {"key": key, "at": now.isoformat(timespec="seconds")}
+            fresh += 1
         simcache.write_offers(cfg, snapshot, files, now)
     except (OSError, sqlite3.Error, ValueError) as e:
         return {"offered": 0, "error": f"{e.__class__.__name__}: {e}"[:200]}
-    return {"offered": len(files), "wait_minutes": simcache.wait_minutes()}
+    return {"offered": fresh, "wait_minutes": simcache.wait_minutes()}

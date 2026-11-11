@@ -201,6 +201,10 @@ def run_lab_export(cfg: Config) -> dict:
     return _with_desk(cfg, "lab-export", work)
 
 
+def run_lab_offer(cfg: Config) -> dict:
+    return {"ok": True, **offer_queue(cfg)}
+
+
 def run_french(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "french", lambda desk: french.run(desk, http or http_session()))
 
@@ -265,6 +269,7 @@ JOBS = {
     "backfill": run_market_backfill,
     "lookthrough": run_lookthrough,
     "lab-export": run_lab_export,
+    "lab-offer": run_lab_offer,
     "french": run_french,
     "research": run_research,
 }
