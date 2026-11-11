@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 from desk.config import Config
@@ -38,3 +39,9 @@ def offer(cfg: Config, kind: str, inputs: dict, copies: tuple[str, ...] = ("lab"
     snapshots.allowed(cfg, copies)
     taken = [snapshots.take(cfg, name) for name in copies]
     return store.enqueue(cfg, kind, inputs, taken, key, again)
+
+
+def online(cfg: Config, now: datetime | None = None) -> bool:
+    from desk.worker import store
+
+    return any(w["state"] == "online" for w in store.workers(cfg, now))
