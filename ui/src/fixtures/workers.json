@@ -1,0 +1,11 @@
+{
+ "now": "2026-11-09T16:42:00Z",
+ "summary": {
+  "state": "none",
+  "name": null,
+  "waiting": 0,
+  "words": "No worker has joined. Everything runs on this box."
+ },
+ "workers": [],
+ "jobs": []
+}
