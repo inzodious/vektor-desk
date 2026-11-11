@@ -4,11 +4,12 @@ import os
 import sys
 import time
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from desk.config import Config
 from desk.engine.lab.data import NotReady
-from desk.engine.lab.runner import process_queue
+from desk.engine.lab.runner import process_queue, sims
 from desk.runlock import Busy, job_lock
 
 
@@ -39,7 +40,18 @@ def once(cfg: Config) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m desk.engine.lab", description="Vektor Desk strategy lab: runs queued experiments with no network.")
     parser.add_argument("--once", action="store_true", help="process the queue now and exit, ignoring the overnight window")
+    parser.add_argument("--sims", metavar="REQUEST", help="simulate one queued experiment file against --data and print the rows; touches no ledger")
+    parser.add_argument("--data", metavar="LAB_DB", help="the lab data file for --sims")
     args = parser.parse_args(argv)
+    if args.sims:
+        if not args.data:
+            parser.error("--sims needs --data")
+        try:
+            print(json.dumps(sims(Path(args.data), json.loads(Path(args.sims).read_text())), separators=(",", ":")))
+        except (NotReady, OSError, ValueError) as e:
+            print(json.dumps({"ok": False, "error": str(e)}), file=sys.stderr)
+            return 1
+        return 0
     cfg = Config.from_env()
     if args.once:
         result = once(cfg)

@@ -1047,6 +1047,19 @@ The NAS containers are small (cron 640 MB, lab 1,536 MB, API 256 MB), so no job 
 
 **Lab data.** `load` keeps each series as packed arrays of doubles with one shared set of date strings; a day is found through one shared calendar and a small per-series offset table (`DayIndex`), about 40 bytes a bar instead of 290. A French set is read as a stream. Workers are forked from the process that already holds the data, so they share it and never reload it; where fork is not available the variants run one after another. Results are identical to the old loader's, down to every stored trial.
 
+**Lab simulations as a job.** A simulation is a pure function of the lab data file and its inputs, so it is keyed, cached and safe to run twice. Module `desk.engine.lab.simcache`.
+
+| Piece | What it is |
+|---|---|
+| Snapshot | SHA-256 of `lab/data/lab.db` |
+| Row key | SHA-256 of the lab code's own hash, the snapshot, the spec hash, params, start, end and cost multiplier |
+| Row | `{key, params, start, end, cost_mult, summary, days, rets, bench}` |
+| Cache | `lab/runs/simcache.db`, table `sim_cache`; emptied when the snapshot changes. Every experiment reads it first and stores what it computes, so a rerun after a stop recomputes nothing and writes no second copy of a trial |
+| Worker side | `python -m desk.engine.lab --sims REQUEST.json --data lab.db`, or `runner.sims(path, request)`: runs the experiment's simulations against a throwaway ledger and prints `{kind: "lab.sims", key, snapshot, request, status, rows}`. No ledger, no network, no keys |
+| NAS side | `simcache.stage(cfg, result)` drops the result in `lab/queue/` as `sims-*.json.gz`. The lab reads it before the queue: wrong snapshot is `stale`; a row whose key, lengths or window do not match is `rejected`; two rows are recomputed and must match exactly or the file is a `mismatch`. Only then are rows stored. Whatever is missing the lab computes itself |
+
+On the synthetic database the heaviest experiment (French industries, 781 simulations) is 17 MB gzipped; with it staged the lab computes nothing and finishes in 8 s against 12.
+
 **Rules for new jobs.** Iterate cursors, do not `fetchall` a bar table. Write downloads in batches inside the loop that fetches them. A second run of a job must be a no-op, not a double write.
 
 ## Stack and tests
