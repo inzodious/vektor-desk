@@ -39,6 +39,10 @@ MARKET_KEYS = (
 )
 FUND_WORDS = {"ETF", "ETFS", "FUND", "FUNDS", "ISHARES", "SPDR", "PROSHARES", "INDEX"}
 PROFILE_ERRORS = (sqlite3.Error, TypeError, KeyError, ValueError, OSError, AttributeError)
+REFERENCE_NOTE = (
+    "No plan of your own is loaded, so drift and the benchmark are measured against the built-in safe mix. "
+    "It is a yardstick, not a target, and the drift rule is not judged against it."
+)
 DEFAULT_RULES = [
     {"id": "no-margin-buys", "kind": "no_margin_buys", "params": {}},
     {"id": "no-new-single-stocks", "kind": "no_new_single_stocks", "params": {}},
@@ -121,6 +125,23 @@ def plan_targets(plan: dict) -> dict[str, float]:
             out[t] = float(w)
     total = sum(out.values())
     return {s: w / total for s, w in out.items()} if total else {}
+
+
+def reference_mix(plan: dict) -> tuple[dict[str, float], str]:
+    targets = plan_targets(plan)
+    return (targets, "plan") if targets else (dict(catalog.SAFE_MIX), "safe_mix")
+
+
+def reference_view(as_of: str, targets: dict[str, float], source: str) -> dict:
+    own = source == "plan"
+    return {
+        "as_of": as_of,
+        "source": source,
+        "name": "Your plan" if own else "Safe mix",
+        "weights": {s: round(w * 100, 4) for s, w in sorted(targets.items())},
+        "judged": own,
+        "note": None if own else REFERENCE_NOTE,
+    }
 
 
 def expense_ratios(plan: dict) -> dict[str, float]:
@@ -255,8 +276,10 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
         return out
     as_of = days[-1]
     plan = latest_plan(mirror)
-    targets = plan_targets(plan)
+    targets, reference = reference_mix(plan)
+    own = reference == "plan"
     kinds = symbol_kinds(mirror, targets, desk)
+    out.views["reference"] = reference_view(as_of, targets, reference)
 
     totals = {d: sum(h["value"] for h in holdings[d]) for d in days}
     quality_by_day = {d: _day_quality(holdings[d]) for d in days}
@@ -297,13 +320,13 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     tr = TotalReturn(series)
     if out.history.rows:
         out.book = broker.build_book(activity, out.history, Prices(series).close)
-    _shadow_metrics(out, days, values, flows_on, targets, tr)
+    _shadow_metrics(out, days, values, flows_on, targets if own else catalog.proxied(targets)[0], tr)
     facts = profile_facts(mirror)
 
     now_rows = holdings[as_of]
     total = totals[as_of]
     amount, when = next_deposit(cfg, plan, as_of, now)
-    _plan_metrics(out, cfg, plan, targets, kinds, now_rows, total, holdings, days, activity, q_now, amount)
+    _plan_metrics(out, cfg, plan, targets, kinds, now_rows, total, holdings, days, activity, q_now, amount, own)
     _margin_metrics(out, now_rows, total)
     _margin_paid(out, activity, as_of)
     _risk_metrics(out, now_rows, total, index, days, values, flows_on, q_now)
@@ -313,7 +336,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     for s, f in sorted(facts.items()):
         if f["yield"] is not None:
             out.m("income.yield", f["yield"], "pct", scope="holding", scope_id=s, window="TTM")
-    _adherence(out, days, activity, targets, q_now)
+    _adherence(out, days, activity, targets, q_now if own else "modelled")
     _tax_metrics(out, cfg, mirror, desk, activity, now_rows, now)
     _after_tax(out, cfg, mirror, desk, accounts, income(activity))
     _research_metrics(out, desk, kinds)
@@ -322,7 +345,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     market = next((m[5] for m in out.metrics if m[0] == "value.market" and m[1] == "portfolio"), total)
     cash_in = [(f["date"], f["amount"]) for f in flows if f["external_portfolio"]]
     goal = fi_goal(cfg, mirror)
-    out.views["fi"] = fi.run(out, plan, targets, expense_ratios(plan), goal, desk, market, cash_in)
+    out.views["fi"] = fi.run(out, plan, targets if own else {}, expense_ratios(plan), goal, desk, market, cash_in)
     held, cash_share, held_notes = catalog.held_mix(now_rows)
     wanted = catalog.mixes(held, cash_share, kinds)
     if "as-held" in wanted:
@@ -476,21 +499,22 @@ def symbol_weights(rows, total) -> dict[str, float]:
     return dict(w)
 
 
-def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, days, activity, q, amount):
+def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, days, activity, q, amount, own=True):
     weights = symbol_weights(rows, total)
     if targets:
+        ref_q = q if own else "modelled"
         drifts = {}
         for s, t in sorted(targets.items()):
             actual = weights.get(s, 0.0)
             drifts[s] = actual - t * 100
             out.m("plan.weight", actual, "pct", scope="holding", scope_id=s, quality=q)
-            out.m("plan.target", t * 100, "pct", scope="holding", scope_id=s, quality=q)
-            out.m("plan.drift", drifts[s], "pts", scope="holding", scope_id=s, quality=q)
-        out.m("plan.drift_max", max(abs(v) for v in drifts.values()), "pts", quality=q)
+            out.m("plan.target", t * 100, "pct", scope="holding", scope_id=s, quality=ref_q)
+            out.m("plan.drift", drifts[s], "pts", scope="holding", scope_id=s, quality=ref_q)
+        out.m("plan.drift_max", max(abs(v) for v in drifts.values()), "pts", quality=ref_q)
         for s, usd in sorted(deposit_split(targets, weights, total, amount or 0.0).items()):
             out.m("plan.next_deposit", usd, "usd", scope="holding", scope_id=s, quality="modelled")
         in_plan = sum(weights.get(s, 0.0) for s in targets)
-        out.m("plan.in_mix", in_plan, "pct", quality=q)
+        out.m("plan.in_mix", in_plan, "pct", quality=ref_q)
     singles = {s: w for s, w in weights.items() if kinds.get(s, "unknown") == "stock" and s not in targets}
     out.m("plan.single_stock", sum(singles.values()), "pct", quality=q)
     for s, w in sorted(singles.items()):
@@ -507,7 +531,7 @@ def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, da
     conv = convictions(rules)
     debit = -sum(h["value"] for h in rows if h["is_cash"] and h["value"] < 0)
     for rule in rules:
-        ok = _rule_ok(rule, weights, singles, targets, debit, holdings, days, activity, kinds, conv)
+        ok = _rule_ok(rule, weights, singles, targets if own else {}, debit, holdings, days, activity, kinds, conv)
         if ok is not None:
             out.m("plan.rules", 1 if ok else 0, "count", scope="rule", scope_id=rule["id"], quality=q if source == "profile" else "modelled")
 
