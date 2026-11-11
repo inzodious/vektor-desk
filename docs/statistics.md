@@ -535,7 +535,7 @@ Backtestable small-cap family: directors and officers buying their own stock on 
 | Bulk history | `insider_buys`, `insider_quarters` | SEC Insider Transactions data sets, one zip per quarter from 2016 Q1 (Alpaca bars start 2016), 8 quarters a night until caught up. Form 4 and 4/A, transaction code P, acquired, shares and price above 0, owner is a director or officer (10% owners alone are left out). One row per filing and owner: shares, dollars, latest trade date, filing date |
 | Live | `insider_buys` (`source` form4), `insider_form4_seen` | Form 4s in `filings_feed` (universe names) after the last bulk quarter: the raw XML, same rules, 200 a night. Bulk rows replace them when the quarter is published |
 | Known date | | The session after the filing date. Nothing counts before then |
-| Prices | `alpaca_bars`, `alpaca_history` | Names with any director or officer buy since 2016, cluster names (2+ insiders within 30 days) and IWM first: daily bars since 2016-01-01 (raw and adjusted), 300 names a night. Roughly 2,500 rows a name |
+| Prices | `alpaca_bars`, `alpaca_history` | Names with any director or officer buy since 2016, cluster names (2+ insiders within 30 days) and IWM first: daily bars since 2016-01-01 (raw and adjusted), 300 names a night in batches of 25, each batch saved as it lands so a stopped run keeps its progress. Roughly 2,500 rows a name |
 | Symbols | | `insider.clean_symbol`: quotes and exchange prefixes stripped, a ticker in brackets used, class shares written `BRK.B`; anything else (names, numbers, `--`) is dropped, at parse time and from stored rows at the start of each run. A batch Alpaca refuses is split until the one bad name is found; that name is skipped and listed in the job result with Alpaca's path and message |
 | Share counts | `sec_shares`, `sec_frames` | SEC `dei:EntityCommonStockSharesOutstanding` frames since late 2014, each quarter once (the last two refresh) |
 | Membership | `smallcap_months` | At each month's first session: shares from a period ending 45+ days earlier (under 400 days old) × raw close between $50M and $2B, and median dollar volume over the prior 20 sessions at least $500K. The whole month uses that answer |
@@ -1030,6 +1030,24 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
 | Nightly 03:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
+
+## Memory budget
+
+The NAS containers are small (cron 640 MB, lab 1,536 MB, API 256 MB), so no job may hold a whole table in Python. Measured 2026-11-11 on a synthetic database of 191k price bars, 85k insider rows, 2.2M Alpaca bars, the full French sets and three years of mirror:
+
+| Job | Peak MB | Seconds | How it stays small |
+|---|---|---|---|
+| `holdings`, `core`, `daily`, `review` | 91, 137, 137, 89 | 1, 19, 20, 1 | Already small |
+| `lab-export` | 54 (was 695) | 10 | Bars go from `desk.db` to `lab.db` as a stream; the first source for a bar wins (Tiingo, then the mirror, then Alpaca) |
+| `insider`: history load, 300 names | 134 (was 1,055) | 9 plus downloads | Batches of 25 names |
+| `insider`: one bulk quarter | 72 (was 273) | 2 | The TSVs are read a row at a time |
+| Lab, 3 workers, 12-variant screen | 132 (was 1,611) | 5 (was 24) | See below |
+| Lab, 3 workers, French 49 industries since 1963 | 184 (was 3,120) | 12 (was 387) | See below |
+| API, every read endpoint | 94 | | |
+
+**Lab data.** `load` keeps each series as packed arrays of doubles with one shared set of date strings; a day is found through one shared calendar and a small per-series offset table (`DayIndex`), about 40 bytes a bar instead of 290. A French set is read as a stream. Workers are forked from the process that already holds the data, so they share it and never reload it; where fork is not available the variants run one after another. Results are identical to the old loader's, down to every stored trial.
+
+**Rules for new jobs.** Iterate cursors, do not `fetchall` a bar table. Write downloads in batches inside the loop that fetches them. A second run of a job must be a no-op, not a double write.
 
 ## Stack and tests
 

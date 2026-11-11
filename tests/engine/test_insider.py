@@ -476,3 +476,42 @@ def test_a_refused_batch_is_skipped_and_named(cfg, monkeypatch):
     with pytest.raises(insider.alpaca.BadRequest, match="invalid symbol: BAD"):
         insider.alpaca.fetch_bars(http, ["AAA", "BAD"], "2024-01-01", "2024-03-02", "raw", sleep=lambda s: None)
     conn.close()
+
+
+# ---- Memory: small batches, streamed files ----
+
+
+class FlakyAlpaca(PickyAlpaca):
+    def __init__(self, fail_on):
+        super().__init__(bad=())
+        self.fail_on = fail_on
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        if self.fail_on in params["symbols"].split(","):
+            return BadRes(429, {"message": "slow down"})
+        return super().get(url, params=params, headers=headers, timeout=timeout)
+
+
+def test_history_loads_in_small_batches_and_keeps_what_landed(cfg, monkeypatch):
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "paper-id")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "paper-secret")
+    monkeypatch.setattr(insider, "HISTORY_BATCH", 2)
+    conn = desk(cfg)
+    names = ["AAA", "BBB", "CCC", "DDD", "EEE"]
+    http = FlakyAlpaca("CCC")
+    with pytest.raises(insider.ProviderError, match="rate limit"):
+        insider.fetch_history(conn, http, names, now=NOW, sleep=lambda s: None)
+    assert [r[0] for r in conn.execute("SELECT symbol FROM alpaca_history ORDER BY symbol")] == ["AAA", "BBB"]
+    assert conn.execute("SELECT count(*) FROM alpaca_bars").fetchone()[0] == 2
+    http = PickyAlpaca(bad=())
+    out = insider.fetch_history(conn, http, names, now=NOW, sleep=lambda s: None)
+    assert out == {"symbols": 3, "bars": 3, "left": 0} and all(len(c) <= 2 for c in http.calls)
+    assert conn.execute("SELECT count(*) FROM alpaca_bars").fetchone()[0] == 5
+    conn.close()
+
+
+def test_bulk_files_are_read_a_row_at_a_time():
+    z = zipfile.ZipFile(io.BytesIO(bulk_zip()))
+    rows = insider._tsv(z, "SUBMISSION.tsv")
+    assert iter(rows) is rows and next(rows)["ACCESSION_NUMBER"]
+    assert list(insider._tsv(z, "NOT_THERE.tsv")) == []

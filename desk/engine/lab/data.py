@@ -1,7 +1,9 @@
 import json
 import os
 import sqlite3
+from array import array
 from bisect import bisect_right
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -66,18 +68,16 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
     out = sqlite3.connect(tmp)
     try:
         out.executescript(EXPORT_SCHEMA)
-        bars: dict[tuple[str, str], tuple] = {}
-        for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM price_bars"):
-            bars[(r["symbol"], r["date"])] = (r["symbol"], r["date"], r["open"], r["close"], r["adj_close"], r["volume"])
-        for r in desk.execute("SELECT symbol, date, close, adj_close FROM prices_daily"):
-            bars.setdefault((r["symbol"], r["date"]), (r["symbol"], r["date"], None, r["close"], r["adj_close"], None))
+        add = "INSERT OR IGNORE INTO bars VALUES (?, ?, ?, ?, ?, ?)"
+        out.executemany(add, (tuple(r) for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM price_bars")))
+        out.executemany(add, ((r[0], r[1], None, r[2], r[3], None) for r in desk.execute("SELECT symbol, date, close, adj_close FROM prices_daily")))
         small = _small_caps(desk, out)
-        for sym in small | {SMALLCAP_BENCHMARK}:
-            for r in (
-                desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM alpaca_bars WHERE symbol=?", (sym,)) if _has(desk, "alpaca_bars") else []
-            ):
-                bars.setdefault((r["symbol"], r["date"]), (r["symbol"], r["date"], r["open"], r["close"], r["adj_close"], r["volume"]))
-        out.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?)", bars.values())
+        if _has(desk, "alpaca_bars"):
+            for sym in sorted(small | {SMALLCAP_BENCHMARK}):
+                out.executemany(
+                    add, (tuple(r) for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM alpaca_bars WHERE symbol=?", (sym,)))
+                )
+        bars = out.execute("SELECT count(*) FROM bars").fetchone()[0]
         roles = {r["symbol"]: r["role"] for r in desk.execute("SELECT symbol, role FROM market_symbols")}
         roles |= {sym: roles.get(sym) or SMALLCAP_ROLE for sym in small}
         spans = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, min(date), max(date) FROM bars GROUP BY symbol")}
@@ -94,7 +94,7 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
             out.executemany("INSERT INTO french VALUES (?, ?, ?, ?)", (tuple(r) for r in desk.execute("SELECT set_name, name, date, ret FROM french_returns")))
             french_rows = out.execute("SELECT count(*) FROM french").fetchone()[0]
         if desk.execute("SELECT 1 FROM sqlite_master WHERE name='macro_daily'").fetchone():
-            out.executemany("INSERT INTO macro VALUES (?, ?, ?)", [tuple(r) for r in desk.execute("SELECT series, date, value FROM macro_daily")])
+            out.executemany("INSERT INTO macro VALUES (?, ?, ?)", (tuple(r) for r in desk.execute("SELECT series, date, value FROM macro_daily")))
         out.executemany("INSERT INTO plan_mix VALUES (?, ?)", list(targets.items()))
         rate = desk.execute(
             "SELECT value FROM metric_values WHERE metric_id='tax.marginal_rate' AND scope='portfolio' AND value IS NOT NULL ORDER BY as_of DESC LIMIT 1"
@@ -107,14 +107,14 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
         if small and _has(desk, "earnings_events"):
             from desk.engine import earnings
 
-            out.executemany("INSERT INTO earnings VALUES (?, ?, ?)", [tuple(r) for r in desk.execute("SELECT symbol, known, surprise FROM earnings_events")])
+            out.executemany("INSERT INTO earnings VALUES (?, ?, ?)", (tuple(r) for r in desk.execute("SELECT symbol, known, surprise FROM earnings_events")))
             settings["earnings_coverage"] = json.dumps(earnings.coverage(desk))
         out.executemany("INSERT INTO settings VALUES (?, ?)", list(settings.items()))
         out.commit()
     finally:
         out.close()
     os.replace(tmp, final)
-    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": len(bars), "french_rows": french_rows, "small_caps": len(small)}
+    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": bars, "french_rows": french_rows, "small_caps": len(small)}
 
 
 def _has(conn: sqlite3.Connection, name: str) -> bool:
@@ -126,26 +126,61 @@ def _small_caps(desk: sqlite3.Connection, out: sqlite3.Connection) -> set[str]:
         return set()
     from desk.engine.insider import known_day
 
-    months = desk.execute("SELECT symbol, month FROM smallcap_months").fetchall()
-    out.executemany("INSERT INTO smallcap VALUES (?, ?)", [tuple(r) for r in months])
+    out.executemany("INSERT INTO smallcap VALUES (?, ?)", (tuple(r) for r in desk.execute("SELECT symbol, month FROM smallcap_months")))
     if _has(desk, "insider_buys"):
+        known: dict[str, str] = {}
         out.executemany(
             "INSERT INTO insider VALUES (?, ?, ?, ?)",
-            [(r[0], known_day(r[1]), r[2], r[3]) for r in desk.execute("SELECT symbol, filed_date, owner_cik, usd FROM insider_buys")],
+            (
+                (r[0], known.get(r[1]) or known.setdefault(r[1], known_day(r[1])), r[2], r[3])
+                for r in desk.execute("SELECT symbol, filed_date, owner_cik, usd FROM insider_buys")
+            ),
         )
-    return {r[0] for r in months}
+    return {r[0] for r in out.execute("SELECT DISTINCT symbol FROM smallcap")}
 
 
 # ---- Load (lab side) ----
 
 
+class DayIndex(Mapping):
+    __slots__ = ("pos", "first", "slots", "size")
+
+    def __init__(self, pos: dict[str, int], dates: list[str]):
+        self.pos, self.first, self.size = pos, pos[dates[0]], len(dates)
+        self.slots = array("i", [-1]) * (pos[dates[-1]] - self.first + 1)
+        for i, d in enumerate(dates):
+            self.slots[pos[d] - self.first] = i
+
+    def get(self, day, default=None):
+        at = self.pos.get(day)
+        if at is None or not 0 <= at - self.first < len(self.slots):
+            return default
+        i = self.slots[at - self.first]
+        return i if i >= 0 else default
+
+    def __getitem__(self, day):
+        i = self.get(day)
+        if i is None:
+            raise KeyError(day)
+        return i
+
+    def __contains__(self, day):
+        return self.get(day) is not None
+
+    def __iter__(self):
+        return (d for d in self.pos if d in self)
+
+    def __len__(self):
+        return self.size
+
+
 @dataclass
 class Series:
     dates: list[str]
-    adj: list[float]
-    open_adj: list[float]
-    volume: list[float | None]
-    index: dict[str, int] = field(default_factory=dict)
+    adj: Sequence[float]
+    open_adj: Sequence[float]
+    volume: Sequence[float | None]
+    index: Mapping[str, int] = field(default_factory=dict)
 
     def at(self, day: str) -> int | None:
         i = bisect_right(self.dates, day) - 1
@@ -197,28 +232,34 @@ class LabData:
         if self.path is not None and self.path.exists():
             conn = connect(self.path, readonly=True)
             try:
+                shared: dict[tuple[str, str, int], tuple[list[str], dict[str, int], list[None]]] = {}
+                days: dict[str, str] = {}
+                name, dates, pcts = None, [], array("d")
+
+                def flush():
+                    if name is None or not dates:
+                        return
+                    key = (dates[0], dates[-1], len(dates))
+                    if key not in shared:
+                        shared[key] = (dates, {d: i for i, d in enumerate(dates)}, [None] * len(dates))
+                    same, index, nones = shared[key]
+                    sym = french_symbol(set_name, name)
+                    self.series[sym] = _levels(same, pcts, index, nones)
+                    self.kinds[sym] = FRENCH_KIND
+                    self.roles[sym] = None
+                    self.last[sym] = same[-1]
+                    symbols.append(sym)
+
                 if conn.execute("SELECT 1 FROM sqlite_master WHERE name='french'").fetchone():
-                    rows = conn.execute("SELECT name, date, ret FROM french WHERE set_name=? ORDER BY name, date", (set_name,)).fetchall()
-                else:
-                    rows = []
+                    for r in conn.execute("SELECT name, date, ret FROM french WHERE set_name=? ORDER BY name, date", (set_name,)):
+                        if r[0] != name:
+                            flush()
+                            name, dates, pcts = r[0], [], array("d")
+                        dates.append(days.setdefault(r[1], r[1]))
+                        pcts.append(r[2])
+                    flush()
             finally:
                 conn.close()
-            shared: dict[tuple[str, str, int], tuple[list[str], dict[str, int], list[None]]] = {}
-            by_name: dict[str, list[tuple[str, float]]] = {}
-            for r in rows:
-                by_name.setdefault(r[0], []).append((r[1], r[2]))
-            for name, pts in by_name.items():
-                sym = french_symbol(set_name, name)
-                key = (pts[0][0], pts[-1][0], len(pts))
-                if key not in shared:
-                    dates = [d for d, _ in pts]
-                    shared[key] = (dates, {d: i for i, d in enumerate(dates)}, [None] * len(dates))
-                dates, index, nones = shared[key]
-                self.series[sym] = _levels(dates, [x for _, x in pts], index, nones)
-                self.kinds[sym] = FRENCH_KIND
-                self.roles[sym] = None
-                self.last[sym] = dates[-1]
-                symbols.append(sym)
         self.french_sets[set_name] = sorted(symbols)
         return self.french_sets[set_name]
 
@@ -228,8 +269,8 @@ class LabData:
         return values[i - 1] if i else None
 
 
-def _levels(dates: list[str], pcts: list[float], index: dict[str, int], volume: list) -> Series:
-    level, adj = 100.0, []
+def _levels(dates: list[str], pcts: Sequence[float], index: dict[str, int], volume: list) -> Series:
+    level, adj = 100.0, array("d")
     for x in pcts:
         level *= 1 + x / 100
         adj.append(level)
@@ -250,22 +291,23 @@ def load(path: Path) -> LabData:
     conn = connect(path, readonly=True)
     try:
         series: dict[str, Series] = {}
-        cur, rows = None, []
+        pos = {r[0]: i for i, r in enumerate(conn.execute("SELECT DISTINCT date FROM bars ORDER BY date"))}
+        days = {d: d for d in pos}
+        cur, dates, adj, opens, volume = None, [], array("d"), array("d"), array("d")
 
         def flush():
-            if cur and rows:
-                dates = [r[0] for r in rows]
-                adj = [r[2] if r[2] else r[1] for r in rows]
-                opens = [(r[3] * (r[2] / r[1]) if r[2] and r[1] else r[3]) if r[3] else a for r, a in zip(rows, adj, strict=True)]
-                s = Series(dates, adj, opens, [r[4] for r in rows])
-                s.index = {d: i for i, d in enumerate(dates)}
-                series[cur] = s
+            if cur and dates:
+                series[cur] = Series(dates, adj, opens, volume, DayIndex(pos, dates))
 
-        for r in conn.execute("SELECT symbol, date, close, adj_close, open, volume FROM bars ORDER BY symbol, date"):
-            if r[0] != cur:
+        for sym, day, close, adjusted, opened, vol in conn.execute("SELECT symbol, date, close, adj_close, open, volume FROM bars ORDER BY symbol, date"):
+            if sym != cur:
                 flush()
-                cur, rows = r[0], []
-            rows.append((r[1], r[2], r[3], r[4], r[5]))
+                cur, dates, adj, opens, volume = sym, [], array("d"), array("d"), array("d")
+            a = adjusted if adjusted else close
+            dates.append(days[day])
+            adj.append(a)
+            opens.append((opened * (adjusted / close) if adjusted and close else opened) if opened else a)
+            volume.append(vol or 0.0)
         flush()
         kinds, roles, last = {}, {}, {}
         for r in conn.execute("SELECT symbol, kind, role, last FROM symbols"):
@@ -280,7 +322,7 @@ def load(path: Path) -> LabData:
         factors: dict[str, dict[str, float]] = {}
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factors'").fetchone():
             for r in conn.execute("SELECT series, date, value FROM factors"):
-                factors.setdefault(r[0], {})[r[1]] = r[2]
+                factors.setdefault(r[0], {})[days.setdefault(r[1], r[1])] = r[2]
         insider: dict[str, tuple[list[str], list[int], list[float]]] = {}
         smallcap: dict[str, set[str]] = {}
         if _has(conn, "insider"):
