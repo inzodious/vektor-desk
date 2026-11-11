@@ -16,6 +16,8 @@ COOLDOWN = timedelta(minutes=5)
 PICKUP_SECONDS = 5
 ALIVE_WITHIN = timedelta(seconds=90)
 NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+SECRETISH = re.compile(r"[A-Za-z0-9_\-+/=]{32,}")
+SAID_MAX = 300
 
 REFRESHES = {
     "mirror": ["freshness", "holdings", "value"],
@@ -79,6 +81,23 @@ def parse_stamp(s: str | None) -> datetime | None:
         return datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
         return None
+
+
+def plain(text: object) -> str | None:
+    if not isinstance(text, str) or not text.strip():
+        return None
+    return SECRETISH.sub("…", " ".join(text.split()))[:SAID_MAX]
+
+
+def last_words(line: str) -> dict:
+    try:
+        said = json.loads(line)
+    except ValueError:
+        return {"error": plain(line)} if line.strip() else {}
+    if not isinstance(said, dict):
+        return {}
+    skipped = said.get("skipped")
+    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, "error": plain(said.get("error"))}
 
 
 def state_dir(cfg: Config) -> Path:
