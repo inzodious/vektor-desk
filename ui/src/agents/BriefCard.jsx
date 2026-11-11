@@ -1,10 +1,11 @@
 import { briefLines, whenLabel } from '../lib/agents.js';
 import { useNow } from '../lib/useNow.js';
 import { dayLabel } from '../lib/charts.js';
+import { EmptyState } from '../start/EmptyState.jsx';
 
 const DOT = { ok: 'var(--teal)', watch: 'var(--mustard)', info: 'var(--sky)' };
 
-export function BriefCard({ brief, i = 6, tag = "Today's brief", span = 'c4', children }) {
+export function BriefCard({ brief, i = 6, tag = "Today's brief", span = 'c4', emptyKey = 'bridge.brief', children }) {
   const now = useNow(60000);
   const b = brief.data;
   const lines = briefLines(b?.summary);
@@ -26,9 +27,11 @@ export function BriefCard({ brief, i = 6, tag = "Today's brief", span = 'c4', ch
           </p>
         ))
       ) : (
-        <p className="brief-empty">
-          {brief.error ? "The brief didn't load. It comes back with the desk API." : brief.loading ? 'Reading the brief…' : 'No brief yet. The plan keeper writes one after its evening run.'}
-        </p>
+        brief.error || brief.loading ? (
+          <p className="brief-empty">{brief.error ? "The brief didn't load. It comes back with the desk API." : 'Reading the brief…'}</p>
+        ) : (
+          <EmptyState k={emptyKey} slim icon="clock" why="No brief yet. The plan keeper writes one after its evening run." />
+        )
       )}
       {children}
       {b?.as_of ? <span className="muted brief-foot">Built from engine numbers as of {dayLabel(b.as_of)}</span> : null}

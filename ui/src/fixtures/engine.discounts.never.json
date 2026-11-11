@@ -1,0 +1,7 @@
+{
+ "as_of": null,
+ "scanned": 0,
+ "rule": "After the close: a down day of 2+ standard deviations of its last year and 1% or more, or a first close 10, 20 or 30% under its 52-week high",
+ "rows": [],
+ "note": "The discount scanner runs after the close on weekdays."
+}

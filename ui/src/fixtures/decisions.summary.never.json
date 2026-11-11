@@ -1,0 +1,10 @@
+{
+ "waiting": 0,
+ "clean": 0,
+ "overrides": 0,
+ "unmatched": 0,
+ "logged_after": 0,
+ "coverage": null,
+ "coverage_window_days": 90,
+ "streak_days": 0
+}

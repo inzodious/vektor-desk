@@ -9,6 +9,7 @@ import { postJson, useApi } from '../lib/api.js';
 import { DECISION_TABS, STATUS, journalPage, kindName, latestScore, originName, reasonOf, scoreOf, scoresOn } from '../lib/decisions.js';
 import { parseDay } from '../lib/charts.js';
 import { plural, usd } from '../lib/format.js';
+import { GapNote } from '../start/EmptyState.jsx';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SHOW_UNMATCHED = 5;
@@ -247,6 +248,7 @@ export default function Journal() {
         }
         foot={tabs}
       />
+      <GapNote k="decisions.journal" />
       <section className="grid">
         <div className="card c8 top" style={{ '--i': 1 }} data-testid="journal" data-page={pg.page} data-pages={pg.pages} data-total={pg.total}>
           <div className="card-head">

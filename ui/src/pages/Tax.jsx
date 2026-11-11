@@ -10,6 +10,7 @@ import { dayLabel } from '../lib/charts.js';
 import { plural, usd } from '../lib/format.js';
 import { useMetrics, val } from '../lib/metrics.js';
 import { mergeWindows, todayEt } from '../lib/tax.js';
+import { GapNote } from '../start/EmptyState.jsx';
 
 const CELLS = [
   { id: 'tax.realized_st', window: 'YTD', label: 'Realized short term' },
@@ -78,6 +79,7 @@ export default function Tax() {
           </>
         }
       />
+      <GapNote k="portfolio.tax" />
       <section className="kpis kpis-4">
         {CELLS.map((c, i) => {
           const row = m.get(c.id, { window: c.window });

@@ -1,0 +1,28 @@
+{
+ "version": 1,
+ "rules": [
+  {
+   "enabled": true,
+   "id": "no-margin-buys",
+   "kind": "no_margin_buys",
+   "params": {},
+   "label": "No buying on margin"
+  },
+  {
+   "enabled": true,
+   "id": "no-new-single-stocks",
+   "kind": "no_new_single_stocks",
+   "params": {},
+   "label": "No new single stocks"
+  },
+  {
+   "enabled": true,
+   "id": "drift-max",
+   "kind": "drift_max_pts",
+   "params": {
+    "pts": 5
+   },
+   "label": "Drift limit 5 points"
+  }
+ ]
+}

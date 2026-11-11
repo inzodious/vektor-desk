@@ -5,7 +5,10 @@ import { Subtabs } from '../components/Subtabs.jsx';
 import { useApi } from '../lib/api.js';
 import { QUALITY } from '../lib/quality.js';
 import { KINDS, RESULT_TABS, changeText, firstRunNote, gainLine, periodPath, stateChip, stepper } from '../lib/results.js';
-import { Accounts, Debrief, DecisionsCard, Events, FirstRun, Ledger, Movers, NextSteps, Numbers, PaperCard, RiskCard, Versus } from '../results/cards.jsx';
+import { Accounts, Debrief, DecisionsCard, Events, Ledger, Movers, NextSteps, Numbers, PaperCard, RiskCard, Versus } from '../results/cards.jsx';
+import { EmptyState } from '../start/EmptyState.jsx';
+
+const REVIEW_NOW = { kind: 'job', job: 'engine-review', label: 'Write it now' };
 
 // ---------- stepper ----------
 function Stepper({ kind, step }) {
@@ -71,7 +74,7 @@ export default function Results() {
       <>
         <Hero kicker="Results" title="Results" art="bridge" big={<b>{missing ? 'Not yet' : 'No answer'}</b>} foot={tabs} />
         {missing ? (
-          <FirstRun note="Results reviews switch on with the next desk update." />
+          <EmptyState k={`results.${kind}`} card icon="telescope" title="No results yet" why="Results reviews switch on with the next desk update." />
         ) : (
           <section className="card" role="alert">
             <div className="card-head">
@@ -91,8 +94,8 @@ export default function Results() {
   if (!pack) {
     return (
       <>
-        <Hero kicker="Results" title="Results" art="bridge" big={<b>First run tonight</b>} foot={foot} />
-        <FirstRun note={firstRunNote(index.data, d)} />
+        <Hero kicker="Results" title="Results" art="bridge" big={<b>Nothing to show yet</b>} foot={foot} />
+        <EmptyState k={`results.${kind}`} card icon="telescope" title="No results yet" why={firstRunNote(index.data, d)} action={REVIEW_NOW} onFilled={api.reload} />
       </>
     );
   }

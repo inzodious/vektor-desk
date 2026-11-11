@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { HealthBanner } from './HealthBanner.jsx';
 import { Icon } from './Icon.jsx';
@@ -9,6 +10,9 @@ import { useTheme } from '../lib/theme.js';
 import { useNow } from '../lib/useNow.js';
 import { ConsoleButton } from '../research/Console.jsx';
 import { SymbolSearch } from '../research/SymbolSearch.jsx';
+import { setupChip } from '../lib/start.js';
+import { StartBanner } from '../start/StartDesk.jsx';
+import { useStart } from '../start/context.js';
 
 // ---------- clock ----------
 export function MarketClock() {
@@ -44,6 +48,20 @@ export function SettingsButton() {
   );
 }
 
+// ---------- setup ----------
+export function SetupChip() {
+  const { setup } = useStart();
+  const chip = setupChip(setup);
+  if (!chip) return null;
+  return (
+    <Link className="setup-chip" to="/settings/first-run" aria-label={chip.label} title="Open the first-run checklist" data-testid="setup-chip" data-left={setup.left}>
+      <Icon name="flag" />
+      <span className="long">{chip.text}</span>
+      <span className="short">{chip.short}</span>
+    </Link>
+  );
+}
+
 // ---------- nav ----------
 function NavLinks({ badges }) {
   const { pathname } = useLocation();
@@ -73,6 +91,8 @@ function NavLinks({ badges }) {
 }
 
 export function Shell({ badges }) {
+  const { view, epoch } = useStart();
+  const starting = view.mode === 'never' || view.mode === 'running';
   return (
     <>
       <a className="skip" href="#main">
@@ -90,6 +110,7 @@ export function Shell({ badges }) {
         </nav>
         <div className="tools">
           <SymbolSearch />
+          <SetupChip />
           <MarketClock />
           <ConsoleButton />
           <ThemeButton />
@@ -97,8 +118,11 @@ export function Shell({ badges }) {
         </div>
       </header>
       <main className="content" id="main" tabIndex={-1}>
-        <HealthBanner />
-        <Outlet />
+        <StartBanner />
+        {starting ? null : <HealthBanner />}
+        <Fragment key={epoch}>
+          <Outlet />
+        </Fragment>
       </main>
       <nav className="nav dock" aria-label="Areas, phone">
         <NavLinks badges={badges} />

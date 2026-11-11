@@ -16,6 +16,7 @@ import { useMetrics, val } from '../lib/metrics.js';
 import { useJsonMany } from '../lib/useResearch.js';
 import { todayEt } from '../lib/tax.js';
 import { alignSeries, chunkIds, drawdown, monthGrid, pairMatrix, scenarioItems } from '../lib/lab.js';
+import { GapGate } from '../start/EmptyState.jsx';
 
 const P = (v, d = 1, sign = false) => pct(v / 100, d, sign);
 
@@ -239,72 +240,74 @@ export default function Risk() {
           )
         }
       />
-      <section className="kpis kpis-6" data-testid="risk-kpis">
-        {kpis.map((k, i) => (
-          <Kpi key={k.id} metric={k.id} label={k.label} value={k.v} line={k.line} quality={k.q} asOf={asOf} i={i + 1} tone={k.tone} onOpen={() => setOpen(k.id)} />
-        ))}
-      </section>
-      <section className="grid">
-        <RiskReturn held={held} />
-        <div className="card c6" data-testid="correlation">
-          <div className="card-head">
-            <span className="tag coral">How they move together</span>
-            <span className="chip">Daily returns, 1 year</span>
+      <GapGate k="portfolio.risk" icon="shield" title="Risk has nothing to measure yet" hasData={m.rows.length > 0}>
+        <section className="kpis kpis-6" data-testid="risk-kpis">
+          {kpis.map((k, i) => (
+            <Kpi key={k.id} metric={k.id} label={k.label} value={k.v} line={k.line} quality={k.q} asOf={asOf} i={i + 1} tone={k.tone} onOpen={() => setOpen(k.id)} />
+          ))}
+        </section>
+        <section className="grid">
+          <RiskReturn held={held} />
+          <div className="card c6" data-testid="correlation">
+            <div className="card-head">
+              <span className="tag coral">How they move together</span>
+              <span className="chip">Daily returns, 1 year</span>
+            </div>
+            {corr.syms.length > 1 ? (
+              <Heatmap rows={corr.syms} cols={corr.syms} values={corr.values} name="Correlation" tipHead={(i, j) => `${corr.syms[i]} and ${corr.syms[j]}`} scale={<div className="scale">Opposite<i className="div" />Together</div>} />
+            ) : (
+              <p className="empty-hint">Needs a year of prices for two or more holdings.</p>
+            )}
           </div>
-          {corr.syms.length > 1 ? (
-            <Heatmap rows={corr.syms} cols={corr.syms} values={corr.values} name="Correlation" tipHead={(i, j) => `${corr.syms[i]} and ${corr.syms[j]}`} scale={<div className="scale">Opposite<i className="div" />Together</div>} />
-          ) : (
-            <p className="empty-hint">Needs a year of prices for two or more holdings.</p>
-          )}
-        </div>
-        <Drawdowns start={start} />
-        <div className="card c6" data-testid="scenarios">
-          <div className="card-head">
-            <span className="tag sky">Scenario shocks</span>
-            <span className="chip">Today&apos;s positions</span>
+          <Drawdowns start={start} />
+          <div className="card c6" data-testid="scenarios">
+            <div className="card-head">
+              <span className="tag sky">Scenario shocks</span>
+              <span className="chip">Today&apos;s positions</span>
+            </div>
+            <HBars items={shocks} fmt={(v) => usd(v)} name="Change in value" labelW={132} empty="No scenarios yet. They run with the nightly engine." />
+            <p className="empty-hint" style={{ marginTop: 6 }}>
+              Dollars lost if it happened again tomorrow. Replays need prices from back then; set shocks are modelled from beta and rate sensitivity.
+            </p>
           </div>
-          <HBars items={shocks} fmt={(v) => usd(v)} name="Change in value" labelW={132} empty="No scenarios yet. They run with the nightly engine." />
-          <p className="empty-hint" style={{ marginTop: 6 }}>
-            Dollars lost if it happened again tomorrow. Replays need prices from back then; set shocks are modelled from beta and rate sensitivity.
-          </p>
-        </div>
-        <div className="card c6" data-testid="lookthrough">
-          <div className="card-head">
-            <span className="tag lilac">What you really own</span>
-            <span className="chip">{look.data?.as_of ? `Look-through · ${dayLabel(look.data.as_of)}` : 'Look-through'}</span>
-          </div>
-          <HBars
-            items={topLook.map((r) => ({ label: r.holding, value: r.weight, color: r.direct ? 'var(--s1)' : 'var(--s-other)', hint: r.name && r.name !== r.holding ? r.name : undefined }))}
-            fmt={(v) => P(v)}
-            name="Share of value"
-            tone="item"
-            labelW={70}
-            empty="No look-through yet. It needs N-PORT holdings for your funds."
-            legend={
-              <div className="legend">
-                <span>
-                  <i className="dot" style={{ '--c': 'var(--s1)' }} />
-                  Held directly
+          <div className="card c6" data-testid="lookthrough">
+            <div className="card-head">
+              <span className="tag lilac">What you really own</span>
+              <span className="chip">{look.data?.as_of ? `Look-through · ${dayLabel(look.data.as_of)}` : 'Look-through'}</span>
+            </div>
+            <HBars
+              items={topLook.map((r) => ({ label: r.holding, value: r.weight, color: r.direct ? 'var(--s1)' : 'var(--s-other)', hint: r.name && r.name !== r.holding ? r.name : undefined }))}
+              fmt={(v) => P(v)}
+              name="Share of value"
+              tone="item"
+              labelW={70}
+              empty="No look-through yet. It needs N-PORT holdings for your funds."
+              legend={
+                <div className="legend">
+                  <span>
+                    <i className="dot" style={{ '--c': 'var(--s1)' }} />
+                    Held directly
+                  </span>
+                  <span>
+                    <i className="dot" style={{ '--c': 'var(--s-other)' }} />
+                    Only inside funds
+                  </span>
+                </div>
+              }
+            />
+            {look.data?.sectors?.length ? (
+              <>
+                <span className="kicker" style={{ marginTop: 10, display: 'block' }}>
+                  By sector
                 </span>
-                <span>
-                  <i className="dot" style={{ '--c': 'var(--s-other)' }} />
-                  Only inside funds
-                </span>
-              </div>
-            }
-          />
-          {look.data?.sectors?.length ? (
-            <>
-              <span className="kicker" style={{ marginTop: 10, display: 'block' }}>
-                By sector
-              </span>
-              <HBars items={look.data.sectors.map((s) => ({ label: s.sector, value: s.weight, color: 'var(--s5)' }))} fmt={(v) => P(v)} name="Share of value" tone="item" labelW={150} table={false} />
-            </>
-          ) : null}
-        </div>
-        <Months held={held} start={start} />
-        <Factors />
-      </section>
+                <HBars items={look.data.sectors.map((s) => ({ label: s.sector, value: s.weight, color: 'var(--s5)' }))} fmt={(v) => P(v)} name="Share of value" tone="item" labelW={150} table={false} />
+              </>
+            ) : null}
+          </div>
+          <Months held={held} start={start} />
+          <Factors />
+        </section>
+      </GapGate>
       <MetricDrawer id={open} rows={m.rows} onClose={() => setOpen(null)} />
     </>
   );

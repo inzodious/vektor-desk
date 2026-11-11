@@ -1,0 +1,122 @@
+{
+ "state": "done",
+ "needs_start": true,
+ "can_start": true,
+ "blocked": null,
+ "result": "partial",
+ "summary": "7 of 10 steps done. 3 need you.",
+ "started_at": "2026-11-11T14:02:10Z",
+ "finished_at": "2026-11-11T14:09:55Z",
+ "last_ok_at": null,
+ "steps": [
+  {
+   "id": "accounts",
+   "title": "Pull your accounts",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "mirror",
+   "started_at": "2026-11-11T14:02:14Z",
+   "finished_at": "2026-11-11T14:02:31Z"
+  },
+  {
+   "id": "prices",
+   "title": "Fetch price history",
+   "state": "skipped",
+   "detail": "Price history is already complete.",
+   "fix": null,
+   "job": "engine-backfill",
+   "started_at": null,
+   "finished_at": "2026-11-11T14:02:35Z"
+  },
+  {
+   "id": "numbers",
+   "title": "Run today’s numbers",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-daily",
+   "started_at": "2026-11-11T14:02:39Z",
+   "finished_at": "2026-11-11T14:03:23Z"
+  },
+  {
+   "id": "market",
+   "title": "Fetch market history",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-french",
+   "started_at": "2026-11-11T14:03:27Z",
+   "finished_at": "2026-11-11T14:04:05Z"
+  },
+  {
+   "id": "review",
+   "title": "Write the results review",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-review",
+   "started_at": "2026-11-11T14:04:09Z",
+   "finished_at": "2026-11-11T14:04:18Z"
+  },
+  {
+   "id": "discounts",
+   "title": "Scan for discounts",
+   "state": "failed",
+   "detail": "It stopped with an error. Settings, Box, Collect logs shows why.",
+   "fix": {
+    "label": "Open Box",
+    "to": "/settings/box"
+   },
+   "job": "engine-discounts",
+   "started_at": "2026-11-11T14:04:22Z",
+   "finished_at": "2026-11-11T14:04:28Z"
+  },
+  {
+   "id": "plan_keeper",
+   "title": "Check your plan",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-plan_keeper",
+   "started_at": "2026-11-11T14:04:32Z",
+   "finished_at": "2026-11-11T14:07:05Z"
+  },
+  {
+   "id": "debrief",
+   "title": "Write the debrief",
+   "state": "skipped",
+   "detail": "The Debrief desk is switched off.",
+   "fix": {
+    "label": "Switch it on",
+    "to": "/settings/crew"
+   },
+   "job": "agents-run-debrief",
+   "started_at": null,
+   "finished_at": "2026-11-11T14:07:09Z"
+  },
+  {
+   "id": "plans",
+   "title": "Draft your stock plans",
+   "state": "skipped",
+   "detail": "The Claude token has expired, so no desk can write.",
+   "fix": {
+    "label": "Renew the token",
+    "to": "/settings/box"
+   },
+   "job": "agents-run-plans",
+   "started_at": null,
+   "finished_at": "2026-11-11T14:07:13Z"
+  },
+  {
+   "id": "paper",
+   "title": "Run the paper race",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-paper",
+   "started_at": "2026-11-11T14:07:17Z",
+   "finished_at": "2026-11-11T14:09:55Z"
+  }
+ ]
+}

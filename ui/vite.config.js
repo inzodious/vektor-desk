@@ -7,6 +7,8 @@ import react from '@vitejs/plugin-react';
 const FIXTURES = fileURLToPath(new URL('./src/fixtures/', import.meta.url));
 const DESK_INIT = fileURLToPath(new URL('../desk/__init__.py', import.meta.url));
 
+const SCENARIO_BASE = { starting: 'never', gaps: 'never' };
+
 function deskVersion() {
   try {
     return /__version__\s*=\s*"([^"]+)"/.exec(readFileSync(DESK_INIT, 'utf8'))?.[1] || null;
@@ -26,7 +28,8 @@ function fixtureApi() {
     const kind = (url.searchParams.get('kind') || '').replace(/[^a-z]+/g, '');
     const end = (url.searchParams.get('end') || '').replace(/[^0-9-]+/g, '');
     const base = url.pathname.slice(5).replace(/\/+$/, '').replace(/\//g, '.') || 'index';
-    const tries = [scenario && `${base}.${scenario}`, kind && end && `${base}.${kind}.${end}`, kind && `${base}.${kind}`, ids && `${base}.${ids}`, symbol && `${base}.${symbol}`, scopeId && `${base}.${scopeId}`, symbol && `${base}.any`, base].filter(Boolean);
+    const under = SCENARIO_BASE[scenario] || '';
+    const tries = [scenario && kind && `${base}.${scenario}.${kind}`, scenario && `${base}.${scenario}`, under && kind && `${base}.${under}.${kind}`, under && `${base}.${under}`, kind && end && `${base}.${kind}.${end}`, kind && `${base}.${kind}`, ids && `${base}.${ids}`, symbol && `${base}.${symbol}`, scopeId && `${base}.${scopeId}`, symbol && `${base}.any`, base].filter(Boolean);
     const file = tries.map((t) => `${FIXTURES}${t}.json`).find((f) => existsSync(f));
     res.setHeader('Cache-Control', 'no-store');
     if (!file) {
@@ -39,7 +42,13 @@ function fixtureApi() {
       const body = JSON.parse(readFileSync(file, 'utf8'));
       return res.end(JSON.stringify({ ...body, version: deskVersion() || body.version }));
     }
-    res.end(readFileSync(file));
+    const text = readFileSync(file, 'utf8');
+    const refused = /^\{\s*"__status":\s*(\d+)/.exec(text);
+    if (refused) {
+      res.statusCode = Number(refused[1]);
+      return res.end(JSON.stringify({ detail: JSON.parse(text).detail }));
+    }
+    res.end(text);
   };
   return {
     name: 'desk-fixture-api',

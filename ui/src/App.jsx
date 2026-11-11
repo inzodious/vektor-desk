@@ -26,6 +26,7 @@ import Strategies from './pages/Strategies.jsx';
 import Strategy from './pages/Strategy.jsx';
 import { LiveProvider } from './live/LiveProvider.jsx';
 import { SymbolProvider } from './live/SymbolProvider.jsx';
+import { StartProvider } from './start/StartProvider.jsx';
 import NotFound from './pages/NotFound.jsx';
 import { movedPath } from './lib/areas.js';
 import { useTitle } from './lib/useTitle.js';
@@ -43,45 +44,47 @@ export default function App() {
     <LiveProvider>
       <ConsoleProvider>
         <SymbolProvider>
-          <Routes>
-            <Route element={<Shell />}>
-              <Route index element={<Bridge />} />
-              <Route path="results" element={<Navigate to="/results/day" replace />} />
-              <Route path="results/:kind" element={<Results />} />
-              <Route path="portfolio" element={<Holdings />} />
-              <Route path="portfolio/stocks" element={<StockPlans />} />
-              <Route path="portfolio/risk" element={<Risk />} />
-              <Route path="portfolio/tax" element={<Tax />} />
-              <Route path="portfolio/*" element={<NotFound />} />
-              <Route path="strategies" element={<Strategies />} />
-              <Route path="strategies/mixes" element={<Mixes />} />
-              <Route path="strategies/habits" element={<Patterns />} />
-              <Route path="strategies/habits/replay" element={<Replay />} />
-              <Route path="strategies/:id" element={<Strategy />} />
-              <Route path="strategies/*" element={<NotFound />} />
-              <Route path="decisions" element={<Decisions />} />
-              <Route path="decisions/journal" element={<Journal />} />
-              <Route path="decisions/flight" element={<Flight />} />
-              <Route path="decisions/*" element={<NotFound />} />
-              <Route path="research" element={<Research />} />
-              <Route path="research/sources" element={<ResearchSources />} />
-              <Route path="research/watchlist" element={<Watchlist />} />
-              <Route path="research/calendar" element={<ResearchCalendar />} />
-              <Route path="research/compare" element={<Compare />} />
-              <Route path="research/boards" element={<Boards />} />
-              <Route path="research/*" element={<NotFound />} />
-              <Route path="settings" element={<Settings tab="desk" />} />
-              <Route path="settings/crew" element={<Settings tab="crew" />} />
-              <Route path="settings/data" element={<Settings tab="data" />} />
-              <Route path="settings/box" element={<Settings tab="box" />} />
-              <Route path="settings/risk" element={<RiskCheck />} />
-              <Route path="settings/first-run" element={<FirstRun />} />
-              <Route path="start" element={<FirstRun />} />
-              <Route path="plan/*" element={<Moved />} />
-              <Route path="lab/*" element={<Moved />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
+          <StartProvider>
+            <Routes>
+              <Route element={<Shell />}>
+                <Route index element={<Bridge />} />
+                <Route path="results" element={<Navigate to="/results/day" replace />} />
+                <Route path="results/:kind" element={<Results />} />
+                <Route path="portfolio" element={<Holdings />} />
+                <Route path="portfolio/stocks" element={<StockPlans />} />
+                <Route path="portfolio/risk" element={<Risk />} />
+                <Route path="portfolio/tax" element={<Tax />} />
+                <Route path="portfolio/*" element={<NotFound />} />
+                <Route path="strategies" element={<Strategies />} />
+                <Route path="strategies/mixes" element={<Mixes />} />
+                <Route path="strategies/habits" element={<Patterns />} />
+                <Route path="strategies/habits/replay" element={<Replay />} />
+                <Route path="strategies/:id" element={<Strategy />} />
+                <Route path="strategies/*" element={<NotFound />} />
+                <Route path="decisions" element={<Decisions />} />
+                <Route path="decisions/journal" element={<Journal />} />
+                <Route path="decisions/flight" element={<Flight />} />
+                <Route path="decisions/*" element={<NotFound />} />
+                <Route path="research" element={<Research />} />
+                <Route path="research/sources" element={<ResearchSources />} />
+                <Route path="research/watchlist" element={<Watchlist />} />
+                <Route path="research/calendar" element={<ResearchCalendar />} />
+                <Route path="research/compare" element={<Compare />} />
+                <Route path="research/boards" element={<Boards />} />
+                <Route path="research/*" element={<NotFound />} />
+                <Route path="settings" element={<Settings tab="desk" />} />
+                <Route path="settings/crew" element={<Settings tab="crew" />} />
+                <Route path="settings/data" element={<Settings tab="data" />} />
+                <Route path="settings/box" element={<Settings tab="box" />} />
+                <Route path="settings/risk" element={<RiskCheck />} />
+                <Route path="settings/first-run" element={<FirstRun />} />
+                <Route path="start" element={<FirstRun />} />
+                <Route path="plan/*" element={<Moved />} />
+                <Route path="lab/*" element={<Moved />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </StartProvider>
         </SymbolProvider>
       </ConsoleProvider>
     </LiveProvider>

@@ -8,6 +8,7 @@ import { dayLabel } from '../lib/charts.js';
 import { assumptions, backtestLine, bandAt, caseOf, chanceText, feeText, fiHeadline, fitBadge, mixLine, mixesHead, money, movesText, rankDots, rewardText, yearsText } from '../lib/mixes.js';
 import { signedPct } from '../lib/strategy.js';
 import { trackText } from '../lib/leaderboard.js';
+import { EmptyState, GapNote } from '../start/EmptyState.jsx';
 
 function Rank({ rank }) {
   return (
@@ -303,6 +304,7 @@ export default function Mixes() {
   return (
     <>
       <LabHero kicker="Mixes" title="Mixes" big={big} />
+      {d?.status === 'ok' && rows.length ? <GapNote k="strategies.mixes" /> : null}
       {api.loading && !d ? (
         <section className="card">
           <p className="empty-hint">Running the mixes through market history…</p>
@@ -312,8 +314,8 @@ export default function Mixes() {
           <p className="empty-hint">{api.error.status === 404 ? 'Mixes switch on with the next engine update.' : 'The bands didn’t load. They come back with the desk API.'}</p>
         </section>
       ) : d?.status !== 'ok' || !rows.length ? (
-        <section className="card" data-testid="mixes-empty">
-          <p className="empty-hint">{d?.note || 'The bands are built with the daily numbers. They show here after the next run.'}</p>
+        <section className="card es-card" data-testid="mixes-empty">
+          <EmptyState k="strategies.mixes" icon="layers" title="No mixes to compare yet" why={d?.note || 'The bands are built with the daily numbers. They show here after the next run.'} onFilled={api.reload} />
         </section>
       ) : (
         <section className="grid" data-testid="mixes">

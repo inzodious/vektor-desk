@@ -7,6 +7,8 @@ import { Icon } from '../components/Icon.jsx';
 import { postJson, useApi } from '../lib/api.js';
 import { countdown, firstRunScore, firstRunSteps } from '../lib/firstrun.js';
 import { jobWord, refusalText, runAndWait } from '../lib/jobs.js';
+import { StartPanel } from '../start/StartDesk.jsx';
+import { useStart } from '../start/context.js';
 
 function Step({ s, n, run, onRun, onPost, alive }) {
   const r = run[s.id];
@@ -68,6 +70,7 @@ export default function FirstRun() {
   const board = useApi('/api/engine/lab/leaderboard');
   const risk = useApi('/api/decisions/risk');
   const [run, setRun] = useState({});
+  const { reloadSetup } = useStart();
   const ctl = useRef(null);
   useEffect(() => {
     ctl.current = new AbortController();
@@ -86,6 +89,7 @@ export default function FirstRun() {
       const ok = last?.result !== 'failed';
       setRun((m) => ({ ...m, [step.id]: { phase: ok ? 'done' : 'failed', text: ok ? `${title} done.` : `${title} didn’t finish${last?.detail ? `: ${last.detail}` : '.'}` } }));
       [status, jobs, health, board].forEach((x) => x.reload());
+      reloadSetup();
     } catch (e) {
       if (e.name !== 'AbortError') setRun((m) => ({ ...m, [step.id]: { phase: 'refused', text: refusalText(e) } }));
     }
@@ -97,6 +101,7 @@ export default function FirstRun() {
       const r = await postJson(path);
       setRun((m) => ({ ...m, [step.id]: { phase: 'done', text: r?.message || 'Done.' } }));
       profile.reload();
+      reloadSetup();
     } catch (e) {
       const text = e.status === 404 ? 'This button switches on with the next desk update.' : e.status === 409 ? 'You already have one. Open Settings → Desk to see it.' : e.message;
       setRun((m) => ({ ...m, [step.id]: { phase: 'refused', text } }));
@@ -125,10 +130,11 @@ export default function FirstRun() {
           </>
         }
       />
+      <StartPanel always />
       <section className="card fr" data-testid="first-run" data-done={score.done} data-total={score.total}>
         <div className="card-head">
           <span className="tag mint">Launch sequence</span>
-          <span className="chip">Everything runs from here; no terminal needed</span>
+          <span className="chip">Or one step at a time; no terminal needed</span>
         </div>
         <span className="lb-track fr-track" role="img" aria-label={`${score.done} of ${score.total} steps done`}>
           <i style={{ width: `${score.share * 100}%` }} />

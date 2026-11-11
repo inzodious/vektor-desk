@@ -11,6 +11,7 @@ import { dayLabel, divergingColor } from '../lib/charts.js';
 import { baseRateText, fundingItems, patternValue, seasonGrid, setupItems } from '../lib/flight.js';
 import { pct, usd } from '../lib/format.js';
 import { headline } from '../lib/replay.js';
+import { GapGate } from '../start/EmptyState.jsx';
 
 const signedUsd = (v) => (v == null ? '—' : usd(v, { sign: true }));
 
@@ -144,123 +145,125 @@ export default function Patterns() {
           <p className="muted">Patterns come back as soon as it does.</p>
         </section>
       ) : (
-        <>
-          <ReplayTease />
-          <RuleTests />
-          <section className="card" data-testid="market">
-            <div className="card-head">
-              <span className="tag">The market today</span>
-              <span className="chip">{d?.as_of ? `As of ${dayLabel(d.as_of)}` : 'Market context'}</span>
-            </div>
-            {mkt.length ? (
-              <div className="pats four">
-                {mkt.map((p) => (
-                  <PatternTile p={p} key={p.id} />
-                ))}
-              </div>
-            ) : (
-              <p className="empty-hint">{api.loading ? 'Reading the tape…' : 'No market context yet. It runs with the nightly engine.'}</p>
-            )}
-          </section>
-          <section className="grid">
-            <div className="card c6" data-testid="holdings">
+        <GapGate k="strategies.habits" icon="user" title="No habits to read yet" hasData={Boolean(mkt.length || d?.drawdowns?.length || Object.keys(d?.holdings || {}).length || Object.keys(b || {}).length)}>
+          <>
+            <ReplayTease />
+            <RuleTests />
+            <section className="card" data-testid="market">
               <div className="card-head">
-                <span className="tag mint">Your holdings</span>
-                <span className="chip">Where each sits against its own past</span>
+                <span className="tag">The market today</span>
+                <span className="chip">{d?.as_of ? `As of ${dayLabel(d.as_of)}` : 'Market context'}</span>
               </div>
-              <Holdings holdings={d?.holdings || {}} />
-            </div>
-            <div className="card c6" data-testid="drawdowns">
+              {mkt.length ? (
+                <div className="pats four">
+                  {mkt.map((p) => (
+                    <PatternTile p={p} key={p.id} />
+                  ))}
+                </div>
+              ) : (
+                <p className="empty-hint">{api.loading ? 'Reading the tape…' : 'No market context yet. It runs with the nightly engine.'}</p>
+              )}
+            </section>
+            <section className="grid">
+              <div className="card c6" data-testid="holdings">
+                <div className="card-head">
+                  <span className="tag mint">Your holdings</span>
+                  <span className="chip">Where each sits against its own past</span>
+                </div>
+                <Holdings holdings={d?.holdings || {}} />
+              </div>
+              <div className="card c6" data-testid="drawdowns">
+                <div className="card-head">
+                  <span className="tag mustard">Drawdown base rates</span>
+                </div>
+                <Drawdowns rows={d?.drawdowns || []} />
+                <p className="empty-hint" style={{ marginTop: 6 }}>
+                  Trading days from an old high back to it, for past drops at least this deep. A base rate, not a call.
+                </p>
+              </div>
+            </section>
+            <section className="grid">
+              <div className="card c7" data-testid="seasonality">
+                <div className="card-head">
+                  <span className="tag sky">Month by month, on average</span>
+                  <span className="chip">{d?.seasonality_note || 'Description, never a signal'}</span>
+                </div>
+                {season.rows.length ? (
+                  <Heatmap
+                    rows={season.rows}
+                    cols={season.cols}
+                    values={season.values}
+                    color={(v) => divergingColor(v, 0.08)}
+                    fmt={(v) => pct(v, 1, true)}
+                    name="Average month"
+                    label="Average return by calendar month"
+                    cellH={28}
+                    tipHead={(i, j) => `${season.rows[i]} · ${season.cols[j]}`}
+                    scale={
+                      <div className="scale">
+                        Down
+                        <i className="div" />
+                        Up
+                      </div>
+                    }
+                  />
+                ) : (
+                  <p className="empty-hint">Not enough months yet.</p>
+                )}
+              </div>
+              <div className="card c5" data-testid="corr-shifts">
+                <div className="card-head">
+                  <span className="tag lilac">Moving together more</span>
+                </div>
+                {d?.corr_shifts?.length ? (
+                  <HBars items={d.corr_shifts.map((c) => ({ label: c.symbol, value: c.shift, hint: `${c.n} days` }))} fmt={(v) => v.toFixed(2)} name="Change in correlation" labelW={80} />
+                ) : (
+                  <p className="empty-hint">No holding changed how it moves with the rest by enough to notice. Shifts of 0.3 or more show here.</p>
+                )}
+              </div>
+            </section>
+            <section className="card" data-testid="behavior">
               <div className="card-head">
-                <span className="tag mustard">Drawdown base rates</span>
+                <span className="tag coral">Your own habits</span>
+                <span className="chip">Your buys against the safe mix, 90 days</span>
               </div>
-              <Drawdowns rows={d?.drawdowns || []} />
-              <p className="empty-hint" style={{ marginTop: 6 }}>
-                Trading days from an old high back to it, for past drops at least this deep. A base rate, not a call.
+              <div className="mini-kpis">
+                <div>
+                  <small>Trades a month</small>
+                  <b>{b?.trades_per_month ?? '—'}</b>
+                  <span className="tile-line">over the last year</span>
+                </div>
+                <div>
+                  <small>Single stocks held</small>
+                  <b>{b?.single_stock_hold_days_median == null ? '—' : `${b.single_stock_hold_days_median} days`}</b>
+                  <span className="tile-line">{b?.single_stock_sales ? `median over ${b.single_stock_sales} sales` : 'no single-stock sales yet'}</span>
+                </div>
+                <div>
+                  <small>Buys scored</small>
+                  <b>{Object.values(b?.buys_by_setup || {}).reduce((a, x) => a + (x.n || 0), 0)}</b>
+                  <span className="tile-line">yours, not the desks&apos;</span>
+                </div>
+              </div>
+              <div className="grid hab">
+                <div className="c6">
+                  <span className="kicker">By what the stock did the month before</span>
+                  <HBars items={setups} fmt={signedUsd} name="Average against the safe mix" labelW={140} table={false} empty="No scored buys of your own yet." />
+                </div>
+                <div className="c6">
+                  <span className="kicker">By how you paid</span>
+                  <HBars items={funding} fmt={signedUsd} name="Average against the safe mix" labelW={160} table={false} empty="Nothing to split yet." />
+                </div>
+              </div>
+              {b?.note ? <p className="empty-hint">{b.note}</p> : null}
+            </section>
+            {d?.left_out ? (
+              <p className="note" role="note">
+                <Icon name="info" />
+                <span>Left out on purpose: {d.left_out}</span>
               </p>
-            </div>
-          </section>
-          <section className="grid">
-            <div className="card c7" data-testid="seasonality">
-              <div className="card-head">
-                <span className="tag sky">Month by month, on average</span>
-                <span className="chip">{d?.seasonality_note || 'Description, never a signal'}</span>
-              </div>
-              {season.rows.length ? (
-                <Heatmap
-                  rows={season.rows}
-                  cols={season.cols}
-                  values={season.values}
-                  color={(v) => divergingColor(v, 0.08)}
-                  fmt={(v) => pct(v, 1, true)}
-                  name="Average month"
-                  label="Average return by calendar month"
-                  cellH={28}
-                  tipHead={(i, j) => `${season.rows[i]} · ${season.cols[j]}`}
-                  scale={
-                    <div className="scale">
-                      Down
-                      <i className="div" />
-                      Up
-                    </div>
-                  }
-                />
-              ) : (
-                <p className="empty-hint">Not enough months yet.</p>
-              )}
-            </div>
-            <div className="card c5" data-testid="corr-shifts">
-              <div className="card-head">
-                <span className="tag lilac">Moving together more</span>
-              </div>
-              {d?.corr_shifts?.length ? (
-                <HBars items={d.corr_shifts.map((c) => ({ label: c.symbol, value: c.shift, hint: `${c.n} days` }))} fmt={(v) => v.toFixed(2)} name="Change in correlation" labelW={80} />
-              ) : (
-                <p className="empty-hint">No holding changed how it moves with the rest by enough to notice. Shifts of 0.3 or more show here.</p>
-              )}
-            </div>
-          </section>
-          <section className="card" data-testid="behavior">
-            <div className="card-head">
-              <span className="tag coral">Your own habits</span>
-              <span className="chip">Your buys against the safe mix, 90 days</span>
-            </div>
-            <div className="mini-kpis">
-              <div>
-                <small>Trades a month</small>
-                <b>{b?.trades_per_month ?? '—'}</b>
-                <span className="tile-line">over the last year</span>
-              </div>
-              <div>
-                <small>Single stocks held</small>
-                <b>{b?.single_stock_hold_days_median == null ? '—' : `${b.single_stock_hold_days_median} days`}</b>
-                <span className="tile-line">{b?.single_stock_sales ? `median over ${b.single_stock_sales} sales` : 'no single-stock sales yet'}</span>
-              </div>
-              <div>
-                <small>Buys scored</small>
-                <b>{Object.values(b?.buys_by_setup || {}).reduce((a, x) => a + (x.n || 0), 0)}</b>
-                <span className="tile-line">yours, not the desks&apos;</span>
-              </div>
-            </div>
-            <div className="grid hab">
-              <div className="c6">
-                <span className="kicker">By what the stock did the month before</span>
-                <HBars items={setups} fmt={signedUsd} name="Average against the safe mix" labelW={140} table={false} empty="No scored buys of your own yet." />
-              </div>
-              <div className="c6">
-                <span className="kicker">By how you paid</span>
-                <HBars items={funding} fmt={signedUsd} name="Average against the safe mix" labelW={160} table={false} empty="Nothing to split yet." />
-              </div>
-            </div>
-            {b?.note ? <p className="empty-hint">{b.note}</p> : null}
-          </section>
-          {d?.left_out ? (
-            <p className="note" role="note">
-              <Icon name="info" />
-              <span>Left out on purpose: {d.left_out}</span>
-            </p>
-          ) : null}
-        </>
+            ) : null}
+          </>
+        </GapGate>
       )}
     </>
   );

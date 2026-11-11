@@ -1,0 +1,173 @@
+{
+ "now": "2026-11-11T14:00:00Z",
+ "start": {
+  "state": "done",
+  "needs_start": true
+ },
+ "sections": [
+  {
+   "key": "bridge.value",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "bridge.brief",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.day",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.week",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.month",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.year",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.debrief",
+   "state": "blocked",
+   "why": "The Debrief desk is switched off.",
+   "action": {
+    "kind": "link",
+    "to": "/settings/crew",
+    "label": "Switch it on"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.holdings",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.stock_plans",
+   "state": "blocked",
+   "why": "The Claude token has expired, so the Plan desk can’t write new drafts.",
+   "action": {
+    "kind": "link",
+    "to": "/settings/box",
+    "label": "Renew the token"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.risk",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.tax",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.race",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.mixes",
+   "state": "stale",
+   "why": "Market history is from October; the monthly fetch hasn’t run since.",
+   "action": {
+    "kind": "job",
+    "job": "engine-french",
+    "label": "Fetch it now"
+   },
+   "next_auto": "2026-12-02T08:30:00Z",
+   "next_auto_text": "Dec 2 at 3:30 AM"
+  },
+  {
+   "key": "strategies.habits",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "decisions.queue",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "decisions.journal",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "research.feed",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "research.boards",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "settings.risk_check",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  }
+ ]
+}

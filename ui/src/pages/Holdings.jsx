@@ -15,6 +15,7 @@ import { dayLabel } from '../lib/charts.js';
 import { QUALITY } from '../lib/quality.js';
 import { plural, usd } from '../lib/format.js';
 import { emptyText, moneyIn, rhythmText, seenText } from '../lib/deposits.js';
+import { GapGate } from '../start/EmptyState.jsx';
 
 const HEAD_IDS = 'plan.drift_max,plan.in_mix,plan.single_stock,plan.rules,fi.progress';
 const TILT = { growth: 'Growth tilt', balanced: 'Balanced', income: 'Income tilt' };
@@ -291,48 +292,50 @@ export default function Holdings() {
           </>
         }
       />
-      <section className="kpis kpis-6">
-        <Kpi i={1} label={words.label} metric="plan.drift_max" value={driftV == null ? '—' : driftV.toFixed(1)} unit="pts" tone={driftTone(reference, driftV, limits)} line={words.line} quality={drift?.quality} asOf={engineAsOf} />
-        <Kpi i={2} label="Next deposit" metric="plan.next_deposit" value={next ? usd(next) : '—'} line={next ? `${plural(funds.filter((f) => f.next > 0).length, 'fund')} get some` : profile.data?.deposits_mode === 'auto' ? 'None on a steady rhythm' : 'Nothing scheduled'} quality={nextModelled ? 'modelled' : undefined} asOf={engineAsOf} />
-        <Kpi i={3} label="Rules" metric="plan.rules" value={ruleRows.length ? `${passing} of ${ruleRows.length}` : '—'} tone={ruleRows.length && passing < ruleRows.length ? 'watch' : undefined} line={ruleRows.length && passing === ruleRows.length ? 'All passing' : 'Some need a look'} asOf={engineAsOf} />
-        <Kpi i={4} label="In the mix" metric="plan.in_mix" value={inMixV == null ? '—' : inMixV.toFixed(1)} unit="%" line={reference.judged ? 'Of the desk in funds with a target' : `Of the desk in funds ${reference.mix} holds`} quality={inMix?.quality} asOf={engineAsOf} />
-        <Kpi i={5} label="Single stocks" metric="plan.single_stock" value={singleV == null ? '—' : singleV.toFixed(1)} unit="%" line={`Cap ${limits.satelliteCap}%`} quality={single?.quality} asOf={engineAsOf} />
-        <Kpi i={6} label="FI progress" metric="fi.progress" value={fiV == null ? 'Not yet' : fiV.toFixed(1)} unit={fiV == null ? undefined : '%'} line={fiV == null ? 'Needs the FI path' : 'of the FI number'} quality={fiV == null ? undefined : fi?.quality} asOf={fiV == null ? null : engineAsOf} onOpen={() => document.querySelector('[data-testid="fi-path"]')?.scrollIntoView({ block: 'start' })} />
-      </section>
-      <section className="grid">
-        {ctx.symbols.length ? (
-          <div className="card c12" style={{ '--i': 7 }} data-testid="holdings-board">
-            <div className="card-head">
-              <span className="tag mustard">Departures board</span>
-              <span className="acts">
-                <span className="muted" style={{ fontSize: 12 }}>
-                  Pick a row for its symbol sheet
+      <GapGate k="portfolio.holdings" icon="portfolio" title="No holdings yet" hasData={ctx.symbols.length > 0 || funds.length > 0}>
+        <section className="kpis kpis-6">
+          <Kpi i={1} label={words.label} metric="plan.drift_max" value={driftV == null ? '—' : driftV.toFixed(1)} unit="pts" tone={driftTone(reference, driftV, limits)} line={words.line} quality={drift?.quality} asOf={engineAsOf} />
+          <Kpi i={2} label="Next deposit" metric="plan.next_deposit" value={next ? usd(next) : '—'} line={next ? `${plural(funds.filter((f) => f.next > 0).length, 'fund')} get some` : profile.data?.deposits_mode === 'auto' ? 'None on a steady rhythm' : 'Nothing scheduled'} quality={nextModelled ? 'modelled' : undefined} asOf={engineAsOf} />
+          <Kpi i={3} label="Rules" metric="plan.rules" value={ruleRows.length ? `${passing} of ${ruleRows.length}` : '—'} tone={ruleRows.length && passing < ruleRows.length ? 'watch' : undefined} line={ruleRows.length && passing === ruleRows.length ? 'All passing' : 'Some need a look'} asOf={engineAsOf} />
+          <Kpi i={4} label="In the mix" metric="plan.in_mix" value={inMixV == null ? '—' : inMixV.toFixed(1)} unit="%" line={reference.judged ? 'Of the desk in funds with a target' : `Of the desk in funds ${reference.mix} holds`} quality={inMix?.quality} asOf={engineAsOf} />
+          <Kpi i={5} label="Single stocks" metric="plan.single_stock" value={singleV == null ? '—' : singleV.toFixed(1)} unit="%" line={`Cap ${limits.satelliteCap}%`} quality={single?.quality} asOf={engineAsOf} />
+          <Kpi i={6} label="FI progress" metric="fi.progress" value={fiV == null ? 'Not yet' : fiV.toFixed(1)} unit={fiV == null ? undefined : '%'} line={fiV == null ? 'Needs the FI path' : 'of the FI number'} quality={fiV == null ? undefined : fi?.quality} asOf={fiV == null ? null : engineAsOf} onOpen={() => document.querySelector('[data-testid="fi-path"]')?.scrollIntoView({ block: 'start' })} />
+        </section>
+        <section className="grid">
+          {ctx.symbols.length ? (
+            <div className="card c12" style={{ '--i': 7 }} data-testid="holdings-board">
+              <div className="card-head">
+                <span className="tag mustard">Departures board</span>
+                <span className="acts">
+                  <span className="muted" style={{ fontSize: 12 }}>
+                    Pick a row for its symbol sheet
+                  </span>
                 </span>
+              </div>
+              <Board rows={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} />
+            </div>
+          ) : null}
+          <div className="card c7" style={{ '--i': 7 }} data-testid="drift-card" data-judged={reference.judged ? 'yes' : 'no'}>
+            <div className="card-head">
+              <span className="tag mint">{words.tag}</span>
+              <span className="acts">
+                <span className="chip">{reference.judged ? `${plural(inPlan.length, 'fund')} with a target` : `${plural(inPlan.length, 'fund')} in the mix`}</span>
               </span>
             </div>
-            <Board rows={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} />
+            {inPlan.length ? <DriftRows rows={inPlan} band={limits.driftPts} values={values} judged={reference.judged} target={words.target} gap={words.gap} /> : <p className="empty-hint">Targets show after the engine&apos;s first daily run.</p>}
+            {reference.note ? (
+              <p className="note" style={{ marginTop: 10 }} data-testid="reference-note">
+                <Icon name="info" />
+                <span>{reference.note}</span>
+              </p>
+            ) : null}
           </div>
-        ) : null}
-        <div className="card c7" style={{ '--i': 7 }} data-testid="drift-card" data-judged={reference.judged ? 'yes' : 'no'}>
-          <div className="card-head">
-            <span className="tag mint">{words.tag}</span>
-            <span className="acts">
-              <span className="chip">{reference.judged ? `${plural(inPlan.length, 'fund')} with a target` : `${plural(inPlan.length, 'fund')} in the mix`}</span>
-            </span>
-          </div>
-          {inPlan.length ? <DriftRows rows={inPlan} band={limits.driftPts} values={values} judged={reference.judged} target={words.target} gap={words.gap} /> : <p className="empty-hint">Targets show after the engine&apos;s first daily run.</p>}
-          {reference.note ? (
-            <p className="note" style={{ marginTop: 10 }} data-testid="reference-note">
-              <Icon name="info" />
-              <span>{reference.note}</span>
-            </p>
-          ) : null}
-        </div>
-        <Rules rules={ruleList} m={m} version={limits.rulesVersion} reference={reference} />
-        <Funds funds={funds} live={ctx.symbols} names={ctx.names} words={words} tone={(v) => driftTone(reference, v, limits)} />
-        <Deposits funds={funds} deposits={Array.isArray(p.deposits) ? p.deposits : []} mode={profile.data?.deposits_mode} landed={deposits.data?.deposits} deskValue={ctx.live?.value} words={words} />
-        <FiPath />
-      </section>
+          <Rules rules={ruleList} m={m} version={limits.rulesVersion} reference={reference} />
+          <Funds funds={funds} live={ctx.symbols} names={ctx.names} words={words} tone={(v) => driftTone(reference, v, limits)} />
+          <Deposits funds={funds} deposits={Array.isArray(p.deposits) ? p.deposits : []} mode={profile.data?.deposits_mode} landed={deposits.data?.deposits} deskValue={ctx.live?.value} words={words} />
+          <FiPath />
+        </section>
+      </GapGate>
     </>
   );
 }

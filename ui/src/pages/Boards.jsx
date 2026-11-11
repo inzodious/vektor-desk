@@ -4,6 +4,9 @@ import { Icon } from '../components/Icon.jsx';
 import { LabHero } from '../lab/parts.jsx';
 import { etStamp, plural } from '../lib/format.js';
 import { BOARD_VIEW, readBoards, removeBoard } from '../lib/lab.js';
+import { EmptyState } from '../start/EmptyState.jsx';
+
+const COMPARE = { kind: 'link', to: '/research/compare', label: 'Open Compare' };
 
 export default function Boards() {
   const [list, setList] = useState(() => readBoards());
@@ -54,7 +57,7 @@ export default function Boards() {
               })}
             </div>
           ) : (
-            <p className="empty-hint">No boards yet. Set up a Compare, Risk or My habits view the way you like it, then press Save as a board.</p>
+            <EmptyState k="research.boards" slim icon="layers" why="No boards yet. Set up a Compare, Risk or My habits view the way you like it, then press Save as a board." action={COMPARE} />
           )}
         </div>
         <div className="stack c4">

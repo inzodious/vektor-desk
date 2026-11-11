@@ -14,6 +14,7 @@ import { bandsFixtures } from './bands.mjs';
 import { discountsFixtures } from './discounts.mjs';
 import { readReviews, reviewsFixtures } from './reviews.mjs';
 import { referenceFixtures } from './reference.mjs';
+import { startFixtures } from './start.mjs';
 import { plansFixtures, readPlans, seedPlans } from './stockplans.mjs';
 import { convictionsFixtures, withEditable } from './convictions.mjs';
 import { withFilingSignals } from './filing-signals.mjs';
@@ -244,3 +245,7 @@ for (const [name, body] of Object.entries(convictionsFixtures(await get('/api/de
 const profileStatus = await get('/api/decisions/profile/status');
 save('decisions.profile.status.empty', { ...profileStatus, path: '/data/desk.yaml' });
 await import('./fresh.mjs');
+
+// ---------- start the desk ----------
+for (const [name, body] of Object.entries(startFixtures())) save(name, body);
+await import('./never.mjs');

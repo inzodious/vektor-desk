@@ -1,0 +1,161 @@
+{
+ "now": "2026-11-11T14:00:00Z",
+ "start": {
+  "state": "done",
+  "needs_start": false
+ },
+ "sections": [
+  {
+   "key": "bridge.value",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "bridge.brief",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.day",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.week",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.month",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.year",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.debrief",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.holdings",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.stock_plans",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.risk",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.tax",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.race",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.mixes",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.habits",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "decisions.queue",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "decisions.journal",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "research.feed",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "research.boards",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "settings.risk_check",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  }
+ ]
+}

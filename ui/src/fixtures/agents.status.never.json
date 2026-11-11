@@ -1,0 +1,238 @@
+{
+ "enabled": false,
+ "enabled_source": "desk.yaml",
+ "busy": false,
+ "guard": {
+  "on": true,
+  "allowed": [
+   "plan_keeper",
+   "tax",
+   "debrief",
+   "plans"
+  ],
+  "ready": false,
+  "why": "The Plan keeper and the Tax desk haven't finished a run yet."
+ },
+ "desks": [
+  {
+   "desk": "plan_keeper",
+   "title": "Plan keeper",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 10
+   }
+  },
+  {
+   "desk": "debrief",
+   "title": "Debrief desk",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": true,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": true,
+   "guarded": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 16
+   }
+  },
+  {
+   "desk": "tax",
+   "title": "Tax desk",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 8
+   }
+  },
+  {
+   "desk": "plans",
+   "title": "Plan desk",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": true,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": true,
+   "guarded": false,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 34
+   }
+  },
+  {
+   "desk": "risk",
+   "title": "Risk desk",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": true,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 3
+   }
+  },
+  {
+   "desk": "research",
+   "title": "Research desk",
+   "model": "opus",
+   "effort": "xhigh",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": true,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 4
+   }
+  },
+  {
+   "desk": "skeptic",
+   "title": "Skeptic",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": true,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 10
+   }
+  },
+  {
+   "desk": "discounts",
+   "title": "Discount cases",
+   "model": "opus",
+   "effort": "xhigh",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": true,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 21
+   }
+  },
+  {
+   "desk": "scout",
+   "title": "Scout",
+   "model": "opus",
+   "effort": "xhigh",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": true,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 1
+   }
+  },
+  {
+   "desk": "strategy",
+   "title": "Strategy desk",
+   "model": "opus",
+   "effort": "xhigh",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": true,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 12
+   }
+  },
+  {
+   "desk": "filings",
+   "title": "Filings desk",
+   "model": "opus",
+   "effort": "high",
+   "live": true,
+   "enabled": false,
+   "source": "desk.yaml",
+   "app": null,
+   "yaml": false,
+   "guarded": true,
+   "last_run": null,
+   "next_run": null,
+   "week": {
+    "runs": 0,
+    "turns": 0,
+    "tokens": 0,
+    "cap": 280
+   }
+  }
+ ]
+}

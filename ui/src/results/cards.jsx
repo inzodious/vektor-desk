@@ -5,6 +5,7 @@ import { etStamp, usd } from '../lib/format.js';
 import { statusWord } from '../lib/convictions.js';
 import { accountName, bandLine, debriefState, decisionRows, diffText, eventWord, kpis, ledger, moverLine, moverRows, riskFacts, scoreLine, versusLine, versusRows, versusScale } from '../lib/results.js';
 import { signedPct } from '../lib/strategy.js';
+import { EmptyState } from '../start/EmptyState.jsx';
 
 const SHOW = 8;
 
@@ -84,9 +85,9 @@ export function Debrief({ review }) {
           </dl>
         </>
       ) : (
-        <p className="empty-hint" data-testid="rs-debrief-wait">
-          {st.hint} The numbers on this page are already final enough to read.
-        </p>
+        <div data-testid="rs-debrief-wait">
+          <EmptyState k="results.debrief" slim icon="clock" why={`${st.hint} The numbers on this page are already final enough to read.`} />
+        </div>
       )}
     </div>
   );
@@ -422,28 +423,5 @@ export function Events({ pack, i }) {
         ))}
       </ul>
     </div>
-  );
-}
-
-export function FirstRun({ note }) {
-  return (
-    <section className="card rs-first" data-testid="rs-first">
-      <div className="card-head">
-        <span className="tag coral">Armed for the first run</span>
-      </div>
-      <p className="rs-headline">{note}</p>
-      <p className="muted">
-        Reviews run on weekdays after the 5:20 PM numbers, and the debrief follows at 5:50 PM. Watch it happen on{' '}
-        <Link className="link" to="/">
-          the Bridge
-        </Link>
-        , or run it now from{' '}
-        <Link className="link" to="/settings/box#jobs">
-          Settings → Jobs
-        </Link>
-        .
-      </p>
-      <Icon name="telescope" className="rs-first-ico" />
-    </section>
   );
 }
