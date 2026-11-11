@@ -4,6 +4,20 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.2.0 - 2026-11-11
+
+### Changed
+
+- The menu is regrouped into Bridge, Results, Portfolio, Strategies, Decisions and Research; Settings moves behind a gear with Desk, Crew, Data, Box, Risk check and First run; the Bridge fits one desktop screen and two phone screens with holdings, mix and discounts in drawers; "the plan" as a benchmark reads "the safe mix"; the Journal pages and filters. Old links redirect ([#168])
+- With no plan of your own loaded, Holdings and the Bridge show drift as a plain comparison with the safe mix: no watch tone, no rebalance prompt ([#171])
+- Briefs call the benchmark "the safe mix" ([#169])
+
+### Fixed
+
+- With no Escape Vektor plan loaded, the "vs the safe mix" card, drift and adherence are measured against the built-in safe mix instead of showing nothing; the drift rule is not judged against it ([#170])
+- Phone alerts from the desks open the right page after the menu regroup ([#169])
+- Plan and profile messages name the right screen, Settings → Risk check ([#167])
+
 ## 1.1.0 - 2026-11-10
 
 ### Added
@@ -450,3 +464,8 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#163]: https://github.com/inzodious/vektor-desk/pull/163
 [#164]: https://github.com/inzodious/vektor-desk/pull/164
 [#165]: https://github.com/inzodious/vektor-desk/pull/165
+[#167]: https://github.com/inzodious/vektor-desk/pull/167
+[#168]: https://github.com/inzodious/vektor-desk/pull/168
+[#169]: https://github.com/inzodious/vektor-desk/pull/169
+[#170]: https://github.com/inzodious/vektor-desk/pull/170
+[#171]: https://github.com/inzodious/vektor-desk/pull/171

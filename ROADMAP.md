@@ -198,7 +198,7 @@ From the outside review at 1.0.9 ([docs/review-2026-11.md](docs/review-2026-11.m
 | F4, F6, N6 | "As held" as a drifting hold; fees and a lower-returns case on every mix; Mixes leads with time to FI by monthly deposit | Bands and FI thread | ✅ (#164) |
 | N4 | Conviction position: hold, rebalance and trim views | Bands and FI thread | ✅ on Mixes (#164); ⏳ on the stock plan card |
 | N1 to N3 | Replay of his own trades under a size cap, an exit rule, no margin and a minimum hold | Replay thread | ✅ (#162) |
-| U1 to U5 | Menu regroup, Settings behind a gear, Bridge diet, single-plan wording retired, Journal paging | Design | ⏳ |
+| U1 to U5 | Menu regroup, Settings behind a gear, Bridge diet, single-plan wording retired, Journal paging | Menu thread | ✅ (#168) |
 | F7, N5 | Event study and placebo for every lane and family | Statistics, Agents | ⏳ |
 | N7, T1, C3 | Two new catalog mixes, a tax lens feeding stock plans, a ceiling and exit rule for conviction holds | Concept, Statistics | ⏳ |
 | C1 | Each desk reports the decisions it changed in the last 30 days | Agents, Lead | ⏳ |
