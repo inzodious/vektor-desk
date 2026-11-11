@@ -23,7 +23,7 @@ def test_failed_and_timed_out_runs_alert_ops_once_a_day(cfg):
     run_desk(get("tax"), "s", "p", cfg=cfg, schema={"type": "object"}, adapter=FakeAdapter({"tax": "no json"}))
     rows = sent(cfg, "ops")
     assert [t for _, t, _, _ in rows] == ["Tax desk failed", "Risk desk timed out"]
-    assert "boom" in rows[0][2] and rows[0][3] == cfg.public_url + "/settings"
+    assert "boom" in rows[0][2] and rows[0][3] == cfg.public_url + "/settings/crew"
 
 
 def test_usage_limit_and_ok_runs_stay_quiet(cfg):
@@ -47,7 +47,7 @@ def test_console_answer_goes_to_research_with_a_link(cfg):
 def test_lab_answers_link_to_the_lab(cfg):
     console.ask(cfg, "strategy", "Test a low-volatility tilt.", run_now=True)
     console.process_queue(cfg, now_only=True, lab=FakeLab(), decisions=FakeDecisions(), adapter=FakeAdapter({"strategy": experiment_answer()}))
-    assert sent(cfg)[-1][3] == cfg.public_url + "/lab"
+    assert sent(cfg)[-1][3] == cfg.public_url + "/strategies"
 
 
 def test_not_ready_answers_send_nothing(cfg):

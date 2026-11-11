@@ -101,12 +101,12 @@ Trigger kinds and where they go: `margin_debit`, `daily_move` and `concentration
 
 | Event | Topic | Priority | Opens | Repeats |
 |---|---|---|---|---|
-| Console or trigger request answered | research | default | `/research` (`/lab` for strategy, `/plan` for the Plan desk) | once per request |
-| Stock plan drafts saved | research | default | `/plan` | once per day |
-| Period debrief written | research | low for a day, else default | `/results` | once per period |
+| Console or trigger request answered | research | default | `/research` (`/strategies` for the Strategy desk, `/portfolio/stocks?symbol=SYM` for the Plan desk) | once per request |
+| Stock plan drafts saved | research | default | `/portfolio/stocks` | once per day |
+| Period debrief written | research | low for a day, else default | `/results/<kind>?end=<end>` | once per period |
 | Scheduled research dossier saved | research | low | `/research` | once per run |
-| Desk run failed or timed out | ops | default | `/settings` | once per desk, status and day |
-| Request dropped after busy or usage limit twice | ops | default | `/settings` | once per desk, status and day |
+| Desk run failed or timed out | ops | default | `/settings/crew` | once per desk, status and day |
+| Request dropped after busy or usage limit twice | ops | default | `/settings/crew` | once per desk, status and day |
 
 A first usage-limit hit stays quiet because it retries that night. A Console research run sends only the answer, not a second dossier alert.
 
@@ -196,9 +196,9 @@ Writes the words on the Results page (`docs/statistics.md` owns the period packs
 | Write | `desk.engine.review.record(cfg, kind, end, result)`, one debrief per (kind, end), rewritten when the pack restates; a refused debrief is noted on the run |
 | Debrief | `schemas/debrief.json`: `headline` ≤ 120, `what_happened` ≤ 700, `why` ≤ 700, `against_decisions` ≤ 500 (never empty; a stock sentence when there were no decisions), `watch` ≤ 4, `next_steps` ≤ 3 `{text, symbol}`, `numbers_cited` (keys of the pack's `numbers`; others dropped), plus `pack_digest`, `model`, `written_at`, `run_id` |
 | No call | Pack missing, or digest unchanged since the last debrief: no model call and no run row |
-| Alert | Phone alert on the research topic with the headline, linking to Results |
+| Alert | Phone alert on the research topic with the headline, opening that period on Results |
 | Stops | Usage limit, run lock busy, weekly cap (16), or switch off |
-| On switch | On by default behind `agents.enabled`; Settings → Desks turns it off. The first-run guard does not hold it, since it only writes text |
+| On switch | On by default behind `agents.enabled`; Settings → Crew turns it off. The first-run guard does not hold it, since it only writes text |
 
 `python -m desk.agents run debrief [--kinds day,week,month,year] [--so-far]` writes now; `dry-run debrief` shows the first pack's prompt.
 
@@ -217,7 +217,7 @@ Drafts and refreshes one stock plan per holding (`docs/concept.md` owns the plan
 | Pinned steps | A Console request to the Plan desk whose text is JSON `{"steps": [...]}` (the plan record's step fields) pins those steps to the symbol. They ride in every draft, even when the desk would keep the plan, until he drops the step from the plan or 60 days after its window |
 | Console | Any other text sent to the Plan desk with a symbol is his note for that plan and runs the desk for that holding |
 | Volume | `usage.plans_per_run` in `desk.yaml`, default 12, at most 30; the rest wait for the next run. Weekly cap is twice that plus 10 |
-| Alert | One phone alert per run that saved drafts, linking to Plan |
+| Alert | One phone alert per run that saved drafts, opening Portfolio → Stock plans |
 | Stops | Usage limit, run lock busy, weekly cap, switch off, or 2 failures in a row. A failed call keeps its reason for the next run |
 | On switch | On by default behind `agents.enabled`; the first-run guard does not hold it |
 
