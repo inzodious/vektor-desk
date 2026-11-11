@@ -17,7 +17,7 @@ import pytest
 
 from desk import jobrun
 from desk.api.app import create_app
-from desk.worker import Kind, offer, registry, snapshots, store
+from desk.worker import Kind, offer, online, registry, snapshots, store
 from desk.worker import api as worker_api
 from desk.worker.__main__ import apply
 from desk.worker.client import loop
@@ -431,10 +431,20 @@ def test_the_worker_command_runs_end_to_end_and_keeps_its_key_out_of_the_job(liv
     assert empty.returncode == 2 and "DESK_WORKER_KEY" in empty.stderr
 
 
+def test_a_package_can_ask_whether_a_worker_is_online(cfg):
+    assert online(cfg) is False
+    worker = store.add_worker(cfg, "Horizon")
+    assert online(cfg, NOW) is False
+    store.beat(cfg, worker["id"], {}, NOW)
+    assert online(cfg, NOW + timedelta(seconds=90)) is True and online(cfg, NOW + timedelta(seconds=200)) is False
+    store.remove_worker(cfg, worker["id"])
+    assert online(cfg, NOW) is False
+
+
 def test_a_package_can_add_its_own_kind_through_the_seam(cfg, monkeypatch):
     kind = Kind("demo.count", "Count rows", slow, lambda cfg, job, path: "counted")
     monkeypatch.setattr("desk.worker.kinds.KINDS", [kind])
-    assert set(registry()) == {"demo.count"} and registry()["demo.count"].title == "Count rows"
+    assert set(registry(only=["worker"])) == {"demo.count"} and registry()["demo.count"].title == "Count rows"
 
 
 # ---- The one-time start on the other machine ----
