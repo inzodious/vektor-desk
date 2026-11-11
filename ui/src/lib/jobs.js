@@ -105,9 +105,11 @@ export function jobState(job) {
   if (job.queued) return { state: 'queued', line: 'Starting in a few seconds' };
   if (!last) return { state: 'never', line: 'Hasn’t run since the desk started' };
   const at = when(last.finished || last.started);
-  const by = last.trigger === 'request' ? ', on request' : '';
+  const by = last.trigger === 'request' ? ', on request' : last.trigger === 'start' ? ', from Start the desk' : '';
+  if (last.result === 'ok' && last.note) return { state: 'skipped', line: `Skipped ${at}${by}: ${last.note}` };
   if (last.result === 'ok') return { state: 'ok', line: `Ran ${at}${by}` };
-  if (last.result === 'failed') return { state: 'failed', line: `Didn’t finish ${at}${by}${last.detail ? `: ${last.detail}` : ''}` };
+  const why = last.error || last.detail;
+  if (last.result === 'failed') return { state: 'failed', line: `Didn’t finish ${at}${by}${why ? `: ${why}` : ''}` };
   if (last.result === 'skipped') return { state: 'skipped', line: `Skipped ${at}${last.detail ? `: ${last.detail}` : ''}` };
   return { state: 'ok', line: `Last ran ${at}` };
 }

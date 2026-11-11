@@ -7,6 +7,7 @@ import { dayLabel } from '../lib/charts.js';
 import { PORTFOLIO_TABS } from '../lib/areas.js';
 import { planCards, plansHead } from '../lib/stockPlans.js';
 import { BareCard, PlanCard } from '../plan/PlanCard.jsx';
+import { EmptyState, GapNote } from '../start/EmptyState.jsx';
 
 export default function StockPlans() {
   const plans = useApi('/api/decisions/plans');
@@ -67,13 +68,16 @@ export default function StockPlans() {
       />
       <section className="grid" data-testid="stock-plans" data-count={cards.length}>
         {!cards.length ? (
-          <div className="card c12 sp-first" style={{ '--i': 1 }} data-testid="plans-first">
-            <div className="card-head">
-              <span className="tag mint">First drafts on the way</span>
-            </div>
-            <p className="muted">The Plan desk writes a draft for each holding on its next run, weekdays at 6:40 PM. Nothing is in force until you approve it. You can also write one below right now.</p>
+          <div className="card c12 es-card" style={{ '--i': 1 }} data-testid="plans-first">
+            <EmptyState k="portfolio.stock_plans" icon="pin" title="No plans yet" why="The Plan desk writes a draft for each holding on its next run, weekdays at 6:40 PM.">
+              <small>Nothing is in force until you approve it. You can also write one below right now.</small>
+            </EmptyState>
           </div>
-        ) : null}
+        ) : (
+          <div className="c12 sp-gap">
+            <GapNote k="portfolio.stock_plans" />
+          </div>
+        )}
         {cards.map((card, n) => (
           <PlanCard key={card.symbol} card={card} meta={d} focus={focus === card.symbol} i={n + 1} onChanged={reload} />
         ))}

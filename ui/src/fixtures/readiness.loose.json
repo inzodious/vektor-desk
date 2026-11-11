@@ -1,0 +1,193 @@
+{
+ "now": "2026-11-11T14:00:00Z",
+ "start": {
+  "state": "done",
+  "needs_start": true
+ },
+ "sections": [
+  {
+   "key": "bridge.value",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "bridge.brief",
+   "state": "blocked",
+   "why": "All desks are switched off.",
+   "action": {
+    "kind": "link",
+    "to": "/settings/crew",
+    "label": "Switch the desks on"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "results.day",
+   "state": "stale",
+   "why": "The last review is behind: today’s run hasn’t happened.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": "2026-11-11T22:35:00Z",
+   "next_auto_text": "today at 5:35 PM"
+  },
+  {
+   "key": "results.week",
+   "state": "stale",
+   "why": "The last review is behind: today’s run hasn’t happened.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": "2026-11-11T22:35:00Z",
+   "next_auto_text": "today at 5:35 PM"
+  },
+  {
+   "key": "results.month",
+   "state": "stale",
+   "why": "The last review is behind: today’s run hasn’t happened.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": "2026-11-11T22:35:00Z",
+   "next_auto_text": "today at 5:35 PM"
+  },
+  {
+   "key": "results.year",
+   "state": "stale",
+   "why": "The last review is behind: today’s run hasn’t happened.",
+   "action": {
+    "kind": "job",
+    "job": "engine-review",
+    "label": "Write it now"
+   },
+   "next_auto": "2026-11-11T22:35:00Z",
+   "next_auto_text": "today at 5:35 PM"
+  },
+  {
+   "key": "results.debrief",
+   "state": "blocked",
+   "why": "All desks are switched off.",
+   "action": {
+    "kind": "link",
+    "to": "/settings/crew",
+    "label": "Switch the desks on"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.holdings",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.stock_plans",
+   "state": "blocked",
+   "why": "All desks are switched off.",
+   "action": {
+    "kind": "link",
+    "to": "/settings/crew",
+    "label": "Switch the desks on"
+   },
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.risk",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "portfolio.tax",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.race",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "strategies.mixes",
+   "state": "stale",
+   "why": "Market history is from October; the monthly fetch hasn’t run since.",
+   "action": {
+    "kind": "job",
+    "job": "engine-french",
+    "label": "Fetch it now"
+   },
+   "next_auto": "2026-12-02T08:30:00Z",
+   "next_auto_text": "Dec 2 at 3:30 AM"
+  },
+  {
+   "key": "strategies.habits",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "decisions.queue",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "decisions.journal",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "research.feed",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "research.boards",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  },
+  {
+   "key": "settings.risk_check",
+   "state": "ready",
+   "why": null,
+   "action": null,
+   "next_auto": null,
+   "next_auto_text": null
+  }
+ ]
+}

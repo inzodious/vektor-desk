@@ -5,6 +5,7 @@ import { Leaderboard } from '../lab/Leaderboard.jsx';
 import { useApi } from '../lib/api.js';
 import { plural } from '../lib/format.js';
 import { PAPER_DAYS, dayOf, STAGES, paperProgress, signedPts, splitStrategies, stageCounts, statusOf } from '../lib/strategy.js';
+import { GapNote } from '../start/EmptyState.jsx';
 
 // ---------- stage rail ----------
 function StageRail({ counts }) {
@@ -89,6 +90,8 @@ export default function Strategies() {
         </section>
       ) : (
         <>
+          <GapNote k="strategies.race" />
+          <GapNote k="settings.risk_check" />
           <Leaderboard />
           <StageRail counts={counts} />
           <section className="grid">

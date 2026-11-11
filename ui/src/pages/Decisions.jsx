@@ -10,6 +10,8 @@ import { accountLabel } from '../live/context.js';
 import { postJson, useApi } from '../lib/api.js';
 import { DECISION_TABS, kindName, needsReason, originName } from '../lib/decisions.js';
 import { usd } from '../lib/format.js';
+import { EmptyState } from '../start/EmptyState.jsx';
+import { useGap } from '../start/context.js';
 
 
 // ---------- to place ----------
@@ -73,6 +75,7 @@ export default function Decisions() {
   const [note, setNote] = useState(null);
   const detailRef = useRef(null);
   const all = useMemo(() => queue.data?.items || [], [queue.data]);
+  const gap = useGap('decisions.queue');
   const desks = useMemo(() => [{ v: 'all', t: 'All desks' }, ...[...new Set(all.map((d) => d.origin))].map((o) => ({ v: o, t: originName(o) }))], [all]);
   const items = desk === 'all' ? all : all.filter((d) => d.origin === desk);
   const want = params.get('d');
@@ -167,6 +170,8 @@ export default function Decisions() {
                   <ProposalCard key={d.id} d={d} on={d.id === cur} onPick={pick} />
                 ))}
               </div>
+            ) : gap && !all.length ? (
+              <EmptyState k="decisions.queue" icon="decisions" title="Nothing to decide yet" />
             ) : (
               <div className="queue-clear">
                 <Icon name="check" />

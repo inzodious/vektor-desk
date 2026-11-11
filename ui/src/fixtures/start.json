@@ -1,0 +1,114 @@
+{
+ "scheduler_alive": true,
+ "state": "done",
+ "needs_start": false,
+ "can_start": true,
+ "blocked": null,
+ "result": "ok",
+ "summary": "10 of 10 steps done.",
+ "started_at": "2026-11-11T14:02:10Z",
+ "finished_at": "2026-11-11T14:11:14Z",
+ "last_ok_at": "2026-11-11T14:11:14Z",
+ "steps": [
+  {
+   "id": "accounts",
+   "title": "Pull your accounts",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "mirror",
+   "started_at": "2026-11-11T14:02:14Z",
+   "finished_at": "2026-11-11T14:02:26Z"
+  },
+  {
+   "id": "prices",
+   "title": "Fetch price history",
+   "state": "skipped",
+   "detail": "Price history is already complete.",
+   "fix": null,
+   "job": "engine-backfill",
+   "started_at": null,
+   "finished_at": "2026-11-11T14:02:30Z"
+  },
+  {
+   "id": "numbers",
+   "title": "Run today’s numbers",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-daily",
+   "started_at": "2026-11-11T14:02:34Z",
+   "finished_at": "2026-11-11T14:03:04Z"
+  },
+  {
+   "id": "market",
+   "title": "Fetch market history",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-french",
+   "started_at": "2026-11-11T14:03:08Z",
+   "finished_at": "2026-11-11T14:03:47Z"
+  },
+  {
+   "id": "review",
+   "title": "Write the results review",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-review",
+   "started_at": "2026-11-11T14:03:51Z",
+   "finished_at": "2026-11-11T14:04:39Z"
+  },
+  {
+   "id": "discounts",
+   "title": "Scan for discounts",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-discounts",
+   "started_at": "2026-11-11T14:04:43Z",
+   "finished_at": "2026-11-11T14:05:40Z"
+  },
+  {
+   "id": "plan_keeper",
+   "title": "Check your plan",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-plan_keeper",
+   "started_at": "2026-11-11T14:05:44Z",
+   "finished_at": "2026-11-11T14:06:50Z"
+  },
+  {
+   "id": "debrief",
+   "title": "Write the debrief",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-debrief",
+   "started_at": "2026-11-11T14:06:54Z",
+   "finished_at": "2026-11-11T14:08:09Z"
+  },
+  {
+   "id": "plans",
+   "title": "Draft your stock plans",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-plans",
+   "started_at": "2026-11-11T14:08:13Z",
+   "finished_at": "2026-11-11T14:09:37Z"
+  },
+  {
+   "id": "paper",
+   "title": "Run the paper race",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-paper",
+   "started_at": "2026-11-11T14:09:41Z",
+   "finished_at": "2026-11-11T14:11:14Z"
+  }
+ ]
+}

@@ -1,0 +1,95 @@
+{
+ "version": 1,
+ "rules_version": 1,
+ "source": "defaults",
+ "loaded_at": "2026-11-11T03:45:28+00:00",
+ "warnings": [],
+ "error": null,
+ "profile": {
+  "agents": {
+   "desks": {
+    "debrief": true,
+    "discounts": false,
+    "filings": false,
+    "plan_keeper": false,
+    "plans": true,
+    "research": false,
+    "risk": false,
+    "scout": false,
+    "skeptic": false,
+    "strategy": false,
+    "tax": false
+   },
+   "enabled": false
+  },
+  "alerts": {
+   "min_priority": "default"
+  },
+  "deposits": [],
+  "fi": {
+   "birth_date": null,
+   "inflation_adjusted": false,
+   "inflation_pct": 0,
+   "multiple": 25,
+   "number_usd": null,
+   "target_age": null,
+   "target_date": null,
+   "yearly_spend_usd": null
+  },
+  "growth": {
+   "fi_target_from_plan": true,
+   "horizon_years": 10,
+   "tilt": "growth"
+  },
+  "industry_focus": {
+   "exclude": [],
+   "themes": []
+  },
+  "opportunity": {
+   "ideas_per_month": 2,
+   "min_confidence": 0.55,
+   "satellite_cap_pct": 10
+  },
+  "risk_level": 3,
+  "rules": [
+   {
+    "id": "no-margin-buys",
+    "kind": "no_margin_buys"
+   },
+   {
+    "id": "no-new-single-stocks",
+    "kind": "no_new_single_stocks"
+   },
+   {
+    "id": "drift-max",
+    "kind": "drift_max_pts",
+    "params": {
+     "pts": 5
+    }
+   }
+  ],
+  "tax": {
+   "harvest_threshold_usd": 250,
+   "lot_method": "highest_cost",
+   "wash_sale_accounts": [],
+   "year_end_start": "12-01"
+  },
+  "usage": {
+   "overnight_window": "01:00-05:00",
+   "weekly_runs": {}
+  }
+ },
+ "deposits_mode": "auto",
+ "editable": [
+  "industry_focus",
+  "opportunity",
+  "tax",
+  "growth",
+  "fi",
+  "usage",
+  "agents",
+  "deposits",
+  "alerts",
+  "rules"
+ ]
+}

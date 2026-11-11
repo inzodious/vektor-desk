@@ -1,0 +1,27 @@
+{
+ "version": "1.2.0",
+ "demo": false,
+ "mirror": {
+  "state": "empty",
+  "note": "The mirror hasn't run yet."
+ },
+ "claude_token": {
+  "state": "unknown",
+  "note": "Set DESK_CLAUDE_TOKEN_EXPIRES (YYYY-MM-DD) in desk.env."
+ },
+ "reviews": {
+  "due": "2026-11-11T22:35:00Z",
+  "job": null,
+  "kinds": {},
+  "missing": [
+   "day",
+   "week",
+   "month",
+   "year"
+  ],
+  "state": "empty",
+  "last_ok": null,
+  "note": "No reviews yet. The first run is 17:35 Eastern on a weekday, or Run now on Review."
+ },
+ "running": []
+}

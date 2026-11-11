@@ -11,6 +11,7 @@ import { dayLabel } from '../lib/charts.js';
 import { plural } from '../lib/format.js';
 import { todayEt } from '../lib/tax.js';
 import { freshness, verdictOf } from '../lib/research.js';
+import { EmptyState } from '../start/EmptyState.jsx';
 
 const SHOW = [
   { v: 'all', t: 'Everything' },
@@ -121,7 +122,7 @@ export default function Research() {
               <div className="card-head">
                 <span className="tag lilac">Dossiers</span>
               </div>
-              <p className="empty-hint">No dossiers yet. The research desk writes one per holding in rotation, or ask for a deep dive.</p>
+              <EmptyState k="research.feed" slim icon="research" why="No dossiers yet. The research desk writes one per holding in rotation, or ask for a deep dive." onFilled={r.dossiers.reload} />
             </div>
           )}
           <div className="card" data-testid="watch-card">

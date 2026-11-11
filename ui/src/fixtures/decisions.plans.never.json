@@ -1,0 +1,38 @@
+{
+ "items": [],
+ "roles": [
+  "core",
+  "conviction",
+  "satellite",
+  "exit"
+ ],
+ "step_kinds": [
+  "add",
+  "trim",
+  "hold",
+  "review",
+  "harvest",
+  "sell",
+  "repay",
+  "other"
+ ],
+ "lot_methods": {
+  "highest_cost": "Specific Shares, highest-cost lots",
+  "lowest_cost": "Specific Shares, lowest-cost lots",
+  "tax_efficient": "Specific Shares, tax-efficient lots",
+  "fifo": "first in, first out",
+  "lifo": "last in, first out"
+ },
+ "step_templates": {
+  "harvest": {
+   "kind": "harvest",
+   "lots": "highest_cost",
+   "no_buy_days": 31,
+   "note": "Tax-loss harvest. Pick Specific Shares at the broker."
+  },
+  "repay": {
+   "kind": "repay",
+   "note": "The deposit pays off the margin debit."
+  }
+ }
+}

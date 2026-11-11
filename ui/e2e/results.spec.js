@@ -75,8 +75,10 @@ test('a debrief written before the final numbers says so', async ({ page }) => {
 
 test('before the first run the page is armed, not empty', async ({ page }) => {
   await page.goto('/results/day?scenario=fresh');
-  await expect(page.locator('.ph-big')).toContainText('First run tonight');
-  await expect(page.getByTestId('rs-first')).toContainText('The first one runs after tonight’s numbers.');
+  await expect(page.locator('.ph-big')).toContainText('Nothing to show yet');
+  const empty = page.getByTestId('empty-state');
+  await expect(empty).toHaveAttribute('data-key', 'results.day');
+  await expect(empty).toContainText('The first one runs after tonight’s numbers.');
   await expect(page.getByTestId('results')).toHaveCount(0);
 });
 
@@ -84,7 +86,7 @@ test('an older desk without reviews explains itself, and unknown kinds go to Day
   await page.route('**/api/engine/reviews**', (route) => route.fulfill({ status: 404, json: { detail: 'Not Found' } }));
   await page.goto('/results/decade');
   await expect(page).toHaveURL(/\/results\/day$/);
-  await expect(page.getByTestId('rs-first')).toContainText('switch on with the next desk update');
+  await expect(page.getByTestId('empty-state')).toContainText('switch on with the next desk update');
 });
 
 test('Results opens from the menu and from the Review stage on the Bridge', async ({ page }) => {

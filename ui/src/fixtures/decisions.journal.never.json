@@ -1,0 +1,54 @@
+{
+ "days": [
+  {
+   "day": "2026-11-10",
+   "items": [
+    {
+     "id": "d_20261111034528_b74a87",
+     "created_at": "2026-11-11T03:45:28+00:00",
+     "updated_at": "2026-11-11T03:45:28+00:00",
+     "origin": "you",
+     "run_id": null,
+     "kind": "rule_change",
+     "title": "Rules set: No buying on margin, No new single stocks, Drift limit 5 points",
+     "symbol": null,
+     "account": null,
+     "amount_usd": null,
+     "shares": null,
+     "funding": null,
+     "thesis": "Rules set: No buying on margin, No new single stocks, Drift limit 5 points",
+     "bear_case": null,
+     "invalidation": null,
+     "horizon": null,
+     "rule_served": "drift-max,no-margin-buys,no-new-single-stocks",
+     "confidence": null,
+     "numbers_used": [],
+     "sources": [],
+     "order_ticket": null,
+     "skeptic": null,
+     "expires_at": null,
+     "status": "logged",
+     "status_reason": null,
+     "snoozed_until": null,
+     "override": false,
+     "override_reason": null,
+     "preflight_status": "none",
+     "preflight": null,
+     "preflight_at": null,
+     "tax_impact": null,
+     "profile_version": null,
+     "rules_version": 1,
+     "decided_at": "2026-11-11T03:45:28+00:00",
+     "placed_at": null,
+     "filled_at": null,
+     "fill": null,
+     "activity_id": null,
+     "decision": "logged",
+     "day": "2026-11-10",
+     "scores": {}
+    }
+   ]
+  }
+ ],
+ "count": 1
+}

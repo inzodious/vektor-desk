@@ -1,0 +1,117 @@
+{
+ "scheduler_alive": true,
+ "state": "running",
+ "needs_start": true,
+ "can_start": false,
+ "blocked": {
+  "error": "running",
+  "message": "The desk is starting now."
+ },
+ "result": null,
+ "summary": "Step 4 of 10: Fetch market history",
+ "started_at": "2026-11-11T14:02:10Z",
+ "finished_at": null,
+ "last_ok_at": null,
+ "steps": [
+  {
+   "id": "accounts",
+   "title": "Pull your accounts",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "mirror",
+   "started_at": "2026-11-11T14:02:14Z",
+   "finished_at": "2026-11-11T14:02:31Z"
+  },
+  {
+   "id": "prices",
+   "title": "Fetch price history",
+   "state": "skipped",
+   "detail": "Price history is already complete.",
+   "fix": null,
+   "job": "engine-backfill",
+   "started_at": null,
+   "finished_at": "2026-11-11T14:02:35Z"
+  },
+  {
+   "id": "numbers",
+   "title": "Run today’s numbers",
+   "state": "ok",
+   "detail": null,
+   "fix": null,
+   "job": "engine-daily",
+   "started_at": "2026-11-11T14:02:39Z",
+   "finished_at": "2026-11-11T14:03:23Z"
+  },
+  {
+   "id": "market",
+   "title": "Fetch market history",
+   "state": "running",
+   "detail": null,
+   "fix": null,
+   "job": "engine-french",
+   "started_at": "2026-11-11T14:03:27Z",
+   "finished_at": null
+  },
+  {
+   "id": "review",
+   "title": "Write the results review",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-review",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "discounts",
+   "title": "Scan for discounts",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-discounts",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "plan_keeper",
+   "title": "Check your plan",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-plan_keeper",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "debrief",
+   "title": "Write the debrief",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-debrief",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "plans",
+   "title": "Draft your stock plans",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-plans",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "paper",
+   "title": "Run the paper race",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-paper",
+   "started_at": null,
+   "finished_at": null
+  }
+ ]
+}

@@ -1,0 +1,114 @@
+{
+ "scheduler_alive": true,
+ "state": "idle",
+ "needs_start": true,
+ "can_start": true,
+ "blocked": null,
+ "result": null,
+ "summary": null,
+ "started_at": null,
+ "finished_at": null,
+ "last_ok_at": null,
+ "steps": [
+  {
+   "id": "accounts",
+   "title": "Pull your accounts",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "mirror",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "prices",
+   "title": "Fetch price history",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-backfill",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "numbers",
+   "title": "Run today’s numbers",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-daily",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "market",
+   "title": "Fetch market history",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-french",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "review",
+   "title": "Write the results review",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-review",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "discounts",
+   "title": "Scan for discounts",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-discounts",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "plan_keeper",
+   "title": "Check your plan",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-plan_keeper",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "debrief",
+   "title": "Write the debrief",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-debrief",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "plans",
+   "title": "Draft your stock plans",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "agents-run-plans",
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "paper",
+   "title": "Run the paper race",
+   "state": "waiting",
+   "detail": null,
+   "fix": null,
+   "job": "engine-paper",
+   "started_at": null,
+   "finished_at": null
+  }
+ ]
+}

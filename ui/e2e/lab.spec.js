@@ -120,5 +120,5 @@ test('a saved board lists, opens and can be removed', async ({ page }) => {
   await expect(page).toHaveURL(/\/research\/compare\?ids=FXAIX%2CFTEC|\/research\/compare\?ids=FXAIX,FTEC/);
   await page.goto('/research/boards');
   await page.getByRole('button', { name: /^Remove Compare/ }).click();
-  await expect(page.locator('.empty-hint')).toContainText('No boards yet');
+  await expect(page.getByTestId('empty-state')).toContainText('No boards yet');
 });

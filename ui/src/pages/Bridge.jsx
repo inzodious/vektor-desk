@@ -16,6 +16,8 @@ import { dayLabel } from '../lib/charts.js';
 import { movers } from '../lib/bridge.js';
 import { QUALITY } from '../lib/quality.js';
 import { etTime, pct, usd } from '../lib/format.js';
+import { EmptyState } from '../start/EmptyState.jsx';
+import { FIRST_RUN } from '../lib/start.js';
 
 const STATE_WORD = { open: 'Market open', pre: 'Pre-market', after: 'After hours', closed: 'Market closed' };
 const HEAD_IDS = 'value.market,value.day_change,bm.excess,plan.drift_max,plan.single_stock,margin.debit,margin.cost_month,cash.ready,cash.pending,cash.pending_days,fi.progress';
@@ -81,17 +83,7 @@ export default function Bridge() {
     return (
       <>
         <Hero kicker="Bridge" title="Bridge" art="bridge" big={<b>Waiting on holdings</b>} foot={<span className="chip info">No holdings yet</span>} />
-        <section className="card soon">
-          <span className="desk-ico">
-            <Icon name="bridge" />
-          </span>
-          <div>
-            <b style={{ color: 'var(--ink)' }}>The engine hasn&apos;t built holdings yet</b>
-            <p className="muted" style={{ fontSize: 12.5 }}>
-              It runs after the next mirror pull. Settings → Data shows when that was.
-            </p>
-          </div>
-        </section>
+        <EmptyState k="bridge.value" card icon="bridge" title="No holdings to show yet" why="They arrive with the first account pull and the numbers that follow it." action={FIRST_RUN} />
       </>
     );
   }

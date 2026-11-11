@@ -1,0 +1,14 @@
+{
+ "state": "closed",
+ "day": "2026-11-10",
+ "opens_at": "2026-11-10T09:30:00-05:00",
+ "closes_at": "2026-11-10T16:00:00-05:00",
+ "as_of": null,
+ "holdings_date": null,
+ "value": 0,
+ "day_change": 0,
+ "day_change_pct": null,
+ "quality": "insufficient_history",
+ "rows": [],
+ "benchmarks": {}
+}
