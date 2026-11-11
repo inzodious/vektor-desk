@@ -1,0 +1,13 @@
+{
+ "as_of": "2026-11-06",
+ "source": "plan",
+ "name": "Your plan",
+ "weights": {
+  "BND": 5,
+  "FTEC": 20,
+  "FXAIX": 60,
+  "VXUS": 15
+ },
+ "judged": true,
+ "note": null
+}

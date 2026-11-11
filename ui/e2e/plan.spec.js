@@ -49,3 +49,42 @@ test('plan explains a dead API', async ({ page }) => {
   await page.goto('/portfolio');
   await expect(page.getByRole('alert')).toContainText("The desk API didn't answer");
 });
+
+test('with no plan loaded, drift reads as a comparison with the safe mix and prompts nothing', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/portfolio?scenario=yardstick');
+  await expect(page.locator('.ph-big')).toContainText('up to 20.0 pts from the safe mix');
+  const kpi = page.locator('.kpi').first();
+  await expect(kpi).toContainText('Vs the safe mix');
+  await expect(kpi).toContainText('A yardstick, not a target');
+  await expect(kpi).not.toContainText('Rebalance');
+  await expect(kpi.locator('.tone-watch')).toHaveCount(0);
+  await expect(kpi).toContainText('20.0');
+  const card = page.getByTestId('drift-card');
+  await expect(card).toHaveAttribute('data-judged', 'no');
+  await expect(card.locator('.drift-row')).toHaveCount(8);
+  await expect(card.locator('.drift-row.over')).toHaveCount(0);
+  await expect(card.locator('.drift-band')).toHaveCount(0);
+  await expect(card.locator('.drift-legend')).not.toContainText('Outside band');
+  await expect(card.locator('.drift-legend')).toContainText('Safe mix');
+  await expect(card.getByTestId('reference-note')).toContainText('It is a yardstick, not a target');
+  await expect(page.getByRole('columnheader', { name: 'Safe mix' })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Gap' })).toBeVisible();
+  await expect(page.locator('tr[data-sym="FXAIX"] td.dn')).toHaveCount(0);
+  await expect(page.locator('tr[data-sym="VXUS"]')).toContainText('Not in the mix');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  expect(errors).toEqual([]);
+});
+
+test('a loaded plan keeps the drift band, the tone and the rebalance line', async ({ page }) => {
+  await page.goto('/portfolio');
+  const kpi = page.locator('.kpi').first();
+  await expect(kpi).toContainText('Largest drift');
+  await expect(kpi).toContainText('Rebalance at 5');
+  const card = page.getByTestId('drift-card');
+  await expect(card).toHaveAttribute('data-judged', 'yes');
+  await expect(card.locator('.drift-band')).toHaveCount(4);
+  await expect(card.locator('.drift-legend')).toContainText('Outside band');
+  await expect(card.getByTestId('reference-note')).toHaveCount(0);
+});
