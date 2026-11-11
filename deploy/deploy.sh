@@ -429,7 +429,7 @@ fingerprint() { openssl pkey -pubin -in "$1" -outform DER 2>/dev/null | sha256su
 builders_pinned() { find "$BUILDERS" -maxdepth 1 -type f -name '*.pub' 2>/dev/null | sort; }
 
 builders_listed() {
-  sed -nE 's/^([0-9a-f]{64})[[:space:]]+([A-Za-z0-9][A-Za-z0-9 _-]{0,39})[[:space:]]*$/\1 \2/p' "$SRC/deploy/builders.txt" 2>/dev/null || true
+  repo show "origin/$BRANCH:deploy/builders.txt" 2>/dev/null | sed -nE 's/^([0-9a-f]{64})[[:space:]]+([A-Za-z0-9][A-Za-z0-9 _-]{0,39})[[:space:]]*$/\1 \2/p' || true
 }
 
 settling() {
@@ -499,6 +499,43 @@ build_wait() {
   echo "the builder is making its image (asked $(((now - asked) / 60)) min ago; the box builds it here if nothing comes within $((BUILD_WAIT / 60)) minutes)"
 }
 
+only_this_build() {
+  python3 - "$1" "$2" <<'PY' 2>/dev/null
+import json
+import sys
+import tarfile
+
+path, want = sys.argv[1], sys.argv[2]
+repo, _, tag = want.rpartition(":")
+found = {}
+with tarfile.open(path, "r|*") as tar:
+    for member in tar:
+        name = member.name
+        while name.startswith("./"):
+            name = name[2:]
+        if name in ("manifest.json", "index.json", "repositories"):
+            if name in found or not member.isfile() or member.size > 4 << 20:
+                sys.exit(1)
+            found[name] = json.load(tar.extractfile(member))
+images = found.get("manifest.json")
+if not isinstance(images, list) or len(images) != 1 or not isinstance(images[0], dict) or images[0].get("RepoTags") != [want]:
+    sys.exit(1)
+if "index.json" in found:
+    rows = found["index.json"].get("manifests") if isinstance(found["index.json"], dict) else None
+    if not isinstance(rows, list) or len(rows) != 1 or not isinstance(rows[0], dict):
+        sys.exit(1)
+    notes = rows[0].get("annotations") or {}
+    if not isinstance(notes, dict) or notes.get("io.containerd.image.name", want) not in (want, "docker.io/library/" + want):
+        sys.exit(1)
+    if notes.get("org.opencontainers.image.ref.name", tag) not in (tag, want, "docker.io/library/" + want):
+        sys.exit(1)
+if "repositories" in found:
+    names = found["repositories"]
+    if not isinstance(names, dict) or list(names) != [repo] or not isinstance(names[repo], dict) or list(names[repo]) != [tag]:
+        sys.exit(1)
+PY
+}
+
 use_built() {
   local target=$1 dir file sig stage sha pub tag why='' ok=0
   [ -n "$(builders_pinned)" ] || return 1
@@ -531,6 +568,8 @@ use_built() {
     done < <(builders_pinned)
     if [ "$ok" -ne 1 ]; then
       why="it isn't signed by an approved builder for this commit"
+    elif ! only_this_build "$stage/image.tar.gz" "$tag"; then
+      why="it carries images or names other than this build"
     elif ! docker load -i "$stage/image.tar.gz" >>"$BUILD_LOG" 2>&1; then
       why="docker couldn't load it (see $BUILD_LOG)"
     elif [ "$(image_build "$tag")" != "$target" ]; then

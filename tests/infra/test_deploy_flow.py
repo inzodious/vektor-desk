@@ -333,7 +333,7 @@ eval "$(declare -f docker | sed '1s/^docker/docker_base/')"
 docker() {
   case "$1" in
     load)
-      read -r t l < <(gzip -dc "$3")
+      read -r t l < <(tar -xzOf "$3" label)
       echo "$l" >"$S/tag.$(key "vektor-desk:built-$t")"
       echo load >>"$S/calls"
       ;;
@@ -347,6 +347,7 @@ repo() {
     rev-parse) cat "$S/head" ;;
     diff) return 0 ;;
     archive) echo source >"$4" ;;
+    show) cat "$DESK_SRC/deploy/builders.txt" 2>/dev/null ;;
     log) if [ "$3" = --format=%ct ]; then cat "$S/landed" 2>/dev/null || true; else echo subject; fi ;;
   esac
 }
@@ -373,13 +374,31 @@ class BuiltBox(Box):
         if approved:
             (self.pinned / f"{self.mark}.pub").write_text(self.pub)
 
-    def send(self, commit: str, label: str | None = None, signed_for: str | None = None, key: Path | None = None) -> None:
-        import gzip
+    def send(self, commit: str, label: str | None = None, signed_for: str | None = None, key: Path | None = None, files: dict | None = None) -> None:
         import hashlib
+        import io
+        import tarfile
 
         from desk.worker import builder
 
-        image = gzip.compress(f"{commit} {label or commit}\n".encode())
+        name = f"vektor-desk:built-{commit}"
+        inside = {
+            "manifest.json": [{"Config": "blobs/sha256/config", "RepoTags": [name], "Layers": []}],
+            "index.json": {
+                "manifests": [
+                    {"annotations": {"io.containerd.image.name": f"docker.io/library/{name}", "org.opencontainers.image.ref.name": f"built-{commit}"}}
+                ]
+            },
+        } | (files or {})
+        packed = io.BytesIO()
+        with tarfile.open(fileobj=packed, mode="w:gz") as tar:
+            rows = [("label", f"{commit} {label or commit}\n".encode())]
+            rows += [(n.rstrip("+"), body if isinstance(body, bytes) else json.dumps(body).encode()) for n, body in inside.items() if body is not None]
+            for member, body in rows:
+                info = tarfile.TarInfo(member)
+                info.size = len(body)
+                tar.addfile(info, io.BytesIO(body))
+        image = packed.getvalue()
         (self.inbox / f"{commit}.tar.gz").write_bytes(image)
         said = builder.sign(key or self.key, builder.statement(signed_for or commit, hashlib.sha256(image).hexdigest()))
         (self.inbox / f"{commit}.sig").write_text(said + "\n")
@@ -429,6 +448,15 @@ def test_deploy_takes_an_image_signed_by_an_approved_builder_and_builds_nothing_
         ("mislabelled", "the image inside isn't the build of this commit"),
         ("other-arch", "it was built for another kind of processor"),
         ("garbled", "its signature isn't readable"),
+        ("second-tag", "it carries images or names other than this build"),
+        ("second-image", "it carries images or names other than this build"),
+        ("other-name", "it carries images or names other than this build"),
+        ("index-name", "it carries images or names other than this build"),
+        ("index-extra", "it carries images or names other than this build"),
+        ("legacy-names", "it carries images or names other than this build"),
+        ("twice", "it carries images or names other than this build"),
+        ("no-manifest", "it carries images or names other than this build"),
+        ("not-a-tar", "it carries images or names other than this build"),
     ],
 )
 def test_an_image_the_box_cannot_trust_is_refused_and_built_here(tmp_path, how, why):
@@ -447,9 +475,34 @@ def test_an_image_the_box_cannot_trust_is_refused_and_built_here(tmp_path, how, 
     elif how == "other-arch":
         box.send("bbb")
         (box.dir / "arch").write_text("arm64\n")
-    else:
+    elif how == "garbled":
         box.send("bbb")
         (box.inbox / "bbb.sig").write_text("@@@ not base64 @@@\n")
+    else:
+        mine = {"Config": "c", "RepoTags": ["vektor-desk:built-bbb"], "Layers": []}
+        note = {"io.containerd.image.name": "docker.io/library/vektor-desk:built-bbb"}
+        bad = {
+            "second-tag": {"manifest.json": [mine | {"RepoTags": ["vektor-desk:built-bbb", "vektor-desk/caddy:local"]}]},
+            "second-image": {"manifest.json": [mine, mine | {"RepoTags": ["jellyfin/jellyfin:latest"]}]},
+            "other-name": {"manifest.json": [mine | {"RepoTags": ["vektor-desk:local"]}]},
+            "index-name": {"index.json": {"manifests": [{"annotations": {"io.containerd.image.name": "docker.io/library/vektor-desk:local"}}]}},
+            "index-extra": {
+                "index.json": {"manifests": [{"annotations": note}, {"annotations": {"io.containerd.image.name": "docker.io/jellyfin/jellyfin:latest"}}]}
+            },
+            "legacy-names": {"repositories": {"vektor-desk": {"built-bbb": "x", "local": "x"}}},
+            "twice": {"manifest.json+": [mine]},
+            "no-manifest": {"manifest.json": None},
+            "not-a-tar": None,
+        }[how]
+        if bad is None:
+            import gzip
+            import hashlib
+
+            image = gzip.compress(b"bbb bbb\n")
+            (box.inbox / "bbb.tar.gz").write_bytes(image)
+            (box.inbox / "bbb.sig").write_text(builder.sign(box.key, builder.statement("bbb", hashlib.sha256(image).hexdigest())) + "\n")
+        else:
+            box.send("bbb", files=bad)
     res = box.run()
     assert res.returncode == 0, res.stdout + res.stderr
     assert [c for c in box.calls() if c != "load"] == [
@@ -482,6 +535,20 @@ def test_a_builder_that_reports_a_failure_hands_the_build_back_to_the_box(tmp_pa
     assert box.run().returncode == 0
     assert box.calls()[0] == "build vektor-desk:candidate" and box.running() == "bbb"
     assert "The builder couldn't make bbb (docker build stopped: npm ERR! out of luck); building it here" in box.log()
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="needs git, like the box")
+def test_the_builders_list_is_read_from_main_in_git_not_from_the_working_files(tmp_path):
+    src, listed, edited = tmp_path / "src", "a" * 64, "b" * 64
+    (src / "deploy").mkdir(parents=True)
+    (src / "deploy" / "builders.txt").write_text(f"# builders\n{listed} Horizon\n")
+    git = ["git", "-C", str(src), "-c", "user.name=t", "-c", "user.email=t@example.com"]
+    for cmd in (["init", "-q", "-b", "main"], ["add", "-A"], ["commit", "-q", "-m", "one"], ["update-ref", "refs/remotes/origin/main", "HEAD"]):
+        subprocess.run(git + cmd, check=True, capture_output=True)
+    (src / "deploy" / "builders.txt").write_text(f"{edited} Stranger\n")
+    env = os.environ | {"DESK_ROOT": str(tmp_path / "root"), "DESK_SRC": str(src), "DESK_GIT_CREDENTIALS": str(tmp_path / "none")}
+    done = subprocess.run(["bash", "-c", f'source "{DEPLOY}"; builders_listed'], capture_output=True, text=True, env=env, timeout=60)
+    assert done.stdout.split() == [listed, "Horizon"]
 
 
 @needs_openssl
