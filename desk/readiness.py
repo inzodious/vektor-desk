@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from desk import jobrun, review_health, startrun
+from desk import jobrun, memory, review_health, startrun
 from desk.config import Config
 from desk.packages import seam
 from desk.runlock import running
@@ -293,6 +293,7 @@ def build(cfg: Config, jobs: list, bodies: dict[str, object], now: datetime | No
     names = {j.name for j in jobs}
     chain_jobs = {s.job for s in startrun.STEPS}
     held = {r["job"] for r in running(cfg)}
+    turns = {w["job"] for w in memory.waiting(cfg)}
     entries = jobrun.catalogue(jobs)
     reviews = review_health.reviews_status(cfg, now)
     rows: dict[str, dict] = {}
@@ -330,6 +331,8 @@ def build(cfg: Config, jobs: list, bodies: dict[str, object], now: datetime | No
         action = {"kind": "job", "job": job, "label": label}
         if entries[job].locks & held:
             return _row(s.key, "empty", "It's running now. This fills in when it finishes.", action, due, now, zone)
+        if job in turns:
+            return _row(s.key, "empty", "It's waiting for its turn: low-memory mode runs heavy jobs one at a time.", action, due, now, zone)
         run = jobrun.last_run(cfg, job) or {}
         said = _first(body.get("note")) if s.note and isinstance(body, dict) else None
         if run.get("result") == "failed":
@@ -349,6 +352,7 @@ def build(cfg: Config, jobs: list, bodies: dict[str, object], now: datetime | No
     return {
         "now": jobrun.stamp(now),
         "start": {"state": start["state"], "needs_start": start["needs_start"]},
+        "memory": start["memory"],
         "sections": [rows[s.key] for s in SECTIONS],
     }
 

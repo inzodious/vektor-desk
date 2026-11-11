@@ -10,7 +10,7 @@ from pathlib import Path
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from desk import jobrun, review_health
+from desk import jobrun, memory, review_health
 from desk.config import Config
 from desk.db import connect
 from desk.packages import seam
@@ -373,6 +373,12 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None, known: Facts 
         known = known or facts(cfg, now, with_crew=False)
         needs = not (known.accounts and known.numbers and known.reviews)
     keep = ("id", "title", "state", "detail", "fix", "job", "started_at", "finished_at")
+    box = memory.status(cfg, now)
+    turns = {w["job"] for w in box["waiting"]}
+    steps = [{k: s.get(k) for k in keep} for s in chain["steps"]]
+    for step in steps:
+        if step["state"] == "running" and step["job"] in turns:
+            step["detail"] = "Waiting for its turn: low-memory mode runs heavy jobs one at a time."
     return {
         "state": chain["state"],
         "needs_start": needs,
@@ -384,7 +390,8 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None, known: Facts 
         "finished_at": chain.get("finished_at"),
         "last_ok_at": chain.get("last_ok_at"),
         "scheduler_alive": alive,
-        "steps": [{k: s.get(k) for k in keep} for s in chain["steps"]],
+        "memory": {"state": box["state"], "low_memory": box["low_memory"]["on"], "killed": len(box["killed"]), "note": box["note"]},
+        "steps": steps,
     }
 
 

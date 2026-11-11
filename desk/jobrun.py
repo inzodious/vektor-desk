@@ -205,12 +205,17 @@ def catalogue(jobs: list) -> dict[str, Entry]:
 
 def describe(cfg: Config, jobs: list, now: datetime | None = None) -> dict:
     now = now or now_utc()
+    from desk import memory
+
     held = {r["job"]: r.get("since") for r in running(cfg)}
+    low = memory.low_memory(cfg, now)
+    turns = _read(memory.waiting_file(cfg)) or {}
     rows = []
     for entry in catalogue(jobs).values():
         since = next((held[lock] for lock in sorted(entry.locks) if lock in held), None)
         is_running = any(lock in held for lock in entry.locks)
         pending = _read(requests_dir(cfg) / f"{entry.name}.json")
+        turn = turns.get(entry.name) if isinstance(turns.get(entry.name), dict) else None
         until = cooldown_until(cfg, entry.name)
         cooling = until is not None and until > now
         rows.append(
@@ -223,9 +228,11 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None) -> dict:
                 "running_since": since,
                 "queued": pending is not None,
                 "queued_at": (pending or {}).get("requested_at"),
+                "waiting": turn is not None,
+                "waiting_since": (turn or {}).get("since"),
                 "last_run": last_run(cfg, entry.name),
                 "cooldown_until": stamp(until) if cooling else None,
-                "can_run": not is_running and pending is None and not cooling,
+                "can_run": not is_running and pending is None and turn is None and not cooling,
                 "refreshes": entry.refreshes,
                 "stage": entry.stage,
             }
@@ -236,6 +243,7 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None) -> dict:
         "cooldown_seconds": int(COOLDOWN.total_seconds()),
         "pickup_seconds": PICKUP_SECONDS,
         "stages": list(STAGE_ORDER),
+        "low_memory": {"on": bool(low.get("on")), "why": low.get("why")},
         "jobs": rows,
     }
 
@@ -267,6 +275,9 @@ def request_run(cfg: Config, jobs: list, name: str, client: str | None = None, n
     pending = _read(folder / f"{name}.json")
     if pending is not None:
         return answer(409, "queued", {"ok": False, "error": "queued", "message": f"{entry.title} is already queued.", "since": pending.get("requested_at")})
+    turn = (_read(run_dir(cfg) / "waiting.json") or {}).get(name)
+    if isinstance(turn, dict):
+        return answer(409, "waiting", {"ok": False, "error": "waiting", "message": f"{entry.title} is waiting for its turn.", "since": turn.get("since")})
     until = cooldown_until(cfg, name)
     if until is not None and until > now:
         wait = int((until - now).total_seconds()) or 1
