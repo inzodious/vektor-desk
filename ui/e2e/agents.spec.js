@@ -77,6 +77,7 @@ test('the Tax tab shows the tax calendar with wash windows and dates, plus a tab
   await page.goto('/portfolio/tax');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Tax');
   await expect(page.locator('.kpi')).toHaveCount(4);
+  await expect(page.getByTestId('wash-open')).toHaveText('4 wash windows open');
   const cal = page.getByTestId('tax-calendar');
   await expect(cal.locator('[data-wash]')).toHaveCount(4);
   await expect(cal.locator('.tax-diamond')).toHaveCount(3);

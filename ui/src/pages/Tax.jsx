@@ -9,7 +9,7 @@ import { useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
 import { plural, usd } from '../lib/format.js';
 import { useMetrics, val } from '../lib/metrics.js';
-import { todayEt } from '../lib/tax.js';
+import { mergeWindows, todayEt } from '../lib/tax.js';
 
 const CELLS = [
   { id: 'tax.realized_st', window: 'YTD', label: 'Realized short term' },
@@ -29,6 +29,7 @@ export default function Tax() {
   const engineAsOf = m.asOf ? `engine ${dayLabel(m.asOf)}` : null;
   const events = (calendar.data?.events || []).filter((e) => !e.kind || e.kind === 'tax');
   const windows = wash.data?.windows || [];
+  const open = mergeWindows(windows).length;
 
   if (m.loading) return <Hero kicker="Portfolio · Tax" title="Tax" art="plan" big={<b>Checking…</b>} foot={tabs} />;
 
@@ -73,7 +74,7 @@ export default function Tax() {
         foot={
           <>
             {tabs}
-            <span className={`chip${windows.length ? ' watch' : ''}`}>{windows.length ? `${plural(windows.length, 'wash window')} open` : 'No wash windows open'}</span>
+            <span className={`chip${open ? ' watch' : ''}`} data-testid="wash-open">{open ? `${plural(open, 'wash window')} open` : 'No wash windows open'}</span>
           </>
         }
       />
