@@ -29,5 +29,50 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
 
+  # ---- Optional: build the desk's images here, so the NAS doesn't have to (docs/setup.md, Builds on Horizon) ----
+  # Started only with `--profile builder`. It can run Docker on this machine, which is as good as root here, so it is
+  # opt-in and separate from the worker. Its signing key is made on first start and never leaves the `work` volume.
+  docker-cli:
+    profiles: [builder]
+    image: docker:27-cli
+    container_name: vektor-desk-docker-cli
+    restart: "no"
+    entrypoint: ["sh", "-c", "mkdir -p /cli/bin /cli/cli-plugins && cp /usr/local/bin/docker /cli/bin/docker && cp /usr/local/libexec/docker/cli-plugins/docker-buildx /cli/cli-plugins/docker-buildx"]
+    volumes:
+      - cli:/cli
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  builder:
+    profiles: [builder]
+    image: vektor-desk:worker
+    container_name: vektor-desk-builder
+    restart: unless-stopped
+    init: true
+    user: "0:0"
+    depends_on:
+      docker-cli:
+        condition: service_completed_successfully
+    command: ["python", "-m", "desk.worker", "build"]
+    environment:
+      DESK_URL: ${DESK_URL:-https://desk-lan.escape-vektor.com}
+      DESK_WORKER_DIR: /work
+      DESK_DOCKER: /opt/docker-cli/bin/docker
+      DOCKER_CONFIG: /opt/docker-cli
+      BUILDX_CONFIG: /tmp/buildx
+      HOME: /tmp
+    volumes:
+      - work:/work
+      - cli:/opt/docker-cli:ro
+      - ${DOCKER_SOCK:-/var/run/docker.sock}:/var/run/docker.sock
+    healthcheck:
+      disable: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+
 volumes:
   work: {}
+  cli: {}

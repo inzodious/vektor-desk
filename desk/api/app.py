@@ -21,6 +21,7 @@ from desk.packages import seams
 from desk.readiness import router as readiness_router
 from desk.startrun import router as start_router
 from desk.status import status
+from desk.worker.build import router as build_router
 
 BUILD = os.environ.get("DESK_BUILD", "dev")
 
@@ -112,6 +113,7 @@ def create_app(cfg: Config | None = None, *, packages: list[str] | None = None, 
     app.include_router(readiness_router)
     app.include_router(keys_router)
     app.include_router(box_router)
+    app.include_router(build_router)
     app.include_router(inbox_router)
     app.state.routers = []
     for pkg, mod in seams("api", packages).items():

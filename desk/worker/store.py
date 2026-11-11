@@ -137,12 +137,16 @@ def worker_for(cfg: Config, key: str | None) -> dict | None:
     return {"id": row["id"], "name": row["name"]}
 
 
+def label(value: object) -> str | None:
+    return re.sub(r"[^A-Za-z0-9._-]", "", str(value))[:64] or None if value else None
+
+
 def beat(cfg: Config, worker_id: str, said: dict, now: datetime | None = None) -> dict:
     row = {
         "at": jobrun.stamp(now or jobrun.now_utc()),
-        "build": jobrun.plain(str(said.get("build") or ""))[:64] if said.get("build") else None,
-        "host": jobrun.plain(str(said.get("host") or ""))[:64] if said.get("host") else None,
-        "code": jobrun.plain(str(said.get("code") or ""))[:64] if said.get("code") else None,
+        "build": label(said.get("build")),
+        "host": label(said.get("host")),
+        "code": label(said.get("code")),
         "job_id": said.get("job_id") if isinstance(said.get("job_id"), str) and ID.match(said["job_id"]) else None,
     }
     jobrun._write(beat_path(cfg, worker_id), row)

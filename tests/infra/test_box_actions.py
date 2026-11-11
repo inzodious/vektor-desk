@@ -20,9 +20,9 @@ def alive(cfg, at=None):
     (folder / "host.alive").write_text(boxrun.stamp(at or boxrun.now_utc()))
 
 
-def test_get_box_lists_the_nine_actions(client, cfg):
+def test_get_box_lists_the_ten_actions(client, cfg):
     body = client.get("/api/box").json()
-    assert set(body) == {"now", "host_alive", "pickup_seconds", "script", "compose", "memory", "actions"}
+    assert set(body) == {"now", "host_alive", "pickup_seconds", "script", "compose", "memory", "build", "actions"}
     assert body["host_alive"] is False and body["pickup_seconds"] == 300 and body["script"] is None and body["compose"] is None
     assert [a["name"] for a in body["actions"]] == [
         "redeploy",
@@ -34,6 +34,7 @@ def test_get_box_lists_the_nine_actions(client, cfg):
         "update-script",
         "deploy-now",
         "apply-compose",
+        "approve-builder",
     ]
     first = body["actions"][0]
     assert set(first) == {"name", "title", "what", "cooldown_seconds", "running", "queued", "queued_at", "last_run", "cooldown_until", "can_run"}

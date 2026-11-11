@@ -406,20 +406,32 @@ def test_the_worker_command_runs_end_to_end_and_keeps_its_key_out_of_the_job(liv
     made = store.add_worker(cfg, "Horizon")
     job = offer(cfg, "worker.check", {}, ("lab",))
     work = tmp_path / "work"
-    env = os.environ | {"DESK_URL": live, "DESK_WORKER_KEY": made["key"], "DESK_WORKER_DIR": str(work), "DESK_WORKER_INSECURE": "1", "DESK_BUILD": "abc1234"}
+    env = os.environ | {
+        "DESK_URL": live,
+        "DESK_WORKER_KEY": made["key"],
+        "DESK_WORKER_DIR": str(work),
+        "DESK_WORKER_INSECURE": "1",
+        "DESK_BUILD": "0123456789abcdef0123456789abcdef01234567",
+    }
     proc = subprocess.Popen([sys.executable, "-m", "desk.worker"], env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    lines: list[str] = []
+    reader = threading.Thread(target=lambda: lines.extend(iter(proc.stdout.readline, "")), daemon=True)
+    reader.start()
+    done = "job " + job["id"] + " done"
     try:
-        for _ in range(150):
-            if store.get(cfg, job["id"])["state"] != "queued" and store.get(cfg, job["id"])["state"] != "leased":
+        for _ in range(300):
+            if any(done in line for line in lines):
                 break
             time.sleep(0.1)
     finally:
         proc.terminate()
-        out = proc.communicate(timeout=10)[0]
+        proc.wait(timeout=10)
+        reader.join(timeout=10)
+    out = "".join(lines)
     assert store.get(cfg, job["id"])["state"] == "returned", out
     assert (work / "key").read_text().strip() == made["key"] and (work / "key").stat().st_mode & 0o777 == 0o600
-    assert made["key"] not in out and "job " + job["id"] + " done" in out
-    assert store.workers(cfg)[0]["build"] == "abc1234"
+    assert made["key"] not in out and done in out
+    assert store.workers(cfg)[0]["build"] == "0123456789abcdef0123456789abcdef01234567"
     refused = subprocess.run(
         [sys.executable, "-m", "desk.worker"],
         env=os.environ | {"DESK_URL": "http://desk.example", "DESK_WORKER_DIR": str(work)},
@@ -455,7 +467,9 @@ def test_the_worker_compose_holds_no_secrets_and_publishes_nothing():
 
     root = Path(__file__).resolve().parents[2]
     text = (root / "deploy" / "worker" / "compose.yaml").read_text()
-    (service,) = yaml.safe_load(text)["services"].values()
+    services = yaml.safe_load(text)["services"]
+    service = services["worker"]
+    assert set(services) == {"worker", "docker-cli", "builder"} and all(services[n]["profiles"] == ["builder"] for n in ("docker-cli", "builder"))
     assert service["restart"] == "unless-stopped" and service["command"] == ["python", "-m", "desk.worker"]
     assert "ports" not in service and "env_file" not in service and "privileged" not in service and service["read_only"] is True
     assert service["volumes"] == ["work:/work"] and service["cap_drop"] == ["ALL"]

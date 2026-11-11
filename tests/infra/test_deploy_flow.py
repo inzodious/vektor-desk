@@ -324,3 +324,262 @@ docker() {{ return 1; }}
 memory_state"""
     res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={"PATH": "/usr/local/bin:/usr/bin:/bin"}, timeout=30)
     assert res.returncode == 0 and json.loads(res.stdout)["kills"] == []
+
+
+# ---- Images from a builder on another machine ----
+
+BUILD_STUBS = r"""
+eval "$(declare -f docker | sed '1s/^docker/docker_base/')"
+docker() {
+  case "$1" in
+    load)
+      read -r t l < <(gzip -dc "$3")
+      echo "$l" >"$S/tag.$(key "vektor-desk:built-$t")"
+      echo load >>"$S/calls"
+      ;;
+    image) cat "$S/arch" 2>/dev/null || echo amd64 ;;
+    version) echo amd64 ;;
+    *) docker_base "$@" ;;
+  esac
+}
+repo() {
+  case "$1" in
+    rev-parse) cat "$S/head" ;;
+    diff) return 0 ;;
+    archive) echo source >"$4" ;;
+    log) if [ "$3" = --format=%ct ]; then cat "$S/landed" 2>/dev/null || true; else echo subject; fi ;;
+  esac
+}
+"""
+
+
+class BuiltBox(Box):
+    def __init__(self, tmp_path: Path, running: str = "aaa", local: str = "aaa", head: str = "bbb", approved: bool = True):
+        from desk.worker import builder
+
+        super().__init__(tmp_path, running, local, head)
+        self.root = tmp_path / "root"
+        self.inbox = self.root / "data" / "run" / "box" / "build" / "in"
+        self.inbox.mkdir(parents=True)
+        self.pending = self.inbox.parent / "pending"
+        self.pending.mkdir()
+        self.src = tmp_path / "src"
+        (self.src / "deploy").mkdir(parents=True)
+        self.pinned = tmp_path / "pin" / "builders"
+        self.pinned.mkdir(parents=True)
+        self.key, self.pub = builder.key_pair(tmp_path / "work")
+        self.mark = builder.fingerprint(self.pub)
+        self.env |= {"DESK_SRC": str(self.src), "DESK_PINNED": str(tmp_path / "pin" / "deploy.sh")}
+        if approved:
+            (self.pinned / f"{self.mark}.pub").write_text(self.pub)
+
+    def send(self, commit: str, label: str | None = None, signed_for: str | None = None, key: Path | None = None) -> None:
+        import gzip
+        import hashlib
+
+        from desk.worker import builder
+
+        image = gzip.compress(f"{commit} {label or commit}\n".encode())
+        (self.inbox / f"{commit}.tar.gz").write_bytes(image)
+        said = builder.sign(key or self.key, builder.statement(signed_for or commit, hashlib.sha256(image).hexdigest()))
+        (self.inbox / f"{commit}.sig").write_text(said + "\n")
+
+    def alive(self, age: int = 0) -> None:
+        from datetime import UTC, datetime, timedelta
+
+        at = (datetime.now(UTC) - timedelta(seconds=age)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        (self.inbox.parent / "builder.alive").write_text(json.dumps({"at": at, "fingerprint": self.mark, "name": "Horizon"}))
+
+    def last(self) -> dict:
+        return json.loads((self.root / "deploy-build.last").read_text())
+
+    def alerts(self) -> str:
+        path = self.dir / "alerts"
+        return path.read_text() if path.exists() else ""
+
+    def run(self, fn: str = "deploy") -> subprocess.CompletedProcess:
+        return subprocess.run(["bash", "-c", f'source "{DEPLOY}"; {STUBS}\n{BUILD_STUBS}\n{fn}'], capture_output=True, text=True, env=self.env, timeout=60)
+
+
+needs_openssl = pytest.mark.skipif(shutil.which("openssl") is None, reason="needs openssl, like the box")
+
+
+@needs_openssl
+def test_deploy_takes_an_image_signed_by_an_approved_builder_and_builds_nothing_itself(tmp_path):
+    box = BuiltBox(tmp_path)
+    box.send("bbb")
+    res = box.run()
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert box.calls() == ["load", "build vektor-desk/caddy:candidate", "backup vektor-desk:candidate", "restart"]
+    assert box.running() == "bbb" and box.tag("vektor-desk:local") == "bbb" and box.tag("vektor-desk:previous") == "aaa"
+    assert box.tag("vektor-desk:built-bbb") == "" and box.tag("vektor-desk:candidate") == ""
+    assert f"Using the image a builder made for bbb (signed by {box.mark[:12]})" in box.log()
+    assert box.last()["how"] == "builder" and box.last()["commit"] == "bbb" and box.last()["why"] is None
+    assert list(box.inbox.iterdir()) == [] and not list(box.root.glob(".built.*")) and box.alerts() == ""
+    assert "1 approved; last image bbb came from a builder" in box.run("builder_line").stdout
+
+
+@needs_openssl
+@pytest.mark.parametrize(
+    ("how", "why"),
+    [
+        ("forged", "it isn't signed by an approved builder for this commit"),
+        ("replayed", "it isn't signed by an approved builder for this commit"),
+        ("stranger", "it isn't signed by an approved builder for this commit"),
+        ("mislabelled", "the image inside isn't the build of this commit"),
+        ("other-arch", "it was built for another kind of processor"),
+        ("garbled", "its signature isn't readable"),
+    ],
+)
+def test_an_image_the_box_cannot_trust_is_refused_and_built_here(tmp_path, how, why):
+    from desk.worker import builder
+
+    box = BuiltBox(tmp_path)
+    if how == "forged":
+        box.send("bbb")
+        (box.inbox / "bbb.tar.gz").write_bytes((box.inbox / "bbb.tar.gz").read_bytes() + b"\0")
+    elif how == "replayed":
+        box.send("bbb", signed_for="aaa")
+    elif how == "stranger":
+        box.send("bbb", key=builder.key_pair(tmp_path / "stranger")[0])
+    elif how == "mislabelled":
+        box.send("bbb", label="ccc")
+    elif how == "other-arch":
+        box.send("bbb")
+        (box.dir / "arch").write_text("arm64\n")
+    else:
+        box.send("bbb")
+        (box.inbox / "bbb.sig").write_text("@@@ not base64 @@@\n")
+    res = box.run()
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert [c for c in box.calls() if c != "load"] == [
+        "build vektor-desk:candidate",
+        "build vektor-desk/caddy:candidate",
+        "backup vektor-desk:candidate",
+        "restart",
+    ]
+    assert ("load" in box.calls()) == (how in ("mislabelled", "other-arch"))
+    assert box.running() == "bbb" and box.tag("vektor-desk:built-bbb") == ""
+    assert f"The builder's image for bbb was refused: {why}. Building it here" in box.log()
+    assert box.alerts().startswith(f"Desk refused a built image: The image a builder sent for bbb was refused: {why}.")
+    assert box.last() == {"commit": "bbb", "how": "box", "why": f"the builder's image was refused: {why}", "at": box.last()["at"]}
+    assert list(box.inbox.iterdir()) == [] and not list(box.root.glob(".built.*"))
+
+
+@needs_openssl
+def test_a_signed_image_is_ignored_until_its_builder_is_approved(tmp_path):
+    box = BuiltBox(tmp_path, approved=False)
+    box.send("bbb")
+    assert box.run().returncode == 0
+    assert box.calls() == ["build vektor-desk:candidate", "build vektor-desk/caddy:candidate", "backup vektor-desk:candidate", "restart"]
+    assert box.alerts() == "" and box.last()["how"] == "box" and "none approved" in box.run("builder_line").stdout
+
+
+@needs_openssl
+def test_a_builder_that_reports_a_failure_hands_the_build_back_to_the_box(tmp_path):
+    box = BuiltBox(tmp_path)
+    (box.inbox / "bbb.failed").write_text(json.dumps({"at": "x", "error": "docker build stopped: npm ERR! out of luck"}))
+    assert box.run().returncode == 0
+    assert box.calls()[0] == "build vektor-desk:candidate" and box.running() == "bbb"
+    assert "The builder couldn't make bbb (docker build stopped: npm ERR! out of luck); building it here" in box.log()
+
+
+@needs_openssl
+def test_approve_builder_pins_only_keys_whose_fingerprint_is_listed_in_main(tmp_path):
+    from desk.worker import builder
+
+    box = BuiltBox(tmp_path, approved=False)
+    listing = box.src / "deploy" / "builders.txt"
+    pin = box.pinned / f"{box.mark}.pub"
+    (box.pending / f"{box.mark}.pub").write_text(box.pub)
+    (box.pending / f"{box.mark}.json").write_text("{}")
+    none = box.run("approve_builder")
+    assert none.returncode == 0 and "lists no builder" in none.stdout and not pin.exists()
+    listing.write_text(f"# builders\n{box.mark} Horizon\nnot-a-fingerprint Mallory\n")
+    other = builder.fingerprint(builder.key_pair(tmp_path / "other")[1])
+    (box.pending / f"{other}.pub").write_text(box.pub)
+    listing.write_text(listing.read_text() + f"{other} Spare\n{'0' * 64} Ghost\n")
+    res = box.run("approve_builder")
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert pin.read_text() == box.pub and pin.stat().st_mode & 0o777 == 0o600 and [p.name for p in box.pinned.iterdir()] == [pin.name]
+    assert f"Approved Horizon ({box.mark[:12]})" in res.stdout and "Mallory" not in res.stdout
+    assert f"Spare ({other[:12]}): the key that was sent doesn't match the fingerprint in main. Not approved" in res.stdout
+    assert "Ghost (000000000000) is listed in main, but its builder hasn't sent that key yet" in res.stdout
+    assert not (box.pending / f"{box.mark}.pub").exists() and box.alerts().startswith("Desk approved a builder: Horizon can now build the desk's images.")
+    again = box.run("approve_builder")
+    assert f"Horizon ({box.mark[:12]}) is already approved" in again.stdout and box.alerts().count("approved a builder") == 1
+    state = json.loads(box.run("builder_state").stdout)
+    assert state["approved"] == [{"fingerprint": box.mark, "name": "Horizon"}] and state["wait_seconds"] == 1200 and state["settle_seconds"] == 600
+    assert [(r["name"], r["approved"]) for r in state["listed"]] == [("Horizon", True), ("Spare", False), ("Ghost", False)]
+    listing.write_text("# nobody\n")
+    gone = box.run("approve_builder")
+    assert f"Removed {box.mark[:12]}" in gone.stdout and not pin.exists()
+    (box.root / "deploy.no-self-pin").touch()
+    off = box.run("approve_builder")
+    assert off.returncode == 1 and "Approving from the app is off" in off.stdout
+
+
+@needs_openssl
+def test_auto_asks_the_builder_waits_while_it_works_and_deploys_its_image(tmp_path):
+    box = BuiltBox(tmp_path)
+    box.alive()
+    assert box.run("auto").returncode == 0
+    want = json.loads((box.inbox.parent / "want.json").read_text())
+    assert (
+        want["commit"] == "bbb"
+        and want["source"] == "bbb.src.tar.gz"
+        and (box.inbox.parent / "bbb.src.tar.gz").read_text() == "source\n"
+        and len(want["sha256"]) == 64
+    )
+    assert box.running() == "aaa" and box.calls() == []
+    assert "Asked the builder for bbb" in box.log() and "Auto-deploy is waiting for bbb: the builder is making its image (asked 0 min ago" in box.log()
+    assert box.run("auto").returncode == 0 and box.log().count("Asked the builder") == 1 and box.log().count("is waiting for bbb") == 1
+    box.send("bbb")
+    assert box.run("auto").returncode == 0
+    assert box.running() == "bbb" and box.calls() == ["load", "build vektor-desk/caddy:candidate", "backup vektor-desk:candidate", "restart"]
+    assert (
+        not (box.inbox.parent / "want.json").exists() and not (box.root / "deploy-build.asked").exists() and not (box.inbox.parent / "bbb.src.tar.gz").exists()
+    )
+
+
+@needs_openssl
+@pytest.mark.parametrize("how", ["asleep", "slow", "stranger", "nobody"])
+def test_auto_builds_here_at_once_when_no_builder_is_working_on_it(tmp_path, how):
+    box = BuiltBox(tmp_path, approved=how != "nobody")
+    if how == "asleep":
+        box.alive(age=600)
+    elif how == "slow":
+        box.alive()
+        (box.root / "deploy-build.asked").write_text("bbb 1000\n")
+    elif how == "stranger":
+        (box.inbox.parent / "builder.alive").write_text(json.dumps({"at": "2099-01-01T00:00:00Z", "fingerprint": "0" * 64, "name": "Mallory"}))
+    else:
+        box.alive()
+    assert box.run("auto").returncode == 0
+    assert box.running() == "bbb" and box.calls()[0] == "build vektor-desk:candidate" and box.last()["how"] == "box"
+    assert ("Asked the builder for bbb" in box.log()) == (how in ("asleep", "stranger"))
+
+
+def test_auto_lets_main_settle_so_commits_that_land_together_become_one_deploy(tmp_path):
+    import time
+
+    box = BuiltBox(tmp_path, approved=False) if shutil.which("openssl") else None
+    if box is None:
+        pytest.skip("needs openssl")
+    (box.dir / "landed").write_text(f"{int(time.time()) - 125}\n")
+    assert box.run("auto").returncode == 0
+    assert box.running() == "aaa" and box.calls() == []
+    assert "Auto-deploy is letting main settle before bbb: it landed 2 min ago, and a deploy waits until main has been quiet for 10 minutes" in box.log()
+    assert box.run("auto").returncode == 0 and box.log().count("letting main settle") == 1
+    (box.dir / "head").write_text("ccc")
+    (box.dir / "landed").write_text(f"{int(time.time()) - 30}\n")
+    assert box.run("auto").returncode == 0 and box.running() == "aaa" and "before ccc: it landed 0 min ago" in box.log()
+    (box.dir / "landed").write_text(f"{int(time.time()) - 601}\n")
+    assert box.run("auto").returncode == 0 and box.running() == "ccc" and box.calls().count("restart") == 1
+    (tmp_path / "now").mkdir()
+    now = BuiltBox(tmp_path / "now", approved=False)
+    (now.dir / "landed").write_text(f"{int(time.time())}\n")
+    assert now.run("deploy").returncode == 0 and now.running() == "bbb"
+    now.env["DESK_SETTLE"] = "0"
+    (now.dir / "head").write_text("ddd")
+    assert now.run("auto").returncode == 0 and now.running() == "ddd"

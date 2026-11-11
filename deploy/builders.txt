@@ -1,0 +1,4 @@
+# Machines allowed to build the desk's images (docs/setup.md, Builds on Horizon).
+# One line each: the SHA-256 fingerprint of the builder's public key, then its name. A fingerprint is not a secret.
+# The box takes an image only when it is signed by a key whose fingerprint is listed here on main AND that was pinned
+# with Settings -> Box -> Approve builder. Remove a line and tap Approve builder again to stop trusting that machine.

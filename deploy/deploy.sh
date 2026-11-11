@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Vektor Desk on TrueNAS SCALE (docs/architecture.md, docs/setup.md). Run as root:
-#   deploy.sh now      pull main, build what changed one stage at a time (the box is short on memory), back up with the new build,
-#                      restart the app; back to the previous images if it isn't healthy. Waits for nothing: refuses while a desk
-#                      job (mirror, engine, agent, lab) is running.
-#   deploy.sh auto     what the auto-deploy cron job runs every 5 minutes: deploys when main has moved, quietly does nothing
-#                      otherwise, waits out a running job, and doesn't retry a commit that failed until the box script changes
+#   deploy.sh now      pull main, take the image an approved builder made for it or build what changed one stage at a time (the
+#                      box is short on memory), back up with the new build, restart the app; back to the previous images if it
+#                      isn't healthy. Waits for nothing: refuses while a desk job (mirror, engine, agent, lab) is running.
+#   deploy.sh auto     what the auto-deploy cron job runs every 5 minutes: deploys when main has moved and been quiet for ten
+#                      minutes, quietly does nothing otherwise, waits out a running job and (for a while) a builder that is
+#                      working on it, and doesn't retry a commit that failed until the box script changes
 #   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
 #   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
 #   deploy.sh restore-test  restore drill: unpacks the newest backup into a scratch folder and checks every database
@@ -16,7 +17,10 @@
 #   deploy.sh redeploy recreate the containers on the images already live, so an edited *.env file takes effect (a
 #                      docker restart doesn't re-read env files); refuses while a desk job is running
 #   deploy.sh box      run the box actions the app asked for (Settings → Box): redeploy, status, check, backup,
-#                      restore-test, logs, update-script, apply-compose, deploy-now; auto does this every 5 minutes
+#                      restore-test, logs, update-script, apply-compose, deploy-now, approve-builder; auto does this every
+#                      5 minutes
+#   deploy.sh approve-builder  trust the builders listed in main's deploy/builders.txt: pins the public key each one sent, once
+#                      its fingerprint matches the list. Only an image signed by a pinned key is ever loaded
 #   deploy.sh card     the app's icon and Web UI button in TrueNAS Apps; TrueNAS drops them when the YAML is edited, so
 #                      now and auto put them back
 # Unattended runs (auto, backup) also send a phone alert on the desk-ops topic when they stop on an error.
@@ -43,7 +47,7 @@ BUILD_LOG=$ROOT/deploy-build.log
 DEBUG_MAX=${DESK_DEBUG_MAX:-104857600}
 NO_SELF_PIN=${DESK_NO_SELF_PIN:-$ROOT/deploy.no-self-pin}
 SELF=${DESK_SELF:-$(readlink -f "${BASH_SOURCE[0]}")}
-BOX_ACTIONS="redeploy status check backup restore-test logs update-script apply-compose deploy-now"
+BOX_ACTIONS="redeploy status check backup restore-test logs update-script apply-compose deploy-now approve-builder"
 BOX_TIMEOUT=${DESK_BOX_TIMEOUT:-1800}
 KEYS_PEM=${DESK_KEYS_PEM:-$ROOT/box-keys.pem}
 ENV_FILES="settings.env desk.env caddy.env tailscale.env"
@@ -59,6 +63,15 @@ BUSY=75
 IMAGES=("vektor-desk:local=." "vektor-desk/caddy:local=deploy/caddy")
 MEMINFO=${DESK_MEMINFO:-/proc/meminfo}
 VMSTAT=${DESK_VMSTAT:-/proc/vmstat}
+BUILDERS=${DESK_BUILDERS:-$(dirname "$PINNED")/builders}
+BUILT=vektor-desk:local
+BUILD_WAIT=${DESK_BUILD_WAIT:-1200}
+BUILD_ALIVE=${DESK_BUILD_ALIVE:-180}
+BUILD_MAX=${DESK_BUILD_MAX:-3221225472}
+BUILD_ASKED=$ROOT/deploy-build.asked
+BUILD_LAST=$ROOT/deploy-build.last
+BUILT_WHY=
+SETTLE=${DESK_SETTLE:-600}
 
 # ---- Helpers ----
 
@@ -231,7 +244,7 @@ update_checkout() {
 }
 
 deploy() {
-  local state why before target pair image dir id stage kills live=1 built=() previous=() files code=vektor-desk:local
+  local state why before target pair image dir id stage kills live=1 built=() previous=() files code=vektor-desk:local how=''
   state=$(app_state)
   if [ "$state" = RUNNING ] && why=$(busy); then
     die "a desk job is running: $why. Nothing was changed" "$BUSY"
@@ -239,6 +252,7 @@ deploy() {
   before=$(repo rev-parse HEAD 2>/dev/null || true)
   update_checkout
   target=$(repo rev-parse HEAD)
+  if [ "$(image_build "$BUILT")" != "$target" ] && [ "$(image_build "${BUILT%:*}:candidate")" != "$target" ] && use_built "$target"; then how=builder; fi
 
   for pair in "${IMAGES[@]}"; do
     image=${pair%%=*}
@@ -247,6 +261,7 @@ deploy() {
     [ "$(image_build "$image")" = "$target" ] && continue
     built+=("$image")
     [ "$(image_build "${image%:*}:candidate")" = "$target" ] && continue
+    [ "$image" != "$BUILT" ] || how=box
     log "Building $image ${target:0:7}, one stage at a time: $(repo log -1 --format=%s) (output in $BUILD_LOG)"
     echo "==== $(date '+%F %T') build $image ${target:0:7} ($(free_mb) MB free)" >>"$BUILD_LOG"
     kills=$(oom_kills)
@@ -267,9 +282,11 @@ deploy() {
     log "Images are at ${target:0:7}. There's no app called $APP yet: install it from deploy/compose.yaml (docs/setup.md, step 6)"
     return 0
   fi
+  [ -z "$how" ] || build_note "$target" "$how" "$([ "$how" = builder ] || echo "$BUILT_WHY")"
   if [ ${#built[@]} -eq 0 ] && [ "$live" -eq 1 ]; then
     log "Already live: ${target:0:7}"
     rm -f "$AUTO_FAILED" "$AUTO_WHY"
+    build_clear
     return 0
   fi
   if [ -n "$before" ] && ! repo diff --quiet "$before" "$target" -- deploy/compose.yaml; then
@@ -299,6 +316,7 @@ deploy() {
   if restart_app && healthy "$target"; then
     log "Live: ${target:0:7}"
     rm -f "$AUTO_FAILED" "$AUTO_WHY"
+    build_clear
     docker image prune -f --filter "label=vektor-desk.app=1" >/dev/null 2>&1 || true
     return 0
   fi
@@ -361,14 +379,24 @@ auto() {
   target=$(repo rev-parse "origin/$BRANCH")
   if [ "$(live_build vektor-desk-api)" = "$target" ]; then
     rm -f "$AUTO_NOTE"
+    build_clear
     return 0
   fi
+  build_offer "$target" || true
   if [ "$(cat "$AUTO_FAILED" 2>/dev/null)" = "$target" ]; then
     [ "$(cat "$AUTO_SCRIPT" 2>/dev/null)" != "$(script_id)" ] || return 0
     log "The box script changed since ${target:0:7} was held back, so auto-deploy tries it once more"
     rm -f "$AUTO_FAILED" "$AUTO_WHY" "$AUTO_SCRIPT"
   fi
+  if why=$(settling "$target"); then
+    note "Auto-deploy is letting main settle before ${target:0:7}: $why" || true
+    return 0
+  fi
   if why=$(busy); then
+    note "Auto-deploy is waiting for ${target:0:7}: $why" || true
+    return 0
+  fi
+  if why=$(build_wait "$target"); then
     note "Auto-deploy is waiting for ${target:0:7}: $why" || true
     return 0
   fi
@@ -379,6 +407,224 @@ auto() {
   trap 'auto_stopped $?' EXIT
   deploy
   trap - EXIT
+}
+
+# ---- Images from a builder on another machine ----
+
+build_dir() {
+  local box want sub
+  box=$(box_dir) || return 1
+  want=$box/build
+  for sub in "$want" "$want/in" "$want/pending"; do
+    [ ! -L "$sub" ] || return 1
+    [ -d "$sub" ] || mkdir "$sub"
+    [ "$(realpath "$sub")" = "$sub" ] || return 1
+    chown 568:568 "$sub" 2>/dev/null || true
+  done
+  printf '%s\n' "$want"
+}
+
+fingerprint() { openssl pkey -pubin -in "$1" -outform DER 2>/dev/null | sha256sum | cut -c1-64; }
+
+builders_pinned() { find "$BUILDERS" -maxdepth 1 -type f -name '*.pub' 2>/dev/null | sort; }
+
+builders_listed() {
+  sed -nE 's/^([0-9a-f]{64})[[:space:]]+([A-Za-z0-9][A-Za-z0-9 _-]{0,39})[[:space:]]*$/\1 \2/p' "$SRC/deploy/builders.txt" 2>/dev/null || true
+}
+
+settling() {
+  local target=$1 at age
+  [ "$SETTLE" -gt 0 ] || return 1
+  at=$(repo log -1 --format=%ct "$target" 2>/dev/null | tr -cd '0-9' || true)
+  [ -n "$at" ] || return 1
+  age=$(($(date +%s) - at))
+  [ "$age" -ge 0 ] && [ "$age" -lt "$SETTLE" ] || return 1
+  echo "it landed $((age / 60)) min ago, and a deploy waits until main has been quiet for $((SETTLE / 60)) minutes (Settings → Box → Deploy now skips the wait)"
+}
+
+build_clear() {
+  local dir
+  rm -f "$BUILD_ASKED"
+  dir=$(build_dir 2>/dev/null) || return 0
+  rm -f "$dir/want.json"
+  find "$dir" -maxdepth 1 \( -type f -o -type l \) -name '*.src.tar.gz*' -delete 2>/dev/null || true
+  find "$dir/in" -maxdepth 1 \( -type f -o -type l \) -delete 2>/dev/null || true
+}
+
+build_note() {
+  jq -n --arg c "$1" --arg h "$2" --arg w "${3:-}" --arg at "$(date -u +%FT%TZ)" \
+    '{commit: $c, how: $h, why: (if $w == "" then null else $w end), at: $at}' >"$BUILD_LAST" 2>/dev/null || true
+}
+
+build_offer() {
+  local target=$1 dir src sha
+  dir=$(build_dir) || return 0
+  if [ -z "$(builders_pinned)" ]; then
+    rm -f "$dir/want.json" "$BUILD_ASKED"
+    return 0
+  fi
+  [ "$(cut -d' ' -f1 "$BUILD_ASKED" 2>/dev/null)" != "$target" ] || return 0
+  build_clear
+  src=$dir/$target.src.tar.gz
+  if ! repo archive --format=tar.gz -o "$src.tmp" "$target" 2>>"$LOG"; then
+    rm -f "$src.tmp"
+    return 0
+  fi
+  chown 568:568 "$src.tmp" 2>/dev/null || true
+  chmod 644 "$src.tmp"
+  mv -f "$src.tmp" "$src"
+  sha=$(sha256sum "$src" | cut -c1-64)
+  jq -n --arg c "$target" --arg at "$(date -u +%FT%TZ)" --arg f "$(basename "$src")" --arg s "$sha" --argjson b "$(stat -c %s "$src")" \
+    '{commit: $c, since: $at, source: $f, sha256: $s, bytes: $b}' | box_put "$dir" want.json
+  printf '%s %s\n' "$target" "$(date +%s)" >"$BUILD_ASKED"
+  log "Asked the builder for ${target:0:7}"
+}
+
+build_wait() {
+  local target=$1 dir asked now alive fp at age
+  [ -n "$(builders_pinned)" ] || return 1
+  dir=$(build_dir) || return 1
+  [ "$(cut -d' ' -f1 "$BUILD_ASKED" 2>/dev/null)" = "$target" ] || return 1
+  [ ! -e "$dir/in/$target.tar.gz" ] && [ ! -e "$dir/in/$target.failed" ] || return 1
+  now=$(date +%s)
+  asked=$(cut -d' ' -f2 "$BUILD_ASKED" | tr -cd '0-9')
+  [ -n "$asked" ] && [ $((now - asked)) -lt "$BUILD_WAIT" ] || return 1
+  [ ! -L "$dir/builder.alive" ] || return 1
+  alive=$(head -c 1024 "$dir/builder.alive" 2>/dev/null) || return 1
+  fp=$(jq -r '.fingerprint // empty' <<<"$alive" 2>/dev/null | tr -cd 'a-f0-9' | head -c 64)
+  [ -n "$fp" ] && [ -f "$BUILDERS/$fp.pub" ] || return 1
+  at=$(date -d "$(jq -r '.at // empty' <<<"$alive" 2>/dev/null | tr -cd '0-9TZ:-' | head -c 20)" +%s 2>/dev/null) || return 1
+  age=$((now - at))
+  [ "$age" -ge 0 ] && [ "$age" -lt "$BUILD_ALIVE" ] || return 1
+  echo "the builder is making its image (asked $(((now - asked) / 60)) min ago; the box builds it here if nothing comes within $((BUILD_WAIT / 60)) minutes)"
+}
+
+use_built() {
+  local target=$1 dir file sig stage sha pub tag why='' ok=0
+  [ -n "$(builders_pinned)" ] || return 1
+  dir=$(build_dir) || return 1
+  file=$dir/in/$target.tar.gz
+  sig=$dir/in/$target.sig
+  if [ -f "$dir/in/$target.failed" ] && [ ! -L "$dir/in/$target.failed" ]; then
+    why=$(head -c 600 "$dir/in/$target.failed" | jq -r '.error // empty' 2>/dev/null | tr -d '\r' | tr '\n' ' ' | cut -c1-300 | sed 's/ *$//' || true)
+    log "The builder couldn't make ${target:0:7}${why:+ ($why)}; building it here"
+    BUILT_WHY="the builder failed${why:+: $why}"
+    rm -f "$dir/in/$target.failed"
+    return 1
+  fi
+  [ -f "$file" ] && [ ! -L "$file" ] && [ -f "$sig" ] && [ ! -L "$sig" ] || return 1
+  stage=$(mktemp -d "$ROOT/.built.XXXXXX")
+  chmod 700 "$stage"
+  tag=${BUILT%:*}:built-$target
+  if ! head -c "$((BUILD_MAX + 1))" "$file" >"$stage/image.tar.gz" 2>/dev/null || [ "$(stat -c %s "$stage/image.tar.gz")" -gt "$BUILD_MAX" ]; then
+    why="it is larger than $((BUILD_MAX / 1048576)) MB"
+  elif ! head -c 4096 "$sig" | base64 -d >"$stage/sig" 2>/dev/null; then
+    why="its signature isn't readable"
+  else
+    sha=$(sha256sum "$stage/image.tar.gz" | cut -c1-64)
+    printf 'vektor-desk-image 1\ncommit %s\nsha256 %s\n' "$target" "$sha" >"$stage/statement"
+    while IFS= read -r pub; do
+      if openssl dgst -sha256 -verify "$pub" -signature "$stage/sig" "$stage/statement" >/dev/null 2>&1; then
+        ok=1
+        break
+      fi
+    done < <(builders_pinned)
+    if [ "$ok" -ne 1 ]; then
+      why="it isn't signed by an approved builder for this commit"
+    elif ! docker load -i "$stage/image.tar.gz" >>"$BUILD_LOG" 2>&1; then
+      why="docker couldn't load it (see $BUILD_LOG)"
+    elif [ "$(image_build "$tag")" != "$target" ]; then
+      why="the image inside isn't the build of this commit"
+    elif [ "$(docker image inspect -f '{{.Architecture}}' "$tag" 2>/dev/null)" != "$(docker version -f '{{.Server.Arch}}' 2>/dev/null)" ]; then
+      why="it was built for another kind of processor"
+    fi
+  fi
+  rm -rf "$stage"
+  rm -f "$file" "$sig"
+  if [ -n "$why" ]; then
+    docker rmi "$tag" >/dev/null 2>&1 || true
+    log "The builder's image for ${target:0:7} was refused: $why. Building it here"
+    alert "Desk refused a built image" "The image a builder sent for ${target:0:7} was refused: $why. The box builds it itself."
+    BUILT_WHY="the builder's image was refused: $why"
+    return 1
+  fi
+  docker tag "$tag" "${BUILT%:*}:candidate"
+  docker rmi "$tag" >/dev/null 2>&1 || true
+  log "Using the image a builder made for ${target:0:7} (signed by $(basename "$pub" .pub | cut -c1-12))"
+}
+
+approve_builder() {
+  local dir rc listed fp name pub tmp changed=0 ALERTS=approve-builder
+  if [ -e "$NO_SELF_PIN" ]; then
+    echo "Approving from the app is off ($NO_SELF_PIN). Copy the builder's public key into $BUILDERS by hand (docs/setup.md, Builds on Horizon)"
+    return 1
+  fi
+  at_main || {
+    rc=$?
+    return "$rc"
+  }
+  dir=$(build_dir) || {
+    echo "$ROOT/data/run/box isn't a plain folder. Nothing was changed"
+    return 1
+  }
+  mkdir -p "$BUILDERS"
+  chmod 700 "$BUILDERS"
+  listed=$(builders_listed)
+  while IFS= read -r pub; do
+    [ -n "$pub" ] || continue
+    fp=$(basename "$pub" .pub)
+    if ! grep -q "^$fp " <<<"$listed"; then
+      rm -f "$pub"
+      changed=1
+      log "Builder removed: ${fp:0:12} is no longer in deploy/builders.txt"
+      echo "Removed ${fp:0:12}: main's deploy/builders.txt no longer lists it"
+    fi
+  done < <(builders_pinned)
+  [ -n "$listed" ] || echo "Main's deploy/builders.txt lists no builder, so the box builds every image itself"
+  while read -r fp name; do
+    [ -n "$fp" ] || continue
+    if [ -f "$BUILDERS/$fp.pub" ]; then
+      echo "$name (${fp:0:12}) is already approved"
+      continue
+    fi
+    pub=$dir/pending/$fp.pub
+    if [ -L "$pub" ] || [ ! -f "$pub" ]; then
+      echo "$name (${fp:0:12}) is listed in main, but its builder hasn't sent that key yet. Start the builder on that machine, then tap again"
+      continue
+    fi
+    tmp=$(mktemp "$BUILDERS/.pub.XXXXXX")
+    head -c 4096 "$pub" >"$tmp"
+    if [ "$(fingerprint "$tmp")" != "$fp" ]; then
+      rm -f "$tmp"
+      echo "$name (${fp:0:12}): the key that was sent doesn't match the fingerprint in main. Not approved"
+      continue
+    fi
+    chmod 600 "$tmp"
+    mv -f "$tmp" "$BUILDERS/$fp.pub"
+    rm -f "$pub" "$dir/pending/$fp.json"
+    changed=1
+    log "Builder approved: $name (${fp:0:12})"
+    echo "Approved $name (${fp:0:12}). The box now takes images it signs, for the commit auto-deploy is waiting on"
+    alert "Desk approved a builder" "$name can now build the desk's images. Key ${fp:0:12}."
+  done <<<"$listed"
+  [ "$changed" -eq 1 ] || echo "Nothing changed"
+}
+
+builder_line() {
+  local n last
+  n=$(builders_pinned | wc -l)
+  last=$(jq -r 'select(.commit != null) | "; last image \(.commit[0:7]) came from \(if .how == "builder" then "a builder" else "this box" end)\(if .why then " (" + .why + ")" else "" end)"' "$BUILD_LAST" 2>/dev/null || true)
+  if [ "$n" -gt 0 ]; then echo "$n approved$last"; else echo "none approved; the box builds its own images$last"; fi
+}
+
+builder_state() {
+  local listed pinned
+  listed=$(builders_listed | jq -R -s '[split("\n")[] | select(. != "") | {fingerprint: .[0:64], name: .[65:]}]')
+  pinned=$(builders_pinned | sed -E 's#.*/([0-9a-f]{64})\.pub$#\1#' | jq -R -s '[split("\n")[] | select(. != "")]')
+  jq -n --arg at "$(date -u +%FT%TZ)" --argjson l "$listed" --argjson p "$pinned" --argjson w "$BUILD_WAIT" --argjson s "$SETTLE" \
+    --slurpfile last <(cat "$BUILD_LAST" 2>/dev/null || echo null) \
+    '{checked_at: $at, approved: [$p[] as $f | {fingerprint: $f, name: (([$l[] | select(.fingerprint == $f) | .name] | first) // null)}],
+      listed: [$l[] | . + {approved: (.fingerprint as $f | $p | index($f) != null)}], wait_seconds: $w, settle_seconds: $s, last: $last[0]}'
 }
 
 script_from() {
@@ -499,6 +745,7 @@ status() {
     echo "             holding back $(cut -c1-7 "$AUTO_FAILED") after it failed; the next push retries, or Settings → Box → Deploy now"
   fi
   echo "Box script:  $(script_line)"
+  echo "Builders:    $(builder_line)"
   compose_drift
   echo "Memory:      $(docker exec vektor-desk-api python -m desk.memory line 2>/dev/null || echo "$(free_mb) MB free")"
   echo
@@ -649,6 +896,7 @@ box_requests() {
   script_state 2>/dev/null | box_put "$dir" script.json || true
   compose_state 2>/dev/null | box_put "$dir" compose.json || true
   memory_state 2>/dev/null | box_put "$dir" memory.json || true
+  builder_state 2>/dev/null | box_put "$dir" builder.json || true
   box_keys "$dir" || true
   for action in $BOX_ACTIONS; do
     file=$dir/requests/$action.json
@@ -661,6 +909,7 @@ box_requests() {
     rm -f "$file"
     box_run "$dir" "$action" "$id"
   done
+  builder_state 2>/dev/null | box_put "$dir" builder.json || true
   find "$dir/requests" -maxdepth 1 \( -type f -o -type l \) -name '*.json' -delete 2>/dev/null || true
 }
 
@@ -1171,13 +1420,14 @@ main() {
     restore-test) restore_test ;;
     check) check ;;
     update-script) update_script ;;
+    approve-builder) approve_builder ;;
     apply-compose)
       exec 9>"$LOCK"
       flock -n 9 || die "a deploy is already running: tail -f $LOG" "$BUSY"
       apply_compose
       ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box | update-script | apply-compose | deploy-now]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box | update-script | apply-compose | deploy-now | approve-builder]" >&2
       exit 2
       ;;
   esac

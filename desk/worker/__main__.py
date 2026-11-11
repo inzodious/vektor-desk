@@ -38,6 +38,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("check", help="on the desk: queue a full database check for a worker")
     add = sub.add_parser("add", help="on the desk: make a worker key")
     add.add_argument("name")
+    sub.add_parser("build", help="on the other machine: build the desk's image when the box asks, sign it and send it")
     one = sub.add_parser("run-job", help="on the worker: run one job from its spec file")
     one.add_argument("spec")
     args = parser.parse_args(argv)
@@ -67,6 +68,20 @@ def main(argv: list[str] | None = None) -> int:
 
     url = os.environ.get("DESK_URL", "").strip()
     work = Path(os.environ.get("DESK_WORKER_DIR", "/work"))
+    if args.cmd == "build":
+        from desk.worker import builder
+
+        try:
+            key = os.environ.get("DESK_WORKER_KEY", "").strip() or (work / "key").read_text().strip()
+        except OSError:
+            key = ""
+        if not url.startswith("https://") and os.environ.get("DESK_WORKER_INSECURE") != "1":
+            print("DESK_URL must start with https://", file=sys.stderr)
+            return 2
+        if not key:
+            print("There is no worker key in the work folder yet. Start the worker first (docs/setup.md, Horizon worker).", file=sys.stderr)
+            return 2
+        return builder.loop(url, key, work)
     key = key_from(work)
     if not url or not key:
         print("Set DESK_URL (https://desk-lan.escape-vektor.com) and DESK_WORKER_KEY (Settings, Box, Workers, Add a worker).", file=sys.stderr)

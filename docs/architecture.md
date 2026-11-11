@@ -154,7 +154,7 @@ The service account can also read life-stack's `users/` data in the same Firebas
 The same pattern as Hemline: `deploy/deploy.sh` runs as root on the NAS.
 
 - `now` pulls `main` and builds `vektor-desk:candidate` and `vektor-desk/caddy:candidate`, stamped with the commit. Each named stage of a Dockerfile is built on its own first (`node`, `ui`, `deps`), then the image, then Caddy, so BuildKit never runs the UI build and the Python install side by side on a box that is short on memory. A build that fails while the kernel's out-of-memory count went up says so, and the hold is marked `memory`. It then backs up with the new build's code (`docker run` on the candidate image, no network), so a fix to the backup can unblock its own deploy, and only after a good backup tags the candidates `:local`, runs `app.redeploy`, and waits for the API to report healthy at that commit. If it doesn't, it rolls back to the images the containers were running, which it tagged `:previous` just before the swap. A failed backup changes no image, and the next try reuses the build. "Already live" means the running containers are at that commit, not just the image tags. It refuses while a desk job holds a run lock.
-- `auto` does the same every 5 minutes when `main` has moved, waits out running jobs, and doesn't retry a failed commit until the next push. Three things release a held-back commit without SSH: **Deploy now** in Settings → Box (`deploy.sh deploy-now`), a new box script (**Update box script**; the hold remembers which script made it), and, when the hold came from a failed backup, the next good backup (nightly, or **Back up now**).
+- `auto` does the same every 5 minutes when `main` has moved and been quiet for 10 minutes (`DESK_SETTLE`, seconds; commits that land together become one deploy and one restart, and **Deploy now** skips the wait), waits out running jobs, and doesn't retry a failed commit until the next push. With an approved builder (Builds on another machine) it takes that machine's image instead of building. Three things release a held-back commit without SSH: **Deploy now** in Settings → Box (`deploy.sh deploy-now`), a new box script (**Update box script**; the hold remembers which script made it), and, when the hold came from a failed backup, the next good backup (nightly, or **Back up now**).
 - `status` shows what's live, GitHub, container health, the tailnet address, backups, a `Memory:` line and the desk's own status.
 - `check` tests the Claude sign-in, Firestore read access, the DNS record against the tailnet address and the certificate, says whether the results reviews are fresh (with each stage of today's run), and sends a test alert to `desk-ops`.
 - The cron jobs run a pinned copy at `/mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh`, so a push to `main` never reaches root on its own. When `main`'s `deploy.sh` moves on, `status`, `check` and Settings → Box say how many `deploy.sh` commits the copy is behind, and the **Update box script** action copies it over once the checkout is clean, sits exactly at `origin/main` and the script parses (temp file and `mv`, then a `desk-ops` alert). Its output names the old commit, the new one and the commits between. `touch /mnt/Manifest/apps/vektor-desk/deploy.no-self-pin` turns the action off.
@@ -179,7 +179,7 @@ The checklist is in [setup.md](setup.md): ten steps, about 45 minutes, all free.
 
 | What | How |
 |---|---|
-| Deploy | Nothing: within 5 minutes of a push to `main`. Right away: `deploy.sh now` |
+| Deploy | Nothing: once `main` has been quiet for 10 minutes. Right away: Settings → Box → Deploy now, or `deploy.sh now` |
 | Status | `deploy.sh status`, or `https://desk.escape-vektor.com/api/status` |
 | Pull Escape Vektor now | Settings → Jobs → Run now, or `docker exec vektor-desk-cron python -m desk.mirror` (`--full` for every row) |
 | Fill an empty desk | **Start the desk** on the Bridge (Start the desk, below): every job in order, one tap |
@@ -297,15 +297,37 @@ A second machine on the home network (Horizon) can take heavy jobs off the NAS. 
 
 A job kind is a `Kind(name, title, run, accept)` listed in `desk/<pkg>/kinds.py` (Package seams). `run(inputs, files)` executes on the worker and must depend only on its inputs and the database copies; `accept(cfg, job, result_path)` executes on the NAS, validates and writes, and returns a one-line note. What happens to work no worker takes is the kind's business: the lab computes whatever its cache is missing itself.
 
-## Box actions
+## Builds on another machine
 
-Chores that need root on the NAS are requests the host picks up, the same way Run now works. `POST /api/box/{action}/run` drops `data/run/box/requests/{action}.json`. The auto-deploy cron job (`deploy.sh auto`, every 5 minutes, as root) then runs `deploy.sh {action}` for each request on its allowlist: `redeploy`, `status`, `check`, `backup`, `restore-test`, `logs`, `update-script`, `apply-compose` and `deploy-now`. It reads nothing from the request except a hex id. The redacted last 300 lines of output go to `data/run/box/{action}.json`.
+The image build is the heaviest thing left on the NAS. An approved builder (Horizon) makes the image for the commit auto-deploy is waiting on, signs it and sends it; the box checks the signature, loads it and carries on with the usual backup, restart and rollback. With no builder, a sleeping one, a slow one or a refused image, the box builds stage by stage as before.
 
-The host refuses to work through a symlinked `data/run/box` or a symlinked request. It writes results with `mktemp` and `mv`, so a planted link can't redirect a root write. Each auto run stamps `data/run/box/host.alive` and writes `data/run/box/script.json` and `compose.json`.
+| Step | How |
+|---|---|
+| Who may build | A worker key is not enough: anything on the home network can make one. The builder has its own RSA key, made on that machine and never sent anywhere. The box takes an image only when it is signed by a key that is both listed by fingerprint in `deploy/builders.txt` on `main` and pinned on the box by **Approve builder**. So it takes a push to `main` and a tap, the same two things the box script needs |
+| Ask to build | `python -m desk.worker build` (the `builder` profile in `deploy/worker/compose.yaml`) posts `/api/build/hello {public_key, protocol}` every 30 seconds with the worker key. An unknown key is kept in `data/run/box/build/pending/` and the app shows its fingerprint |
+| Approve | `deploy.sh approve-builder`, from the app: with the checkout clean and at `origin/main`, it copies each pending public key whose fingerprint is listed into `/mnt/Manifest/apps/.vektor-desk-deploy/builders/` (root only), recomputing the fingerprint with `openssl` first, and drops pinned keys that `main` no longer lists. `deploy.no-self-pin` turns it off |
+| The box asks | When `main` moves, `auto` writes `data/run/box/build/want.json` and the commit's source (`git archive`) beside it. The builder downloads the source, checks its SHA-256, runs `docker build` with the same arguments the box uses, and `docker save`s the image through gzip |
+| Sign and send | The builder signs the text `vektor-desk-image 1`, `commit <sha>`, `sha256 <of the file>` and posts the file to `/api/build/image/{commit}`. The API streams it to `data/run/box/build/in/` (3 GB limit), checks only that it arrived whole, and runs nothing |
+| Check and load | `deploy.sh` copies the file into a root-only folder, rebuilds that text itself and verifies the signature against each pinned key with `openssl dgst -verify`. Then `docker load`, and the image must carry this commit's revision label and the box's processor type. A refusal is logged, alerted on `desk-ops` and the box builds the image itself |
+| Wait | `auto` waits for the image while the approved builder has checked in within 3 minutes, for at most 20 minutes (`DESK_BUILD_WAIT`). A builder that fails says so (`/api/build/failed/{commit}`) and the box stops waiting at once |
+| What stays on the box | The Caddy image (cached unless `deploy/caddy` changes), the backup, the restart and the health check. The builder never gets a key, a database or a shell on the NAS |
 
 | Call | Answer |
 |---|---|
-| `GET /api/box` | `{now, host_alive, pickup_seconds: 300, script, compose, actions: [...]}` |
+| `GET /api/build`, and `build` in `GET /api/box` | `{state: none\|asking\|approve\|online\|asleep, words, builders: [{fingerprint, name, online, last_seen}], asking: [{fingerprint, name, asked_at}], listed, want: {commit, since, arrived: image\|failed\|null}\|null, last: {commit, how: builder\|box, why, at}\|null, wait_seconds, settle_seconds, host_seen}`. `words` says who builds and where the last image came from |
+| Builder calls | `Authorization: Bearer <worker key>`: `POST /api/build/hello`, `GET /api/build/source/{commit}`, `POST /api/build/image/{commit}` (`X-Desk-Sha256`, `X-Desk-Signature`), `POST /api/build/failed/{commit}` |
+
+The builder runs Docker on its own machine, which is as good as root there, so it is a separate opt-in service and it runs the code of the checkout it was started from, never code sent by the NAS. The source of the wanted commit is served to any machine holding a worker key.
+
+## Box actions
+
+Chores that need root on the NAS are requests the host picks up, the same way Run now works. `POST /api/box/{action}/run` drops `data/run/box/requests/{action}.json`. The auto-deploy cron job (`deploy.sh auto`, every 5 minutes, as root) then runs `deploy.sh {action}` for each request on its allowlist: `redeploy`, `status`, `check`, `backup`, `restore-test`, `logs`, `update-script`, `apply-compose`, `deploy-now` and `approve-builder`. It reads nothing from the request except a hex id. The redacted last 300 lines of output go to `data/run/box/{action}.json`.
+
+The host refuses to work through a symlinked `data/run/box` or a symlinked request. It writes results with `mktemp` and `mv`, so a planted link can't redirect a root write. Each auto run stamps `data/run/box/host.alive` and writes `data/run/box/script.json`, `compose.json`, `memory.json` and `builder.json`.
+
+| Call | Answer |
+|---|---|
+| `GET /api/box` | `{now, host_alive, pickup_seconds: 300, script, compose, memory, build, actions: [...]}` (`memory`: Memory; `build`: Builds on another machine) |
 | `script` | `null` until the host checks in, else `{checked_at, pinned, current, behind, from, to, off}`. `behind` counts `deploy.sh` commits since the cron copy (`null` if it matches no commit); `from` and `to` are full SHAs. Show Update box script when `current` is false |
 | `compose` | `null` until the host checks in, else `{checked_at, state: current\|drift\|unknown, drift, escalations, missing_dirs, missing_files, can_apply, copy_available}`. On `drift`: `can_apply` shows Apply compose; otherwise one banner with `escalations` and a Copy button |
 | `GET /api/box/compose.yaml` | The checkout's `compose.yaml` as `text/yaml` for the Copy button while `state` is `drift`; `404 no_change` otherwise |
@@ -314,7 +336,7 @@ The host refuses to work through a symlinked `data/run/box` or a symlinked reque
 | `POST /api/box/{action}/run` | `202 {ok: true, action, request_id, requested_at, message}` |
 | Refusals | `{ok: false, error, message, ...}`: `404 unknown_action`; `409 running` or `queued` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 host_down` (no `host.alive` in 12 minutes: the cron copy of `deploy.sh` is older than this feature, or auto-deploy is off) |
 
-Cooldowns: apply-compose 10 minutes, redeploy, update-script and deploy-now 5, status and logs 1, check 2, backup and restore-test 30. `update-script` and `apply-compose` end `skipped` while the checkout or live build is still catching up to `main`. Every request is logged to `data/run/box-requests.log`. `deploy.sh box` runs pending requests right away.
+Cooldowns: apply-compose 10 minutes, redeploy, update-script and deploy-now 5, status, logs and approve-builder 1, check 2, backup and restore-test 30. `update-script` and `apply-compose` end `skipped` while the checkout or live build is still catching up to `main`. Every request is logged to `data/run/box-requests.log`. `deploy.sh box` runs pending requests right away.
 
 ## Inbox upload
 
@@ -348,7 +370,7 @@ Each package under `desk/` plugs in through five optional modules, found on thei
 | `desk/<pkg>/kinds.py` | `KINDS`, a list of `desk.worker.Kind` | `desk.worker.registry`, on the NAS and inside the worker's child process |
 | `desk/<pkg>/readiness.py` | `sections(cfg)`, returning `{key: {state, why, action, next_auto, next_auto_text}}` for the readiness keys it wants to answer itself | `desk.readiness`, which lays those fields over its own answer |
 
-Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/start`, `/api/readiness`, `/api/memory/...`, `/api/workers`, `/api/worker/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
+Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/start`, `/api/readiness`, `/api/memory/...`, `/api/workers`, `/api/worker/...`, `/api/build/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
 ## Web app
 
