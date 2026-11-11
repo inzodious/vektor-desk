@@ -154,7 +154,7 @@ def run_quotes(cfg: Config, http=None, force: bool = False) -> dict:
             f"{why}, so Live shows the last close. Check Settings.",
             "default",
             tags=["hourglass"],
-            click="/settings",
+            click="/settings/data",
             key=f"quotes-{datetime.now(UTC).date().isoformat()}",
             cfg=cfg,
         )

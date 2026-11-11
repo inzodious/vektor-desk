@@ -201,7 +201,7 @@ Windows: 1D, 1W, MTD, QTD, YTD, 1Y, 3Y, since start. **Returns under a year are 
 
 | Id | Metric | Notes |
 |---|---|---|
-| `bm.plan_shadow` | Plan-mix shadow portfolio | Every external dollar, on its real date, buys the plan's target weights at that day's close; deposits steer drift the way the plan does; never sells |
+| `bm.plan_shadow` | Safe-mix shadow portfolio | Every external dollar, on its real date, buys the reference mix's weights at that day's close; deposits steer drift the way the mix does; never sells |
 | `bm.sp500_shadow` | S&P 500 shadow | Same dollars, same dates, all in an S&P 500 index fund (total return) |
 | `bm.excess` | Excess return vs each shadow | In percent and in dollars. Dollars are the headline |
 | `bm.tracking_error` | Tracking error | Annualized volatility of daily excess return |
@@ -247,13 +247,24 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 
 | Id | Metric | Notes |
 |---|---|---|
-| `plan.weight`, `plan.target`, `plan.drift` | Actual weight, target and drift in points per fund | Against the active plan version from the mirror |
+| `plan.weight`, `plan.target`, `plan.drift` | Actual weight, target and drift in points per fund | Against the reference mix (below) |
 | `plan.in_mix` | Share of value in plan funds | |
 | `plan.drift_max` | Largest drift, in points, and which fund | The Bridge headline |
 | `plan.single_stock` | Single-stock share vs its band | |
 | `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling. Only when a deposit is expected from your activity (auto-detected series or a schedule); the plan's contributions never predict one |
 | `plan.adherence` | Plan adherence | Share of buy dollars (activity, core sweeps excluded) that went to plan funds; windows `MTD`, `QTD`, `YTD`, `1Y`, `ITD` |
 | `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points, conviction holds (pass while the symbol's weight sits inside `band_min_pct`–`band_max_pct`). A conviction symbol is exempt from the single-stock band and from no new single stocks. Each a pass or fail with the evidence |
+
+**Reference mix.** `core.reference_mix(plan)` gives the weights these metrics are measured against: the Escape Vektor plan when the mirror has one, else the built-in safe mix (`catalog.SAFE_MIX`). `GET /api/engine/reference` returns `{as_of, source (plan or safe_mix), name, weights, judged, note}`.
+
+| On the built-in mix | What happens |
+|---|---|
+| `bm.plan_shadow`, `bm.excess`, `bm.tracking_error` | Run on the mix, FXAIX and FTIHX as IVV and VXUS, the same weights the catalog's Safe mix uses |
+| `plan.target`, `plan.drift`, `plan.drift_max`, `plan.in_mix`, `plan.adherence` | Run on the mix, flagged `modelled`. A distance from a yardstick, not a to-do |
+| `plan.next_deposit` | The split that would close the gap to the mix, `modelled`. One reference for the Plan keeper; its deposit route is still judged against your risk band |
+| `plan.rules` drift check | Not judged, so no rule fails and no alert fires for being away from the mix |
+| `bm.active_share`, the scorecard's plan return and off-plan gap, replay's broad-fund list | Run on the mix |
+| Preflight, the FI path, fund look-through, the lab export | Unchanged: they read the Escape Vektor plan only |
 
 ### Tax (needs the lot export or the Fidelity history)
 

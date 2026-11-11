@@ -522,6 +522,11 @@ def fi_view(request: Request) -> JSONResponse:
     return _view(request, "fi", {"as_of": None, "status": "not_ready", "lines": [], "fi_date": {}})
 
 
+@router.get("/api/engine/reference")
+def reference_view(request: Request) -> JSONResponse:
+    return _view(request, "reference", {"as_of": None, "source": None, "name": None, "weights": {}, "judged": False, "note": None})
+
+
 @router.get("/api/engine/factors")
 def factors_view(request: Request) -> JSONResponse:
     return _view(request, "factors", {"as_of": None, "holdings": {}, "portfolio": {}, "coverage_pct": 0.0})
