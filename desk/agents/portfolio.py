@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from desk.agents import advisor, briefs, store, switches
+from desk.agents import advisor, briefs, store, switches, wording
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.plans import brief_plan
@@ -35,6 +35,8 @@ HOLDING_FIELDS = ("symbol", "name", "kind", "as_of", "price_as_of", "numbers", "
 PREVIOUS_FIELDS = ("as_of", "thesis", "bear_case", "valuation_range", "valuation_note", "risks", "fit", "verdict", "verdict_line", "what_would_change")
 TEXT = {"what_it_is": 500, "thesis": 1500, "bear_case": 1500, "valuation_note": 600, "fit": 800, "verdict_line": 240, "what_would_change": 800}
 NEEDED = ("what_it_is", "thesis", "bear_case", "fit", "verdict_line", "what_would_change")
+UNITS = ("price", "multiple", "percent")
+BASIS_CHARS = 120
 RISKS_MAX = 6
 RISK_CHARS = 300
 SOURCES_MAX = 12
@@ -105,6 +107,9 @@ def schema() -> dict:
     dossier = deepcopy(briefs.DOSSIER)
     dossier["required"] = [*dossier["required"], "what_it_is", "risks", "fit", "verdict", "verdict_line"]
     dossier["properties"]["verdict"] = {"enum": list(VERDICTS)}
+    span = dossier["properties"]["valuation_range"]
+    span["required"] = [*span["required"], "unit"]
+    span["properties"]["basis"] = {"type": "string", "maxLength": BASIS_CHARS}
     return {
         "type": "object",
         "additionalProperties": False,
@@ -121,11 +126,18 @@ def _weight(row: dict) -> float:
     return 0.0
 
 
+def _held(row: dict) -> bool:
+    if row.get("held") is not False:
+        return True
+    value = (row.get("numbers") or {}).get("value") if isinstance(row.get("numbers"), dict) else None
+    return isinstance(value, int | float) and not isinstance(value, bool) and value > 0
+
+
 def held_rows(rows: list[dict]) -> list[dict]:
     out, seen = [], set()
     for row in rows:
         symbol = str(row.get("symbol") or "").upper()
-        if not symbol or symbol in seen or row.get("held") is False or str(row.get("kind") or "") in SKIP_KINDS:
+        if not symbol or symbol in seen or not _held(row) or str(row.get("kind") or "") in SKIP_KINDS:
             continue
         seen.add(symbol)
         out.append(row | {"symbol": symbol})
@@ -191,10 +203,11 @@ def build_queue(cfg: Config, rows: list[dict], now: datetime, zone: ZoneInfo, sy
         if symbols and symbol not in symbols:
             continue
         found = latest.get(symbol)
-        why = ["asked"] if symbols else reasons(row, _at(found["created_at"]) if found else None, now, zone)
+        previous = _body(found)
+        full = previous is not None and bool(previous.get("what_it_is"))
+        why = ["asked"] if symbols else reasons(row, _at(found["created_at"]) if full else None, now, zone)
         if not why or (not symbols and misses.get(symbol, 0) >= TRIES_A_NIGHT):
             continue
-        previous = _body(found)
         if previous is not None:
             previous = {"written_at": found["created_at"]} | {k: previous[k] for k in PREVIOUS_FIELDS if previous.get(k) is not None}
         items.append(Item(symbol, row, why, previous))
@@ -240,7 +253,8 @@ def _range(found: object) -> dict:
         v = box.get(key)
         return float(v) if isinstance(v, int | float) and not isinstance(v, bool) else None
 
-    return {"low": num("low"), "high": num("high"), "now": num("now"), "basis": _text(box.get("basis"), 400)}
+    unit = box.get("unit") if box.get("unit") in UNITS else None
+    return {"low": num("low"), "high": num("high"), "now": num("now"), "unit": unit, "basis": str(box.get("basis") or "").strip()}
 
 
 def clean(answer: dict, item: Item, view: dict, today: str) -> tuple[dict | None, str | None]:
@@ -249,7 +263,7 @@ def clean(answer: dict, item: Item, view: dict, today: str) -> tuple[dict | None
         return None, "no analysis came back"
     out: dict = {"symbol": item.symbol, "as_of": today}
     for key, cap in TEXT.items():
-        out[key] = _text(raw.get(key), cap)
+        out[key] = _text(wording.tidy(raw.get(key)), cap)
     missing = [k for k in NEEDED if not out[k]]
     if missing:
         return None, f"the analysis left out {', '.join(missing)}"
@@ -257,11 +271,16 @@ def clean(answer: dict, item: Item, view: dict, today: str) -> tuple[dict | None
     if verdict not in VERDICTS:
         return None, "the analysis gave no verdict"
     out["sources"] = _sources(raw.get("sources"))
-    if not out["sources"]:
+    if not out["sources"] and str(item.row.get("kind") or "") == "stock":
         return None, "the analysis cited no dated source"
-    out["risks"] = [t for t in (_text(r, RISK_CHARS) for r in raw.get("risks") or () if isinstance(r, str)) if t][:RISKS_MAX]
-    out["valuation_range"] = _range(raw.get("valuation_range"))
-    out["changes_since_last"] = (_text(raw.get("changes_since_last"), 800) or None) if item.previous else None
+    out["risks"] = [t for t in (_text(wording.tidy(r), RISK_CHARS) for r in raw.get("risks") or () if isinstance(r, str)) if t][:RISKS_MAX]
+    span = _range(raw.get("valuation_range"))
+    basis = str(wording.tidy(span["basis"]))
+    if len(basis) > BASIS_CHARS:
+        out["valuation_note"] = out["valuation_note"] or _text(basis, TEXT["valuation_note"])
+        basis = basis.split(". ")[0].split(" (")[0][:BASIS_CHARS].rstrip(" ,;:.")
+    out["valuation_range"] = span | {"basis": basis}
+    out["changes_since_last"] = (_text(wording.tidy(raw.get("changes_since_last")), 800) or None) if item.previous else None
     until = advisor.no_buy_until(view, item.symbol, today)
     band = item.row.get("band") if isinstance(item.row.get("band"), dict) else {}
     if verdict == "add" and until:

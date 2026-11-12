@@ -74,6 +74,10 @@ class RealDecisions:
     def history(self, cfg: Config, desk: str, limit: int) -> list[dict]:
         return list(_fn("desk.decisions", "desk_history")(cfg, desk, limit=limit))
 
+    def standing(self, cfg: Config) -> list[dict]:
+        keys = ("origin", "kind", "symbol", "subject", "title")
+        return [{k: i.get(k) for k in keys} for i in _fn("desk.decisions", "queue")(cfg).get("items") or ()]
+
     def create(self, cfg: Config, proposal: dict, desk: str, run_id: str) -> dict:
         return _fn("desk.decisions", "create_proposal")(cfg, proposal, desk, run_id=run_id)
 
