@@ -93,6 +93,27 @@ def test_margin_borrows_in_a_dip_and_pays_interest(cfg):
     assert out.interest > 0 and base.interest == 0 and out.contributed == base.contributed
 
 
+def test_paying_the_debit_first_is_measured_against_leaving_it(cfg):
+    data = rules_lab(cfg)
+    raw = {"id": "p", "rule": "paydown", "params": {"debit_pct": 10, "rate_pct": 12}, "horizons": [5], "mix": {"AAA": 1.0}}
+    rule = rules.parse(raw, data)
+    assert rule.variants == [{"debit_pct": 10.0, "rate_pct": 12.0}] and any("same margin debit" in c for c in rule.caveats)
+    out = rules.simulate(data, rule, rule.variants[0], "2014-06-02", "2017-06-30", rate=0.24)
+    base = rules._baseline(data, rule, "2014-06-02", "2017-06-30", 0.24)
+    assert out.contributed == base.contributed and 0 < out.interest < base.interest
+    assert base.interest > 0.12 * 1000 * 3 and out.interest < 0.12 * 1000 / 12 + 1
+    free = rules.parse(raw | {"params": {"debit_pct": 10, "rate_pct": 0}}, data)
+    costless = rules.simulate(data, free, free.variants[0], "2014-06-02", "2017-06-30", rate=0.24)
+    kept = rules._baseline(data, free, "2014-06-02", "2017-06-30", 0.24)
+    assert costless.interest == kept.interest == 0 and kept.after_liq > costless.after_liq
+    body = rules.evaluate(data, rule)
+    assert body["trials"] == 1 and body["baseline"]["description"].startswith("Same starting debit") and body["verdict"] in ("helps", "hurts", "no_clear_edge")
+    with pytest.raises(rules.RuleError, match="a fact, not a dial"):
+        rules.parse(raw | {"params": {"debit_pct": [10, 20], "rate_pct": 12}}, data)
+    with pytest.raises(rules.RuleError, match="needs params.debit_pct"):
+        rules.parse(raw | {"params": {"rate_pct": 12}}, data)
+
+
 def test_rule_queue_view_and_api(cfg, app_client):
     rules_lab(cfg)
     queue(cfg, {"request": "rule", "id": "steer", "rule": "deposit_steering", "horizons": [5, 10], "model": "m"}, "001-rule.json")
