@@ -19,6 +19,8 @@ NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 SECRETISH = re.compile(r"[A-Za-z0-9_\-+/=]{32,}")
 SAID_MAX = 300
 KEEP_RUNS = 10
+FIELD_MAX = 80
+SPOKEN = ("skipped", "error", "ready", "detail")
 
 REFRESHES = {
     "mirror": ["freshness", "holdings", "value"],
@@ -90,17 +92,42 @@ def plain(text: object) -> str | None:
     return SECRETISH.sub("…", " ".join(text.split()))[:SAID_MAX]
 
 
+def _short(value: object) -> str:
+    if isinstance(value, dict):
+        return f"{len(value)} fields"
+    if isinstance(value, list):
+        return f"{len(value)} items"
+    text = value if isinstance(value, str) else json.dumps(value)
+    text = " ".join(text.split())
+    return text if len(text) <= FIELD_MAX else f"{text[:FIELD_MAX]}…"
+
+
+def fields(said: dict) -> str | None:
+    out = ""
+    for key, value in said.items():
+        if key in SPOKEN:
+            continue
+        more = f"{out}; {key}: {_short(value)}" if out else f"{key}: {_short(value)}"
+        if len(more) > SAID_MAX - 2:
+            out += "; …"
+            break
+        out = more
+    return plain(out)
+
+
 def last_words(line: str) -> dict:
     whole = plain(line)
     try:
         said = json.loads(line)
     except ValueError:
+        if line.strip().startswith(("{", "[")) or line.strip().endswith(("}", "]")):
+            return {"error": whole}
         return {"error": whole, "detail": whole, "said": whole} if whole else {}
     if not isinstance(said, dict):
-        return {"said": whole}
+        return {"said": _short(said)}
     skipped = said.get("skipped")
     words = {key: plain(said.get(key)) for key in ("error", "ready", "detail")}
-    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, **words, "said": whole}
+    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, **words, "said": fields(said)}
 
 
 def state_dir(cfg: Config) -> Path:

@@ -333,12 +333,30 @@ def test_every_run_keeps_its_last_line_and_a_plain_one_shows_on_the_step(cfg):
     counted.proc.wait()
     reap([counted], cfg)
     run = jobrun.last_run(cfg, "engine-backfill")
-    assert (run["did"], run["said"]) == (None, '{"ok": true, "asked": 3}') and overnight.outcome(run) == ("ok", None, None)
+    assert (run["did"], run["said"]) == (None, "ok: true; asked: 3") and overnight.outcome(run) == ("ok", None, None)
     quiet = make_job("c", "0 0 1 1 *", ["true"], name="mirror")
     start(quiet, cfg, "schedule")
     quiet.proc.wait()
     reap([quiet], cfg)
     assert jobrun.last_run(cfg, "mirror")["said"] is None
+
+
+def test_a_json_last_line_is_kept_field_by_field_never_cut_mid_field():
+    symbols = [f"SYM{n}" for n in range(400)]
+    body = {"ok": True, "detail": "Asked for 3 days.", "asked": 3, "note": "x " * 100, "month_symbols": symbols, "by_day": {"a": 1, "b": 2}}
+    body |= {f"field_{n}": "value " * 5 for n in range(20)}
+    said = jobrun.last_words(json.dumps(body))
+    assert said["detail"] == "Asked for 3 days." and "detail" not in said["said"]
+    assert said["said"].startswith(f"ok: true; asked: 3; note: {('x ' * 100).strip()[:80]}…; month_symbols: 400 items; by_day: 2 fields; field_0: ")
+    assert len(said["said"]) <= 300 and said["said"].endswith("; …") and "SYM" not in said["said"]
+    assert jobrun.last_words(json.dumps({"ready": "3 done"})) == {"skipped": None, "error": None, "ready": "3 done", "detail": None, "said": None}
+    assert jobrun.last_words("[1, 2, 3]") == {"said": "3 items"}
+    cut = json.dumps(body)[:2000]
+    assert jobrun.last_words(cut) == {"error": jobrun.plain(cut)} and jobrun.last_words(cut[5:] + "}")["error"]
+    assert "detail" not in jobrun.last_words(cut[5:] + "}") and jobrun.last_words("") == {} and jobrun.last_words("   ") == {}
+    long = make_job("a", "0 0 1 1 *", ["true"], name="engine-backfill")
+    scheduler._pump(long, [json.dumps(body) + "\n"])
+    assert jobrun.last_words(long.said)["detail"] == "Asked for 3 days."
 
 
 # ---- What the app and the phone see ----
