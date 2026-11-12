@@ -4,7 +4,7 @@ import time
 from datetime import date, datetime
 from statistics import median
 
-from desk.engine import alpaca
+from desk.engine import NO_ALPACA, NO_SEC, SKIPS, alpaca, skip
 from desk.engine.market import ProviderError
 from desk.engine.research import SEC_GAP, _get, sec_agent, sec_ciks
 from desk.paper_check import NotPaper
@@ -42,7 +42,7 @@ def _frames(day: date) -> list[tuple[int, int]]:
 def fetch_shares(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> int:
     agent = sec_agent()
     if not agent:
-        raise ProviderError("DESK_SEC_USER_AGENT is not set")
+        raise ProviderError(SKIPS[NO_SEC])
     rows = []
     for year, q in _frames(now.date()):
         body = _get(http, SEC_FRAME.format(year=year, q=q), "SEC", headers={"User-Agent": agent}) or {}
@@ -124,9 +124,9 @@ def lane_symbols(conn: sqlite3.Connection) -> set[str]:
 
 def run(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> dict:
     if alpaca.headers() is None:
-        return {"ok": True, "skipped": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"}
+        return skip(NO_ALPACA)
     if not sec_agent():
-        return {"ok": True, "skipped": "DESK_SEC_USER_AGENT is not set"}
+        return skip(NO_SEC)
     try:
         sec_ciks(conn, http, sec_agent(), now, sleep)
         assets = alpaca.fetch_assets(conn, http, now=now)

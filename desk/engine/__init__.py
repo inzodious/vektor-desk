@@ -12,6 +12,20 @@ KEY_WORDS = {
 }
 
 
+NO_SEC, NO_ALPACA, NO_FRED, NO_FINNHUB, NO_SMALL_COMPANIES = "no_sec_contact", "no_alpaca_keys", "no_fred_key", "no_finnhub_key", "no_small_companies"
+SKIPS = {
+    NO_SEC: f"The SEC contact is not set. Add it in {KEYS_AT}.",
+    NO_ALPACA: f"The Alpaca paper keys are not set. Add them in {KEYS_AT}.",
+    NO_FRED: f"The FRED key is not set. Add it in {KEYS_AT}.",
+    NO_FINNHUB: f"The Finnhub key is not set. Add it in {KEYS_AT}.",
+    NO_SMALL_COMPANIES: "The list of small companies is not built yet. It builds itself on weekday evenings.",
+}
+
+
+def skip(code: str) -> dict:
+    return {"ok": True, "skipped": SKIPS[code], "skipped_code": code}
+
+
 def key_fix(keys: list[str]) -> str:
     words = [KEY_WORDS.get(k, "a key") for k in keys]
     listed = words[0] if len(words) == 1 else f"{', '.join(words[:-1])} and {words[-1]}"
