@@ -19,6 +19,7 @@ def _roomy_box(monkeypatch):
     monkeypatch.setenv("DESK_LOW_MEMORY", "off")
     monkeypatch.setitem(scheduler._LOW, "on", False)
     monkeypatch.setitem(scheduler._LOW, "checked", None)
+    monkeypatch.setitem(scheduler._LOW, "sample_due", None)
 
 
 @pytest.fixture

@@ -28,6 +28,11 @@ FRESH = timedelta(minutes=10)
 HOST_FRESH = timedelta(minutes=15)
 RECENT = timedelta(hours=48)
 SAME_KILL = timedelta(minutes=3)
+SAMPLE_EVERY = timedelta(minutes=5)
+SAMPLE_SLACK = timedelta(seconds=30)
+SAMPLE_KEEP = timedelta(hours=48)
+SAMPLE_MAX = SAMPLE_KEEP // SAMPLE_EVERY
+SAMPLE_JOBS = 12
 KILLED = (-9, 137)
 LOG_KEEP = 200
 SERVICES = {"cron": "scheduler", "api": "app", "lab": "lab", "eval": "eval session", "caddy": "web server", "ntfy": "phone alerts", "tailscale": "tailnet"}
@@ -118,6 +123,10 @@ def state_file(cfg: Config) -> Path:
 
 def waiting_file(cfg: Config) -> Path:
     return run_dir(cfg) / "waiting.json"
+
+
+def history_file(cfg: Config) -> Path:
+    return run_dir(cfg) / "memory-history.json"
 
 
 def read_mode(cfg: Config) -> str:
@@ -329,6 +338,46 @@ def status(cfg: Config, now: datetime | None = None, info: dict | None = None) -
     }
 
 
+# ---- The last two days ----
+
+
+def history(cfg: Config, now: datetime | None = None) -> list[dict]:
+    now = now or jobrun.now_utc()
+    rows = (jobrun._read(history_file(cfg)) or {}).get("samples")
+    kept = []
+    for row in rows if isinstance(rows, list) else []:
+        seen = jobrun.parse_stamp(row.get("at")) if isinstance(row, dict) else None
+        if seen is not None and now - SAMPLE_KEEP <= seen <= now:
+            kept.append(row)
+    return kept[-SAMPLE_MAX:]
+
+
+def sample(
+    cfg: Config, now: datetime | None = None, low: bool = False, running: list[str] | None = None, info: dict | None = None, group: dict | None = None
+) -> dict | None:
+    now = now or jobrun.now_utc()
+    rows = history(cfg, now)
+    last = jobrun.parse_stamp(rows[-1]["at"]) if rows else None
+    if last is not None and now - last < SAMPLE_EVERY - SAMPLE_SLACK:
+        return None
+    info = info if info is not None else meminfo() or {}
+    group = group if group is not None else cgroup()
+    row = {
+        "at": jobrun.stamp(now),
+        "free_mb": info.get("available_mb"),
+        "cache_mb": info.get("cache_mb"),
+        "scheduler_mb": group.get("used_mb"),
+        "low": bool(low),
+        "running": [str(name) for name in (running or [])[:SAMPLE_JOBS]],
+    }
+    jobrun._write(history_file(cfg), {"samples": [*rows, row][-SAMPLE_MAX:]})
+    return row
+
+
+def history_block(cfg: Config, now: datetime | None = None) -> dict:
+    return {"every_minutes": SAMPLE_EVERY // timedelta(minutes=1), "keeps_hours": SAMPLE_KEEP // timedelta(hours=1), "samples": history(cfg, now)}
+
+
 # ---- Pausing a service while the mode is on ----
 
 
@@ -402,8 +451,9 @@ NO_STORE = {"Cache-Control": "no-store"}
 
 
 @router.get("/api/memory")
-def get_memory(request: Request) -> JSONResponse:
-    return JSONResponse(status(request.app.state.cfg), headers=NO_STORE)
+def get_memory(request: Request, history: bool = False) -> JSONResponse:
+    cfg = request.app.state.cfg
+    return JSONResponse(status(cfg) | ({"history": history_block(cfg)} if history else {}), headers=NO_STORE)
 
 
 @router.put("/api/memory/low")
