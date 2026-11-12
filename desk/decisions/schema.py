@@ -1,3 +1,5 @@
+import sqlite3
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS risk_profiles (
   version INTEGER PRIMARY KEY,
@@ -73,6 +75,10 @@ CREATE TABLE IF NOT EXISTS decisions (
   filled_at TEXT,
   fill TEXT,
   activity_id TEXT UNIQUE,
+  subject TEXT,
+  as_of TEXT,
+  valid TEXT,
+  replaced_by TEXT,
   CHECK (status IN ('proposed', 'snoozed', 'approved', 'placed', 'filled', 'done', 'dismissed', 'passed', 'expired', 'rejected', 'logged')),
   CHECK (preflight_status IN ('none', 'pending', 'clear', 'flagged', 'blocked', 'error'))
 );
@@ -119,3 +125,20 @@ CREATE TABLE IF NOT EXISTS plan_step_state (
   PRIMARY KEY (symbol, step_id)
 );
 """
+
+ADDED = {"decisions": {"subject": "TEXT", "as_of": "TEXT", "valid": "TEXT", "replaced_by": "TEXT"}}
+INDEXES = "CREATE INDEX IF NOT EXISTS decisions_subject ON decisions (origin, subject, status);"
+
+
+def apply(conn: sqlite3.Connection) -> None:
+    for table, columns in ADDED.items():
+        have = {r[1] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for name, kind in columns.items():
+            if name in have:
+                continue
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {kind}")
+            except sqlite3.OperationalError as e:
+                if "duplicate column" not in str(e).lower():
+                    raise
+    conn.execute(INDEXES)

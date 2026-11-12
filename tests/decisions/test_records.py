@@ -72,9 +72,11 @@ def test_preflight_pending_without_engine_and_error_is_kept(cfg, preflight, now,
 
 
 def test_memo_skips_preflight(cfg, preflight, now, proposal):
-    d = create_proposal(cfg, {"kind": "memo", "title": "Weekly risk note", "thesis": "All quiet."}, "risk", now=now)
-    assert d["preflight_status"] == "none" and preflight["calls"] == []
+    d = create_proposal(cfg, {"kind": "hold_off", "title": "Hold off while the debit is open", "thesis": "All quiet."}, "risk", now=now)
+    assert d["preflight_status"] == "pending" or preflight["calls"]
     assert approve(cfg, d["id"], now=now)["status"] == "done"
+    note = create_proposal(cfg, {"kind": "memo", "title": "Weekly risk note", "thesis": "All quiet."}, "risk", now=now)
+    assert note["preflight_status"] == "none" and note["status"] == "logged"
 
 
 @pytest.mark.parametrize(

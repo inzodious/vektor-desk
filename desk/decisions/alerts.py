@@ -5,7 +5,7 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.plans import LOT_TEXT, approved_plans
 from desk.decisions.profile import active_profile
-from desk.decisions.records import queue, unmatched
+from desk.decisions.records import notes, queue, unmatched
 from desk.decisions.risk import convictions
 from desk.decisions.store import loads, session
 from desk.notify import PRIORITIES, publish
@@ -48,8 +48,8 @@ def send_alerts(cfg: Config, *, now: datetime | None = None) -> list[str]:
     floor = PRIORITIES[active_profile(cfg).get("alerts", "min_priority", default="default")]
     sent: list[str] = []
 
-    # ---- Queue ----
-    for d in queue(cfg, now=now)["items"]:
+    # ---- Queue and notes ----
+    for d in [*queue(cfg, now=now)["items"], *notes(cfg, days=1, now=now)["items"]]:
         if d["origin"] == "you":
             continue
         priority = item_priority(d, now)
