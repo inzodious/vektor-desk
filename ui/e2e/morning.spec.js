@@ -175,6 +175,23 @@ test('Research is organised by holding, each with a status', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
+test('a fund with no valuation range shows its reason as text and no strip', async ({ page }) => {
+  const note = 'A broad fund has no single fair price, so there is no range here. It is judged by its cost and how closely it tracks its index.';
+  await page.route('**/api/agents/dossiers', async (route) => {
+    const res = await route.fetch();
+    const rows = await res.json();
+    await route.fulfill({ json: rows.map((r) => (r.symbol === 'FTEC' ? { ...r, dossier: { ...r.dossier, valuation_range: { low: null, high: null, now: null, unit: null, basis: null }, valuation_note: note } } : r)) });
+  });
+  await page.goto('/research?s=FTEC');
+  const d = page.getByTestId('dossier');
+  await expect(d.getByTestId('valuation-note')).toHaveText(note);
+  await expect(d.getByTestId('range-label')).toHaveText('Valuation');
+  await expect(d.locator('.range')).toHaveCount(0);
+  await expect(d).not.toContainText('No valuation range written yet');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+});
+
 test('an older dossier with a long method note prints it as plain text and its multiples without a dollar sign', async ({ page }) => {
   const basis = 'Forward P/E on the listed shares (price ÷ next-year consensus EPS). Low 22x = the recent trough reading; high 33x = the five-year average. Now 24.57x at the close of $100.00.';
   await page.route('**/api/agents/dossiers', async (route) => {
@@ -255,6 +272,27 @@ test('each idea says which price it is worked out from, and why a buy is not in 
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
+});
+
+test('a long stance label stays inside its card', async ({ page }) => {
+  const labels = ['You already hold this; the analysis says hold, not add', 'Watch: the case says buy, but your research note says hold'];
+  await page.route('**/api/opportunities*', async (route) => {
+    const res = await route.fetch();
+    const json = await res.json();
+    await route.fulfill({ json: { ...json, rows: json.rows.map((r, k) => ({ ...r, stance: 'watch', stance_label: labels[k % 2] })) } });
+  });
+  await page.goto('/research/opportunities');
+  await expect(page.getByTestId('ideas')).toContainText(labels[1]);
+  const gaps = await page.locator('.idea').evaluateAll((cards) =>
+    cards.map((card) => {
+      const pad = parseFloat(getComputedStyle(card).paddingRight);
+      const chip = card.querySelector('.card-head .chip').getBoundingClientRect();
+      return Math.round(card.getBoundingClientRect().right - chip.right - pad);
+    }),
+  );
+  gaps.forEach((gap) => expect(gap).toBeGreaterThanOrEqual(-1));
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
 });
 
 test('an empty opportunities list gives its reason', async ({ page }) => {
