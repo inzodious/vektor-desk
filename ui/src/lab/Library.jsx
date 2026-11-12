@@ -24,6 +24,11 @@ function Row({ r }) {
       </span>
       <span className="lib-end">
         <span className={`chip ${chip.tone}`}>{chip.t}</span>
+        {r.outdated ? (
+          <span className="chip lilac" data-testid="lib-retest" title="This result is from an older version of the rule. It is queued to run again.">
+            Retest pending
+          </span>
+        ) : null}
         {excess ? <small>{excess}</small> : null}
       </span>
     </>

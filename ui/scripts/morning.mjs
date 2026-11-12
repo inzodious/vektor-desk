@@ -73,6 +73,8 @@ function libraryRow([id, title, kind, family, description, benchmark, outcome, e
     noise: tested && !rule && excess != null ? { trials: 212, excess_total_pts: excess * 7.8, band_total_pts: 12.4, luck: Math.abs(excess * 7.8) < 12.4 } : null,
     rule: rule && tested ? { horizon_years: 10, starts: 100, p5_pts: -3.2, p50_pts: id === 'deposit-monthly' ? -1.4 : 0.8, p95_pts: 4.1, share_better: id === 'deposit-monthly' ? 0.32 : 0.81 } : null,
     research_only: family === 'Insiders' || family === 'Earnings',
+    yardstick: false,
+    outdated: tested && id === 'dual-momentum',
     caveats: family === 'Insiders' ? ['Insider filings arrive up to two days late.'] : [],
     detail: `/api/lab/strategies/${id}`,
   };
@@ -84,7 +86,7 @@ function library(rows) {
     as_of: rows.some((r) => r.status === 'tested') ? at('08:12:00') : null,
     trials: 212,
     note: rows.some((r) => r.status === 'tested') ? 'Every result is out of sample. The bar for “held up” rises with every strategy tried: 212 so far.' : 'Nothing has run yet. The lab works through the list tonight, from 1 AM.',
-    counts: { total: rows.length, tested: n((r) => r.status === 'tested'), held_up: n((r) => r.verdict === 'held_up'), within_noise: n((r) => r.verdict === 'within_noise'), fell_short: n((r) => r.verdict === 'fell_short'), inconclusive: n((r) => r.verdict === 'inconclusive'), waiting: n((r) => r.status === 'waiting'), not_run: n((r) => r.status === 'not_run') },
+    counts: { outdated: n((r) => r.outdated), total: rows.length, tested: n((r) => r.status === 'tested'), held_up: n((r) => r.verdict === 'held_up'), within_noise: n((r) => r.verdict === 'within_noise'), fell_short: n((r) => r.verdict === 'fell_short'), inconclusive: n((r) => r.verdict === 'inconclusive'), waiting: n((r) => r.status === 'waiting'), not_run: n((r) => r.status === 'not_run') },
     kinds: KINDS,
     rows,
   };
@@ -367,3 +369,17 @@ export function morningFixtures() {
 
 // ---------- write ----------
 for (const [name, body] of Object.entries(morningFixtures())) write(name, body);
+
+// ---------- what a finished job did ----------
+const jobs = read('jobs');
+const backfill = jobs.jobs.find((j) => j.name === 'engine-backfill');
+if (backfill?.last_run) {
+  backfill.last_run.did = 'Asked Tiingo for 2 names. FXAIX and FTEC answered with nothing new for 2026-11-06.';
+  backfill.last_run.said = backfill.last_run.did;
+}
+const paper = jobs.jobs.find((j) => j.name === 'engine-paper');
+if (paper?.last_run) {
+  paper.last_run.did = null;
+  paper.last_run.said = '{"filled": 0, "skipped": 4}';
+}
+write('jobs', jobs);

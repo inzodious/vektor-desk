@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api.js';
-import { cronWords, jobState, jobWord, refreshPlan, refusalText, runAndWait, scheduleWords, splitJobs } from './jobs.js';
+import { cronWords, jobState, jobWord, plainLine, refreshPlan, refusalText, runAndWait, scheduleWords, splitJobs, stepTitle } from './jobs.js';
 
 describe('job words', () => {
   it('names jobs plainly', () => {
@@ -52,6 +52,32 @@ describe('job state', () => {
     expect(jobState({ waiting: true, waiting_since: null }).line).toBe('Waiting for its turn: low-memory mode runs heavy jobs one at a time');
     expect(jobState({ running: true, waiting: true }).state).toBe('running');
     expect(refusalText({ body: { error: 'waiting' } })).toMatch(/already waiting for its turn/);
+  });
+
+  it('gives the real reason a job is waiting, and none when the desk names none', () => {
+    expect(jobState({ waiting: true, waiting_since: null, waiting_for: 'memory' }).line).toBe('Waiting for its turn: low-memory mode runs heavy jobs one at a time');
+    expect(jobState({ waiting: true, waiting_since: null, waiting_for: 'night' }).line).toBe('Waiting for its turn: the overnight run goes one step at a time');
+    expect(jobState({ waiting: true, waiting_since: null, waiting_for: null }).line).toBe('Waiting for its turn');
+    expect(jobState({ waiting: true, waiting_since: null, waiting_for: 'something new' }).line).toBe('Waiting for its turn');
+    expect(refusalText({ body: { error: 'waiting', waiting_for: 'night' } })).toBe('It’s already waiting for its turn. The overnight run goes one step at a time.');
+    expect(refusalText({ body: { error: 'waiting', waiting_for: null } })).toBe('It’s already waiting for its turn.');
+    expect(refusalText({ body: { error: 'waiting' } })).toBe('It’s already waiting for its turn. Low-memory mode runs heavy jobs one at a time.');
+  });
+
+  it('shows what a finished run did, and never raw output', () => {
+    const run = { result: 'ok', finished: '2026-11-09T13:01:00Z' };
+    expect(jobState({ last_run: { ...run, did: ' Asked for 2 names. Nothing new. ', said: 'x' } }).did).toBe('Asked for 2 names. Nothing new.');
+    expect(jobState({ last_run: { ...run, did: null, said: '{"filled": 0}' } }).did).toBeNull();
+    expect(jobState({ last_run: { ...run, did: '{"filled": 0}' } }).did).toBeNull();
+    expect(jobState({ last_run: run }).did).toBeNull();
+    expect(plainLine('[1, 2]')).toBeNull();
+    expect(plainLine('Traceback (most recent call last):')).toBeNull();
+    expect(plainLine('')).toBeNull();
+    expect(plainLine({ filled: 0 })).toBeNull();
+    expect(plainLine('4 holdings analysed')).toBe('4 holdings analysed');
+    expect(stepTitle({ job: 'mirror', title: 'Mirror' })).toBe('Accounts');
+    expect(stepTitle({ job: 'night', title: 'Work up tonight’s buying opportunities' })).toBe('Work up tonight’s buying opportunities');
+    expect(stepTitle({ id: 'agents-run-tax' })).toBe('Tax desk');
   });
 
   it('splits data jobs from the rest', () => {

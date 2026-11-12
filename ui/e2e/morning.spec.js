@@ -38,6 +38,44 @@ test('This morning has three doors, each with a count, a line and when it ran', 
   expect(errors).toEqual([]);
 });
 
+test('What ran overnight is a closed fold that lists each step with the line it left', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/');
+  const fold = page.getByTestId('night-steps');
+  await expect(fold.locator('summary')).toContainText('What ran overnight');
+  await expect(fold.locator('summary')).toContainText('5 steps');
+  await expect(fold.locator('li').first()).toBeHidden();
+  await fold.locator('summary').click();
+  await expect(fold.locator('li')).toHaveCount(5);
+  await expect(fold.locator('[data-step="mirror"]')).toContainText('Accounts');
+  await expect(fold.locator('[data-step="mirror"]')).toContainText('Done');
+  await expect(fold.locator('[data-step="mirror"] .night-line')).toHaveCount(0);
+  await expect(fold.locator('[data-step="engine-daily"]')).toContainText('Daily numbers');
+  await expect(fold.locator('[data-step="engine-daily"] .night-line')).toHaveText('It already ran on the version that is live.');
+  await expect(fold.locator('[data-step="strategies"] .night-line')).toHaveText('24 strategies tested, 5 held up out of sample');
+  await expect(fold.locator('[data-step="agents-run-debrief"]')).toHaveAttribute('data-state', 'failed');
+  await expect(fold.locator('[data-step="agents-run-debrief"]')).toContainText('Didn’t finish');
+  await expect(fold.locator('[data-step="agents-run-debrief"] .night-line')).toHaveText('The model call timed out.');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+
+  await page.route('**/api/overnight*', async (route) => {
+    const res = await route.fetch();
+    const night = await res.json();
+    night.steps[0].detail = '{"accounts": 4, "rows": 212}';
+    await route.fulfill({ response: res, json: night });
+  });
+  await page.goto('/');
+  await page.getByTestId('night-steps').locator('summary').click();
+  await expect(page.getByTestId('night-steps').locator('li')).toHaveCount(5);
+  await expect(page.getByTestId('night-steps')).not.toContainText('{');
+
+  await page.goto('/?scenario=fresh');
+  await expect(page.getByTestId('morning')).toBeVisible();
+  await expect(page.getByTestId('night-steps')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('each door opens the page it promises', async ({ page }) => {
   await page.goto('/');
   await page.getByTestId('morning').locator('[data-door="strategies"]').click();
@@ -107,6 +145,8 @@ test('Strategies leads with the overnight table, grouped by kind, with honest wo
   await expect(classic.locator('.lib-row').first()).toContainText('+3.1 pts a year');
   await expect(classic.locator('.lib-row').first()).toContainText('Ahead by 3.1 points a year out of sample, more than luck explains across 212 tries.');
   await expect(classic.locator('.lib-row').first()).toHaveAttribute('href', '/strategies/momentum-12-1');
+  await expect(lib.getByTestId('lib-retest')).toHaveCount(1);
+  await expect(classic.locator('.lib-row', { hasText: 'Dual momentum' }).getByTestId('lib-retest')).toHaveText('Retest pending');
   await classic.getByRole('button', { name: /Show all/ }).click();
   await expect(classic.locator('.lib-row[data-verdict="fell_short"]').first()).toContainText('Fell short');
   await expect(lib.locator('.lib-row[data-verdict="waiting"]')).toContainText('Waiting');
@@ -274,7 +314,7 @@ test('the page leads with what could be bought and folds the rest under Not now'
   expect(errors).toEqual([]);
 });
 
-test('when nothing is a buy or close to one the Not now list is open, and an older desk keeps one flat list', async ({ page }) => {
+test('when nothing is a buy or close to one the Not now list stays folded until opened, and an older desk keeps one flat list', async ({ page }) => {
   const fact = '31.3% under its 52-week high at the latest price (31.9% when the case was written)';
   let mode = 'not_now';
   await page.route('**/api/opportunities*', async (route) => {
@@ -293,6 +333,9 @@ test('when nothing is a buy or close to one the Not now list is open, and an old
   await expect(page.getByTestId('opp-count')).toHaveText('0');
   await expect(page.locator('.ph-big')).toContainText('ideas to look at · 4 not for now');
   await expect(ideas.locator('[data-group="not_now"] .idea')).toHaveCount(4);
+  await expect(page.getByTestId('opp-top')).toContainText('Nothing rated a buy yet. 4 not for now.');
+  await expect(ideas.locator('[data-idea="QUAL"]')).toBeHidden();
+  await ideas.locator('summary').click();
   await expect(ideas.locator('[data-idea="QUAL"]')).toBeVisible();
   await expect(ideas.locator('[data-idea="QUAL"] .idea-facts li').first()).toHaveText(fact);
   const gaps = await page.locator('.idea').evaluateAll((cards) =>

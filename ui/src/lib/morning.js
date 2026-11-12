@@ -1,5 +1,6 @@
 import { dayWords } from './charts.js';
 import { etTime } from './format.js';
+import { plainLine, stepTitle } from './jobs.js';
 import { todayEt } from './tax.js';
 
 // ---------- when ----------
@@ -17,6 +18,25 @@ export function passWords(next, now = new Date()) {
   if (!/^\d{4}-\d{2}-\d{2}T/.test(text)) return text;
   const words = whenWords(text, now);
   return words ? `${words} ET` : null;
+}
+
+// ---------- overnight steps ----------
+const STEP_WORD = {
+  ok: { t: 'Done', dot: 'ok' },
+  skipped: { t: 'Skipped', dot: 'skipped' },
+  failed: { t: 'Didn’t finish', dot: 'failed' },
+  running: { t: 'Running now', dot: 'running' },
+  waiting: { t: 'Waiting for its turn', dot: 'waiting' },
+};
+
+export function nightSteps(night, now = new Date()) {
+  const steps = Array.isArray(night?.steps) ? night.steps : [];
+  if (!night || night.state === 'idle') return [];
+  return steps.map((s) => {
+    const word = STEP_WORD[s.state] || { t: 'To come', dot: 'never' };
+    const lines = [plainLine(s.ready), plainLine(s.detail)].filter(Boolean);
+    return { id: s.id, title: stepTitle(s), state: s.state, word: word.t, dot: word.dot, when: whenWords(s.finished_at || s.started_at, now), line: lines.join(' ') || null };
+  });
 }
 
 // ---------- doors ----------

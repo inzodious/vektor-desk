@@ -148,7 +148,7 @@ export default function Opportunities() {
           <div className="idea-groups" data-testid="ideas">
             {groups.map((g) =>
               g.fold ? (
-                <details className="idea-fold" key={g.key} data-group={g.key} open={open.length === 0}>
+                <details className="idea-fold" key={g.key} data-group={g.key}>
                   <summary>
                     <b>{g.title}</b>
                     <span className="chip">{g.rows.length}</span>

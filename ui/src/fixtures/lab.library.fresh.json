@@ -3,6 +3,7 @@
  "trials": 212,
  "note": "Nothing has run yet. The lab works through the list tonight, from 1 AM.",
  "counts": {
+  "outdated": 0,
   "total": 26,
   "tested": 0,
   "held_up": 0,
@@ -44,6 +45,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/buy-hold-total"
   },
@@ -64,6 +67,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/sixty-forty"
   },
@@ -84,6 +89,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/trend-200d"
   },
@@ -104,6 +111,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/momentum-12-1"
   },
@@ -124,6 +133,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/dual-momentum"
   },
@@ -144,6 +155,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/low-vol"
   },
@@ -164,6 +177,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/value-tilt"
   },
@@ -184,6 +199,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/size-tilt"
   },
@@ -204,6 +221,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/quality-tilt"
   },
@@ -224,6 +243,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/sector-rotation"
   },
@@ -244,6 +265,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/risk-parity"
   },
@@ -264,6 +287,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/vol-target"
   },
@@ -284,6 +309,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/dip-5"
   },
@@ -304,6 +331,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/dip-10"
   },
@@ -324,6 +353,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/deposit-monthly"
   },
@@ -344,6 +375,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/rebalance-band-5"
   },
@@ -364,6 +397,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/rebalance-yearly"
   },
@@ -384,6 +419,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/as-held"
   },
@@ -404,6 +441,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/safe-mix"
   },
@@ -424,6 +463,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/tech-tilt"
   },
@@ -444,6 +485,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/trend-dip"
   },
@@ -464,6 +507,8 @@
    "noise": null,
    "rule": null,
    "research_only": true,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [
     "Insider filings arrive up to two days late."
    ],
@@ -486,6 +531,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/drawdown-boost"
   },
@@ -506,6 +553,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/breakout-vol-cap"
   },
@@ -526,6 +575,8 @@
    "noise": null,
    "rule": null,
    "research_only": true,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/pead-insiders"
   },
@@ -546,6 +597,8 @@
    "noise": null,
    "rule": null,
    "research_only": false,
+   "yardstick": false,
+   "outdated": false,
    "caveats": [],
    "detail": "/api/lab/strategies/discount-entries"
   }

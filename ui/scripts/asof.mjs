@@ -130,3 +130,12 @@ write('asof.afterclose', {
   live: { day: MONDAY, state: 'after', at: `${MONDAY}T23:40:00+00:00`, value: 16513.99, day_change: 120.5, day_change_pct: 0.74, words: 'Mon Nov 9, last quotes 6:40 PM ET' },
   market: { state: 'after', day: MONDAY },
 });
+
+// ---------- waiting: the day is booked, two funds have not printed their official close ----------
+write('asof.waiting', {
+  ...evening,
+  at: '2026-11-10T00:12:10+00:00',
+  words: 'Mon Nov 9, at the close. Waiting on the official close for FXAIX and FTEC; the day is restated when it lands.',
+  prices: { official: 3, quoted: 0, carried: [], waiting: ['FXAIX', 'FTEC'] },
+  market: { state: 'closed', day: MONDAY },
+});

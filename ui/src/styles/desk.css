@@ -887,6 +887,7 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .job-text b { color: var(--ink); font-size: 13.5px; }
 .job-text small { display: block; color: var(--ink-2); font-size: 12px; overflow-wrap: anywhere; }
 .job-text .job-when { color: var(--ink-3); }
+.job-text .job-did { color: var(--ink); }
 .job-note { margin-top: 2px; font-weight: 600; }
 .job-note.done { color: var(--ok); }
 .job-note.failed, .job-note.refused { color: var(--watch); }
@@ -1620,6 +1621,7 @@ a.chip { text-decoration: none; }
 /* ---------- one clock ---------- */
 .ph-asof { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 3px 12px; font-size: 12px; color: var(--ink-2); }
 .ph-asof b { font-weight: 700; color: var(--ink); }
+.ph-asof-wait { flex: 1 1 100%; min-width: 0; line-height: 1.4; overflow-wrap: anywhere; }
 .ph-asof em { font-style: normal; font-weight: 700; color: var(--ink); }
 .ph-asof em.up { color: var(--ok); }
 .ph-asof em.dn { color: var(--watch); }
@@ -1722,3 +1724,21 @@ a.chip { text-decoration: none; }
 /* ---------- valuation basis ---------- */
 .valuation-note { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink); max-width: 70ch; }
 .range-basis { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); max-width: 70ch; }
+
+/* ---------- overnight steps ---------- */
+.night-steps { margin-top: 12px; }
+.night-steps > summary { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: 13px; color: var(--ink); padding: 4px 2px; border-radius: 8px; }
+.night-steps > summary::-webkit-details-marker { display: none; }
+.night-steps > summary::before { content: '+'; font-weight: 800; color: var(--teal); width: 10px; }
+.night-steps[open] > summary::before { content: '−'; }
+.night-steps > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.night-steps ol { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 22px; }
+.night-steps li { display: grid; grid-template-columns: 12px minmax(0, 1fr); gap: 10px; align-items: start; }
+.night-steps li .job-dot { margin-top: 5px; }
+.night-steps li b { display: block; font-size: 13px; color: var(--ink); }
+.night-steps li small { display: block; font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.night-steps li .night-line { color: var(--ink); }
+.night-steps li[data-state='failed'] .night-line { color: var(--watch); font-weight: 600; }
+@media (max-width: 760px) {
+  .night-steps ol { grid-template-columns: minmax(0, 1fr); }
+}

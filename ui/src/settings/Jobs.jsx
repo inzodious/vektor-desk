@@ -19,6 +19,11 @@ function JobRow({ job, alive, mine, onRun }) {
       <span className="job-text">
         <b>{word.title}</b>
         <small>{st.line}</small>
+        {st.did ? (
+          <small className="job-did" data-testid="job-did">
+            {st.did}
+          </small>
+        ) : null}
         <small className="job-when">{scheduleWords(job)}</small>
         {mine?.text ? (
           <small className={`job-note ${mine.phase}`} role="status">

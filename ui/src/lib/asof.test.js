@@ -44,6 +44,18 @@ describe('one clock', () => {
     expect(v.title).toContain('Provisional until official closes land overnight.');
   });
 
+  it('prints the funds still waiting on a close, in the desk’s words, and drops them once live quotes lead', () => {
+    const waiting = { ...FINAL, provisional: true, status: 'provisional', words: 'Wed Nov 11, at the close. Waiting on the official close for FXAIX and FTIHX; the day is restated when it lands.', prices: { official: 3, quoted: 0, carried: [], waiting: ['FXAIX', 'FTIHX'] } };
+    const v = asOfView(waiting, NOW);
+    expect(v.text).toBe('As of Wed Nov 11, at the close');
+    expect(v.provisional).toBe(true);
+    expect(v.waiting).toBe('Waiting on the official close for FXAIX and FTIHX; the day is restated when it lands.');
+    expect(asOfView(FINAL, NOW).waiting).toBeNull();
+    expect(asOfView({ ...FINAL, prices: { official: 5, quoted: 0, carried: [], waiting: [] } }, NOW).waiting).toBeNull();
+    expect(asOfView({ ...waiting, live: LIVE }, NOW).waiting).toBeNull();
+    expect(asOfView({ ...waiting, words: 'Wed Nov 11, at the close.' }, NOW).waiting).toBeNull();
+  });
+
   it('leads with the live day and its change when quotes are newer than the book', () => {
     const v = asOfView({ ...FINAL, live: LIVE }, NOW);
     expect(v.headline).toEqual({ value: 41010.77, change: -251.41, pct: -0.6093, when: 'today', live: true });
