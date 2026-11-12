@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from desk.agents import console, store, switches
+from desk.agents import console, portfolio, store, switches
 from desk.agents.desks import DESKS
 from desk.agents.runner import UNGUARDED
 from desk.agents.sources import NotReady, RealDecisions
@@ -56,7 +56,7 @@ def delete_enabled(desk: str, cfg: CfgDep) -> dict:
 @router.put("/guard")
 def put_guard(body: Switch, cfg: CfgDep) -> dict:
     store.set_guard(cfg, body.enabled)
-    return {"guard": body.enabled, "allowed": list(UNGUARDED)}
+    return {"guard": store.guard_on(cfg), "allowed": list(UNGUARDED)}
 
 
 @router.get("/brief")
@@ -95,6 +95,11 @@ def get_console(request_id: int, cfg: CfgDep) -> JSONResponse:
 
 def _dossier(row: dict) -> dict:
     return {"symbol": row["symbol"], "run_id": row["run_id"], "created_at": row["created_at"], "dossier": json.loads(row["dossier"])}
+
+
+@router.get("/holdings")
+def list_holdings(cfg: CfgDep) -> JSONResponse:
+    return JSONResponse(portfolio.status(cfg), headers={"Cache-Control": "no-store"})
 
 
 @router.get("/dossiers")

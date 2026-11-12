@@ -136,6 +136,8 @@ The plan desk writes through `desk.decisions.plans.save_draft`. It never changes
 | `DELETE /api/decisions/convictions/{symbol}` | Removes it |
 
 - **FI goal.** `fi` in the profile (`number_usd`, or `yearly_spend_usd` × `multiple`; `target_age` + `birth_date`, or `target_date`) is the fallback when Escape Vektor has no FI goal. `desk.decisions.profile.fi_goal(data)` returns it in the engine's shape.
+- **Desks on (2026-11-11).** Research, Scout, Strategy, Discounts and Filings are on by default, and a one-time pass switched them on in an existing `desk.yaml` (kept as `desk.yaml.bak`, recorded in `profile_passes`, shown in `GET /profile/status` → `notices`). A switch in Settings → Crew always wins.
+- **Margin rate.** `margin.rate_pct` in the profile (default 12, a typical retail rate) so interest cost is never unknown; `profile.margin_rate(data)` returns `{rate_pct, source}` with source `default` or `profile`.
 - **Conviction hold.** A held conviction position (rule `conviction_hold`) is exempt from the single-stock cap and has its own band instead. No adds above the ceiling, never on margin, and one friendly alert a week only while above it.
 - Agent status: last run, next run, usage cost of each run in turns, on or off.
 - Data freshness: last mirror, last price tick, last lot import.

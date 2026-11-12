@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS rules_versions (
   created_at TEXT NOT NULL,
   decision_id TEXT
 );
+CREATE TABLE IF NOT EXISTS profile_passes (
+  id TEXT PRIMARY KEY,
+  applied_at TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '{}'
+);
 CREATE TABLE IF NOT EXISTS profile_state (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   checked_at TEXT NOT NULL,

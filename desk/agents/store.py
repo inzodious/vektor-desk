@@ -10,6 +10,7 @@ from desk.db import desk_conn
 
 ALL = "*"
 GUARD = "~first_run_guard"
+GUARD_UNTIL = ("plan_keeper", "tax")
 COUNTED = ("ok", "failed", "timeout", "running")
 STALE_RUN_MINUTES = 2
 STALE_REQUEST_MINUTES = 10
@@ -92,7 +93,9 @@ def is_enabled(cfg: Config, desk: str) -> bool:
 def guard_on(cfg: Config) -> bool:
     with db(cfg) as conn:
         row = conn.execute("SELECT enabled FROM agent_settings WHERE desk=?", (GUARD,)).fetchone()
-    return True if row is None else bool(row["enabled"])
+    if row is not None and not row["enabled"]:
+        return False
+    return any(n == 0 for n in ok_runs(cfg, GUARD_UNTIL).values())
 
 
 def set_guard(cfg: Config, on: bool) -> None:
@@ -183,9 +186,36 @@ def runs(cfg: Config, desk: str | None = None, limit: int = 50) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def save_dossier(cfg: Config, symbol: str, run_id: int, dossier: str) -> None:
+def save_dossier(cfg: Config, symbol: str, run_id: int, dossier: str, at: str | None = None) -> None:
     with db(cfg) as conn:
-        conn.execute("INSERT INTO agent_dossiers (symbol, run_id, dossier, created_at) VALUES (?,?,?,?)", (symbol, run_id, dossier, now_iso()))
+        conn.execute("INSERT INTO agent_dossiers (symbol, run_id, dossier, created_at) VALUES (?,?,?,?)", (symbol, run_id, dossier, at or now_iso()))
+
+
+def start_try(cfg: Config, symbol: str, at: str | None = None) -> int:
+    with db(cfg) as conn:
+        cur = conn.execute("INSERT INTO agent_holding_tries (symbol, status, started_at) VALUES (?,?,?)", (symbol, "running", at or now_iso()))
+        return int(cur.lastrowid)
+
+
+def finish_try(cfg: Config, try_id: int, status: str, note: str | None = None, run_id: int | None = None, at: str | None = None) -> None:
+    with db(cfg) as conn:
+        conn.execute("UPDATE agent_holding_tries SET status=?, note=?, run_id=?, finished_at=? WHERE id=?", (status, note, run_id, at or now_iso(), try_id))
+
+
+def last_tries(cfg: Config) -> dict[str, dict]:
+    with db(cfg) as conn:
+        rows = conn.execute(
+            "SELECT t.* FROM agent_holding_tries t JOIN (SELECT symbol, max(id) AS id FROM agent_holding_tries GROUP BY symbol) m ON m.id = t.id"
+        ).fetchall()
+    return {r["symbol"]: dict(r) for r in rows}
+
+
+def misses_since(cfg: Config, since: str) -> dict[str, int]:
+    with db(cfg) as conn:
+        rows = conn.execute(
+            "SELECT symbol, count(*) AS n FROM agent_holding_tries WHERE started_at>=? AND status NOT IN ('ok','running') GROUP BY symbol", (since,)
+        ).fetchall()
+    return {r["symbol"]: r["n"] for r in rows}
 
 
 def latest_dossier(cfg: Config, symbol: str) -> dict | None:
