@@ -4,6 +4,42 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.4.0 - 2026-11-12
+
+### Added
+
+- The overnight run: the desk does its night's work by itself, in order and one heavy job at a time, from 23:30 to 06:30 Eastern; it carries on after a deploy, and one alert at 06:45 says what is ready ([#196], [#203], [#216])
+- Strategy library: 38 built-in strategies (old and tested, practical, novel) are simulated every night without an agent, and Strategies shows one out-of-sample table of which held up. With no plan loaded the S&P 500 row is the yardstick, and the library checks itself against it ([#197], [#204], [#215], [#217], [#223])
+- Research holds a current analysis of every holding, refreshed overnight: what it is, the thesis, what changed, valuation, risks, fit with your plan and a plain verdict. Retirement-plan funds are known by name ([#195], [#213])
+- Buying opportunities: one ranked list from the discount scanner, the written cases and Scout, in your holdings and outside them. Each row has why now, an entry zone, a size that respects your caps and never uses margin, what would make it wrong, and a written analysis. Rows are grouped into worth buying, could become a buy and not now ([#194], [#200], [#209], [#212], [#214], [#219], [#225])
+- Navigation: the Bridge opens with This morning, three doors to the strategies tested, the holdings analysed and the buying opportunities. Strategies leads with the overnight table by kind, Research is organised by holding, and every page says what it is and where to go next ([#211])
+- One "as of" for the whole desk (`/api/asof`), shown on every page with the day's change, cash ready and margin ([#198], [#202])
+- Settings → Box data says which of the desk's services are running and, when the Tailscale address stops answering, the reason from its log ([#203])
+- Read-only views of the last 10 runs of each job, of which fund prices answered, and of proposals the queue rule cleared ([#229], [#230], [#233])
+
+### Changed
+
+- The desk books today's prices within minutes of the close, and at any hour it finds itself behind. Every date is the desk's day in Eastern time. A day stays provisional while a fund price is on the way and is redone by itself when it lands ([#208], [#227])
+- Every page leads with the newest quotes and today's change, not the day before ([#211])
+- The Decisions queue holds only what is true today: a newer proposal replaces the older one on its subject, out-of-date ones expire with a plain reason in the journal, heads-up notes stay out, and a proposal that pulls against your approved plan is cleared overnight and at each sync ([#201], [#205], [#233], [#234])
+- Research, Scout, Strategy, Discounts and Filings are on by default and were switched on once in an existing profile (recorded; switch any off in Settings → Crew). A default margin rate means interest cost always shows ([#193])
+- The desks no longer suggest a buy the cash or the margin debit rules out. They know your planned steps for the next 60 days, so a proposal keeps your sale window and never sells to pay margin you already planned to repay ([#206], [#226])
+- Desk notes read plainly: rounded percentages, one cash figure, no talk about the desk's own plumbing. Research valuations say whether a range is a price, a multiple or a percent ([#199], [#206])
+- The Plan keeper checks your plan once per day however often the night restarts, and a desk that declines to run reads skipped with its reason ([#220], [#228], [#231])
+- Low-memory mode switches itself on only when the box is really short and off again at 1.5 GB free; the memory strip speaks only when a job has really waited or was stopped ([#191], [#192], [#210])
+- An overnight step shows a line on what it did, and every job run keeps its last line ([#221], [#228])
+- Health checks say where in Settings to fix a problem instead of naming a command or a variable, and margin messages point to Settings ([#207], [#224])
+- The discount scanner's quality list is priced every day and scanned again when new closes land ([#222])
+
+### Fixed
+
+- Lab strategies are invested from the first day of every test year instead of waiting in cash for a rebalance day, and a mix with a fund younger than the test no longer holds that fund's share in cash before it existed. The library was run again with both fixes ([#223], [#232])
+- A held fund whose price arrives late is asked for every hour until noon instead of waiting a night, and a provider error no longer parks a name for a week ([#229])
+- The hourly agents queue no longer loses its turn to the every-minute one ([#228])
+- A failed health check marks every number stale, and the insider job keeps loading price history when the SEC has a bad night ([#207])
+- A deposit rule that changed nothing no longer reads "worse in 100% of start months" ([#222])
+- The "What changed" card no longer prints "as of undefined NaN"; on a phone a long label on a buying opportunity wraps inside its card; a fund with no valuation range shows its reason as text ([#192], [#218])
+
 ## 1.3.0 - 2026-11-11
 
 ### Added
@@ -508,3 +544,47 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#186]: https://github.com/inzodious/vektor-desk/pull/186
 [#187]: https://github.com/inzodious/vektor-desk/pull/187
 [#188]: https://github.com/inzodious/vektor-desk/pull/188
+[#191]: https://github.com/inzodious/vektor-desk/pull/191
+[#192]: https://github.com/inzodious/vektor-desk/pull/192
+[#193]: https://github.com/inzodious/vektor-desk/pull/193
+[#194]: https://github.com/inzodious/vektor-desk/pull/194
+[#195]: https://github.com/inzodious/vektor-desk/pull/195
+[#196]: https://github.com/inzodious/vektor-desk/pull/196
+[#197]: https://github.com/inzodious/vektor-desk/pull/197
+[#198]: https://github.com/inzodious/vektor-desk/pull/198
+[#199]: https://github.com/inzodious/vektor-desk/pull/199
+[#200]: https://github.com/inzodious/vektor-desk/pull/200
+[#201]: https://github.com/inzodious/vektor-desk/pull/201
+[#202]: https://github.com/inzodious/vektor-desk/pull/202
+[#203]: https://github.com/inzodious/vektor-desk/pull/203
+[#204]: https://github.com/inzodious/vektor-desk/pull/204
+[#205]: https://github.com/inzodious/vektor-desk/pull/205
+[#206]: https://github.com/inzodious/vektor-desk/pull/206
+[#207]: https://github.com/inzodious/vektor-desk/pull/207
+[#208]: https://github.com/inzodious/vektor-desk/pull/208
+[#209]: https://github.com/inzodious/vektor-desk/pull/209
+[#210]: https://github.com/inzodious/vektor-desk/pull/210
+[#211]: https://github.com/inzodious/vektor-desk/pull/211
+[#212]: https://github.com/inzodious/vektor-desk/pull/212
+[#213]: https://github.com/inzodious/vektor-desk/pull/213
+[#214]: https://github.com/inzodious/vektor-desk/pull/214
+[#215]: https://github.com/inzodious/vektor-desk/pull/215
+[#216]: https://github.com/inzodious/vektor-desk/pull/216
+[#217]: https://github.com/inzodious/vektor-desk/pull/217
+[#218]: https://github.com/inzodious/vektor-desk/pull/218
+[#219]: https://github.com/inzodious/vektor-desk/pull/219
+[#220]: https://github.com/inzodious/vektor-desk/pull/220
+[#221]: https://github.com/inzodious/vektor-desk/pull/221
+[#222]: https://github.com/inzodious/vektor-desk/pull/222
+[#223]: https://github.com/inzodious/vektor-desk/pull/223
+[#224]: https://github.com/inzodious/vektor-desk/pull/224
+[#225]: https://github.com/inzodious/vektor-desk/pull/225
+[#226]: https://github.com/inzodious/vektor-desk/pull/226
+[#227]: https://github.com/inzodious/vektor-desk/pull/227
+[#228]: https://github.com/inzodious/vektor-desk/pull/228
+[#229]: https://github.com/inzodious/vektor-desk/pull/229
+[#230]: https://github.com/inzodious/vektor-desk/pull/230
+[#231]: https://github.com/inzodious/vektor-desk/pull/231
+[#232]: https://github.com/inzodious/vektor-desk/pull/232
+[#233]: https://github.com/inzodious/vektor-desk/pull/233
+[#234]: https://github.com/inzodious/vektor-desk/pull/234
