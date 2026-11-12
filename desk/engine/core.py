@@ -10,7 +10,7 @@ from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
 from desk.engine import ENGINE_VERSION, INBOX_AT, JOBS_AT, KEY_WORDS, bands, broker, catalog, fi, key_fix, lookthrough, patterns, replay, risk, scoring
-from desk.engine.asof import ET, day_words, provisional_symbols
+from desk.engine.asof import CLOSES_LAND, ET, day_words, provisional_symbols
 from desk.engine.backfill import ASK_WORDS, NO_PRICES, parked_until
 from desk.engine.cash import margin_rate
 from desk.engine.cash import picture as cash_picture
@@ -898,7 +898,7 @@ def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
     if missing:
         notes.append(f"No close for {', '.join(missing)} on {as_of}. " + (f"The desk asks for them {ASK_WORDS}. Fix: nothing to do yet." if keyed else no_key))
     if quoted:
-        notes.append(f"{day_words(as_of)} is priced from the closing quotes until official closes land overnight; the day is restated then.")
+        notes.append(f"{day_words(as_of)} is priced from the closing quotes until {CLOSES_LAND} The day is restated as they land.")
         if stale:
             notes.append(f"{', '.join(stale)} have no quote, so they carry their last close until then.")
     elif stale:
