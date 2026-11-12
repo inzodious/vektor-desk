@@ -176,7 +176,7 @@ def test_status_api(cfg, app_client):
     assert (tiles["plan_keeper"]["source"], tiles["plan_keeper"]["yaml"], tiles["plan_keeper"]["app"]) == ("desk.yaml", False, None)
     assert body["guard"] | {"allowed": None} == {"on": False, "allowed": None, "ready": False, "why": "The Tax desk hasn't finished a run yet."}
     assert tiles["plan_keeper"]["last_run"]["status"] == "ok"
-    assert tiles["plan_keeper"]["week"] == {"runs": 1, "turns": 1, "tokens": tiles["plan_keeper"]["last_run"]["tokens"], "cap": 10}
+    assert tiles["plan_keeper"]["week"] == {"runs": 1, "turns": 1, "tokens": tiles["plan_keeper"]["last_run"]["tokens"], "cap": 10, "line": None, "parts": []}
     assert client.put("/api/agents/tax/enabled", json={"enabled": False}).json() == {"desk": "tax", "enabled": False}
     assert client.put("/api/agents/nope/enabled", json={"enabled": False}).status_code == 404
     assert {d["desk"]: d for d in crew(cfg)["desks"]}["tax"]["enabled"] is False

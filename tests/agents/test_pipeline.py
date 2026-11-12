@@ -1,7 +1,8 @@
 import json
+from datetime import UTC, datetime, timedelta
 
 from desk.agents import briefs, store
-from desk.agents.adapter import FakeAdapter
+from desk.agents.adapter import AgentError, FakeAdapter
 from desk.agents.jobs import JOBS
 from desk.agents.pipeline import run_proposal_desk
 from tests.agents.agent_fakes import SLICE, FakeDecisions, FakeEngine, answer, proposal
@@ -98,3 +99,64 @@ def test_brief_and_runs_api(cfg, app_client):
     runs = client.get("/api/agents/runs", params={"desk": "plan_keeper"}).json()
     assert runs[0]["status"] == "ok"
     assert client.get("/api/agents/runs", params={"desk": "nope"}).status_code == 404
+
+
+# ---- Plan keeper: one check a day ----
+
+
+def day_slice(day: str, words: str) -> dict:
+    return SLICE | {"data_as_of": day, "day": {"day": day, "provisional": True, "words": words}}
+
+
+def age_runs(cfg, hours: float) -> None:
+    then = (datetime.now(UTC) - timedelta(hours=hours)).isoformat(timespec="seconds")
+    with store.db(cfg) as conn:
+        conn.execute("UPDATE agent_runs SET started_at=?", (then,))
+
+
+def test_plan_keeper_checks_once_per_book_day_however_often_the_night_restarts(cfg):
+    kw = {"decisions": FakeDecisions(), "adapter": FakeAdapter({"plan_keeper": answer()})}
+    first = run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(day_slice("2026-11-11", "Wednesday, 9:12 PM.")), **kw)
+    assert first.status == "ok" and store.latest_brief(cfg, "plan_keeper")["as_of"] == "2026-11-11"
+    for trigger in ("schedule", "retry"):
+        again = run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(day_slice("2026-11-11", "Wednesday, 11:40 PM.")), trigger=trigger, **kw)
+        assert again.status == "unchanged" and again.note == "Already checked against the numbers for 2026-11-11. One check a day."
+    assert len(kw["adapter"].calls) == 1 and store.week_usage(cfg, "plan_keeper")["runs"] == 1
+    asked = run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(day_slice("2026-11-11", "Wednesday, 11:55 PM.")), trigger="console", **kw)
+    urgent = run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(day_slice("2026-11-11", "Thursday, 12:10 AM.")), trigger="trigger", **kw)
+    assert asked.status == "ok" and urgent.status == "ok"
+    next_day = run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(day_slice("2026-11-12", "Thursday, 5:20 PM.")), **kw)
+    assert next_day.status == "ok" and store.latest_brief(cfg, "plan_keeper")["as_of"] == "2026-11-12"
+
+
+def test_the_daily_check_runs_when_the_week_is_spent_but_extras_wait(cfg):
+    spent = FakeDecisions(profile_data={"usage": {"weekly_runs": {"plan_keeper": 1}}})
+    kw = {"decisions": spent, "adapter": FakeAdapter({"plan_keeper": answer()})}
+    assert run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(day_slice("2026-11-11", "Wednesday, 9:12 PM.")), **kw).status == "ok"
+    thursday = FakeEngine(day_slice("2026-11-12", "Thursday, 5:20 PM."))
+    soon = run_proposal_desk(cfg, "plan_keeper", engine=thursday, **kw)
+    assert soon.status == "over_budget" and soon.note == "Weekly cap of 1 runs reached."
+    age_runs(cfg, 5)
+    assert run_proposal_desk(cfg, "plan_keeper", engine=thursday, trigger="trigger", **kw).status == "over_budget"
+    daily = run_proposal_desk(cfg, "plan_keeper", engine=thursday, **kw)
+    assert daily.status == "ok" and store.week_usage(cfg, "plan_keeper")["runs"] == 2
+    assert run_proposal_desk(cfg, "plan_keeper", engine=thursday, **kw).status == "unchanged"
+    assert run_proposal_desk(
+        cfg, "tax", engine=thursday, decisions=FakeDecisions(profile_data={"usage": {"weekly_runs": {"tax": 0}}}), adapter=FakeAdapter()
+    ).status == ("over_budget")
+
+
+def test_a_failed_daily_check_is_not_retried_outside_the_allowance_for_three_hours(cfg):
+    class Broken(FakeAdapter):
+        def run(self, desk, system, prompt, schema=None):
+            self.calls.append({"desk": desk.name})
+            raise AgentError("the CLI exited with an error")
+
+    spent = FakeDecisions(profile_data={"usage": {"weekly_runs": {"plan_keeper": 0}}})
+    thursday = FakeEngine(day_slice("2026-11-12", "Thursday, 5:20 PM."))
+    broken = Broken()
+    assert run_proposal_desk(cfg, "plan_keeper", engine=thursday, decisions=spent, adapter=broken).status == "failed"
+    assert run_proposal_desk(cfg, "plan_keeper", engine=thursday, decisions=spent, adapter=broken).status == "over_budget"
+    assert len(broken.calls) == 1
+    age_runs(cfg, 4)
+    assert run_proposal_desk(cfg, "plan_keeper", engine=thursday, decisions=spent, adapter=FakeAdapter({"plan_keeper": answer()})).status == "ok"
