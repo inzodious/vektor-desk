@@ -13,8 +13,16 @@ RULES = {
     "deposit_steering": {},
     "harvest": {"threshold_usd": (50.0, 100_000.0)},
     "margin": {"dip_pct": (5.0, 60.0), "borrow_pct": (1.0, 50.0), "rate_pct": (0.0, 30.0)},
+    "dip_reserve": {"hold_pct": (5.0, 90.0), "dip_pct": (5.0, 60.0)},
+    "spread": {"months": (2.0, 36.0)},
 }
-REQUIRED = {"rebalance_band": ("band_pts",), "harvest": ("threshold_usd",), "margin": ("dip_pct", "borrow_pct", "rate_pct")}
+REQUIRED = {
+    "rebalance_band": ("band_pts",),
+    "harvest": ("threshold_usd",),
+    "margin": ("dip_pct", "borrow_pct", "rate_pct"),
+    "dip_reserve": ("hold_pct", "dip_pct"),
+    "spread": ("months",),
+}
 SCALAR = ("rate_pct",)
 DEFAULT_DEPOSIT = 1_000.0
 DEFAULT_START = 10_000.0
@@ -128,8 +136,10 @@ def parse(raw: dict, data: LabData) -> Rule:
         problems.append("tax-loss harvesting only means something in a taxable account")
     deposit = _num(raw.get("deposit_monthly", DEFAULT_DEPOSIT), 0.0, 1_000_000.0, "deposit_monthly", problems)
     start_value = _num(raw.get("start_value", DEFAULT_START), 0.0, 100_000_000.0, "start_value", problems)
-    if deposit == 0 and name == "deposit_steering":
-        problems.append("deposit steering needs a monthly deposit above zero")
+    if deposit == 0 and name in ("deposit_steering", "dip_reserve"):
+        problems.append(f"{name.replace('_', ' ')} needs a monthly deposit above zero")
+    if start_value == 0 and name == "spread":
+        problems.append("spreading a lump sum needs a start_value above zero")
     if problems:
         raise RuleError(problems)
     total = sum(mix.values())
@@ -139,6 +149,8 @@ def parse(raw: dict, data: LabData) -> Rule:
     ]
     if name == "harvest":
         caveats.append("Harvest sells into a close substitute fund, modelled as the same returns with a new basis; wash-sale timing is assumed handled.")
+    if name in ("dip_reserve", "spread"):
+        caveats.append("Money held back earns the three-month Treasury rate until it is invested.")
     if name == "margin":
         caveats.append("Margin interest is charged at the given rate on a 360-day year and not deducted; a margin call sells at 30% equity, back to 35%.")
     return Rule(rid, int(raw.get("version") or 1), name, combos, {s: w / total for s, w in mix.items()}, horizons, deposit, start_value, taxable, raw, caveats)
@@ -167,6 +179,9 @@ def simulate(data: LabData, rule: Rule, params: dict | None, start: str, end: st
     series = {s: data.series[s] for s in syms}
     cash, loan = rule.start_value, 0.0
     out.contributed = rule.start_value
+    slices = int(params.get("months") or 0) if rule.rule == "spread" else 0
+    reserve = rule.start_value * (1 - 1 / slices) if slices else 0.0
+    part = rule.start_value / slices if slices else 0.0
     qty = {s: 0.0 for s in syms}
     lots: dict[str, list[list]] = {s: [] for s in syms}
     realized = {"st": 0.0, "lt": 0.0}
@@ -213,7 +228,7 @@ def simulate(data: LabData, rule: Rule, params: dict | None, start: str, end: st
 
     def buy(sym: str, dollars: float, px: float, day: str):
         nonlocal cash
-        dollars = min(dollars, cash)
+        dollars = min(dollars, cash - reserve)
         if dollars < 1.0 or not px:
             return
         fee = dollars * FUND_BPS / 10_000
@@ -226,14 +241,15 @@ def simulate(data: LabData, rule: Rule, params: dict | None, start: str, end: st
         out.trades += 1
 
     def invest(day: str, px: dict[str, float]):
-        if cash < 1.0:
+        free = cash - reserve
+        if free < 1.0:
             return
         if rule.rule == "deposit_steering":
             total = gross(px)
             weights = {s: qty[s] * px[s] / total * 100 for s in syms} if total else {}
-            split = deposit_split(rule.mix, weights, total, cash)
+            split = deposit_split(rule.mix, weights, total, free)
         else:
-            split = {s: cash * w for s, w in rule.mix.items()}
+            split = {s: free * w for s, w in rule.mix.items()}
         for s, dollars in split.items():
             buy(s, dollars, px[s], day)
 
@@ -258,12 +274,20 @@ def simulate(data: LabData, rule: Rule, params: dict | None, start: str, end: st
                 amount = (gross(px) + cash - loan) * params["borrow_pct"] / 100
                 loan += amount
                 cash += amount
+            elif pending == "release":
+                reserve = 0.0
             invest(day, px)
             pending = None
         if loan > 0 and k:
             charge = loan * params["rate_pct"] / 100 / 360 * (date.fromisoformat(day) - date.fromisoformat(cal[k - 1])).days
             loan += charge
             out.interest += charge
+        if reserve > 0 and k:
+            rf = data.macro_at("DGS3MO", day)
+            if rf:
+                earned = reserve * rf / 100 / 252
+                cash += earned
+                reserve += earned
         flow = 0.0
         if day in firsts and k:
             deposit = rule.deposit
@@ -274,6 +298,10 @@ def simulate(data: LabData, rule: Rule, params: dict | None, start: str, end: st
             cash += deposit
             flow = rule.deposit
             out.contributed += rule.deposit
+            if rule.rule == "dip_reserve":
+                reserve += deposit * params["hold_pct"] / 100
+            elif slices:
+                reserve = max(0.0, reserve - part) if reserve > part * 1.5 else 0.0
         px = px_at(day, "adj")
         g = gross(px)
         if loan > 0 and g and (g + cash - loan) / g < MAINTENANCE:
@@ -314,6 +342,8 @@ def simulate(data: LabData, rule: Rule, params: dict | None, start: str, end: st
                 pending, borrowed = "borrow", True
             elif borrowed and dd > -params["dip_pct"] / 2:
                 borrowed = False
+        if rule.rule == "dip_reserve" and pending is None and reserve >= 1.0 and dd <= -params["dip_pct"]:
+            pending = "release"
         if pending is None and day in firsts:
             pending = "invest"
             if rule.rule == "rebalance_band" and g > 0:
@@ -458,6 +488,8 @@ def _baseline(data: LabData, rule: Rule, start: str, end: str, rate: float) -> O
 def _baseline_text(name: str) -> str:
     return {
         "margin": "Same deposits split pro rata, never borrowing",
+        "dip_reserve": "Same deposits invested in full every month, nothing held back",
+        "spread": "The whole sum invested on the first day",
         "harvest": "Same deposits split pro rata, never harvesting",
     }.get(name, "Deposits split pro rata to the mix, never selling")
 
