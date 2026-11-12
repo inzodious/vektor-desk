@@ -6,7 +6,7 @@ import time
 from datetime import UTC, date, datetime, timedelta
 from xml.parsers import expat
 
-from desk.engine import SET_KEY, research
+from desk.engine import JOBS_AT, key_fix, research
 from desk.engine.market import ProviderError, finnhub_key
 from desk.engine.research import SEC_ARCHIVE, SEC_SUBMISSIONS, _fresh, _get, _log, _stamp, sec_agent, sec_ciks
 
@@ -427,13 +427,13 @@ def metrics(out, desk: sqlite3.Connection, kinds: dict[str, str], profiles: dict
     ]
     missing = sorted(f for f, v in view["funds"].items() if not v["holdings"] and f not in SECTOR_FUNDS)
     if missing:
-        fix = "the weekly look-through job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else f"run `{SET_KEY} DESK_SEC_USER_AGENT`"
+        fix = "the weekly look-through job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else key_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
         out.h("lookthrough", "warn", f"No N-PORT holdings yet for {', '.join(missing)}. Fix: {fix}.")
     elif stale:
         out.h(
             "lookthrough",
             "warn",
-            f"N-PORT holdings for {', '.join(stale)} are over 150 days old. Fix: run `python -m desk.engine lookthrough`.",
+            f"N-PORT holdings for {', '.join(stale)} are over 150 days old. Fix: in {JOBS_AT}, run Fund breakdowns.",
         )
     else:
         out.h("lookthrough", "ok", f"Look-through covers {view['coverage']:.0f}% of invested value.")
