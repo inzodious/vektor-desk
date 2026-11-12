@@ -78,7 +78,15 @@ def test_debrief_text_is_rounded_but_cited_numbers_are_not():
 
 def test_prompts_ask_for_plain_rounded_text_and_one_cash_figure():
     common = system_prompt("plan_keeper")
-    for words in ("one decimal at most", "One cash figure", "Never show the machinery", "Don't raise the same thing twice", "the same words every day"):
+    for words in (
+        "one decimal at most",
+        "One cash figure",
+        "Never show the machinery",
+        "Don't raise the same thing twice",
+        "the same words every day",
+        "`day.provisional`",
+        "never a count",
+    ):
         assert words in common
     assert "say so in `summary` instead of working it out" not in common
     for name in ("debrief", "plans"):
