@@ -19,7 +19,7 @@ import { ago, count, etStamp, etTime, plural } from '../lib/format.js';
 import { MIRROR, THEMES, TOKEN, daysLabel, mirrorLine, summary, tokenLine } from '../lib/status.js';
 import { originName } from '../lib/decisions.js';
 import { SETTINGS_TABS, settingsTabFor } from '../lib/areas.js';
-import { defaultsText, keyWord, profileSource } from '../lib/profile.js';
+import { defaultsText, keyWord, marginWords, profileSource } from '../lib/profile.js';
 
 // ---------- cards ----------
 function Freshness({ mirror, onOpen }) {
@@ -234,6 +234,7 @@ function Profile({ api }) {
     setTimeout(() => setCopied(null), 1600);
   };
   const all = defaultsText(p);
+  const margin = marginWords(p.margin);
   return (
     <div className="card c12" style={{ '--i': 5 }} data-testid="profile" data-source={p.exists ? 'file' : 'defaults'}>
       <div className="card-head">
@@ -268,7 +269,7 @@ function Profile({ api }) {
           </div>
         </div>
       ) : null}
-      <div className="mini-kpis prof-kpis">
+      <div className={`mini-kpis prof-kpis${margin ? ' four' : ''}`}>
         <div>
           <small>Desks</small>
           <b>{p.agents_enabled ? `${p.desks_on.length} on` : 'Off'}</b>
@@ -284,6 +285,13 @@ function Profile({ api }) {
           <b>{p.loaded_at ? etStamp(p.loaded_at) : '—'}</b>
           <span>{p.set?.length ? `${plural(p.set.length, 'setting')} of yours` : 'Nothing of yours yet'}</span>
         </div>
+        {margin ? (
+          <div data-testid="profile-margin" data-source={margin.yours ? 'yours' : 'default'}>
+            <small>Margin rate</small>
+            <b>{margin.rate}</b>
+            <span>{margin.line}</span>
+          </div>
+        ) : null}
       </div>
       <div className="prof-defaults" data-testid="still-default">
         <span className="kicker">Still default</span>

@@ -597,6 +597,7 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .crew-runs > span:first-child { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .crew-runs .chip { font-size: 10.5px; padding: 1px 7px; }
 .crew-note { font-style: italic; }
+.crew-week { line-height: 1.35; overflow-wrap: anywhere; }
 .switch:disabled { opacity: .5; cursor: default; }
 .kill { display: inline-flex; gap: 8px; align-items: center; font-size: 12.5px; font-weight: 700; }
 .use-rows { display: grid; gap: 8px; }
@@ -1048,7 +1049,8 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 @media (max-width: 900px) { .rq-grid { grid-template-columns: minmax(0, 1fr); } .risk-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) { .risk-body { grid-template-columns: minmax(0, 1fr); } }
 /* ---------- keys and compose ---------- */
-.key-name { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 12.5px; overflow-wrap: anywhere; }
+.key-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; min-width: 0; }
+.key-name { font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; font-size: 11px; font-weight: 500; color: var(--ink-3); overflow-wrap: anywhere; }
 .key-form { display: grid; gap: 6px; margin-top: 6px; }
 .key-form input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--card); color: var(--ink); font: 500 13px ui-monospace, 'SFMono-Regular', Menlo, monospace; }
 .key-form input:focus { outline: 2px solid var(--teal); outline-offset: 1px; }
@@ -1726,6 +1728,14 @@ a.chip { text-decoration: none; }
 .range-basis { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); max-width: 70ch; }
 
 /* ---------- overnight steps ---------- */
+.fold-card > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; cursor: pointer; list-style: none; font-size: 14px; color: var(--ink); border-radius: 10px; }
+.fold-card > summary::-webkit-details-marker { display: none; }
+.fold-card > summary::before { content: '+'; font-weight: 800; color: var(--teal); width: 12px; }
+.fold-card[open] > summary::before { content: '−'; }
+.fold-card > summary small { flex: 1 1 220px; font-size: 12px; color: var(--ink-2); }
+.fold-card > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.fold-card[open] > summary { margin-bottom: 10px; }
+.cleared-why { color: var(--ink); }
 .night-steps { margin-top: 12px; }
 .night-steps > summary { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; list-style: none; font-size: 13px; color: var(--ink); padding: 4px 2px; border-radius: 8px; }
 .night-steps > summary::-webkit-details-marker { display: none; }

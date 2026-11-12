@@ -14,8 +14,9 @@ test('the profile card shows version, source, desks and what is still default', 
   await expect(card).toContainText('desk.yaml');
   await expect(card).toContainText('4 on');
   await expect(card).toContainText('Plan keeper, Risk desk');
-  await expect(card.getByTestId('still-default').locator('.chip')).toHaveCount(12);
+  await expect(card.getByTestId('still-default').locator('.chip')).toHaveCount(13);
   await expect(card.getByTestId('still-default')).toContainText('Lot method');
+  await expect(card.getByTestId('still-default')).toContainText('Margin rate');
   await expect(card.getByTestId('starter')).toHaveCount(0);
 });
 

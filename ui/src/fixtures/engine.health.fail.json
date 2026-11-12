@@ -25,7 +25,7 @@
   {
    "check_name": "marginal_rate",
    "status": "warn",
-   "detail": "No marginal tax rate yet: open Taxes in Escape Vektor once, or set tax.marginal_rate_pct in desk.yaml."
+   "detail": "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once; the desk reads the rate from there."
   },
   {
    "check_name": "research",

@@ -64,6 +64,8 @@ describe('this morning', () => {
     expect(libraryChip({ status: 'not_run' }).t).toBe('Not run');
     expect(libraryChip({ status: 'tested', verdict: null, yardstick: true })).toEqual({ t: 'Yardstick', tone: '' });
     expect(libraryChip({ status: 'tested', verdict: 'held_up', yardstick: true }).t).toBe('Held up');
+    expect(libraryChip({ status: 'tested', verdict: null, hindsight: true })).toEqual({ t: 'Hindsight', tone: '' });
+    expect(libraryChip({ status: 'waiting', verdict: null, hindsight: true }).t).toBe('Waiting to run');
     expect(excessWords({ status: 'tested', yardstick: true, out_of_sample: { excess_pts: null } })).toBeNull();
     expect(excessWords(LIB.rows[0])).toBe('+3.1 pts a year');
     expect(excessWords(LIB.rows[1])).toBe('−1.3 pts a year');

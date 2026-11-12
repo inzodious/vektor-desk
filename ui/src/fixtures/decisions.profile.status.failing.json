@@ -28,6 +28,7 @@
   "tax.wash_sale_accounts",
   "growth.horizon_years",
   "growth.fi_target_from_plan",
+  "margin.rate_pct",
   "usage.overnight_window",
   "usage.weekly_runs",
   "alerts.min_priority"
@@ -42,5 +43,9 @@
  "deposits": 2,
  "deposits_mode": "auto",
  "rules": 4,
+ "margin": {
+  "rate_pct": 12,
+  "source": "default"
+ },
  "starter": null
 }

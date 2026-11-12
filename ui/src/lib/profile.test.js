@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { defaultsText, keyWord, profileSource } from './profile.js';
+import { defaultsText, keyWord, marginWords, profileSource } from './profile.js';
 
 describe('desk profile', () => {
   it('words dotted keys', () => {
     expect(keyWord('tax.harvest_threshold_usd')).toBe('Harvest threshold');
     expect(keyWord('alerts.quiet_hours')).toBe('Quiet hours');
+  });
+
+  it('says whose margin rate it is', () => {
+    expect(keyWord('margin.rate_pct')).toBe('Margin rate');
+    expect(marginWords({ rate_pct: 12, source: 'default' })).toEqual({ rate: '12%', yours: false, line: 'A typical rate until you set your own' });
+    expect(marginWords({ rate_pct: 12.075, source: 'profile' })).toEqual({ rate: '12.075%', yours: true, line: 'Your rate, a year' });
+    expect(marginWords({ rate_pct: null })).toBeNull();
+    expect(marginWords(undefined)).toBeNull();
   });
 
   it('names the source', () => {

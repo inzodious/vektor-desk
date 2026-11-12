@@ -1,0 +1,36 @@
+{
+ "count": 2,
+ "days": 2,
+ "items": [
+  {
+   "id": "d_20261109051000_cc01",
+   "created_at": "2026-11-09T05:10:00+00:00",
+   "updated_at": "2026-11-09T13:10:00+00:00",
+   "origin": "tax",
+   "run_id": "r-seed-7",
+   "kind": "sell",
+   "title": "Sell ACME to harvest the loss",
+   "symbol": "ACME",
+   "status": "expired",
+   "status_reason": "Your ACME plan already times this sale for Nov 13, so a second proposal would double it.",
+   "decided_at": "2026-11-09T13:10:00+00:00",
+   "check": "plan",
+   "cleared_at": "2026-11-09T13:10:00+00:00"
+  },
+  {
+   "id": "d_20261109051000_cc02",
+   "created_at": "2026-11-09T05:10:00+00:00",
+   "updated_at": "2026-11-09T08:40:00+00:00",
+   "origin": "risk",
+   "run_id": "r-seed-7",
+   "kind": "memo",
+   "title": "Hold off on new margin",
+   "symbol": null,
+   "status": "expired",
+   "status_reason": "The Plan keeper already has a margin hold-off waiting on you, so this one was a repeat.",
+   "decided_at": "2026-11-09T08:40:00+00:00",
+   "check": "plan",
+   "cleared_at": "2026-11-09T08:40:00+00:00"
+  }
+ ]
+}

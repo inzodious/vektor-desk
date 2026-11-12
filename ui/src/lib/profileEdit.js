@@ -50,6 +50,12 @@ export const GROUPS = [
     ],
   },
   {
+    id: 'margin',
+    title: 'Borrowing',
+    sub: 'The yearly rate your broker charges on a margin loan. The desk uses it to cost what you borrow.',
+    fields: [{ key: 'margin.rate_pct', label: 'Margin rate, % a year', kind: 'num', min: 0, max: 40 }],
+  },
+  {
     id: 'industry_focus',
     title: 'Focus',
     sub: 'Themes Research and Scout look at first, and what they leave out. Commas between.',

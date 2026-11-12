@@ -2,9 +2,37 @@ import { when } from './box.js';
 
 const FILES = { 'desk.env': 'Desk', 'settings.env': 'Settings', 'caddy.env': 'Certificates', 'tailscale.env': 'Tailscale' };
 
+const KEY_WORD = {
+  CLAUDE_CODE_OAUTH_TOKEN: 'Claude token',
+  DESK_CLAUDE_TOKEN_EXPIRES: 'Claude token expiry date',
+  TIINGO_API_KEY: 'Tiingo prices key',
+  FINNHUB_API_KEY: 'Finnhub quotes key',
+  FRED_API_KEY: 'FRED rates key',
+  DESK_SEC_USER_AGENT: 'SEC contact line',
+  ALPACA_API_KEY_ID: 'Alpaca paper key ID',
+  ALPACA_API_SECRET_KEY: 'Alpaca paper secret',
+  DESK_FIREBASE_PROJECT: 'Escape Vektor project',
+  DESK_UID: 'Escape Vektor user ID',
+  PORKBUN_API_KEY: 'Porkbun key',
+  PORKBUN_API_SECRET_KEY: 'Porkbun secret',
+  TS_AUTHKEY: 'Tailscale sign-in key',
+};
+
 // ---------- words ----------
 export function fileWord(file) {
   return FILES[file] || file;
+}
+
+export function keyWord(k) {
+  const name = String(k?.name || '');
+  if (KEY_WORD[name]) return KEY_WORD[name];
+  const plain = name
+    .replace(/^DESK_/, '')
+    .split('_')
+    .filter(Boolean)
+    .map((w) => (/^(API|ID|UID|URL|SEC)$/.test(w) ? w : w.toLowerCase()))
+    .join(' ');
+  return plain ? `${plain[0].toUpperCase()}${plain.slice(1)}` : name;
 }
 
 export function keyCount(d) {
