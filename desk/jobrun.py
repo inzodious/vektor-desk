@@ -210,6 +210,7 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None) -> dict:
     held = {r["job"]: r.get("since") for r in running(cfg)}
     low = memory.low_memory(cfg, now)
     turns = _read(memory.waiting_file(cfg)) or {}
+    why = memory.waiting_for(cfg) if turns else None
     rows = []
     for entry in catalogue(jobs).values():
         since = next((held[lock] for lock in sorted(entry.locks) if lock in held), None)
@@ -230,6 +231,7 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None) -> dict:
                 "queued_at": (pending or {}).get("requested_at"),
                 "waiting": turn is not None,
                 "waiting_since": (turn or {}).get("since"),
+                "waiting_for": why if turn is not None else None,
                 "last_run": last_run(cfg, entry.name),
                 "cooldown_until": stamp(until) if cooling else None,
                 "can_run": not is_running and pending is None and turn is None and not cooling,
