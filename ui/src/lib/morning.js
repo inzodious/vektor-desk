@@ -107,7 +107,7 @@ export const LIB_VERDICT = {
 export const LIB_STATUS = { waiting: { t: 'Waiting to run', tone: 'info' }, not_run: { t: 'Not run', tone: '' } };
 
 export function libraryChip(row) {
-  if (row.status === 'tested') return LIB_VERDICT[row.verdict] || { t: 'Tested', tone: '' };
+  if (row.status === 'tested') return LIB_VERDICT[row.verdict] || { t: row.yardstick ? 'Yardstick' : 'Tested', tone: '' };
   return LIB_STATUS[row.status] || { t: 'Waiting to run', tone: 'info' };
 }
 
