@@ -1,3 +1,4 @@
+import dataclasses
 import multiprocessing
 import time
 from datetime import UTC, datetime, timedelta
@@ -30,6 +31,7 @@ def test_status_reports_fresh_then_stale(cfg):
 
 
 def test_token_countdown(cfg):
+    cfg = dataclasses.replace(cfg, claude_token_expires="2027-11-01")
     s = status(cfg, now=datetime(2027, 10, 15, tzinfo=UTC))
     assert s["claude_token"] == {"state": "renew", "expires": "2027-11-01", "days_left": 17}
 

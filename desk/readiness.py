@@ -120,8 +120,8 @@ SECTIONS = (
     ),
     Section(
         "portfolio.tax",
-        "/api/engine/wash",
-        _has("as_of"),
+        "/api/engine/metrics?ids=tax.*",
+        _has("metrics"),
         job="engine-daily",
         label="Run the numbers now",
         empty="No tax picture yet: today's numbers haven't run.",

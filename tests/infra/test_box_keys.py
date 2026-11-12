@@ -82,7 +82,7 @@ def test_host_makes_its_key_then_saves_sealed_values_and_queues_a_redeploy(tmp_p
     assert host(root).returncode == 0
     pem = root / "box-keys.pem"
     assert oct(pem.stat().st_mode & 0o777) == "0o600"
-    cfg = Config(data_dir=root / "data", project="demo-project", uid="user-1", claude_token_expires="2027-11-01")
+    cfg = Config(data_dir=root / "data", project="demo-project", uid="user-1")
     assert boxkeys.public_key(cfg) is not None
     names = {r["name"] for r in json.loads((boxrun.box_dir(cfg) / "keys.json").read_text())["present"]}
     assert names == {"TIINGO_API_KEY", "FRED_API_KEY", "DESK_UID"}

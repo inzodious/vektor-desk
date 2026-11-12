@@ -1,6 +1,6 @@
 import shutil
 from collections.abc import Callable
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -23,10 +23,11 @@ def _roomy_box(monkeypatch):
 
 @pytest.fixture
 def cfg(tmp_path) -> Config:
-    return Config(data_dir=tmp_path, project="demo-project", uid="user-1", claude_token_expires="2027-11-01")
+    return Config(data_dir=tmp_path, project="demo-project", uid="user-1", claude_token_expires=TOKEN_EXPIRES)
 
 
 DEMO_TODAY = date(2026, 11, 6)
+TOKEN_EXPIRES = (date.today() + timedelta(days=350)).isoformat()
 
 
 @pytest.fixture(scope="session")
