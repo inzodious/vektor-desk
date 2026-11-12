@@ -359,7 +359,7 @@ def run_market_backfill(cfg: Config, http=None) -> dict:
 
 def _backfill_then_scan(desk, http) -> dict:
     out = run_backfill(desk, http)
-    if out.get("fetched"):
+    if out.get("advanced"):
         try:
             out["discounts"] = discounts.scan(desk, now=datetime.now(UTC))
         except sqlite3.Error as e:

@@ -20,6 +20,8 @@ HSA = "hsa-0002"
 IND = "individual-0003"
 THU, FRI, SAT = "2026-11-05", "2026-11-06", "2026-11-07"
 SAT_NOW = datetime(2026, 11, 7, 15, 0, tzinfo=UTC)
+MON = "2026-11-09"
+MON_NIGHT = datetime(2026, 11, 10, 3, 0, tzinfo=UTC)
 HELD = [
     (K401, "P10001", 10.0, 500.0, False),
     (K401, "Q20002", 2.0, 150.0, False),
@@ -122,6 +124,35 @@ def test_held_symbols_are_fetched_unless_the_mirror_has_the_last_session(cfg, mi
     assert rows_on(cfg, FRI)[(IND, "ROKT")]["close"] == pytest.approx(33.0)
     status, detail = health(cfg)["closes"]
     assert status == "ok" and "P10001, Q20002" in detail and "snapshot price" in detail
+
+
+def test_a_fund_price_a_day_late_says_when_it_is_expected_and_why_it_waits(cfg, mirror, monkeypatch):
+    seed_like_the_box(mirror)
+    monkeypatch.setenv("TIINGO_API_KEY", "k")
+    late = ("FXAIX", "FTIHX")
+    add_bars(cfg, [(s, d, px) for s, px in THURSDAY.items() for d in (THU, FRI, MON) if not (d == MON and s in late)])
+    run_holdings(cfg)
+    status, detail = health(cfg, now=MON_NIGHT)["closes"]
+    assert status == "warn" and "the overnight backfill" not in detail
+    assert f"Closes for FTIHX, FXAIX stop at {FRI}. A fund's price for a day can arrive hours after the others." in detail
+    assert "The desk asks for it every hour from 1:10 AM to 12:10 PM ET, and the day's numbers follow once it lands. Fix: nothing to do yet." in detail
+    desk = connect(cfg.desk_db)
+    sync_roles(desk, MON_NIGHT)
+    with desk:
+        desk.execute("UPDATE market_symbols SET fetched_at='2026-11-10T02:10:00+00:00', error='Tiingo rate limit' WHERE symbol='FXAIX'")
+        desk.execute("UPDATE market_symbols SET fetched_at='2026-11-10T02:10:00+00:00', error='Tiingo has no daily prices for FTIHX' WHERE symbol='FTIHX'")
+    desk.close()
+    status, detail = health(cfg, now=MON_NIGHT)["closes"]
+    assert status == "warn" and "The last ask for FXAIX failed (Tiingo rate limit); it is asked again at the next run." in detail
+    assert "Tiingo had no prices for FTIHX at the last ask; it is asked again on Tue Nov 10." in detail
+    desk = connect(cfg.desk_db)
+    with desk:
+        desk.execute("DELETE FROM price_bars WHERE symbol IN ('FXAIX', 'FTIHX') AND date=?", (FRI,))
+        desk.execute("UPDATE market_symbols SET error=NULL")
+    desk.close()
+    run_holdings(cfg)
+    status, detail = health(cfg, now=MON_NIGHT)["closes"]
+    assert status == "warn" and f"stop at {THU}. That is more than a day behind. Fix: in Settings, Box, run Backfill and read its result there." in detail
 
 
 def test_fresh_mirror_closes_skip_the_fetch(cfg, mirror):
