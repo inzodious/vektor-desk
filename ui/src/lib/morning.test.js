@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { excessWords, holdingsDoor, libraryChip, libraryGroups, opportunitiesDoor, strategiesDoor, whenWords } from './morning.js';
 import { guideFor } from './guide.js';
-import { earningsLine, entryLine, heldLine, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
+import { earningsLine, entryLine, heldLine, inQueue, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
 import { holdingChip } from './research.js';
 
 const NOW = new Date('2026-11-12T15:00:00Z');
@@ -105,6 +105,11 @@ describe('buying opportunities', () => {
     expect(earningsLine(null)).toBeNull();
     expect(opportunityNotes({ freshness: { note: '3 have no written case yet.' }, profile: { source: 'default_moderate', note: 'Sizes use the Moderate band.' }, cash: { note: 'Never from margin.' } })).toEqual(['3 have no written case yet.', 'Sizes use the Moderate band.', 'Never from margin.']);
     expect(opportunityNotes({ profile: { source: 'risk_check', note: 'x' }, cash: {} })).toEqual([]);
+    expect(opportunityNotes({ prices: { words: 'Prices run to Wed Nov 11.' }, freshness: { note: 'One has no case.' } })).toEqual(['Prices run to Wed Nov 11.', 'One has no case.']);
+    expect(inQueue({ decision_id: 'd_1', queued: true })).toBe(true);
+    expect(inQueue({ decision_id: 'd_1', queued: false })).toBe(false);
+    expect(inQueue({ decision_id: 'd_1' })).toBe(true);
+    expect(inQueue({ decision_id: null, queued: true })).toBe(false);
   });
 });
 

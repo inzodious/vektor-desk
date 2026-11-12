@@ -233,6 +233,30 @@ test('buying opportunities lists each idea with why now, a zone, a size and what
   expect(errors).toEqual([]);
 });
 
+test('each idea says which price it is worked out from, and why a buy is not in the queue', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/research/opportunities');
+  await expect(page.getByTestId('opp-top')).toContainText('Prices run to Mon Nov 9. NOVA is still at an earlier close');
+  const ideas = page.getByTestId('ideas');
+  await expect(ideas.locator('[data-idea="QUAL"]').getByTestId('idea-asof')).toHaveText('Priced at Mon Nov 9, 11:40 AM ET. The written case is from Fri Nov 6; the price is 1.8% lower since.');
+  await expect(ideas.locator('[data-idea="NOVA"]').getByTestId('idea-asof')).toContainText('The desk has no newer price for it than Fri Nov 6');
+  await expect(ideas.locator('[data-idea="NOVA"]')).not.toContainText('Numbers from');
+  await expect(ideas.locator('[data-idea="NOVA"]').getByTestId('idea-queue')).toHaveText('See it in Decisions');
+  await expect(ideas.getByTestId('idea-queue')).toHaveCount(1);
+  await expect(ideas.getByTestId('idea-not-queued')).toHaveCount(0);
+
+  await page.goto('/research/opportunities?scenario=evening');
+  await expect(page.getByTestId('opp-top')).toContainText('2 worth buying once the margin debit is paid');
+  const debit = page.getByTestId('ideas');
+  await expect(debit.locator('[data-idea="QUAL"]').getByTestId('idea-not-queued')).toHaveText('Pay the margin debit first: $1,500 is open, so no buy goes to the queue.');
+  await expect(debit.locator('[data-idea="NOVA"]').getByTestId('idea-not-queued')).toBeVisible();
+  await expect(debit.getByTestId('idea-queue')).toHaveCount(0);
+  await expect(debit.locator('[data-idea="ACME"]').getByTestId('idea-not-queued')).toHaveCount(0);
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  expect(errors).toEqual([]);
+});
+
 test('an empty opportunities list gives its reason', async ({ page }) => {
   await page.goto('/research/opportunities?scenario=fresh');
   await expect(page.getByTestId('opp-count')).toHaveText('0');

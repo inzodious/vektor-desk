@@ -41,5 +41,10 @@ export function earningsLine(e) {
 
 export function opportunityNotes(d) {
   if (!d) return [];
-  return [d.freshness?.note || null, d.profile?.source === 'default_moderate' ? d.profile.note : null, d.cash?.note || null].filter(Boolean);
+  return [d.prices?.words || null, d.freshness?.note || null, d.profile?.source === 'default_moderate' ? d.profile.note : null, d.cash?.note || null].filter(Boolean);
+}
+
+export function inQueue(row) {
+  if (!row?.decision_id) return false;
+  return row.queued === undefined ? true : row.queued === true;
 }

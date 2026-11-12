@@ -3,7 +3,7 @@ import { ApiDown, ResearchHero } from '../research/parts.jsx';
 import { useApi } from '../lib/api.js';
 import { useAsOf, fromDay } from '../lib/asof.js';
 import { whenWords } from '../lib/morning.js';
-import { earningsLine, entryLine, heldLine, opportunityNotes, sizeLine, stanceOf } from '../lib/opportunities.js';
+import { earningsLine, entryLine, heldLine, inQueue, opportunityNotes, sizeLine, stanceOf } from '../lib/opportunities.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 
 // ---------- one idea ----------
@@ -44,6 +44,7 @@ function Idea({ row, deskDay }) {
             <dt>Entry zone</dt>
             <dd>
               {entry}
+              {row.as_of_words ? <small data-testid="idea-asof">{row.as_of_words}</small> : null}
               {row.entry.basis ? <small>{row.entry.basis}</small> : null}
             </dd>
           </div>
@@ -61,16 +62,26 @@ function Idea({ row, deskDay }) {
           </div>
         ) : null}
       </dl>
+      {row.as_of_words && !entry ? (
+        <p className="idea-asof muted" data-testid="idea-asof">
+          {row.as_of_words}
+        </p>
+      ) : null}
+      {row.not_queued ? (
+        <p className="idea-noq" data-testid="idea-not-queued">
+          {row.not_queued}
+        </p>
+      ) : null}
       <p className="idea-foot muted">
         <span>{heldLine(row)}</span>
         {row.source_label ? <span>{row.source_label}</span> : null}
         {earnings ? <span>{earnings}</span> : null}
-        {older ? <span>Numbers {older}</span> : null}
+        {older && !row.as_of_words ? <span>Numbers {older}</span> : null}
         <Link className="link" to={`/research?s=${encodeURIComponent(row.symbol)}`}>
           Open its research
         </Link>
-        {row.decision_id ? (
-          <Link className="link" to="/decisions">
+        {inQueue(row) ? (
+          <Link className="link" to="/decisions" data-testid="idea-queue">
             See it in Decisions
           </Link>
         ) : null}
