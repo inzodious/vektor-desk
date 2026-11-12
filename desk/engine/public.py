@@ -10,17 +10,40 @@ from desk.engine import NO_SEC, backfill, skip
 from desk.engine.market import ProviderError
 from desk.engine.research import SEC_GAP, _get, sec_agent, sec_ciks
 
-FRAME = "https://data.sec.gov/api/xbrl/frames/dei/EntityPublicFloat/USD/CY{year}Q{q}I.json"
-FRAMES = ((2010, 3), (2010, 4), (2011, 1), (2011, 2))
+FRAME = "https://data.sec.gov/api/xbrl/frames/{taxonomy}/{concept}/{unit}/CY{year}Q{q}I.json"
+FLOAT = ("dei", "EntityPublicFloat", "USD")
+SHARES = ("dei", "EntityCommonStockSharesOutstanding", "shares")
+ASSETS = ("us-gaap", "Assets", "USD")
+FRAMES = ((2010, 3), (2010, 4), (2011, 1), (2011, 2), (2011, 3), (2011, 4))
+BEFORE = ((2009, 3), (2009, 4), (2010, 1), (2010, 2))
+AROUND = ((2010, 4), (2011, 1), (2011, 2), (2011, 3))
 FILING = "https://www.sec.gov/Archives/edgar/data/{cik}/{acc}/{name}"
 TIINGO_TICKERS = "https://apimedia.tiingo.com/docs/tiingo/daily/supported_tickers.zip"
 AS_OF = "2011-06-30"
+LAST_KNOWN = "2011-12-31"
 TESTS_FROM = "2012-01-03"
 SIZE = 200
 SMALLER = 150
 ROOM = 220
 ENOUGH_PCT = 90.0
-FLOAT_MIN, FLOAT_MAX = 1e9, 7e11
+FLOAT_MIN, FLOAT_MAX = 1e9, 4.5e11
+APART_DAYS = 300
+AGREE = 10.0
+PRICE_MIN, PRICE_MAX = 1.0, 2000.0
+ASSETS_MAX = 15.0
+TOO_BIG, UNBACKED, OVER_ASSETS = "too_big", "unbacked", "over_assets"
+WHY = {
+    TOO_BIG: "larger than any company was",
+    UNBACKED: "nothing else the company reported backs it",
+    OVER_ASSETS: "far above its own balance sheet",
+}
+MISFILED = "misfiled"
+LEFT_OUT_RANK = 10_000
+LEFT_OUT_KEPT = 100
+LEFT_OUT_SHOWN = 15
+TOP_SHOWN = 25
+CALLS = "public_list"
+RULE = "checked-floats-1"
 FRESH_DAYS = 6
 TRADING_DAYS = 10
 PRICED, LATE, MISSING, NO_TICKER, UNASKED = "priced", "late", "missing", "no_ticker", "unasked"
@@ -30,6 +53,7 @@ PAGE_SYMBOL = re.compile(r"Trading Symbol(?:(?!</tr>).)*?<td[^>]*>\s*([A-Za-z]{1
 FILE_SYMBOL = re.compile(r"^([a-z]{1,5})-\d{8}\.xml$", re.I)
 GIVE_UP = ("rate limit", "did not answer")
 NOT_RUN = "The public stock list has not been built yet."
+TICKER_FIELDS = ("symbol", "source", "first_bar", "last_bar", "state", "trading")
 
 # ---- The 200 largest companies of mid-2011 ----
 
@@ -41,33 +65,83 @@ def _reach(who: str, fn):
         raise ProviderError(f"{who} did not answer") from e
 
 
-def largest(http, agent: str, sleep=time.sleep, size: int = SIZE) -> list[dict]:
-    mid = date.fromisoformat(AS_OF)
+def _frame(http, agent: str, what: tuple[str, str, str], year: int, q: int, sleep) -> list[dict]:
+    taxonomy, concept, unit = what
+    url = FRAME.format(taxonomy=taxonomy, concept=concept, unit=unit, year=year, q=q)
+    body = _reach("The SEC", lambda: _get(http, url, "SEC", headers={"User-Agent": agent})) or {}
+    sleep(SEC_GAP)
+    mid, out = date.fromisoformat(AS_OF), []
+    for r in body.get("data") or []:
+        try:
+            cik, val, end = int(r["cik"]), float(r["val"]), str(r["end"])[:10]
+            gap = abs((date.fromisoformat(end) - mid).days)
+        except (KeyError, TypeError, ValueError):
+            continue
+        if val > 0:
+            out.append({"cik": cik, "name": str(r.get("entityName") or cik), "val": val, "end": end, "accn": str(r.get("accn") or ""), "gap": gap})
+    return out
+
+
+def _nearest(rows: list[dict]) -> dict[int, float]:
     best: dict[int, dict] = {}
-    for year, q in FRAMES:
-        body = _reach("The SEC", lambda y=year, n=q: _get(http, FRAME.format(year=y, q=n), "SEC", headers={"User-Agent": agent})) or {}
-        sleep(SEC_GAP)
-        for r in body.get("data") or []:
-            try:
-                cik, val, end = int(r["cik"]), float(r["val"]), str(r["end"])[:10]
-                gap = abs((date.fromisoformat(end) - mid).days)
-            except (KeyError, TypeError, ValueError):
-                continue
-            if not FLOAT_MIN <= val <= FLOAT_MAX:
-                continue
-            if cik not in best or gap < best[cik]["gap"]:
-                best[cik] = {
-                    "cik": cik,
-                    "name": str(r.get("entityName") or cik),
-                    "float_usd": val,
-                    "float_at": end,
-                    "accn": str(r.get("accn") or ""),
-                    "gap": gap,
-                }
-    if not best:
-        raise ProviderError("The SEC has no public float figures for 2011")
-    ranked = sorted(best.values(), key=lambda r: (-r["float_usd"], r["cik"]))[:size]
-    return [{k: v for k, v in r.items() if k != "gap"} | {"rank": i} for i, r in enumerate(ranked, 1)]
+    for r in rows:
+        if r["cik"] not in best or r["gap"] < best[r["cik"]]["gap"]:
+            best[r["cik"]] = r
+    return {cik: r["val"] for cik, r in best.items()}
+
+
+def figures(http, agent: str, sleep=time.sleep) -> tuple[dict[int, list[dict]], dict[int, float], dict[int, float]]:
+    floats: dict[int, list[dict]] = {}
+    for year, q in (*BEFORE, *FRAMES):
+        for r in _frame(http, agent, FLOAT, year, q, sleep):
+            if r["end"] <= LAST_KNOWN:
+                floats.setdefault(r["cik"], []).append(r | {"listed": (year, q) in FRAMES})
+    shares = _nearest([r for year, q in AROUND for r in _frame(http, agent, SHARES, year, q, sleep)])
+    assets = _nearest([r for year, q in AROUND for r in _frame(http, agent, ASSETS, year, q, sleep)])
+    return floats, shares, assets
+
+
+def doubt(fact: dict, others: list[dict], shares: float | None, assets: float | None) -> str | None:
+    val, day = fact["val"], date.fromisoformat(fact["end"])
+    if val > FLOAT_MAX:
+        return TOO_BIG
+    backed = any(abs((date.fromisoformat(o["end"]) - day).days) >= APART_DAYS and val / AGREE <= o["val"] <= val * AGREE for o in others)
+    priced = bool(shares) and PRICE_MIN <= val / shares <= PRICE_MAX
+    if not backed and not priced:
+        return UNBACKED
+    if assets and val > assets * ASSETS_MAX:
+        return OVER_ASSETS
+    return None
+
+
+def largest(http, agent: str, sleep=time.sleep, size: int = SIZE) -> tuple[list[dict], list[dict]]:
+    floats, shares, assets = figures(http, agent, sleep)
+    picked, doubted = [], []
+    for cik, facts in floats.items():
+        if not any(f["listed"] for f in facts):
+            continue
+        facts.sort(key=lambda f: (f["gap"], f["end"]))
+        good, why = None, None
+        for f in facts:
+            reason = doubt(f, [o for o in facts if o is not f], shares.get(cik), assets.get(cik))
+            if reason is None:
+                good = f
+                break
+            why = why or reason
+        if good is not None and good["val"] >= FLOAT_MIN:
+            picked.append(good)
+        elif why and facts[0]["val"] >= FLOAT_MIN:
+            doubted.append(facts[0] | {"why": why})
+    if not picked:
+        raise ProviderError(f"The SEC has no public float figures for {AS_OF[:4]} that hold up")
+
+    def row(r: dict) -> dict:
+        return {"cik": r["cik"], "name": r["name"], "float_usd": r["val"], "float_at": r["end"], "accn": r["accn"]}
+
+    ranked = sorted(picked, key=lambda r: (-r["val"], r["cik"]))[:size]
+    least = ranked[-1]["val"] if len(ranked) == size else FLOAT_MIN
+    left = sorted((r for r in doubted if r["val"] >= least), key=lambda r: (-r["val"], r["cik"]))
+    return [row(r) | {"rank": i} for i, r in enumerate(ranked, 1)], [row(r) | {"why": r["why"]} for r in left]
 
 
 # ---- Tickers ----
@@ -160,29 +234,42 @@ def resolve(http, agent: str, top: list[dict], listing: dict, by_cik: dict[int, 
 # ---- Store and report ----
 
 
-def store(conn: sqlite3.Connection, rows: list[dict], now: datetime) -> None:
+def store(conn: sqlite3.Connection, rows: list[dict], now: datetime, left: list[dict] | tuple = ()) -> None:
     stamp = now.isoformat(timespec="seconds")
     cols = ("rank", "cik", "name", "float_usd", "float_at", "accn", "symbol", "source", "first_bar", "last_bar", "state", "trading")
+    blank = {"symbol": None, "first_bar": None, "last_bar": None, "state": MISFILED, "trading": 0}
+    aside = [r | blank | {"rank": LEFT_OUT_RANK + i, "source": r["why"]} for i, r in enumerate(left[:LEFT_OUT_KEPT], 1)]
     with conn:
         conn.execute("DELETE FROM public_stocks")
         conn.executemany(
             f"INSERT INTO public_stocks ({', '.join(cols)}, fetched_at) VALUES ({', '.join('?' * len(cols))}, ?)",
-            [(*(r[c] for c in cols), stamp) for r in rows],
+            [(*(r[c] for c in cols), stamp) for r in (*rows, *aside)],
         )
         conn.execute("INSERT INTO api_calls (provider, at, symbol, ok) VALUES ('sec', ?, NULL, 1)", (stamp,))
+        conn.execute("INSERT INTO api_calls (provider, at, symbol, ok) VALUES (?, ?, ?, 1)", (CALLS, stamp, RULE))
+
+
+def _stored(conn: sqlite3.Connection, misfiled: bool) -> list[dict]:
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='public_stocks'").fetchone() is None:
+        return []
+    test = "=" if misfiled else "!="
+    return [dict(r) for r in conn.execute(f"SELECT * FROM public_stocks WHERE state {test} ? ORDER BY rank", (MISFILED,))]
 
 
 def names(conn: sqlite3.Connection) -> list[dict]:
-    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='public_stocks'").fetchone() is None:
-        return []
-    return [dict(r) for r in conn.execute("SELECT * FROM public_stocks ORDER BY rank")]
+    return _stored(conn, False)
+
+
+def left_out(conn: sqlite3.Connection) -> list[dict]:
+    return _stored(conn, True)
 
 
 def fresh(conn: sqlite3.Connection, now: datetime) -> bool:
     rows = names(conn)
     if not rows or any(r["state"] == UNASKED for r in rows):
         return False
-    return rows[0]["fetched_at"] >= (now - timedelta(days=FRESH_DAYS)).isoformat(timespec="seconds")
+    by_rule = conn.execute("SELECT 1 FROM api_calls WHERE provider=? AND symbol=? AND at=?", (CALLS, RULE, rows[0]["fetched_at"])).fetchone()
+    return by_rule is not None and rows[0]["fetched_at"] >= (now - timedelta(days=FRESH_DAYS)).isoformat(timespec="seconds")
 
 
 def room(conn: sqlite3.Connection, rows: list[dict], now: datetime) -> dict:
@@ -198,12 +285,35 @@ def room(conn: sqlite3.Connection, rows: list[dict], now: datetime) -> dict:
     }
 
 
+def coverage(conn: sqlite3.Connection, loaded) -> dict | None:
+    rows = names(conn)
+    if not rows:
+        return None
+    priced = [r for r in rows if r["state"] == PRICED and r["symbol"]]
+    have = [r for r in priced if r["symbol"] in loaded]
+    asked = {r[0] for r in conn.execute("SELECT symbol FROM market_symbols WHERE fetched_at IS NOT NULL")}
+    loading = sum(1 for r in priced if r["symbol"] not in loaded and r["symbol"] not in asked)
+    pct = round(100 * len(have) / len(rows), 1)
+    return {
+        "as_of": AS_OF,
+        "tests_from": TESTS_FROM,
+        "listed": len(rows),
+        "priced": len(have),
+        "loading": loading,
+        "missing": len(rows) - len(have) - loading,
+        "stopped": sum(1 for r in have if not r["trading"]),
+        "pct": pct,
+        "enough": pct >= ENOUGH_PCT,
+    }
+
+
 def summary(conn: sqlite3.Connection, rows: list[dict], now: datetime) -> dict:
     priced = [r for r in rows if r["state"] == PRICED]
 
     def label(r: dict) -> str:
         return f"{r['name']} ({r['symbol']})" if r["symbol"] else r["name"]
 
+    aside = left_out(conn)
     out = {
         "as_of": AS_OF,
         "tests_from": TESTS_FROM,
@@ -222,6 +332,9 @@ def summary(conn: sqlite3.Connection, rows: list[dict], now: datetime) -> dict:
         "history_too_short": [label(r) for r in rows if r["state"] == LATE],
         "not_asked": [label(r) for r in rows if r["state"] == UNASKED],
         "check_by_eye": [label(r) for r in priced if r["source"] != SEC_LIST and r["trading"]],
+        "top": [r["name"] for r in rows[:TOP_SHOWN]],
+        "left_out_count": len(aside),
+        "left_out": [f"{r['name']} (${r['float_usd'] / 1e9:,.0f} billion, {WHY.get(r['source'], WHY[UNBACKED])})" for r in aside[:LEFT_OUT_SHOWN]],
         "tiingo": room(conn, rows, now),
     }
     out["enough"] = out["priced_pct"] >= ENOUGH_PCT
@@ -233,6 +346,13 @@ def words(s: dict) -> str:
         return NOT_RUN
     head = f"Of the {s['listed']} largest US companies of mid-2011, {s['with_ticker']} have a ticker"
     parts = [f"{head} and Tiingo prices {s['priced']} of them from January 2012 ({s['priced_pct']:g}%)."]
+    if len(s["top"]) >= 3:
+        parts.append(f"The largest are {s['top'][0]}, {s['top'][1]} and {s['top'][2]}.")
+    if s["left_out_count"]:
+        one = s["left_out_count"] == 1
+        parts.append(
+            f"{s['left_out_count']} {'company was' if one else 'companies were'} left out because the size {'it' if one else 'they'} reported looks mistyped."
+        )
     if s["listed"] < s["wanted"]:
         parts.append(f"The SEC lists only {s['listed']} of the {s['wanted']} asked for.")
     if s["stopped"]:
@@ -256,7 +376,7 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None, sleep=ti
     if fresh(conn, now):
         return {"ok": True, "fresh": True} | summary(conn, names(conn), now)
     try:
-        top = largest(http, agent, sleep)
+        top, left = largest(http, agent, sleep)
         listing = tiingo_listing(http)
         by_cik: dict[int, list[str]] = {}
         for symbol, cik in _reach("The SEC", lambda: sec_ciks(conn, http, agent, now, sleep)).items():
@@ -264,7 +384,9 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None, sleep=ti
         rows = resolve(http, agent, top, listing, by_cik, sleep)
     except ProviderError as e:
         return {"ok": False, "error": f"{e}. The public stock list was left as it was."}
-    store(conn, rows, now)
+    known = {r["cik"]: r for r in names(conn) if r["state"] == PRICED}
+    rows = [r | {k: known[r["cik"]][k] for k in TICKER_FIELDS} if r["state"] == UNASKED and r["cik"] in known else r for r in rows]
+    store(conn, rows, now, left)
     return {"ok": True, "fresh": False} | summary(conn, names(conn), now)
 
 
@@ -277,4 +399,5 @@ def view(conn: sqlite3.Connection | None, *, now: datetime | None = None) -> dic
     if not rows:
         return {"as_of": AS_OF, "tests_from": TESTS_FROM, "wanted": SIZE, "listed": 0, "detail": NOT_RUN, "fetched_at": None, "names": []}
     keep = ("rank", "name", "cik", "float_usd", "float_at", "symbol", "source", "first_bar", "last_bar", "state", "trading")
-    return summary(conn, rows, now) | {"fetched_at": rows[0]["fetched_at"], "names": [{k: r[k] for k in keep} for r in rows]}
+    aside = [{"name": r["name"], "cik": r["cik"], "float_usd": r["float_usd"], "float_at": r["float_at"], "why": WHY.get(r["source"])} for r in left_out(conn)]
+    return summary(conn, rows, now) | {"fetched_at": rows[0]["fetched_at"], "names": [{k: r[k] for k in keep} for r in rows], "left_out_names": aside}
