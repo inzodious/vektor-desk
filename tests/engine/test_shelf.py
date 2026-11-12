@@ -610,6 +610,29 @@ def test_stock_screen_rows_say_they_lean_on_hindsight_even_on_a_result_stored_be
     assert not mix["leans_on_hindsight"] and SCREEN_HINDSIGHT not in mix["caveats"] and "hindsight" not in mix["line"]
 
 
+def test_a_row_that_leans_on_hindsight_can_never_read_held_up(stocked, monkeypatch):
+    cfg = stocked
+    ids = ("lib-stock-momentum", "lib-three-fund")
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
+    monkeypatch.setattr(shelf, "IDS", frozenset(ids))
+    shelf.queue_missing(cfg, now=NOW)
+    process_queue(cfg, now=NOW)
+    won = {
+        "verdict": "held_up",
+        "line": "Beat S&P 500 (SPY) by 6.1 points a year over 6 years out of sample, more than the 4.0 luck allows across the 3 variants tried.",
+    }
+    monkeypatch.setattr(shelf, "_experiment", lambda *a, **k: dict(won))
+    view = shelf.view(cfg)
+    rows = {r["id"]: r for r in view["rows"]}
+    screen, mix = rows["lib-stock-momentum"], rows["lib-three-fund"]
+    assert screen["verdict"] == "within_noise" and mix["verdict"] == "held_up" and view["counts"]["held_up"] == 1
+    assert screen["line"] == (
+        "Ahead, but it leans on hindsight: beat S&P 500 (SPY) by 6.1 points a year over 6 years out of sample, more than the 4.0 luck allows "
+        "across the 3 variants tried. Not counted as held up, because the stock list is small and includes names you hold or held."
+    )
+    assert mix["line"] == won["line"] and shelf.ready(cfg).endswith("1 held up out of sample")
+
+
 def test_the_library_grew_and_each_kind_names_its_new_rows():
     by = {e["id"]: e for e in shelf.LIBRARY}
     assert len(shelf.LIBRARY) == 62 and len(by) == 62

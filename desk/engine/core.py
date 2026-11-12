@@ -9,7 +9,24 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION, INBOX_AT, JOBS_AT, KEY_WORDS, bands, broker, catalog, fi, key_fix, lookthrough, patterns, replay, risk, scoring
+from desk.engine import (
+    ENGINE_VERSION,
+    INBOX_AT,
+    JOBS_AT,
+    KEY_WORDS,
+    KEYS_AT,
+    bands,
+    broker,
+    catalog,
+    fi,
+    heal,
+    key_fix,
+    lookthrough,
+    patterns,
+    replay,
+    risk,
+    scoring,
+)
 from desk.engine.asof import CLOSES_LAND, ET, day_words, provisional_symbols
 from desk.engine.backfill import ASK_WORDS, NO_PRICES, parked_until
 from desk.engine.cash import margin_rate
@@ -94,8 +111,18 @@ class Out:
         if value is not None:
             self.series.append((series_id, scope, scope_id, day, round(float(value), 6), quality))
 
-    def h(self, check: str, status: str, detail: str):
-        self.health.append((self.as_of, check, status, detail))
+    def h(self, check: str, status: str, detail: str, say: str | None = None, kind: str | None = None, job: str | None = None):
+        self.health.append((self.as_of, check, status, detail, say or detail, heal.kind_of(status, kind), job if status != "ok" else None))
+
+    def c(self, check: "Check"):
+        self.h(*check, check.say, check.kind, check.job)
+
+
+class Check(tuple):
+    def __new__(cls, name: str, status: str, detail: str, say: str | None = None, kind: str | None = None, job: str | None = None):
+        self = super().__new__(cls, (name, status, detail))
+        self.say, self.kind, self.job = say, kind, job
+        return self
 
 
 def env_float(name: str) -> float | None:
@@ -280,7 +307,14 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     with desk:
         store_flows(desk, flows)
     if not days:
-        out.h("holdings", "fail", f"No holdings yet. Fix: in {JOBS_AT}, run Accounts and then Daily numbers.")
+        out.h(
+            "holdings",
+            "fail",
+            f"No holdings yet. Fix: in {JOBS_AT}, run Accounts and then Daily numbers.",
+            "No holdings yet. The desk is reading your accounts now.",
+            heal.BLOCKS,
+            heal.ACCOUNTS,
+        )
         return out
     as_of = days[-1]
     plan = latest_plan(mirror)
@@ -531,11 +565,17 @@ def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, da
         out.m("plan.single_stock", w, "pct", scope="holding", scope_id=s, quality=q)
     unknown = sorted(s for s in weights if kinds.get(s, "unknown") == "unknown" and s not in targets)
     if unknown:
+        sec = bool(os.environ.get("DESK_SEC_USER_AGENT"))
+        what = "is a fund or a single stock" if len(unknown) == 1 else "are funds or single stocks"
         out.h(
             "symbol_kinds",
             "warn",
             f"Not sure whether {', '.join(unknown)} are funds or single stocks. Fix: "
-            + ("the nightly research job loads SEC's ticker lists." if os.environ.get("DESK_SEC_USER_AGENT") else key_fix(["DESK_SEC_USER_AGENT"])),
+            + ("the nightly research job loads SEC's ticker lists." if sec else key_fix(["DESK_SEC_USER_AGENT"])),
+            f"The desk does not know yet whether {heal.listed(unknown)} {what}. "
+            + ("It is looking that up." if sec else f"To let it look that up, {key_fix(['DESK_SEC_USER_AGENT'])}"),
+            heal.FIXES if sec else heal.NEEDS,
+            heal.RESEARCH if sec else None,
         )
     rules, source = rules_in_force(cfg, plan)
     conv = convictions(rules)
@@ -632,7 +672,7 @@ def _margin_metrics(out: Out, rows, total, cfg: Config | None = None):
                 drop = 1 - a["debit"] / ((1 - maint / 100) * a["value"])
                 out.m("margin.call_drop", max(0.0, drop) * 100, "pct", scope="account", scope_id=acct, quality="modelled")
         if rate is None:
-            out.h("margin_rate", "warn", NO_MARGIN_RATE)
+            out.h("margin_rate", "warn", NO_MARGIN_RATE, NO_MARGIN_RATE.replace("Fix: open", "Open"), heal.NEEDS)
         elif rate_source == "default":
             out.h("margin_rate", "ok", f"Margin interest is estimated at a typical {rate:g}% a year until you set your own rate in Settings.")
     else:
@@ -811,7 +851,13 @@ def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datet
         out.m("tax.marginal_rate", federal, "pct", scope="tax", scope_id="federal", quality="modelled")
         out.m("tax.marginal_rate", state, "pct", scope="tax", scope_id="state", quality="modelled")
     else:
-        out.h("marginal_rate", "warn", "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once; the desk reads the rate from there.")
+        out.h(
+            "marginal_rate",
+            "warn",
+            "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once; the desk reads the rate from there.",
+            "No tax rate yet. Open Taxes in Escape Vektor once and the desk reads it from there.",
+            heal.NEEDS,
+        )
     out.m("tax.harvest_value", total * rate / 100 if lots and rate is not None else None, "usd", quality="modelled")
     if source != "none":
         out.h("marginal_rate", "ok", "Marginal rate from Escape Vektor's tax estimate." if source == "escape_vektor" else "Marginal rate from your profile.")
@@ -866,16 +912,24 @@ def _research_metrics(out: Out, desk, kinds):
     covered = {r[0] for r in desk.execute("SELECT DISTINCT symbol FROM fundamentals")}
     bare = [s for s in symbols if s not in covered]
     if bare:
-        fix = "the nightly research job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else key_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
-        out.h("research", "warn", f"No SEC company facts yet for {', '.join(bare[:10])}. Fix: {fix}.")
+        sec = bool(os.environ.get("DESK_SEC_USER_AGENT"))
+        fix = "the nightly research job fills them" if sec else key_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
+        out.h(
+            "research",
+            "warn",
+            f"No SEC company facts yet for {', '.join(bare[:10])}. Fix: {fix}.",
+            f"Company facts for {heal.listed(bare)} are not in yet. " + ("The desk is fetching them." if sec else f"To fetch them, {fix}."),
+            heal.FIXES if sec else heal.NEEDS,
+            heal.RESEARCH if sec else None,
+        )
     elif symbols:
-        out.h("research", "ok", f"SEC company facts for {len(symbols)} stocks.")
+        out.h("research", "ok", f"SEC company facts for {len(symbols)} stocks.", f"Company facts are in for {len(symbols)} stocks.")
 
 
 # ---- Data health ----
 
 
-def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
+def _closes_check(desk, rows, as_of: str) -> Check:
     held = sorted({h["symbol"] for h in rows if not h["is_cash"]})
     newest: dict[str, str] = {}
     for tbl in ("prices_daily", "price_bars"):
@@ -892,32 +946,60 @@ def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
     session = last_trading_day(date.fromisoformat(as_of)).isoformat()
     stale = [s for s in held if s in newest and newest[s] < session and s not in snap and s not in quoted]
     broker = [s for s in held if s not in newest and s in no_source]
-    notes = []
+    notes, say = [], []
+    kind, job = heal.FIXES, None
     keyed = bool(os.environ.get("TIINGO_API_KEY"))
     no_key = "Fix: " + key_fix(["TIINGO_API_KEY"])
+    add_key = f"To get prices by itself, the desk needs you to {key_fix(['TIINGO_API_KEY'])}"
+    day = heal.plain_day(session, as_of)
     if missing:
         notes.append(f"No close for {', '.join(missing)} on {as_of}. " + (f"The desk asks for them {ASK_WORDS}. Fix: nothing to do yet." if keyed else no_key))
+        say.append(
+            f"No price yet for {heal.listed(heal.names(desk, missing))}. "
+            + (f"The desk is asking for {'it' if len(missing) == 1 else 'them'} now." if keyed else add_key)
+        )
+        kind, job = (heal.FIXES, heal.BACKFILL) if keyed else (heal.NEEDS, None)
     if quoted:
         notes.append(f"{day_words(as_of)} is priced from the closing quotes until {CLOSES_LAND} The day is restated as they land.")
+        say.append(f"{day} is priced from closing quotes until {CLOSES_LAND}")
         if stale:
             notes.append(f"{', '.join(stale)} have no quote, so they carry their last close until then.")
+            say.append(f"{_prices(desk, stale)} without a quote {'carries its' if len(stale) == 1 else 'carry their'} last close until then.")
     elif stale:
         oldest = min(newest[s] for s in stale)
         head = f"Closes for {', '.join(stale)} stop at {oldest}."
         if not keyed:
             notes.append(f"{head} {no_key}")
+            say.append(f"{_prices(desk, stale)} for {day} {_be(stale)} missing. {add_key}")
+            kind = heal.NEEDS
         elif oldest >= last_trading_day(date.fromisoformat(session) - timedelta(days=1)).isoformat():
             notes.append(
                 f"{head} A fund's price for a day can arrive hours after the others. The desk asks for it {ASK_WORDS}, "
                 "and the day's numbers follow once it lands. Fix: nothing to do yet."
             )
+            say.append(f"{_prices(desk, stale)} for {day} {_be(stale)} not out yet. The desk checks every hour.")
         else:
             notes.append(f"{head} That is more than a day behind. Fix: in {JOBS_AT}, run Backfill and read its result there.")
+            say.append(f"{_prices(desk, stale)} {_be(stale)} more than a day behind. The desk is asking for {'it' if len(stale) == 1 else 'them'} again now.")
+            job = job or heal.BACKFILL
     notes.extend(_ask_words(s, asked[s]) for s in stale if s in asked)
     if broker:
         notes.append(f"{', '.join(broker)} have no market price anywhere, so they're valued at the broker's snapshot price.")
     status = "warn" if missing or (stale and not quoted) else "ok"
-    return "closes", status, " ".join(notes) or f"Every holding has a close on {as_of}."
+    return Check(
+        "closes", status, " ".join(notes) or f"Every holding has a close on {as_of}.", " ".join(say) or f"Every holding has a price for {day}.", kind, job
+    )
+
+
+def _prices(desk, symbols: list[str]) -> str:
+    funds = all(len(s) == 5 and s.endswith("X") for s in symbols)
+    if len(symbols) == 1:
+        return f"The price of {heal.names(desk, symbols)[0]}"
+    return f"{heal.count(len(symbols))} {'fund prices' if funds else 'prices'}"
+
+
+def _be(symbols: list[str]) -> str:
+    return "is" if len(symbols) == 1 else "are"
 
 
 def _ask_words(symbol: str, row) -> str:
@@ -938,13 +1020,17 @@ def _snapshot_age(rows, day: str, series) -> str | None:
     return max(set(hits), key=hits.count)
 
 
-def _value_check(rows, day: str, series=None) -> tuple[str, str, str]:
+def _value_check(rows, day: str, series=None) -> Check:
     mism = [h for h in rows if h["quality"] == "mismatch"]
     if mism:
-        return (
+        return Check(
             "value",
             "fail",
             f"The {day} snapshot's positions don't add up to its account totals. Fix: in {JOBS_AT}, run Accounts; if it repeats, check Escape Vektor.",
+            f"Your broker's positions and account totals for {heal.plain_day(day)} do not add up, so values cannot be trusted yet. "
+            "The desk is reading your accounts again.",
+            heal.BLOCKS,
+            heal.ACCOUNTS,
         )
     bad, gaps = [], []
     for acct in sorted({h["account"] for h in rows}):
@@ -959,26 +1045,35 @@ def _value_check(rows, day: str, series=None) -> tuple[str, str, str]:
                     if abs(broker - h["close"]) > max(0.01, broker * 0.0005):
                         gaps.append((abs(h["value"] - h["reported_value"]), f"{h['symbol']} {h['close']:,.2f} vs {broker:,.2f}"))
     if not bad:
-        return "value", "ok", f"Values match the broker on {day}."
+        return Check("value", "ok", f"Values match the broker on {day}.", f"Values match your broker for {heal.plain_day(day)}.")
     top = ", ".join(g for _, g in sorted(gaps, reverse=True)[:3])
     why = f" Biggest price gaps (close vs broker): {top}." if top else ""
     age = _snapshot_age(rows, day, series or {})
     if age:
-        return (
+        return Check(
             "value",
             "warn",
             f"{'; '.join(bad)}. The {day} snapshot carries {age} closes, so the broker figures are older than the desk's.{why} "
             "Fix: nothing to do; the desk values at the newer closes and the next sync catches up.",
+            f"Your broker's figures still use {heal.plain_day(age, day)}'s prices and the desk uses newer ones, so the totals differ a little. "
+            "It clears with the next account read.",
+            heal.FIXES,
         )
-    return "value", "warn", f"{'; '.join(bad)}.{why} Fix: the broker priced at a different time than the close; it clears with the next snapshot."
+    return Check(
+        "value",
+        "warn",
+        f"{'; '.join(bad)}.{why} Fix: the broker priced at a different time than the close; it clears with the next snapshot.",
+        "Your broker priced a few holdings at a different time than the market close, so the totals differ a little. It clears with the next account read.",
+        heal.FIXES,
+    )
 
 
 LOT_METHOD = "FIFO for stocks and ETFs, average cost for mutual funds"
 
 
-def _history_check(h: broker.History | None) -> tuple[str, str, str]:
+def _history_check(h: broker.History | None) -> Check:
     if h is None or not h.rows:
-        return "history", "ok", "No Fidelity history imported, so Escape Vektor's activity is used as is."
+        return Check("history", "ok", "No Fidelity history imported, so Escape Vektor's activity is used as is.")
     info = broker.summary(h)
     span = f"{info['start']} to {info['end']}"
     detail = f"Fidelity history {span}: {info['rows']} rows over {', '.join(info['accounts'])}; {info['matched']} Escape Vektor rows replaced."
@@ -988,16 +1083,19 @@ def _history_check(h: broker.History | None) -> tuple[str, str, str]:
         )
         detail += f" {len(h.kept)} Escape Vektor rows inside those dates had no broker match and are kept as they are ({shown})."
     if not h.unmapped:
-        return "history", "ok", detail
-    return (
+        return Check("history", "ok", detail, f"Your Fidelity history is loaded, from {heal.plain_day(info['start'])} to {heal.plain_day(info['end'])}.")
+    return Check(
         "history",
         "warn",
         f"{detail} But no Escape Vektor account ends with the same 4 digits as {', '.join(h.unmapped)}. "
         f"Fix: check the account names in Escape Vektor, then upload the Fidelity history JSON again in {INBOX_AT}.",
+        "Part of your Fidelity history belongs to an account the desk cannot match. "
+        f"Check the account names in Escape Vektor, then upload the history again in {INBOX_AT}.",
+        heal.NEEDS,
     )
 
 
-def _modelled_check(out: Out, lots: list[dict], rows: list[dict]) -> tuple[str, str, str]:
+def _modelled_check(out: Out, lots: list[dict], rows: list[dict]) -> Check:
     accounts = {lot["account"] for lot in lots}
     held = defaultdict(float)
     for h in rows:
@@ -1013,43 +1111,63 @@ def _modelled_check(out: Out, lots: list[dict], rows: list[dict]) -> tuple[str, 
     notes = [f"{a} {s} {text}" for (a, s), text in sorted((out.book.notes if out.book else {}).items())]
     head = f"Lots rebuilt from the Fidelity history ({LOT_METHOD})"
     if not diffs and not notes:
-        return "shares", "ok", f"{head} match holdings."
+        return Check("shares", "ok", f"{head} match holdings.", "Tax lots rebuilt from your Fidelity history match what you hold.")
     body = "; ".join(diffs[:8] + notes[:5])
-    return "shares", "warn", f"{head}: {body}. Fix: upload a lot export CSV in {INBOX_AT}; it wins over the rebuilt lots."
+    return Check(
+        "shares",
+        "warn",
+        f"{head}: {body}. Fix: upload a lot export CSV in {INBOX_AT}; it wins over the rebuilt lots.",
+        f"Tax lots rebuilt from your Fidelity history do not quite match what you hold. To settle it, upload a lot export in {INBOX_AT}.",
+        heal.NEEDS,
+    )
 
 
-def _flows_check(implied: dict[tuple[str, str], float], holdings, cover: dict[str, tuple[str, str]] | None = None) -> tuple[str, str, str]:
+def _flows_check(implied: dict[tuple[str, str], float], holdings, cover: dict[str, tuple[str, str]] | None = None) -> Check:
     snaps = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
     if not snaps:
-        return "flows", "ok", "No snapshots yet."
+        return Check("flows", "ok", "No snapshots yet.", "No account reads yet.")
     last = max(snaps)
     mine = {a: v for (a, d), v in implied.items() if d == last}
     if not mine:
-        return "flows", "ok", f"The {last} snapshot matches prices plus recorded activity."
+        return Check(
+            "flows", "ok", f"The {last} snapshot matches prices plus recorded activity.", "Your latest account read matches prices plus recorded activity."
+        )
     parts = "; ".join(f"{a} {v:+,.2f}" for a, v in sorted(mine.items()))
     covered = sorted(a for a in mine if a in (cover or {}) and cover[a][0] <= last <= cover[a][1])
     if covered:
-        return (
+        return Check(
             "flows",
             "warn",
             f"The {last} snapshot moved {parts} beyond prices and recorded activity, and Fidelity history covers {', '.join(covered)} on that day, "
             "so the gap is a missing or misread row, not unlogged money. Counted as money in or out for now. "
             f"Fix: upload a fresh Fidelity history JSON in {INBOX_AT}; if it stays, send the account and date to the statistics thread.",
+            f"{heal.count(len(covered))} account{'s' if len(covered) > 1 else ''} moved by more than prices and your recorded activity explain. "
+            f"Upload a fresh Fidelity history in {INBOX_AT}.",
+            heal.NEEDS,
         )
-    return (
+    return Check(
         "flows",
         "ok",
         f"The {last} snapshot moved {parts} beyond prices and recorded activity; counted as money in or out, not return "
         "(deposits, payroll contributions or a margin buy Escape Vektor didn't log).",
+        "Money the desk had not seen recorded, such as a deposit or a payroll contribution, was counted as money in or out, not as return.",
     )
 
 
-def _market_keys() -> tuple[str, str, str]:
+def _market_keys() -> Check:
     need = [(k, why) for k, why in MARKET_KEYS if not os.environ.get(k)]
     if not need:
-        return "market_keys", "ok", "Tiingo, Finnhub, FRED, SEC and Alpaca paper are all set."
+        return Check("market_keys", "ok", "Tiingo, Finnhub, FRED, SEC and Alpaca paper are all set.", "Every data source is set up.")
     gaps = "; ".join(f"{KEY_WORDS[k]} ({why})" for k, why in need)
-    return "market_keys", "warn", f"Missing {gaps}. Fix: {key_fix([k for k, _ in need])}"
+    several = len(need) > 1
+    return Check(
+        "market_keys",
+        "warn",
+        f"Missing {gaps}. Fix: {key_fix([k for k, _ in need])}",
+        f"{heal.count(len(need))} data source{'s are' if several else ' is'} not set up, so parts of the desk are off. "
+        f"Add {'them' if several else 'it'} in {KEYS_AT}.",
+        heal.NEEDS,
+    )
 
 
 def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
@@ -1059,22 +1177,33 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
             age = (now - datetime.fromisoformat(row["mirrored_at"].replace("Z", "+00:00"))).total_seconds() / 3600
             status = "ok" if age <= cfg.stale_hours else "fail"
             fix = "" if status == "ok" else f" Fix: in {JOBS_AT}, run Accounts and read its result there."
-            out.h("freshness", status, f"Mirror pulled {age:.1f} hours ago (limit {cfg.stale_hours:g}).{fix}")
+            ago = "under an hour ago" if age < 1 else f"{age:.0f} hour{'' if round(age) == 1 else 's'} ago"
+            say = f"Your accounts were read {ago}."
+            if status != "ok":
+                say = f"Your accounts were last read {ago}, so these numbers are old. The desk is reading them again now."
+            out.h("freshness", status, f"Mirror pulled {age:.1f} hours ago (limit {cfg.stale_hours:g}).{fix}", say, heal.BLOCKS, heal.ACCOUNTS)
         else:
-            out.h("freshness", "fail", f"The mirror has never pulled snapshots. Fix: in {JOBS_AT}, run Accounts and read its result there.")
+            out.h(
+                "freshness",
+                "fail",
+                f"The mirror has never pulled snapshots. Fix: in {JOBS_AT}, run Accounts and read its result there.",
+                "Your accounts have not been read yet. The desk is reading them now.",
+                heal.BLOCKS,
+                heal.ACCOUNTS,
+            )
     as_of = out.as_of
     rows = holdings[as_of]
-    out.h(*_closes_check(desk, rows, as_of))
-    out.h(*_flows_check(out.implied, holdings, out.history.cover if out.history else None))
+    out.c(_closes_check(desk, rows, as_of))
+    out.c(_flows_check(out.implied, holdings, out.history.cover if out.history else None))
     snap_days = [d for d in holdings if any(h["source"] == "snapshot" for h in holdings[d])]
     if snap_days:
-        out.h(*_value_check(holdings[max(snap_days)], max(snap_days), price_series(mirror, desk)))
-    out.h(*_market_keys())
-    out.h(*_history_check(out.history))
+        out.c(_value_check(holdings[max(snap_days)], max(snap_days), price_series(mirror, desk)))
+    out.c(_market_keys())
+    out.c(_history_check(out.history))
     lots = current_lots(desk, out.book.lots if out.book else None)
     modelled = any(lot.get("quality") == "modelled" for lot in lots)
     if lots and modelled:
-        out.h(*_modelled_check(out, lots, rows))
+        out.c(_modelled_check(out, lots, rows))
     elif lots:
         held = defaultdict(float)
         for h in rows:
@@ -1089,14 +1218,18 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
         newest = max(str(lot["as_of"] or "") for lot in lots)
         status = "ok" if not diffs else ("warn" if newest < as_of else "fail")
         detail = "Lot shares match holdings."
+        say = "Your tax lots match what you hold."
         if diffs:
             detail = "; ".join(diffs[:10]) + f". Fix: upload a fresh lot export in {INBOX_AT}."
-        out.h("shares", status, detail)
+            say = f"Your lot export no longer matches what you hold, so tax figures are off. Upload a fresh one in {INBOX_AT}."
+        out.h("shares", status, detail, say, heal.BLOCKS if status == "fail" else heal.NEEDS)
     else:
         out.h(
             "shares",
             "warn",
             f"No lots yet, so tax lots and wash-sale checks are off. Fix: upload the Fidelity history JSON or a lot export CSV in {INBOX_AT}.",
+            f"No tax lots yet, so tax and wash-sale checks are off. Upload your Fidelity history or a lot export in {INBOX_AT}.",
+            heal.NEEDS,
         )
 
 
@@ -1112,7 +1245,7 @@ def store(desk: sqlite3.Connection, out: Out) -> dict:
         desk.execute("DELETE FROM series_daily")
         desk.executemany("INSERT OR REPLACE INTO series_daily VALUES (?, ?, ?, ?, ?, ?)", out.series)
         desk.execute("DELETE FROM data_health WHERE as_of=?", (out.as_of,))
-        desk.executemany("INSERT INTO data_health VALUES (?, ?, ?, ?)", out.health)
+        desk.executemany("INSERT INTO data_health (as_of, check_name, status, detail, say, kind, job) VALUES (?, ?, ?, ?, ?, ?, ?)", out.health)
         if out.lookthrough is not None:
             desk.execute("DELETE FROM lookthrough")
             desk.executemany("INSERT OR REPLACE INTO lookthrough VALUES (?, ?, ?, ?, ?, ?)", out.lookthrough)
@@ -1126,5 +1259,5 @@ def store(desk: sqlite3.Connection, out: Out) -> dict:
         if out.wash is not None:
             desk.execute("DELETE FROM wash_windows")
             desk.executemany("INSERT OR REPLACE INTO wash_windows VALUES (?, ?, ?, ?, ?, ?, ?)", out.wash)
-    worst = "fail" if any(h[2] == "fail" for h in out.health) else ("warn" if any(h[2] == "warn" for h in out.health) else "ok")
+    worst = heal.overall([{"status": h[2], "kind": h[5]} for h in out.health])
     return {"as_of": out.as_of, "metrics": len(out.metrics), "series": len(out.series), "health": worst, "checks": {h[1]: h[2] for h in out.health}}

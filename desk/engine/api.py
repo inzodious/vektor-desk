@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import asof, backfill, discounts, lab, lane, leaderboard, paper_exec, planfacts, review, schema, watchlist
+from desk.engine import asof, backfill, discounts, heal, lab, lane, leaderboard, paper_exec, planfacts, review, schema, watchlist
 from desk.engine.compare import CompareError, compare
 from desk.engine.lab import shelf
 from desk.engine.live import live_view
@@ -238,14 +238,17 @@ def health(request: Request) -> JSONResponse:
         return _json({"as_of": None, "status": "fail", "checks": []})
     try:
         day = conn.execute("SELECT max(as_of) FROM data_health").fetchone()[0]
-        checks = [dict(r) for r in conn.execute("SELECT check_name, status, detail FROM data_health WHERE as_of=? ORDER BY check_name", (day,))]
+        rows = [dict(r) for r in conn.execute("SELECT * FROM data_health WHERE as_of=? ORDER BY check_name", (day,))]
         last = None
         if _has(conn, "engine_runs"):
             last = conn.execute("SELECT job, started_at, finished_at, ok FROM engine_runs ORDER BY started_at DESC LIMIT 1").fetchone()
     finally:
         conn.close()
-    status = "fail" if any(c["status"] == "fail" for c in checks) else ("warn" if any(c["status"] == "warn" for c in checks) else "ok")
-    return _json({"as_of": day, "status": status if checks else "fail", "checks": checks, "last_run": dict(last) if last else None})
+    checks = heal.annotate(get_cfg(request), rows)
+    kinds = {k: sum(c["kind"] == k for c in checks) for k in heal.KINDS}
+    return _json(
+        {"as_of": day, "status": heal.overall(checks) if checks else "fail", "kinds": kinds, "checks": checks, "last_run": dict(last) if last else None}
+    )
 
 
 @router.post("/api/preflight")
