@@ -8,6 +8,7 @@ from desk.db import connect
 from desk.decisions.profile import active_profile
 from desk.engine import ENGINE_VERSION, broker, schema
 from desk.engine.cash import margin_rate
+from desk.engine.cash import picture as cash_picture
 from desk.engine.core import (
     PROFILE_ERRORS,
     convictions,
@@ -22,7 +23,7 @@ from desk.engine.core import (
     symbol_weights,
 )
 from desk.engine.lots import current_lots, realized_rows
-from desk.engine.market import latest_close
+from desk.engine.market import et_day, latest_close
 from desk.engine.source import closes, open_mirror
 from desk.engine.tax import LOT_METHODS, pick_lots, shared, split_gain, wash_check, wash_windows
 
@@ -73,15 +74,13 @@ def picture(rows: list[dict], ctx: Context) -> dict:
     weights = symbol_weights(rows, total)
     singles = {s: w for s, w in weights.items() if ctx.kinds.get(s, "unknown") == "stock" and s not in ctx.targets}
     drift = {s: weights.get(s, 0.0) - t * 100 for s, t in ctx.targets.items()}
-    debit, gross, call = 0.0, {}, {}
+    money = cash_picture(rows)
+    held, call = defaultdict(float), {}
     for r in rows:
-        gross.setdefault(r["account"], [0.0, 0.0])
-        if r["is_cash"] and r["value"] < 0:
-            gross[r["account"]][0] -= r["value"]
-        else:
-            gross[r["account"]][1] += r["value"]
-    for acct, (d, v) in gross.items():
-        debit += d
+        if not r["is_cash"]:
+            held[r["account"]] += r["value"]
+    for acct, d in money["debit_by_account"].items():
+        v = held[acct]
         if d > 0 and v > 0:
             call[acct] = max(0.0, 1 - d / ((1 - ctx.maint / 100) * v)) * 100
     cash = sum(r["value"] for r in rows if r["is_cash"])
@@ -93,7 +92,9 @@ def picture(rows: list[dict], ctx: Context) -> dict:
         "top1": max(weights.values(), default=0.0),
         "drift": drift,
         "drift_max": max((abs(v) for v in drift.values()), default=None),
-        "debit": debit,
+        "debit": money["debit"],
+        "cash_ready": money["ready"],
+        "ready_by_account": money["ready_by_account"],
         "call_drop": call,
         "cash_share": cash / total * 100 if total else None,
     }
@@ -104,7 +105,7 @@ def _match(want: str, key: str) -> bool:
     return w in k or k in w
 
 
-def pick_account(want: str | None, rows: list[dict], symbol: str, side: str) -> str:
+def pick_account(want: str | None, rows: list[dict], symbol: str, side: str, funding: str = "") -> str:
     accounts = sorted({r["account"] for r in rows})
     held = defaultdict(float)
     for r in rows:
@@ -118,6 +119,9 @@ def pick_account(want: str | None, rows: list[dict], symbol: str, side: str) -> 
         return want
     if side == "sell" and holding:
         return holding[0]
+    ready = cash_picture(rows)["ready_by_account"]
+    if side == "buy" and funding == "cash" and ready:
+        return max(sorted(ready), key=lambda a: ready[a])
     return next((a for a in accounts if a.startswith("individual")), accounts[0] if accounts else "individual")
 
 
@@ -214,16 +218,22 @@ def lamp_funding(ctx, t, before, after):
         cost = added * ctx.margin_rate / 100 * 30 / 360 if ctx.margin_rate is not None else None
         money = f", about ${cost:,.0f} a month in interest." if cost is not None else ". Set DESK_MARGIN_RATE_PCT to see the interest in dollars."
         covered = t["amount_usd"] - added
+        short = (
+            ""
+            if before["cash_ready"] - covered < 0.5
+            else f" Ready cash is ${before['cash_ready']:,.0f} across accounts, and the rest of it sits in another account."
+        )
         lead = f"Cash covers ${covered:,.0f}; the other ${added:,.0f} goes on margin" if covered > 0.5 else f"All ${added:,.0f} goes on margin"
         drop = after["call_drop"].get(t["account"])
         tail = f" A {drop:.0f}% drop would bring a margin call." if drop is not None else ""
-        return "act", f"{lead}{money}{tail}", b, a
+        return "act", f"{lead}{money}{tail}{short}", b, a
     if t["side"] == "buy" and t["funding"] == "deposit":
         _, when = ctx.next_deposit
         return "ok", f"Waits for the {when} deposit." if when else "Paid from a deposit.", b, a
     if t["side"] == "sell" and b > 0:
         return "ok", f"Proceeds pay the margin debit down from ${b:,.0f} to ${a:,.0f}.", b, a
-    return "ok", "Paid from settled cash." if t["side"] == "buy" else "Proceeds go to cash.", b, a
+    paid = f"Paid from the ${before['ready_by_account'].get(t['account'], 0.0):,.0f} of ready cash in this account."
+    return "ok", paid if t["side"] == "buy" else "Proceeds go to cash.", b, a
 
 
 def lamp_lots(ctx, t, before, after):
@@ -317,7 +327,7 @@ def normalize(trade: dict, ctx: Context) -> dict:
         return {**out, "account": trade.get("account"), "shares": None, "amount_usd": None, "price": ctx.prices.get(symbol)}
     if not symbol:
         raise PreflightError("A trade needs a symbol")
-    out["account"] = pick_account(trade.get("account"), ctx.rows, symbol, side)
+    out["account"] = pick_account(trade.get("account"), ctx.rows, symbol, side, funding)
     price = trade.get("limit") if isinstance(trade.get("limit"), int | float) and trade["limit"] > 0 else ctx.prices.get(symbol)
     shares, amount = trade.get("shares"), trade.get("amount_usd")
     if not price:
@@ -429,7 +439,7 @@ def load_context(cfg: Config, mirror: sqlite3.Connection | None, desk: sqlite3.C
     has_lots = bool(lots)
     sold = realized_rows(desk)
     activity = broker.activity(mirror, desk)
-    today = max(day, now.date().isoformat())
+    today = max(day, et_day(now))
     ctx = Context(as_of=day, rows=rows, targets=targets, kinds=kinds, rules=rules, lots=lots, has_lots=has_lots)
     ctx.windows = wash_windows(activity, sold, lots, today)
     ctx.wash_accounts = list(tax.get("wash_sale_accounts") or [])
