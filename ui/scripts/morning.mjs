@@ -21,7 +21,15 @@ const MARKET = 'US stock market (French)';
 const SMALL = 'Small caps (IWM)';
 const PLAIN = 'The same deposits, invested plainly';
 const LUMP = 'Investing it all on day one';
-const LIB_NOTE = 'Every number here is out of sample: from periods the strategy was not tuned on. The last two years of data are held back and untouched. Held up means ahead of its benchmark by more than luck allows across every variant tried in the library.';
+const LIB_NOTE = 'Every number here is out of sample: from periods the strategy was not tuned on. The last two years of data are held back and untouched. Each row names what it is measured against; for most that is the S&P 500 with dividends reinvested. Held up means ahead of its benchmark by more than luck allows across every variant tried in the library. The luck bar counts all 212 variants tried across the library, not only a row’s own, so it rises for every row as strategies are added.';
+const BENCH_WORDS = {
+  [SPY]: 'The S&P 500 index fund SPY, bought and held with dividends reinvested.',
+  [MIX]: 'The funds in your plan at their target weights. With no plan loaded this is the S&P 500.',
+  [MARKET]: 'Every US stock weighted by size, from Ken French’s research data.',
+  [SMALL]: 'The small-company index fund IWM, bought and held with dividends reinvested.',
+  [PLAIN]: 'The same starting money and monthly deposits put into the same funds, without the rule.',
+  [LUMP]: 'The whole sum invested in the same funds on the first day.',
+};
 const LIB = [
   ['buy-hold-total', 'Buy and hold the total market', 'classic', 'Buy and hold', 'Buy the whole market and never touch it.', SPY, 'within_noise', 0.1],
   ['sixty-forty', '60/40 stocks and bonds', 'classic', 'Allocation', 'Sixty percent stocks, forty percent bonds, rebalanced once a year.', SPY, 'fell_short', -2.4],
@@ -68,6 +76,7 @@ function libraryRow([id, title, kind, family, description, benchmark, outcome, e
     family,
     description,
     benchmark,
+    benchmark_words: BENCH_WORDS[benchmark],
     type: rule ? 'rule' : 'experiment',
     status: tested ? 'tested' : outcome,
     verdict,
@@ -93,6 +102,7 @@ function library(rows) {
     note: rows.some((r) => r.status === 'tested') ? LIB_NOTE : 'Nothing has run yet. The lab works through the list tonight, from 1 AM.',
     counts: { outdated: n((r) => r.outdated), total: rows.length, tested: n((r) => r.status === 'tested'), held_up: n((r) => r.verdict === 'held_up'), within_noise: n((r) => r.verdict === 'within_noise'), fell_short: n((r) => r.verdict === 'fell_short'), inconclusive: n((r) => r.verdict === 'inconclusive'), waiting: n((r) => r.status === 'waiting'), not_run: n((r) => r.status === 'not_run') },
     kinds: KINDS,
+    benchmarks: Object.entries(BENCH_WORDS).map(([name, words]) => ({ name, words, rows: n((r) => r.benchmark === name) })),
     rows,
   };
 }

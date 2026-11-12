@@ -1653,6 +1653,13 @@ a.chip { text-decoration: none; }
 /* ---------- strategy library ---------- */
 .lib-note { font-size: 12.5px; margin: 0 0 6px; max-width: 86ch; color: var(--ink-2); }
 .lib-row .lib-bench { color: var(--ink); font-weight: 600; }
+.lib-benchmarks { margin: 0 0 10px; padding: 10px 12px; border-radius: 14px; background: var(--card-2); font-size: 12.5px; max-width: 86ch; }
+.lib-benchmarks p { margin: 0; color: var(--ink-2); }
+.lib-benchmarks p b { color: var(--ink); }
+.lib-benchmarks summary { margin-top: 6px; cursor: pointer; font-weight: 600; color: var(--ink); }
+.lib-benchmarks ul { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.lib-benchmarks li b { color: var(--ink); }
+.lib-benchmarks li small { display: block; color: var(--ink-2); font-size: 12px; }
 .lib-group + .lib-group { margin-top: 14px; }
 .lib-head { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; padding: 6px 0 2px; border-bottom: 1px solid var(--line); }
 .lib-head h3 { margin: 0; font-family: var(--f-head); font-size: 15px; font-weight: 700; color: var(--ink); }

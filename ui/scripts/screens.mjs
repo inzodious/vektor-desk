@@ -133,6 +133,8 @@ const SHOTS = [
   { name: 'library-big', path: '/strategies?scenario=big', fixtures: true, clock: MONDAY, full: true },
   { name: 'library-big-open', path: '/strategies?scenario=big', fixtures: true, clock: MONDAY, full: true, act: async (p) => p.getByTestId('library').getByRole('button', { name: /^Show all/ }).first().click() },
   { name: 'morning-door-big', path: '/?scenario=big', fixtures: true, clock: MONDAY, el: 'morning' },
+  { name: 'library-benchmarks', path: '/strategies?scenario=big', fixtures: true, clock: MONDAY, el: 'lib-benchmarks' },
+  { name: 'library-benchmarks-open', path: '/strategies?scenario=big', fixtures: true, clock: MONDAY, el: 'lib-benchmarks', act: async (p) => p.getByTestId('lib-benchmarks').locator('summary').click() },
   { name: 'morning-research', path: '/research', fixtures: true, clock: MONDAY, full: true },
   { name: 'morning-research-none', path: '/research?s=BND', fixtures: true, clock: MONDAY },
   { name: 'morning-research-fresh', path: '/research?scenario=fresh', fixtures: true, clock: MONDAY, full: true },

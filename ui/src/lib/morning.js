@@ -133,11 +133,26 @@ export function libraryChip(row) {
 
 const BENCH = { 'S&P 500 (SPY)': 'the S&P 500 (SPY)', 'US stock market (French)': 'the US stock market', 'Small caps (IWM)': 'small caps (IWM)', SPY: 'the S&P 500 (SPY)' };
 
-export function benchmarkWords(benchmark) {
+export function benchmarkPlain(benchmark) {
   if (typeof benchmark !== 'string' || !benchmark.trim()) return null;
   const b = benchmark.trim();
-  const plain = BENCH[b] || (/^[A-Z][a-z]/.test(b) ? `${b[0].toLowerCase()}${b.slice(1)}` : b);
-  return `Measured against ${plain}`;
+  return BENCH[b] || (/^[A-Z][a-z]/.test(b) ? `${b[0].toLowerCase()}${b.slice(1)}` : b);
+}
+
+export function benchmarkWords(benchmark) {
+  const plain = benchmarkPlain(benchmark);
+  return plain ? `Measured against ${plain}` : null;
+}
+
+// ---------- the benchmarks legend above the table ----------
+export function benchmarksView(d) {
+  if (!d || !Array.isArray(d.benchmarks)) return null;
+  const used = d.benchmarks.filter((b) => b && typeof b.name === 'string' && b.name.trim() && Number(b.rows) > 0).map((b) => ({ name: b.name.trim(), plain: benchmarkPlain(b.name), words: typeof b.words === 'string' && b.words.trim() ? b.words.trim() : null, rows: Number(b.rows) }));
+  if (!used.length) return null;
+  const [top, ...rest] = [...used].sort((a, b) => b.rows - a.rows);
+  const total = Array.isArray(d.rows) ? d.rows.length : used.reduce((a, b) => a + b.rows, 0);
+  const lead = rest.length ? `${top.rows} of ${total} are measured against ${top.plain}.` : `Every strategy here is measured against ${top.plain}.`;
+  return { lead, words: top.words, rest: rest.map((b) => ({ ...b, count: `${b.rows} ${b.rows === 1 ? 'strategy' : 'strategies'}` })) };
 }
 
 export const LIB_LEGEND = 'Held up means it beat its benchmark on years it was never tuned on, by more than luck allows across everything tried. The last two years are held back.';

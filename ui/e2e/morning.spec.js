@@ -138,6 +138,12 @@ test('Strategies leads with the overnight table, grouped by kind, with honest wo
   await expect(lib.getByTestId('lib-note')).toContainText('Held up means ahead of its benchmark by more than luck allows');
   await expect(lib.getByTestId('lib-note')).toContainText('The last two years of data are held back');
   await expect(lib.getByTestId('lib-legend')).toHaveCount(0);
+  const legend = lib.getByTestId('lib-benchmarks');
+  await expect(legend).toContainText('17 of 26 are measured against the S&P 500 (SPY). The S&P 500 index fund SPY, bought and held with dividends reinvested.');
+  await expect(legend.locator('details')).toHaveJSProperty('open', false);
+  await legend.locator('summary').click();
+  await expect(legend.locator('li')).toHaveCount(5);
+  await expect(legend.locator('li').first()).toContainText('Every US stock weighted by size');
   await expect(lib.locator('.lib-group')).toHaveCount(3);
   await expect(lib.locator('.lib-group h3')).toHaveText(['Old and tested', 'Practical', 'Novel and creative']);
   const classic = lib.locator('.lib-group[data-kind="classic"]');
@@ -145,6 +151,7 @@ test('Strategies leads with the overnight table, grouped by kind, with honest wo
   await expect(classic.locator('.lib-row').first()).toContainText('12-1 momentum');
   await expect(classic.locator('.lib-row').first()).toContainText('Held up');
   await expect(classic.locator('.lib-row').first().getByTestId('lib-bench')).toHaveText('Measured against the S&P 500 (SPY)');
+  await expect(classic.locator('.lib-row').first().getByTestId('lib-bench')).toHaveAttribute('title', 'The S&P 500 index fund SPY, bought and held with dividends reinvested.');
   await expect(classic.locator('.lib-row', { hasText: 'Profitability and quality tilt' }).getByTestId('lib-bench')).toHaveText('Measured against the US stock market');
   await expect(lib.locator('.lib-row:visible').getByTestId('lib-bench')).toHaveCount(await lib.locator('.lib-row:visible').count());
   await expect(classic.locator('.lib-row').first()).toContainText('+3.1 pts a year');
@@ -493,6 +500,13 @@ test('an older desk note gets the Held up legend above it, once', async ({ page 
   await expect(lib.getByTestId('lib-legend')).toHaveText('Held up means it beat its benchmark on years it was never tuned on, by more than luck allows across everything tried. The last two years are held back.');
   await expect(lib.getByTestId('lib-note')).toHaveText('Every result is out of sample.');
   await expect(lib.getByText(/Held up means/)).toHaveCount(1);
+  await page.unroute('**/api/lab/library*');
+  const { benchmarks, ...older } = LIB;
+  expect(benchmarks.length).toBeGreaterThan(1);
+  await page.route('**/api/lab/library*', (route) => route.fulfill({ json: older }));
+  await page.goto('/strategies');
+  await expect(page.getByTestId('library').locator('.lib-row').first()).toBeVisible();
+  await expect(page.getByTestId('lib-benchmarks')).toHaveCount(0);
 });
 
 test('a library of 60 stays short: three rows a kind with counts, the rest behind Show all', async ({ page }) => {
