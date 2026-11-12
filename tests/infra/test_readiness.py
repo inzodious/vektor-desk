@@ -115,10 +115,30 @@ def test_after_the_numbers_and_the_review_each_section_names_its_one_action(demo
         jobrun.record(
             demo_cfg,
             "engine-paper",
-            {"result": "ok", "finished": "2026-11-11T13:00:00Z", "error": None, "note": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"},
+            {
+                "result": "ok",
+                "finished": "2026-11-11T13:00:00Z",
+                "error": None,
+                "note": "The Alpaca paper keys are not set. Add them in Settings, Data, Keys.",
+                "skipped_code": "no_alpaca_keys",
+            },
         )
         keys = sections(client)[1]["strategies.race"]
         assert keys["state"] == "blocked" and keys["action"] == {"kind": "link", "to": "/settings/data", "label": "Add the Alpaca paper keys"}
+
+
+def test_a_skip_with_a_code_links_to_its_fix_whatever_the_words_say(demo_cfg):
+    from desk.engine.__main__ import JOBS
+
+    with TestClient(create_app(demo_cfg)) as client:
+        assert JOBS["daily"](demo_cfg)["ok"] and JOBS["review"](demo_cfg)["ok"]
+        said = {"result": "ok", "finished": "2026-11-11T13:00:00Z", "error": None, "note": "Reworded since."}
+        jobrun.record(demo_cfg, "engine-paper", said)
+        plain = sections(client)[1]["strategies.race"]
+        assert plain["state"] == "empty" and plain["why"] == "Reworded since." and plain["action"]["kind"] == "job"
+        jobrun.record(demo_cfg, "engine-paper", said | {"skipped_code": "no_alpaca_keys"})
+        coded = sections(client)[1]["strategies.race"]
+        assert coded["state"] == "blocked" and coded["action"] == {"kind": "link", "to": "/settings/data", "label": "Add the Alpaca paper keys"}
 
 
 def test_the_tax_section_stays_ready_when_no_wash_window_is_open(demo_cfg):

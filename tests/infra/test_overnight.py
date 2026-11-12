@@ -349,7 +349,14 @@ def test_a_json_last_line_is_kept_field_by_field_never_cut_mid_field():
     assert said["detail"] == "Asked for 3 days." and "detail" not in said["said"]
     assert said["said"].startswith(f"ok: true; asked: 3; note: {('x ' * 100).strip()[:80]}…; month_symbols: 400 items; by_day: 2 fields; field_0: ")
     assert len(said["said"]) <= 300 and said["said"].endswith("; …") and "SYM" not in said["said"]
-    assert jobrun.last_words(json.dumps({"ready": "3 done"})) == {"skipped": None, "error": None, "ready": "3 done", "detail": None, "said": None}
+    assert jobrun.last_words(json.dumps({"ready": "3 done"})) == {
+        "skipped": None,
+        "skipped_code": None,
+        "error": None,
+        "ready": "3 done",
+        "detail": None,
+        "said": None,
+    }
     assert jobrun.last_words("[1, 2, 3]") == {"said": "3 items"}
     cut = json.dumps(body)[:2000]
     assert jobrun.last_words(cut) == {"error": jobrun.plain(cut)} and jobrun.last_words(cut[5:] + "}")["error"]
