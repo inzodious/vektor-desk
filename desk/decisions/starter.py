@@ -14,13 +14,12 @@ from desk.config import Config
 from desk.db import connect
 from desk.decisions.detect import STALE_DAYS, cadence, series, slug
 from desk.decisions.plan import cash_in, deposit_series
-from desk.decisions.profile import DEFAULTS, ProfileError, active_profile, parse, profile_path
+from desk.decisions.profile import DEFAULTS, DESKS_ON_ID, ProfileError, active_profile, margin_rate, parse, passes, profile_path
 from desk.decisions.store import session
 from desk.engine.broker import decision_rows
 
 WINDOW_DAYS = 180
 PAYS_PER_MONTH = {"weekly": 52 / 12, "biweekly": 26 / 12, "semimonthly": 2, "monthly": 1}
-STARTER_DESKS = ("plan_keeper", "tax", "risk", "skeptic", "debrief", "plans")
 BROKERAGE_KINDS = ("individual", "brokerage", "joint")
 STARTER_RUNS = {"plan_keeper": 10}
 HEADER = "# Vektor Desk profile, drafted from the mirror"
@@ -216,7 +215,7 @@ def draft(cfg: Config, *, today: date | None = None) -> tuple[dict, list[str]]:
     else:
         notes.append("No plan in the mirror; rules stay at the defaults")
     data["usage"] = {"weekly_runs": dict(STARTER_RUNS)}
-    data["agents"] = {"enabled": False, "desks": {d: d in STARTER_DESKS for d in DEFAULTS["agents"]["desks"]}}
+    data["agents"] = {"enabled": False, "desks": {d: True for d in DEFAULTS["agents"]["desks"]}}
     return data, notes
 
 
@@ -357,6 +356,20 @@ def _at(node, dotted: str):
     return node
 
 
+DESK_TITLES = {"research": "Research", "scout": "Scout", "strategy": "Strategy", "discounts": "Discounts", "filings": "Filings"}
+
+
+def _notices(cfg: Config) -> list[str]:
+    out = []
+    with session(cfg) as conn:
+        for p in passes(conn):
+            if p["id"] == DESKS_ON_ID:
+                names = ", ".join(DESK_TITLES[d] for d in p.get("switched_on", []))
+                did = f"switched on {names} in desk.yaml" if names else "made Research, Scout, Strategy, Discounts and Filings on by default"
+                out.append(f"On {p['applied_at'][:10]} the desk {did}, because you asked for the full overnight run. Switch any desk off in Settings → Crew.")
+    return out
+
+
 def status(cfg: Config) -> dict:
     path = profile_path(cfg)
     profile = active_profile(cfg)
@@ -386,5 +399,7 @@ def status(cfg: Config) -> dict:
         "deposits": len(series),
         "deposits_mode": mode,
         "rules": len(profile.get("rules", default=[]) or []),
+        "notices": _notices(cfg),
+        "margin": margin_rate(profile.data),
         "starter": None if path.exists() else "docker exec vektor-desk-cron python -m desk.decisions.profile init",
     }

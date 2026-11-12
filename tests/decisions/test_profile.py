@@ -106,10 +106,10 @@ def test_unknown_sections_and_desks_warn(cfg, yaml_path):
 
 
 def test_desk_needs_master_switch_and_its_own(cfg, yaml_path):
-    yaml_path.write_text("agents:\n  enabled: true\n  desks:\n    tax: true\n")
+    yaml_path.write_text("agents:\n  enabled: true\n  desks:\n    tax: true\n    risk: false\n")
     p = active_profile(cfg)
     assert p.desk_enabled("tax") is True
-    assert p.desk_enabled("scout") is False
+    assert p.desk_enabled("risk") is False
 
 
 def test_rule_change_is_logged_as_a_decision(cfg, yaml_path):
@@ -165,3 +165,55 @@ def test_fi_goal_from_the_profile(cfg, yaml_path):
     assert (
         "fi.multiple must be between 1 and 100" in str(e.value) and "fi.birth_date must be a date" in str(e.value) and "fi.inflation_adjusted" in str(e.value)
     )
+
+
+# ---- Desks on, margin rate ----
+
+
+def test_the_overnight_desks_are_on_by_default(cfg):
+    on = sorted(d for d, v in DEFAULTS["agents"]["desks"].items() if v)
+    assert on == ["debrief", "discounts", "filings", "plans", "research", "scout", "strategy"] and DEFAULTS["agents"]["enabled"] is False
+
+
+def test_desks_switched_off_by_the_starter_are_turned_on_once(cfg, yaml_path):
+    from desk.decisions.starter import status
+
+    desks = "    plan_keeper: true\n    research: false\n    scout: false\n    risk: false\n"
+    before = f"# My desk\nagents:\n  enabled: true\n  desks:\n{desks}\nalerts:\n  min_priority: high\n"
+    yaml_path.write_text(before)
+    p = active_profile(cfg)
+    assert all(p.desk_enabled(d) for d in ("research", "scout", "strategy", "discounts", "filings", "plan_keeper"))
+    assert p.desk_enabled("risk") is False and p.get("alerts", "min_priority") == "high"
+    assert yaml_path.with_name("desk.yaml.bak").read_text() == before
+    text = yaml_path.read_text()
+    assert text.startswith("# My desk\n") and "research: true" in text and "risk: false" in text
+    notices = status(cfg)["notices"]
+    assert len(notices) == 1 and "switched on Research, Scout in desk.yaml" in notices[0] and "Settings → Crew" in notices[0]
+    yaml_path.write_text(text.replace("research: true", "research: false"))
+    again = active_profile(cfg)
+    assert again.desk_enabled("research") is False and again.desk_enabled("scout") is True
+    assert "research: false" in yaml_path.read_text() and len(status(cfg)["notices"]) == 1
+
+
+def test_the_one_time_pass_is_recorded_without_a_file(cfg, yaml_path):
+    from desk.decisions.profile import passes
+
+    assert active_profile(cfg).source == "defaults"
+    with session(cfg) as conn:
+        assert [(p["id"], p["switched_on"]) for p in passes(conn)] == [("desks-on-2026-11-11", [])]
+    yaml_path.write_text("agents:\n  desks:\n    scout: false\n")
+    assert active_profile(cfg).data["agents"]["desks"]["scout"] is False
+
+
+def test_margin_rate_has_a_default_and_can_be_set(cfg, yaml_path):
+    from desk.decisions.profile import margin_rate
+    from desk.decisions.starter import status
+    from desk.decisions.yamlfile import edit_profile
+
+    assert margin_rate(DEFAULTS) == {"rate_pct": 12.0, "source": "default"}
+    assert status(cfg)["margin"] == {"rate_pct": 12.0, "source": "default"}
+    yaml_path.write_text("alerts:\n  min_priority: high\n")
+    edit_profile(cfg, {"margin": {"rate_pct": 9.25}})
+    assert margin_rate(active_profile(cfg).data) == {"rate_pct": 9.25, "source": "profile"}
+    with pytest.raises(ProfileError, match="margin.rate_pct must be between 0 and 40"):
+        parse("margin:\n  rate_pct: 90\n")

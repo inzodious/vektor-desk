@@ -73,8 +73,13 @@ def go(cfg, queue, profile=ON, answer=SCORE, **kw):
 # ---- Switches and guard ----
 
 
-@pytest.mark.parametrize("profile", [{}, {"agents": {"enabled": True, "desks": {}}}, {"agents": {"enabled": False, "desks": {"filings": True}}}])
-def test_off_unless_desk_yaml_switches_it_on(cfg, profile):
+def test_on_by_default(cfg):
+    report, box, fake = go(cfg, [filing(1)], profile={})
+    assert report.status == "ok" and len(fake.calls) == 1 and len(box.recorded) == 1
+
+
+@pytest.mark.parametrize("profile", [{"agents": {"enabled": True, "desks": {"filings": False}}}, {"agents": {"enabled": False, "desks": {"filings": True}}}])
+def test_off_when_desk_yaml_switches_it_off(cfg, profile):
     report, box, fake = go(cfg, [filing(1)], profile=profile)
     assert report.status == "disabled" and not fake.calls and not box.recorded
     assert store.runs(cfg, "filings")[0]["status"] == "disabled"

@@ -71,7 +71,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Plan keeper** | Daily 17:30, after the 17:00 mirror | Drift vs plan mix, cash, pending deposits, margin debit, rule status | Where the next deposit goes; rule-breach alerts; the 3 to 5 line daily Brief on Bridge | high; no tools |
 | **Tax desk** | Sunday 02:00; daily 02:00 in December; when a new lot export lands | Lots, unrealized gains and losses, wash-sale windows across all accounts, marginal rate from Escape Vektor's tax estimate | Harvest candidates, lot picks for Specific Shares, year-end deadline list | high; no tools |
 | **Risk desk** | Saturday 02:00; also when the engine flags a trigger (below) | Concentration, correlation, drawdown scenarios, margin debit and interest cost | Weekly risk report; trim or "hold off" proposals | high; no tools |
-| **Research desk** | Wednesday 01:00 (one holding a week, in rotation); on request; day after a holding reports earnings | Holding fundamentals from the brief, plus the web and SEC EDGAR | Dossier per holding (or any symbol asked for in the Console), written and refreshed: thesis, bear case, valuation range with today's value on the same basis, a verdict (add, hold, trim, avoid, watch), what would change the call, dated sources | xhigh; WebSearch, WebFetch |
+| **Research desk** | Nightly portfolio pass at 00:05 (every holding the first night, then each holding weekly or when it has a reason; see [Portfolio pass](#portfolio-pass)); on request; day after a holding reports earnings | One holding's plan facts, his plan for it, the last analysis and his risk band, plus the web and SEC EDGAR | One analysis per holding (or any symbol asked for in the Console): what it is, thesis, what changed, valuation range and note, risks, bear case, fit with his plan and risk, a verdict (add, hold, trim, watch), what would change it, dated sources | high for the pass, xhigh on request; WebSearch, WebFetch |
 | **Scout** | First Sunday of the month, 03:00 | Industry focus, growth tilt, satellite room left | Up to N ideas inside the satellite cap, each with its bear case | xhigh; WebSearch, WebFetch |
 | **Skeptic** | Right after any buy or sell proposal from Research or Scout | The proposal and the engine numbers only, no web | A counter-case and a pass/flag verdict, shown beside the proposal | high; no tools |
 | **Strategy desk** | Nightly 05:45, one variant in a rotating family (below); on request from the Console; when a lab result lands; 12 runs a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
@@ -104,7 +104,7 @@ Trigger kinds and where they go: `margin_debit`, `daily_move` and `concentration
 | Console or trigger request answered | research | default | `/research` (`/strategies` for the Strategy desk, `/portfolio/stocks?symbol=SYM` for the Plan desk) | once per request |
 | Stock plan drafts saved | research | default | `/portfolio/stocks` | once per day |
 | Period debrief written | research | low for a day, else default | `/results/<kind>?end=<end>` | once per period |
-| Scheduled research dossier saved | research | low | `/research` | once per run |
+| Nightly portfolio pass | none of its own | | | its last line feeds the 06:45 morning alert |
 | Desk run failed or timed out | ops | default | `/settings/crew` | once per desk, status and day |
 | Request dropped after busy or usage limit twice | ops | default | `/settings/crew` | once per desk, status and day |
 
@@ -201,6 +201,22 @@ Writes the words on the Results page (`docs/statistics.md` owns the period packs
 | On switch | On by default behind `agents.enabled`; Settings → Crew turns it off. The first-run guard does not hold it, since it only writes text |
 
 `python -m desk.agents run debrief [--kinds day,week,month,year] [--so-far]` writes now; `dry-run debrief` shows the first pack's prompt.
+
+## Portfolio pass
+
+One current analysis per holding, written overnight and shown in Research. It runs under the Research desk's name and switch, writes no proposals, and adds nothing to the queue.
+
+| Point | Detail |
+|---|---|
+| Job | `agents-run-research` (`python -m desk.agents run research`, or `python -m desk.agents portfolio` by hand), `overnight: 200` in the night's order, fallback 00:05 with resume lines at 02:05 and 04:05 |
+| Which holdings | Never analysed, then a new discount signal, a new filing signal, earnings today or tomorrow, then older than 7 days. Biggest weight first within each. An analysis under 18 hours old is skipped, so starting twice in a night is safe |
+| One at a time | Each holding is one call behind the shared `agents` lock: Opus, `high`, web search, 30 turns. No new call starts between 06:00 and 08:00, so a slow night never runs into the morning jobs |
+| Prompt | `holding` (plan facts without lots), `current_plan`, `previous_analysis`, `no_buy`, `advisor`, `risk_numbers`, `reasons` |
+| Checks | Needs a verdict, the six text sections and one dated source, or it is refused. An `add` becomes `hold` when the holding is over its band or inside a no-buy window |
+| Failures | A failed holding is tried once more that night, then left for the next. Three failures in a row or a usage limit stop the pass. Each try is kept in `agent_holding_tries`, and the page says why in plain words |
+| Last line | `{"ready": "All 14 holdings analysed"}` or `{"skipped": "..."}` for the morning alert |
+| App | `GET /api/agents/holdings`: counts, `fresh_at`, one `line`, and a row per holding with `status` (`today`, `older`, `running`, `waiting`, `failed`, `none`), `status_line`, `verdict`, `verdict_line`. One holding: `GET /api/agents/dossiers/{symbol}` |
+| By hand | `python -m desk.agents portfolio --symbol SYM --trigger console`; `python -m desk.agents dry-run research --trigger schedule` prints the queue and the first prompt |
 
 ## Plan desk
 
@@ -348,6 +364,7 @@ desk/agents/
   discounts.py    discount cases after the close: queue, case, number check, record
   debrief.py      period debriefs after the review job: pack, debrief, number check, record
   plans.py        stock plan drafts: queue by reason, draft or keep, level check, pinned steps, save
+  portfolio.py    nightly portfolio pass: one analysis per holding, tries, status for the app
   advisor.py      risk band, catalog, convictions and planned actions for every brief
   switches.py     Settings over desk.yaml over defaults
   prompts/        one system prompt per desk (Phase 5 on)
@@ -377,10 +394,10 @@ Numbering follows `ROADMAP.md`.
 
 | Safety | What it does | How to use it |
 |---|---|---|
-| Switches | Settings (`PUT /api/agents/{desk}/enabled`, `*` for all) overrides `desk.yaml`; `DELETE` the same path to follow `desk.yaml` again. Status shows each desk's `source` (`app`, `desk.yaml` or `default`); the Filings desk defaults to off | Settings, Desks panel |
+| Switches | Settings (`PUT /api/agents/{desk}/enabled`, `*` for all) overrides `desk.yaml`; `DELETE` the same path to follow `desk.yaml` again. Status shows each desk's `source` (`app`, `desk.yaml` or `default`); every desk defaults to on | Settings, Desks panel |
 | Health gate | A desk logs `unhealthy` and stays quiet while any engine health check is `fail`, or the engine's last run finished over 36 hours ago. Warnings don't block. | Fix the failing check; the next run goes ahead |
 | Dry run | `python -m desk.agents dry-run <desk>` builds the real brief and prompt from live data and prints them with the health checks and any skip reason. It calls no model and writes nothing. | Add `--symbol`, `--question`, `--system` or `--schema` as needed |
-| First-run guard | On by default: only the Plan keeper and Tax desk run, whatever `desk.yaml` enables (the Debrief and Plan desks are exempt; they only write text and drafts). Status shows the other desks as guarded, and `guard.ready` turns true once both have finished an ok run (`guard.why` says which is missing). | `python -m desk.agents guard off` once their first runs look right (or `PUT /api/agents/guard`) |
+| First-run guard | On until the Plan keeper and the Tax desk have each finished an ok run, then it lifts itself and every desk that is on starts on its schedule (the Debrief and Plan desks are never held; they only write text and drafts). Status shows the other desks as guarded until then, and `guard.why` says which run is missing. | Nothing to do. `python -m desk.agents guard off` (or `PUT /api/agents/guard`) lifts it early |
 | Recovery | A run or request left `running` by a stopped process is closed or queued again at the next `run` or `queue`, but only while no desk holds the run lock. A request interrupted twice fails. | Automatic |
 
 ## Before you start

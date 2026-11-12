@@ -59,14 +59,18 @@ agents:
     plan_keeper: true
     tax: true
     risk: true
-    research: false
+    research: true
     skeptic: true
-    scout: false
-    strategy: false
-    filings: false
-    discounts: false
+    scout: true
+    strategy: true
+    filings: true
+    discounts: true
     debrief: true
     plans: true
+
+# Margin rate used for interest cost when the engine has no rate from the broker. Set your own in Settings.
+margin:
+  rate_pct: 12.0
 
 alerts:
   min_priority: default

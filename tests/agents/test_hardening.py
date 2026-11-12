@@ -60,12 +60,25 @@ def test_guard_allows_only_plan_keeper_and_tax(cfg, app_client):
     assert run_desk(get("research"), "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "guarded"
     assert run_desk(get("risk"), "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "guarded"
     assert run_desk(get("plan_keeper"), "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "ok"
-    assert run_desk(get("tax"), "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "ok"
     tiles = {d["desk"]: d for d in crew(cfg)["desks"]}
     assert crew(cfg)["guard"]["on"] and tiles["risk"]["guarded"] and tiles["risk"]["next_run"] is None and not tiles["tax"]["guarded"]
     client = app_client(packages=["agents"])
     assert client.put("/api/agents/guard", json={"enabled": False}).json()["guard"] is False
     assert run_desk(get("risk"), "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "ok"
+
+
+def test_guard_lifts_itself_once_plan_keeper_and_tax_have_run(cfg):
+    store.clear_enabled(cfg, store.GUARD)
+    assert store.guard_on(cfg) and run_desk(get("research"), "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "guarded"
+    run_desk(get("plan_keeper"), "s", "p", cfg=cfg, adapter=FakeAdapter())
+    assert store.guard_on(cfg) and crew(cfg)["guard"]["ready"] is False
+    run_desk(get("tax"), "s", "p", cfg=cfg, adapter=FakeAdapter())
+    body = crew(cfg)
+    assert not store.guard_on(cfg) and body["guard"]["on"] is False and body["guard"]["ready"] is True
+    assert not {d["desk"] for d in body["desks"] if d["guarded"]}
+    assert run_desk(get("research"), "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "ok"
+    store.set_guard(cfg, True)
+    assert not store.guard_on(cfg)
 
 
 def test_a_fresh_desk_starts_guarded(tmp_path):
