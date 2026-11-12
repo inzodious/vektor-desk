@@ -50,8 +50,8 @@ FILINGS = {
 }
 
 
-def accn(cik: int) -> str:
-    return f"{cik:010d}-11-000001"
+def accn(cik: int, year: int = 11) -> str:
+    return f"{cik:010d}-{year}-000001"
 
 
 class Res:
@@ -63,19 +63,28 @@ class Res:
 
 
 class Http:
-    def __init__(self, *, companies=COMPANIES, limit_after=None, tiingo_status=200, extra=()):
+    def __init__(self, *, companies=COMPANIES, limit_after=None, tiingo_status=200, extra=(), shares=None, assets=None):
         self.calls, self.companies, self.limit_after, self.tiingo_status, self.extra = [], list(companies), limit_after, tiingo_status, list(extra)
         self.filing_calls = 0
+        self.shares = shares if shares is not None else {c: v / 40 for c, _n, v, _end, _f in self.companies}
+        self.assets = assets if assets is not None else {c: v for c, _n, v, _end, _f in self.companies}
 
     def get(self, url, params=None, headers=None, timeout=None):
         self.calls.append(url)
         if "sec.gov" in url:
             assert headers == {"User-Agent": CONTACT}
-        frame = re.search(r"EntityPublicFloat/USD/CY(\d{4})Q(\d)I\.json$", url)
+        frame = re.search(r"frames/([a-z-]+)/(\w+)/(\w+)/CY(\d{4})Q(\d)I\.json$", url)
         if frame:
-            want = (int(frame.group(1)), int(frame.group(2)))
-            rows = [{"accn": accn(c), "cik": c, "entityName": n, "loc": "US-NY", "end": end, "val": v} for c, n, v, end, f in self.companies if f == want]
-            return Res(200, {"taxonomy": "dei", "tag": "EntityPublicFloat", "data": rows + [r for f, r in self.extra if f == want]})
+            concept, want = frame.group(2), (int(frame.group(4)), int(frame.group(5)))
+            if concept == "EntityPublicFloat":
+                assert frame.group(1, 3) == ("dei", "USD")
+                rows = [{"accn": accn(c), "cik": c, "entityName": n, "loc": "US-NY", "end": end, "val": v} for c, n, v, end, f in self.companies if f == want]
+                return Res(200, {"taxonomy": "dei", "tag": "EntityPublicFloat", "data": rows + [r for f, r in self.extra if f == want]})
+            side = {"EntityCommonStockSharesOutstanding": ("dei", "shares", self.shares), "Assets": ("us-gaap", "USD", self.assets)}[concept]
+            assert frame.group(1, 3) == side[:2]
+            if want != (2011, 2):
+                return Res(404)
+            return Res(200, {"tag": concept, "data": [{"accn": "side", "cik": c, "entityName": "", "end": "2011-06-30", "val": v} for c, v in side[2].items()]})
         if url.endswith("company_tickers.json"):
             return Res(200, {str(i): {"cik_str": c, "ticker": s, "title": s} for i, (s, c) in enumerate(SEC_LIST.items())})
         if url.endswith("supported_tickers.zip"):
@@ -89,7 +98,7 @@ class Http:
             if self.limit_after is not None and self.filing_calls > self.limit_after:
                 return Res(429)
             cik, name = int(filing.group(1)), filing.group(3)
-            assert filing.group(2) == accn(cik).replace("-", "")
+            assert filing.group(2) in (accn(cik).replace("-", ""), accn(cik, 10).replace("-", ""))
             if cik not in FILINGS:
                 return Res(404)
             if name == "index.json":
@@ -143,6 +152,7 @@ def test_the_sentence_is_plain_and_says_when_the_list_is_too_thin_to_test_on(des
     out = run(desk)
     assert out["detail"] == (
         "Of the 7 largest US companies of mid-2011, 6 have a ticker and Tiingo prices 4 of them from January 2012 (57.1%). "
+        "The largest are Alder Works Inc, Birch Holdings Corp and Cedar Systems Inc. "
         "The SEC lists only 7 of the 200 asked for. 1 of the priced names have since stopped trading. "
         "That is under 90%, so stock screens stay research only. Tiingo has room for 400 more names this month and the list needs 4."
     )
@@ -155,11 +165,110 @@ def test_a_company_is_ranked_once_by_the_float_nearest_mid_2011_and_misfiled_flo
         ((2011, 2), {"accn": "x", "cik": 201, "entityName": "Typo Billions Inc", "end": "2011-06-30", "val": 4.0e15}),
         ((2011, 2), {"accn": "x", "cik": 202, "entityName": "Small Float Co", "end": "2011-06-30", "val": 5.0e8}),
         ((2011, 2), {"accn": "x", "cik": None, "entityName": "No Number", "end": "2011-06-30", "val": 5.0e10}),
+        ((2011, 4), {"accn": "late", "cik": 203, "entityName": "Next Year Co", "end": "2012-01-28", "val": 5.0e10}),
+        ((2010, 2), {"accn": "gone", "cik": 204, "entityName": "Gone By Then Co", "end": "2010-06-30", "val": 5.0e10}),
     ]
-    top = public.largest(Http(extra=extra), CONTACT, sleep=lambda s: None)
+    http = Http(extra=extra)
+    top, left = public.largest(http, CONTACT, sleep=lambda s: None)
     assert [(r["rank"], r["cik"]) for r in top] == [(i, c) for i, (c, *_rest) in enumerate(COMPANIES, 1)]
     assert (top[0]["float_usd"], top[0]["float_at"], top[0]["accn"]) == (9.0e10, "2011-06-30", accn(101))
-    assert [r["cik"] for r in public.largest(Http(), CONTACT, sleep=lambda s: None, size=3)] == [101, 102, 103]
+    assert [(r["name"], r["why"]) for r in left] == [("Typo Billions Inc", "too_big")]
+    assert [r["cik"] for r in public.largest(Http(), CONTACT, sleep=lambda s: None, size=3)[0]] == [101, 102, 103]
+    asked = [re.search(r"frames/[a-z-]+/(\w+)/\w+/CY(\d{4})Q(\d)I", u).groups() for u in http.calls]
+    assert [(y, q) for c, y, q in asked if c == "EntityPublicFloat"] == [(str(y), str(q)) for y, q in (*public.BEFORE, *public.FRAMES)]
+    assert sum(c == "EntityCommonStockSharesOutstanding" for c, *_ in asked) == sum(c == "Assets" for c, *_ in asked) == len(public.AROUND)
+
+
+ROUGH_2011 = [
+    (34088, "Exxon Mobil Corp", 4.009e11, "2011-06-30", 2.90e11, 4.9e9, 3.3e11),
+    (320193, "Apple Inc", 3.22e11, "2011-03-25", 2.09e11, 9.2e8, 1.07e11),
+    (789019, "Microsoft Corp", 2.05e11, "2010-12-31", 2.45e11, 8.4e9, 1.0e11),
+    (51143, "International Business Machines Corp", 2.07e11, "2011-06-30", 1.57e11, 1.2e6, 1.1e11),
+    (93410, "Chevron Corp", 2.06e11, "2011-06-30", 1.36e11, 2.0e9, 2.0e11),
+    (40545, "General Electric Co", 2.00e11, "2011-06-30", 1.54e11, 1.06e10, 7.4e11),
+    (104169, "Wal Mart Stores Inc", 9.8e10, "2011-07-29", 9.6e10, 3.4e9, 1.9e11),
+    (200406, "Johnson & Johnson", 1.82e8, "2011-06-30", 1.63e11, 2.7e9, 1.1e11),
+    (80424, "Procter & Gamble Co", 1.76e11, "2010-12-31", 1.77e11, 2.8e9, 1.4e11),
+    (732717, "AT&T Inc", 1.86e14, "2011-06-30", 1.43e11, 5.9e9, 2.7e11),
+]
+MISTYPED = [
+    (901, "Small Devices Inc", 6.2e11, 2.3e7, 9.0e8, "too_big"),
+    (902, "Harbor Private Bank Corp", 5.0e11, 7.7e7, 6.0e9, "too_big"),
+    (903, "Prairie Farm Life Group", 3.5e11, 3.0e7, 1.5e10, "unbacked"),
+    (904, "Shoreline Re Ltd", 4.0e10, None, 3.0e9, "unbacked"),
+    (905, "Model Apparel Inc", 3.0e10, 3.0e9, 4.0e8, "over_assets"),
+]
+FRAME_OF = {"2010-12-31": (2010, 4), "2011-03-25": (2011, 1), "2011-06-30": (2011, 2), "2011-07-29": (2011, 2)}
+
+
+def giants() -> Http:
+    floats, shares, assets = [], {}, {}
+    for cik, name, val, end, before, count, total in ROUGH_2011:
+        year_before = f"{int(end[:4]) - 1}{end[4:]}"
+        floats.append((FRAME_OF[end], {"accn": accn(cik), "cik": cik, "entityName": name, "end": end, "val": val}))
+        floats.append(((FRAME_OF[end][0] - 1, FRAME_OF[end][1]), {"accn": accn(cik, 10), "cik": cik, "entityName": name, "end": year_before, "val": before}))
+        shares[cik], assets[cik] = count, total
+    for cik, name, val, count, total, _why in MISTYPED:
+        floats.append(((2011, 2), {"accn": accn(cik), "cik": cik, "entityName": name, "end": "2011-06-30", "val": val}))
+        assets[cik] = total
+        if count:
+            shares[cik] = count
+    floats.append(((2011, 2), {"accn": accn(906), "cik": 906, "entityName": "New Motors Co", "end": "2011-06-30", "val": 4.5e10}))
+    floats.append(((2011, 2), {"accn": accn(907), "cik": 907, "entityName": "Honest Small Co", "end": "2011-06-30", "val": 4.0e8}))
+    shares |= {906: 1.5e9, 907: 2.0e7}
+    assets |= {906: 1.4e11, 907: 3.0e8}
+    return Http(companies=[], extra=floats, shares=shares, assets=assets)
+
+
+def test_the_obvious_giants_of_mid_2011_lead_the_list_and_no_mistyped_small_company_is_on_it(desk):
+    top, left = public.largest(giants(), CONTACT, sleep=lambda s: None)
+    assert {r["name"] for r in top[:10]} == {name for _c, name, *_rest in ROUGH_2011}
+    assert [r["name"] for r in top[:3]] == ["Exxon Mobil Corp", "Apple Inc", "International Business Machines Corp"]
+    assert top[10]["name"] == "New Motors Co" and len(top) == 11
+    assert not {r["cik"] for r in top} & {cik for cik, *_rest in MISTYPED} and all(r["float_usd"] <= public.FLOAT_MAX for r in top)
+    assert [(r["name"], r["why"]) for r in left] == [(name, why) for _c, name, _v, _s, _a, why in MISTYPED]
+    by = {r["name"]: r for r in top}
+    assert (by["AT&T Inc"]["float_usd"], by["AT&T Inc"]["float_at"]) == (1.43e11, "2010-06-30")
+    assert (by["Johnson & Johnson"]["float_usd"], by["Johnson & Johnson"]["float_at"]) == (1.63e11, "2010-06-30")
+    assert by["International Business Machines Corp"]["float_usd"] == 2.07e11 and by["Wal Mart Stores Inc"]["float_at"] == "2011-07-29"
+    out = run(desk, giants())
+    assert out["ok"] and out["listed"] == 11 and out["top"][:2] == ["Exxon Mobil Corp", "Apple Inc"] and out["left_out_count"] == 5
+    assert out["left_out"][0] == "Small Devices Inc ($620 billion, larger than any company was)"
+    assert out["left_out"][2] == "Prairie Farm Life Group ($350 billion, nothing else the company reported backs it)"
+    assert out["left_out"][4] == "Model Apparel Inc ($30 billion, far above its own balance sheet)"
+    assert "The largest are Exxon Mobil Corp, Apple Inc and International Business Machines Corp." in out["detail"]
+    assert "5 companies were left out because the size they reported looks mistyped." in out["detail"] and not NOT_PLAIN.search(out["detail"])
+    assert len(public.names(desk)) == 11 and [r["name"] for r in public.left_out(desk)] == [name for _c, name, *_rest in MISTYPED]
+    assert public.coverage(desk, set())["listed"] == 11
+    view = public.view(desk, now=NOW)
+    assert len(view["names"]) == 11 and view["left_out_names"][0] == {
+        "name": "Small Devices Inc",
+        "cik": 901,
+        "float_usd": 6.2e11,
+        "float_at": "2011-06-30",
+        "why": "larger than any company was",
+    }
+
+
+def test_a_float_needs_a_second_figure_that_agrees_and_must_fit_the_balance_sheet():
+    fact = {"val": 4.0e10, "end": "2011-06-30"}
+    year_ago, last_quarter = {"val": 3.0e10, "end": "2010-06-30"}, {"val": 3.0e10, "end": "2011-03-31"}
+    assert public.doubt(fact, [], None, None) == "unbacked" and public.doubt(fact, [last_quarter], None, None) == "unbacked"
+    assert public.doubt(fact, [year_ago], None, None) is None and public.doubt(fact, [], 1.0e9, None) is None
+    assert public.doubt(fact, [{"val": 4.0e7, "end": "2010-06-30"}], None, None) == "unbacked"
+    assert public.doubt(fact, [], 1.0e6, None) == "unbacked" and public.doubt(fact, [], 1.0e11, None) == "unbacked"
+    assert public.doubt(fact, [year_ago], 1.0e6, None) is None
+    assert public.doubt(fact, [year_ago], 1.0e9, 2.0e9) == "over_assets" and public.doubt(fact, [year_ago], 1.0e9, 4.0e9) is None
+    assert public.doubt({"val": 4.6e11, "end": "2011-06-30"}, [year_ago], 1.0e10, 9.0e11) == "too_big"
+
+
+def test_a_list_built_before_the_checks_is_built_again_at_once(desk):
+    run(desk)
+    assert run(desk, now=NOW + timedelta(hours=4))["fresh"] is True
+    with desk:
+        desk.execute("DELETE FROM api_calls WHERE provider=?", (public.CALLS,))
+    again = Http()
+    assert run(desk, again, now=NOW + timedelta(hours=8))["fresh"] is False and again.calls
 
 
 def test_a_fresh_list_is_not_fetched_again_and_an_old_one_is(desk):
@@ -180,6 +289,10 @@ def test_when_the_sec_stops_answering_the_rest_wait_and_the_next_run_asks_again(
     assert "The SEC did not answer for 3; the next run tries them again." in first["detail"]
     second = run(desk, now=NOW + timedelta(hours=4))
     assert second["fresh"] is False and second["not_asked"] == [] and by_name(desk)["Elm"]["state"] == "late"
+    week_on = run(desk, Http(limit_after=0), now=NOW + timedelta(days=8))
+    kept = by_name(desk)
+    assert (kept["Cedar"]["symbol"], kept["Cedar"]["state"], kept["Cedar"]["trading"]) == ("CCC", "priced", 0) and kept["Dogwood"]["state"] == "priced"
+    assert week_on["priced"] == second["priced"] and week_on["not_asked"] == ["Elm Retail Group", "Fir Paper Co", "Gum Tree Foods Inc (GGG)"]
 
 
 def test_a_failed_fetch_leaves_the_stored_list_as_it_was(desk):
@@ -239,6 +352,29 @@ def test_the_route_shows_the_stored_list_and_reads_empty_before_the_first_run(cf
         "trading": 0,
     }
     assert "accn" not in json.dumps(body)
+
+
+def test_coverage_counts_what_the_lab_has_and_only_a_name_never_asked_for_is_still_loading(desk):
+    assert public.coverage(desk, set()) is None
+    run(desk)
+    priced = sorted(r["symbol"] for r in public.names(desk) if r["state"] == public.PRICED)
+    assert len(priced) >= 3
+    first = public.coverage(desk, set())
+    assert first["listed"] == 7 and first["priced"] == 0 and first["loading"] == len(priced) and first["missing"] == 7 - len(priced)
+    assert first["as_of"] == public.AS_OF and first["tests_from"] == public.TESTS_FROM and not first["enough"]
+    with desk:
+        desk.executemany(
+            "INSERT INTO market_symbols (symbol, role, priority, added_at, fetched_at) VALUES (?, 'public', 4, ?, ?)",
+            [(s, NOW.isoformat(), NOW.isoformat()) for s in priced[:2]],
+        )
+    part = public.coverage(desk, {priced[0]})
+    assert part["priced"] == 1 and part["loading"] == len(priced) - 2 and part["missing"] == 7 - 1 - part["loading"] and part["pct"] == 14.3
+    stopped = sum(1 for r in public.names(desk) if r["state"] == public.PRICED and not r["trading"])
+    assert public.coverage(desk, set(priced))["stopped"] == stopped and public.coverage(desk, set(priced))["loading"] == 0
+    whole = [dict(r) | {"state": public.PRICED, "symbol": r["symbol"] or f"X{r['rank']}", "trading": 1} for r in public.names(desk)]
+    public.store(desk, whole, NOW)
+    full = public.coverage(desk, {r["symbol"] for r in whole})
+    assert full["priced"] == full["listed"] == 7 and full["pct"] == 100.0 and full["enough"] and full["missing"] == 0
 
 
 def test_the_job_is_light_runs_in_the_daytime_and_has_a_title_a_person_can_read():
