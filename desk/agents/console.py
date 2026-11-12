@@ -65,10 +65,12 @@ def _answer(report) -> str:
         parts.append(report.memo)
     if getattr(report, "queued", None):
         parts.append(f"Sent to the lab as {report.queued.name}.")
-    if getattr(report, "created", None):
-        parts.append(f"{len(report.created)} proposal(s) added to the queue.")
-    if getattr(report, "rejected", None):
-        parts.append(f"{len(report.rejected)} proposal(s) rejected by the number check.")
+    if getattr(report, "waiting", None):
+        parts.append(f"{len(report.waiting)} proposal(s) added to the queue.")
+    if getattr(report, "notes", None):
+        parts.append(f"{len(report.notes)} note(s) filed under Notes.")
+    if getattr(report, "refused", None):
+        parts.append(f"{len(report.refused)} proposal(s) turned down by the desk's checks.")
     return "\n".join(parts) or (report.note or "")
 
 

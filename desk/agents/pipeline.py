@@ -22,6 +22,7 @@ ADVISED = {"plan_keeper", "tax", "risk", "research", "scout"}
 CASH_SLACK = 1.0
 NO_BUYS = re.compile(r"\bno (new )?buys?\b|\bno buying\b|\bpause (all )?buy")
 BUY_KINDS = {"buy", "deposit_route"}
+NOTED = "logged"
 
 
 @dataclass
@@ -37,6 +38,29 @@ class Report:
     @property
     def status(self) -> str:
         return self.outcome.status
+
+    @property
+    def notes(self) -> list[dict]:
+        return [r for r in self.created if r.get("status") == NOTED]
+
+    @property
+    def refused(self) -> list[dict]:
+        return self.rejected + [r for r in self.created if r.get("status") == "rejected"]
+
+    @property
+    def waiting(self) -> list[dict]:
+        return [r for r in self.created if r.get("status") not in (NOTED, "rejected")]
+
+    @property
+    def tally(self) -> str:
+        parts = [_count(len(self.waiting), "proposal")]
+        if self.notes:
+            parts.append(_count(len(self.notes), "note"))
+        return ", ".join([*parts, f"{len(self.refused)} rejected"])
+
+
+def _count(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
 
 
 def _log_skip(cfg: Config, name: str, status: str, note: str, trigger: str) -> Report:

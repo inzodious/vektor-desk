@@ -253,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
     report = run_proposal_desk(cfg, desk.name, trigger=args.trigger, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
     if report.status in ("deferred", "busy") and args.trigger == "schedule":
         queue_retry(cfg, desk.name)
-    line = f"{desk.title}: {report.status}, {len(report.created)} proposals, {len(report.rejected)} rejected. {report.note or ''}".strip()
+    line = f"{desk.title}: {report.status}, {report.tally}. {report.note or ''}".strip()
     return _end(report.status, line, report.note)
 
 
