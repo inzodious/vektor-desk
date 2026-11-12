@@ -673,11 +673,11 @@ Limits: leftover swings are drawn month by month and holding by holding, so a fu
 
 ## Discount-day scanner
 
-Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run.
+Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run. The `backfill` job (hourly 01:10 to 06:10 ET) scans again whenever it fetched prices, so a name priced from Tiingo is scored on its newest close before the morning.
 
 | Piece | Rule |
 |---|---|
-| Names | Held (latest holdings, cash left out), then the watchlist, then the quality list (`discounts.QUALITY`: broad ETFs and a dozen large quality names, added to the backfill). A name keeps its first list |
+| Names | Held (latest holdings, cash left out), then the watchlist, then the quality list (`market.QUALITY`: broad ETFs and a dozen large quality names). The backfill registers the quality list itself and refetches it every day like the watchlist, whatever role a name already has. A name keeps its first list |
 | Prices | `price_bars` (adjusted), else `alpaca_bars`, extended with today's `prices_daily` close. A name needs 60 sessions |
 | Measures | Day move; its z-score against the root-mean-square of the prior 252 daily moves; drop from the 252-session high; 1-year return |
 | Valuation | `pe_annual` (price ÷ the latest 10-K diluted EPS) when that EPS is positive, else `price_vs_5y_avg`. `pctile_own` = share of the last 5 years' month-end values at or below today |
@@ -891,7 +891,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 | Named French portfolios | `{"type": "french", "set": "size_deciles", "members": ["lo"]}` keeps the portfolios whose name starts that way and needs no signal |
 | `params`, `grid` | `{"top_n": {"min": 1, "max": 4, "default": 3}}` or a list; grid values must sit inside. Over the trial budget (max 200), a seeded, deterministic subset runs |
 
-**A run.** Signals at the close, fills at the next open (`adjClose`-scaled), costs 5 bps for funds, 15 for stocks, 25 under $20M a day. FIFO lots, year-end tax on net realized gains at the exported marginal rate (else 24%) and 15% long-term, losses carried. Cash earns the 3-month bill. A symbol whose bars stop before the data ends is sold at its last price less 30%. The benchmark is `spec.benchmark`, else the plan mix, else the S&P 500, rebalanced monthly; the S&P 500 is always reported.
+**A run.** A window opens invested: the picks from the close before the window's first day are bought at that day's open, so no test year waits in cash for its first rebalance day (a window with no earlier day, or no pick yet, starts in cash). That first purchase is counted in costs and turnover but sits before the first measured return. The paper replay passes `enter=False` and still waits for its first rebalance day, as the paper executor does. Signals at the close, fills at the next open (`adjClose`-scaled), costs 5 bps for funds, 15 for stocks, 25 under $20M a day. FIFO lots, year-end tax on net realized gains at the exported marginal rate (else 24%) and 15% long-term, losses carried. Cash earns the 3-month bill. A symbol whose bars stop before the data ends is sold at its last price less 30%. The benchmark is `spec.benchmark`, else the plan mix, else the S&P 500, rebalanced monthly; the S&P 500 is always reported.
 
 **Walk-forward.** The two years before the newest bar are the holdout and never run before finalize. The range before it splits into folds of 3 years train and 1 year test (2 and 0.5 under 4 years; under 2.5 years is rejected). Each fold picks the variant with the best training Sharpe that meets `max_turnover` (read as turnover a year), then runs it on the test year; test years are stitched into the walk-forward record. Every variant also runs over the whole range for the overfitting tests.
 
@@ -1070,7 +1070,7 @@ Not on the shelf: the as-held mix. A backtest of today's holdings is the hindsig
 
 | Step | When | What happens |
 |---|---|---|
-| Queue | End of `lab-export` (00:55), before the offer to a worker; `lab-offer` repeats it each minute of the lab hours, so a build that lands after 00:55 still queues that night | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Experiments sort before rules. An entry the lab refused is queued again once 12 hours have passed, or at once when the lab's code has changed since the refusal (each refusal records `lab_build`, a hash of the lab's source files). A second run the same night queues nothing |
+| Queue | End of `lab-export` (00:55), before the offer to a worker; `lab-offer` repeats it each minute of the lab hours, so a build that lands after 00:55 still queues that night | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Each entry has a revision (`rev`, default `shelf.REV`); the request carries it as `library_rev` and the result stores it. A tested entry is queued again at once when its result is from an older revision, or when it is 30 days old. If a rerun leaves no new result, the next try waits 12 hours. A rerun keeps version 1, so it replaces the same trials and never adds to the trial count. Experiments sort before rules. An entry the lab refused is queued again once 12 hours have passed, or at once when the lab's code has changed since the refusal (each refusal records `lab_build`, a hash of the lab's source files). A second run the same night queues nothing |
 | Run | Lab, with a worker first | Experiments are `lab.sims` jobs like any other; deposit rules run in the lab itself. The lab keeps waiting for an offered file while the worker has answered something in the last `DESK_LAB_WORKER_WAIT_MIN` minutes, then runs what is left |
 | Count | Ledger | Every shelf strategy has `parent_id: "library"`, so they are one family and each variant counts toward the trial count. `insider-` and `drift-` ids also count in those gate families |
 | Report | `GET /api/lab/library` | One row per entry, sorted by kind, verdict, then excess |
@@ -1084,7 +1084,7 @@ Not on the shelf: the as-held mix. A backtest of today's holdings is the hindsig
 | Verdict | Experiment | Deposit rule |
 |---|---|---|
 | `held_up` | Ahead of the benchmark by at least the luck band, and overfitting probability under 0.2 | `helps`: 5th percentile above zero and the holdout not negative |
-| `within_noise` | Ahead, but inside the band, or the best settings look fitted | `no_clear_edge` |
+| `within_noise` | Ahead, but inside the band, or the best settings look fitted, or level with the benchmark to a tenth of a point | `no_clear_edge` |
 | `fell_short` | Behind the benchmark | `hurts`: 95th percentile below zero |
 | `inconclusive` | No out-of-sample record | No horizon with a start month |
 
@@ -1092,11 +1092,15 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 
 **No plan loaded.** `lib-rebalance-bands-plan` carries `mix_without_plan` (the built-in safe mix). With no plan mix in the lab data the rule runs on it: funds with no prices, or under 8 years of them, are left out and the rest scaled up (at least half the weight must remain). The row's `line` starts "Run on the built-in safe mix" and `caveats` names what was left out. `lib-plan-mix` stays `not_run` with a plain reason, since the safe mix has its own row.
 
-**Yardstick.** `lib-buy-hold-sp500` is judged against the plan's mix. With no plan mix in the lab data the simulator's benchmark falls back to the S&P 500, so the row would be judged against itself. `shelf.view` then marks it `yardstick: true`, gives it no verdict and no `excess_pts`, sorts it first in its group and counts it under `counts.yardstick`, not under fell short. Its line states the gap it shows against itself (`gap_pts`), which comes mostly from each test window starting in cash until its first rebalance day. Until the simulator enters on the first day of a window, that gap is applied to every experiment row: a row that trails by less than the gap is `within_noise`, not `fell_short`; when the gap is positive a row must clear its luck band by more than the gap to be `held_up`; and `note` says so in plain words with the figure.
+**Yardstick.** `lib-buy-hold-sp500` is judged against the plan's mix. With no plan mix in the lab data the simulator's benchmark falls back to the S&P 500, so the row would be judged against itself. `shelf.view` then marks it `yardstick: true`, gives it no verdict and no `excess_pts`, sorts it first in its group and counts it under `counts.yardstick`. `gap_pts` is what it shows against itself, which should be zero. That is the lab's self-check: the payload's `self_check` is `{gap_pts, level}`, and when a current yardstick row is 0.2 points a year or more away from level, `note` says every experiment row may lean by that much.
+
+**Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results.
+
+**Rule rows.** A deposit rule is compared with its baseline for every start month. `share_better` and `share_worse` count the start months that ended ahead and behind; the rest ended the same, which happens when the rule never had cause to act. The row's line says ahead, behind and no different, and never counts a tie as worse. A result stored before `share_worse` existed states only what its numbers support. When the 5th, 50th and 95th percentile all round to 0.0 points the row reads "No difference" and is `within_noise` whatever the stored verdict.
 
 **Known funds.** The lab data labels a symbol a fund only when the desk has seen it held or in a plan. `LISTED_FUNDS` in `lab/data.py` names the ETFs the built-in mixes use, so `load` treats them as funds whatever the label; a test keeps the list in step with the library.
 
-**Row** (`rows[]`): `id`, `title`, `kind`, `family`, `description`, `benchmark`, `type` (`experiment` or `rule`), `status` (`tested`, `waiting`, `not_run`), `verdict`, `line` (one sentence with the numbers), `reason` (why it has not run, as a plain sentence from `shelf.plain`; it never quotes request syntax), `tested_at`, `out_of_sample` (`start`, `end`, `ann_return_pct`, `excess_pts`, `sharpe`, `mdd_pct`), `noise` (`trials`, `band_pts`, `luck`), `rule` (`horizon_years`, `starts`, `p5_pts`, `p50_pts`, `p95_pts`, `share_better`), `deflated_sharpe`, `pbo`, `variants`, `research_only`, `caveats`, `detail`, `yardstick`, `gap_pts`. The payload also has `as_of`, `trials`, `note`, `counts` and `kinds`. `shelf.ready(cfg)` gives the morning alert its line.
+**Row** (`rows[]`): `id`, `title`, `kind`, `family`, `description`, `benchmark`, `type` (`experiment` or `rule`), `status` (`tested`, `waiting`, `not_run`), `verdict`, `line` (one sentence with the numbers), `reason` (why it has not run, as a plain sentence from `shelf.plain`; it never quotes request syntax), `tested_at`, `out_of_sample` (`start`, `end`, `ann_return_pct`, `excess_pts`, `sharpe`, `mdd_pct`), `noise` (`trials`, `band_pts`, `luck`), `rule` (`horizon_years`, `starts`, `p5_pts`, `p50_pts`, `p95_pts`, `share_better`, `share_worse`), `deflated_sharpe`, `pbo`, `variants`, `research_only`, `caveats`, `detail`, `yardstick`, `gap_pts`, `outdated`. The payload also has `as_of`, `trials`, `note`, `counts` and `kinds`. `shelf.ready(cfg)` gives the morning alert its line.
 
 ## Memory budget
 

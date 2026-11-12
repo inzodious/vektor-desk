@@ -72,16 +72,31 @@ def last_run(cfg: Config, desk: str) -> dict | None:
     return dict(row) if row else None
 
 
-def week_usage(cfg: Config, desk: str, now: datetime | None = None) -> dict:
+LANES = {
+    None: "",
+    "pass": " AND id IN (SELECT run_id FROM agent_holding_tries WHERE run_id IS NOT NULL)",
+    "desk": " AND id NOT IN (SELECT run_id FROM agent_holding_tries WHERE run_id IS NOT NULL)",
+}
+
+
+def week_usage(cfg: Config, desk: str, now: datetime | None = None, lane: str | None = None) -> dict:
     since = ((now or datetime.now(UTC)) - timedelta(days=7)).isoformat(timespec="seconds")
     marks = ",".join("?" * len(COUNTED))
     with db(cfg) as conn:
         row = conn.execute(
             f"SELECT count(*) AS runs, coalesce(sum(turns),0) AS turns, coalesce(sum(input_tokens+output_tokens+cache_tokens),0) AS tokens "
-            f"FROM agent_runs WHERE desk=? AND started_at>=? AND status IN ({marks})",
+            f"FROM agent_runs WHERE desk=? AND started_at>=? AND status IN ({marks}){LANES[lane]}",
             (desk, since, *COUNTED),
         ).fetchone()
     return {"runs": row["runs"], "turns": row["turns"], "tokens": row["tokens"]}
+
+
+def runs_since(cfg: Config, desk: str, hours: float, now: datetime | None = None) -> int:
+    since = ((now or datetime.now(UTC)) - timedelta(hours=hours)).isoformat(timespec="seconds")
+    marks = ",".join("?" * len(COUNTED))
+    with db(cfg) as conn:
+        row = conn.execute(f"SELECT count(*) AS n FROM agent_runs WHERE desk=? AND started_at>=? AND status IN ({marks})", (desk, since, *COUNTED)).fetchone()
+    return int(row["n"])
 
 
 def is_enabled(cfg: Config, desk: str) -> bool:

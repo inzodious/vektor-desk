@@ -439,6 +439,7 @@ def _quantiles(xs: list[float]) -> dict:
         "p50_pts": q(0.5),
         "p95_pts": q(0.95),
         "share_better": round(sum(1 for x in xs if x > 0) / len(xs), 4),
+        "share_worse": round(sum(1 for x in xs if x < 0) / len(xs), 4),
     }
 
 
@@ -550,6 +551,8 @@ def run(conn, data: LabData, request: dict, *, now: datetime) -> dict:
             conn.execute("INSERT OR REPLACE INTO lab_results VALUES (?, ?, 'rejected', ?, ?)", (rid, version, stamp, json.dumps(body)))
         return body
     body = {"strategy_id": rid, "version": version, "kind": "rule", "result_at": stamp, "request": raw, **body}
+    if raw.get("library_rev"):
+        body["library_rev"] = int(raw["library_rev"])
     with conn:
         conn.execute("INSERT OR REPLACE INTO lab_results VALUES (?, ?, 'rule', ?, ?)", (rid, version, stamp, json.dumps(body)))
         for v in body["variants"]:

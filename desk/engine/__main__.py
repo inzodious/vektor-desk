@@ -337,7 +337,17 @@ def run_review(cfg: Config) -> dict:
 
 
 def run_market_backfill(cfg: Config, http=None) -> dict:
-    return _with_desk(cfg, "backfill", lambda desk: run_backfill(desk, http or http_session()))
+    return _with_desk(cfg, "backfill", lambda desk: _backfill_then_scan(desk, http or http_session()))
+
+
+def _backfill_then_scan(desk, http) -> dict:
+    out = run_backfill(desk, http)
+    if out.get("fetched"):
+        try:
+            out["discounts"] = discounts.scan(desk, now=datetime.now(UTC))
+        except sqlite3.Error as e:
+            out["discounts"] = {"ok": False, "error": str(e)}
+    return out
 
 
 JOBS = {

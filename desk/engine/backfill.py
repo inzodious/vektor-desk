@@ -4,7 +4,7 @@ import sqlite3
 from datetime import UTC, date, datetime, timedelta
 
 from desk.engine.holdings import CASH_SYMBOLS
-from desk.engine.market import BENCHMARKS, ProviderError, last_trading_day, tiingo_daily, tiingo_key
+from desk.engine.market import BENCHMARKS, QUALITY, ProviderError, last_trading_day, tiingo_daily, tiingo_key
 
 ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "past": 3, "universe": 3}
 TICKER = re.compile(r"^[A-Z]{1,5}$")
@@ -54,6 +54,7 @@ def traded_symbols(conn: sqlite3.Connection) -> list[str]:
 
 def sync_roles(conn: sqlite3.Connection, now: datetime | None = None) -> None:
     add_symbols(conn, BENCHMARKS, "benchmark")
+    add_symbols(conn, QUALITY, "universe")
     add_symbols(conn, traded_symbols(conn), "past")
     day = conn.execute("SELECT max(date) FROM holdings_daily").fetchone()[0]
     if not day:
@@ -95,15 +96,19 @@ def month_symbols(conn: sqlite3.Connection, now: datetime) -> set[str]:
 def due(conn: sqlite3.Connection, now: datetime) -> list[sqlite3.Row]:
     target = last_trading_day(now.date() - timedelta(days=1)).isoformat()
     rotate = (now.date() - timedelta(days=ROTATE_DAYS)).isoformat()
-    return conn.execute(
-        """SELECT * FROM market_symbols
-           WHERE (error IS NULL OR fetched_at < ?)
-             AND (last_bar IS NULL
-                  OR (priority <= 2 AND last_bar < ?)
-                  OR (priority > 2 AND substr(fetched_at, 1, 10) < ?))
-           ORDER BY (last_bar IS NULL) DESC, priority, symbol""",
-        ((now - timedelta(days=7)).isoformat(timespec="seconds"), target, rotate),
+    rows = conn.execute(
+        "SELECT * FROM market_symbols WHERE error IS NULL OR fetched_at < ? ORDER BY (last_bar IS NULL) DESC, priority, symbol",
+        ((now - timedelta(days=7)).isoformat(timespec="seconds"),),
     ).fetchall()
+
+    def stale(r: sqlite3.Row) -> bool:
+        if r["last_bar"] is None:
+            return True
+        if r["priority"] <= 2 or r["symbol"] in QUALITY:
+            return r["last_bar"] < target
+        return r["fetched_at"] is not None and r["fetched_at"][:10] < rotate
+
+    return [r for r in rows if stale(r)]
 
 
 def store_bars(conn: sqlite3.Connection, symbol: str, bars: list[dict]) -> None:

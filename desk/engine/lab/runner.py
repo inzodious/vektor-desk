@@ -343,7 +343,7 @@ def run_experiment(cfg: Config | None, conn, data: LabData, request: dict, *, no
         "factor_check": factor,
         "analyses": _analyses(cfg, data, spec, request.get("analyses") or [], full, favorite, win, factor, cache),
         "caveats": spec.caveats + _caveats(spec, factor),
-    }
+    } | ({"library_rev": int(request["library_rev"])} if request.get("library_rev") else {})
     return _record(conn, spec, "experiment", body, now)
 
 

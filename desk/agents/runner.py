@@ -40,6 +40,7 @@ def run_desk(
     adapter: Adapter | None = None,
     trigger: str = "schedule",
     wait: float = 0.0,
+    capped: bool = True,
 ) -> Outcome:
     def skip(status: str, note: str) -> Outcome:
         return Outcome(status, store.start_run(cfg, desk.name, trigger=trigger, model=desk.model, effort=desk.effort, status=status, note=note), note=note)
@@ -48,7 +49,7 @@ def run_desk(
         return skip("disabled", "Switched off in Settings.")
     if desk.name in DESKS and desk.name not in UNGUARDED and store.guard_on(cfg):
         return skip("guarded", GUARD_NOTE)
-    if trigger in CAPPED and store.week_usage(cfg, desk.name)["runs"] >= desk.weekly_runs:
+    if capped and trigger in CAPPED and store.week_usage(cfg, desk.name)["runs"] >= desk.weekly_runs:
         return skip("over_budget", f"Weekly cap of {desk.weekly_runs} runs reached.")
     adapter = adapter or ClaudeCli()
     try:
