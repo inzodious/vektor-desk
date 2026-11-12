@@ -293,6 +293,15 @@ Every desk returns the same shape (`agents/schemas/proposal.json`). The UI and t
 
 Decisions Joshua makes are stored against the proposal: `approved`, `dismissed`, `snoozed`, or `override` (he traded against a block), each with an optional one-line reason.
 
+## Wording and the queue
+
+| Rule | Where |
+|---|---|
+| Prose is rounded before it is saved: percentages, points and ratios to one or two decimals, dollars over $1,000 to whole dollars. `numbers_used` and `numbers_cited` are never touched | `wording.tidy`, applied to proposal titles and text, the Brief summary, debrief text and plan summaries |
+| One cash figure, no machinery talk ("the rule's own count reads 0", "no margin rate is set"), nothing raised twice | `prompts/common.md` Writing, `debrief.md`, `plans.md` |
+| Every proposal a desk files carries `subject` and `as_of` | `wording.stamp`: `subject` is stable and has no numbers (`next-deposit`, `margin`, `buy:SYM`, `sell:SYM`, `rebalance:SYM`, `hold_off:SYM`, `rule:<slug>`); `as_of` is the engine day of the brief |
+| What the record does with them | `desk.decisions` replaces an open proposal from the same desk on the same subject, expires stale ones, and logs `alert` and `memo` as notes instead of queue items (see `docs/concept.md`) |
+
 ## Guardrails
 
 **Preflight checks the agents rely on.** Preflight is engine code owned by `docs/statistics.md` and rendered by `docs/design.md`; the runner calls it and never re-implements it. Desk-written fields are above; Preflight adds the result, tax impact, profile version and status. The agents side needs at least these checks:
@@ -365,6 +374,7 @@ desk/agents/
   debrief.py      period debriefs after the review job: pack, debrief, number check, record
   plans.py        stock plan drafts: queue by reason, draft or keep, level check, pinned steps, save
   portfolio.py    nightly portfolio pass: one analysis per holding, tries, status for the app
+  wording.py      rounds prose he reads; gives each proposal its subject and as-of day
   advisor.py      risk band, catalog, convictions and planned actions for every brief
   switches.py     Settings over desk.yaml over defaults
   prompts/        one system prompt per desk (Phase 5 on)
