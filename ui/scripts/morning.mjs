@@ -245,7 +245,7 @@ const OPPS = [
     price_behind: true,
     analysis_as_of: '2026-11-05',
     since_analysis_pct: 2.3,
-    as_of_words: 'Priced at the Fri Nov 6 close. Scout’s idea is from Thu Nov 5; the price is 2.3% higher since. The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands this evening.',
+    as_of_words: 'Priced at the Fri Nov 6 close. Scout’s idea is from Thu Nov 5; the price is 2.3% higher since. The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and other closes arrive the same evening, mutual funds later.',
     next_earnings: { date: '2026-11-18', days: 9 },
     score: 64,
   }),
@@ -303,7 +303,7 @@ const opportunities = {
   cash: { free_usd: 142, account: 'individual', next_deposit_usd: 500, next_deposit_on: '2026-11-18', note: 'Sizes come from free cash first, then the next deposit. Never from margin.' },
   method: METHOD,
   rows: OPPS,
-  prices: { day: '2026-11-09', words: 'Prices run to Mon Nov 9. NOVA is still at an earlier close: live quotes cover what you hold, and other closes land this evening; fund prices can follow in the morning.', older: [{ symbol: 'NOVA', price_as_of: '2026-11-06', held: false }] },
+  prices: { day: '2026-11-09', words: 'Prices run to Mon Nov 9. NOVA is still at an earlier close: live quotes cover what you hold, and other closes arrive the same evening, mutual funds later.', older: [{ symbol: 'NOVA', price_as_of: '2026-11-06', held: false }] },
   passed: [{ symbol: 'BND', name: 'Synthetic Total Bond ETF', reason: 'Written case says avoid: cheap for a reason that looks lasting.' }],
 };
 const DEBIT = 'Pay the margin debit first: $1,500 is open, so no buy goes to the queue.';
