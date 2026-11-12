@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import schema
+from desk.engine import JOBS_AT, schema
 from desk.engine.market import ProviderError
 from desk.engine.research import SEC_ARCHIVE, SEC_GAP, SEC_SUBMISSIONS, sec_agent
 from desk.engine.universe import members
@@ -261,7 +261,7 @@ def _open(cfg: Config, readonly: bool) -> sqlite3.Connection:
     conn = connect(cfg.desk_db, readonly=readonly)
     if conn.execute("SELECT 1 FROM sqlite_master WHERE name='filings_feed'").fetchone() is None:
         conn.close()
-        raise NotReady("The filings tables don't exist yet; run python -m desk.engine filings")
+        raise NotReady(f"No filings have been read yet. In {JOBS_AT}, run Filings.")
     return conn
 
 

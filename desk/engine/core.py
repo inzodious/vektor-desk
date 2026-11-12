@@ -9,7 +9,7 @@ from desk.config import Config
 from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
-from desk.engine import ENGINE_VERSION, SET_KEY, bands, broker, catalog, fi, lookthrough, patterns, replay, risk, scoring
+from desk.engine import ENGINE_VERSION, INBOX_AT, JOBS_AT, KEY_WORDS, bands, broker, catalog, fi, key_fix, lookthrough, patterns, replay, risk, scoring
 from desk.engine.asof import day_words, provisional_symbols
 from desk.engine.backfill import NO_PRICES
 from desk.engine.cash import margin_rate
@@ -280,7 +280,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     with desk:
         store_flows(desk, flows)
     if not days:
-        out.h("holdings", "fail", "No holdings yet. Fix: check the mirror has snapshots (`python -m desk.mirror`), then run `python -m desk.engine daily`.")
+        out.h("holdings", "fail", f"No holdings yet. Fix: in {JOBS_AT}, run Accounts and then Daily numbers.")
         return out
     as_of = days[-1]
     plan = latest_plan(mirror)
@@ -535,7 +535,7 @@ def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, da
             "symbol_kinds",
             "warn",
             f"Not sure whether {', '.join(unknown)} are funds or single stocks. Fix: "
-            + ("the nightly research job loads SEC's ticker lists." if os.environ.get("DESK_SEC_USER_AGENT") else env_fix(["DESK_SEC_USER_AGENT"])),
+            + ("the nightly research job loads SEC's ticker lists." if os.environ.get("DESK_SEC_USER_AGENT") else key_fix(["DESK_SEC_USER_AGENT"])),
         )
     rules, source = rules_in_force(cfg, plan)
     conv = convictions(rules)
@@ -811,10 +811,10 @@ def _tax_metrics(out: Out, cfg: Config, mirror, desk, activity, rows, now: datet
         out.m("tax.marginal_rate", federal, "pct", scope="tax", scope_id="federal", quality="modelled")
         out.m("tax.marginal_rate", state, "pct", scope="tax", scope_id="state", quality="modelled")
     else:
-        out.h("marginal_rate", "warn", "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once, or set tax.marginal_rate_pct in desk.yaml.")
+        out.h("marginal_rate", "warn", "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once; the desk reads the rate from there.")
     out.m("tax.harvest_value", total * rate / 100 if lots and rate is not None else None, "usd", quality="modelled")
     if source != "none":
-        out.h("marginal_rate", "ok", "Marginal rate from Escape Vektor's tax estimate." if source == "escape_vektor" else "Marginal rate from desk.yaml.")
+        out.h("marginal_rate", "ok", "Marginal rate from Escape Vektor's tax estimate." if source == "escape_vektor" else "Marginal rate from your profile.")
 
 
 # ---- Rule replays ----
@@ -866,7 +866,7 @@ def _research_metrics(out: Out, desk, kinds):
     covered = {r[0] for r in desk.execute("SELECT DISTINCT symbol FROM fundamentals")}
     bare = [s for s in symbols if s not in covered]
     if bare:
-        fix = "the nightly research job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else env_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
+        fix = "the nightly research job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else key_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
         out.h("research", "warn", f"No SEC company facts yet for {', '.join(bare[:10])}. Fix: {fix}.")
     elif symbols:
         out.h("research", "ok", f"SEC company facts for {len(symbols)} stocks.")
@@ -892,7 +892,7 @@ def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
     stale = [s for s in held if s in newest and newest[s] < session and s not in snap and s not in quoted]
     broker = [s for s in held if s not in newest and s in no_source]
     notes = []
-    fix = "the overnight backfill fills them" if os.environ.get("TIINGO_API_KEY") else env_fix(["TIINGO_API_KEY"]).rstrip(".")
+    fix = "the overnight backfill fills them" if os.environ.get("TIINGO_API_KEY") else key_fix(["TIINGO_API_KEY"]).rstrip(".")
     if missing:
         notes.append(f"No close for {', '.join(missing)} on {as_of}. Fix: {fix}.")
     if quoted:
@@ -924,7 +924,7 @@ def _value_check(rows, day: str, series=None) -> tuple[str, str, str]:
         return (
             "value",
             "fail",
-            f"The {day} snapshot's positions don't add up to its account totals. Fix: re-pull the mirror; if it repeats, check Escape Vektor.",
+            f"The {day} snapshot's positions don't add up to its account totals. Fix: in {JOBS_AT}, run Accounts; if it repeats, check Escape Vektor.",
         )
     bad, gaps = [], []
     for acct in sorted({h["account"] for h in rows}):
@@ -973,7 +973,7 @@ def _history_check(h: broker.History | None) -> tuple[str, str, str]:
         "history",
         "warn",
         f"{detail} But no Escape Vektor account ends with the same 4 digits as {', '.join(h.unmapped)}. "
-        "Fix: check the account names in Escape Vektor, then drop the Fidelity history JSON in the inbox's fidelity folder again.",
+        f"Fix: check the account names in Escape Vektor, then upload the Fidelity history JSON again in {INBOX_AT}.",
     )
 
 
@@ -995,7 +995,7 @@ def _modelled_check(out: Out, lots: list[dict], rows: list[dict]) -> tuple[str, 
     if not diffs and not notes:
         return "shares", "ok", f"{head} match holdings."
     body = "; ".join(diffs[:8] + notes[:5])
-    return "shares", "warn", f"{head}: {body}. Fix: drop a lot export CSV in the inbox's fidelity folder; it wins over the rebuilt lots."
+    return "shares", "warn", f"{head}: {body}. Fix: upload a lot export CSV in {INBOX_AT}; it wins over the rebuilt lots."
 
 
 def _flows_check(implied: dict[tuple[str, str], float], holdings, cover: dict[str, tuple[str, str]] | None = None) -> tuple[str, str, str]:
@@ -1014,7 +1014,7 @@ def _flows_check(implied: dict[tuple[str, str], float], holdings, cover: dict[st
             "warn",
             f"The {last} snapshot moved {parts} beyond prices and recorded activity, and Fidelity history covers {', '.join(covered)} on that day, "
             "so the gap is a missing or misread row, not unlogged money. Counted as money in or out for now. "
-            "Fix: drop a fresh Fidelity history JSON in the inbox's fidelity folder; if it stays, send the account and date to the statistics thread.",
+            f"Fix: upload a fresh Fidelity history JSON in {INBOX_AT}; if it stays, send the account and date to the statistics thread.",
         )
     return (
         "flows",
@@ -1024,18 +1024,12 @@ def _flows_check(implied: dict[tuple[str, str], float], holdings, cover: dict[st
     )
 
 
-def env_fix(keys: list[str]) -> str:
-    if len(keys) == 1:
-        return f"run `{SET_KEY} {keys[0]}`."
-    return f"run `{SET_KEY} KEY` for each of {', '.join(keys)}."
-
-
 def _market_keys() -> tuple[str, str, str]:
     need = [(k, why) for k, why in MARKET_KEYS if not os.environ.get(k)]
     if not need:
         return "market_keys", "ok", "Tiingo, Finnhub, FRED, SEC and Alpaca paper are all set."
-    gaps = "; ".join(f"{k} ({why})" for k, why in need)
-    return "market_keys", "warn", f"Missing {gaps}. Fix: {env_fix([k for k, _ in need])}"
+    gaps = "; ".join(f"{KEY_WORDS[k]} ({why})" for k, why in need)
+    return "market_keys", "warn", f"Missing {gaps}. Fix: {key_fix([k for k, _ in need])}"
 
 
 def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
@@ -1044,10 +1038,10 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
         if row and row["mirrored_at"]:
             age = (now - datetime.fromisoformat(row["mirrored_at"].replace("Z", "+00:00"))).total_seconds() / 3600
             status = "ok" if age <= cfg.stale_hours else "fail"
-            fix = "" if status == "ok" else " Fix: check the mirror job in `docker logs vektor-desk-cron`, or run `python -m desk.mirror`."
+            fix = "" if status == "ok" else f" Fix: in {JOBS_AT}, run Accounts and read its result there."
             out.h("freshness", status, f"Mirror pulled {age:.1f} hours ago (limit {cfg.stale_hours:g}).{fix}")
         else:
-            out.h("freshness", "fail", "The mirror has never pulled snapshots. Fix: run `python -m desk.mirror` and check the Firestore reader key.")
+            out.h("freshness", "fail", f"The mirror has never pulled snapshots. Fix: in {JOBS_AT}, run Accounts and read its result there.")
     as_of = out.as_of
     rows = holdings[as_of]
     out.h(*_closes_check(desk, rows, as_of))
@@ -1076,13 +1070,13 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
         status = "ok" if not diffs else ("warn" if newest < as_of else "fail")
         detail = "Lot shares match holdings."
         if diffs:
-            detail = "; ".join(diffs[:10]) + ". Fix: drop a fresh lot export in the inbox's fidelity folder."
+            detail = "; ".join(diffs[:10]) + f". Fix: upload a fresh lot export in {INBOX_AT}."
         out.h("shares", status, detail)
     else:
         out.h(
             "shares",
             "warn",
-            "No lots yet, so tax lots and wash-sale checks are off. Fix: drop the Fidelity history JSON or a lot export CSV in the inbox's fidelity folder.",
+            f"No lots yet, so tax lots and wash-sale checks are off. Fix: upload the Fidelity history JSON or a lot export CSV in {INBOX_AT}.",
         )
 
 

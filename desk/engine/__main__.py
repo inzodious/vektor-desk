@@ -15,7 +15,24 @@ import requests
 from desk import jobrun
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, asof, broker, core, discounts, earnings, filings, french, insider, lane, paper_exec, review, schema, triggers, universe
+from desk.engine import (
+    ENGINE_VERSION,
+    JOBS_AT,
+    asof,
+    broker,
+    core,
+    discounts,
+    earnings,
+    filings,
+    french,
+    insider,
+    lane,
+    paper_exec,
+    review,
+    schema,
+    triggers,
+    universe,
+)
 from desk.engine.backfill import never_fetched, run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.kinds import offer_queue
@@ -43,7 +60,7 @@ def now_iso() -> str:
 def run_holdings(cfg: Config) -> dict:
     mirror = open_mirror(cfg)
     if mirror is None:
-        return {"ok": False, "error": "mirror.db does not exist yet; run python -m desk.mirror first."}
+        return {"ok": False, "error": f"The desk has not pulled your accounts yet. In {JOBS_AT}, run Accounts first."}
     desk = connect(cfg.desk_db)
     try:
         schema.apply(desk)
@@ -61,7 +78,7 @@ def run_holdings(cfg: Config) -> dict:
 def run_core(cfg: Config) -> dict:
     mirror = open_mirror(cfg)
     if mirror is None:
-        return {"ok": False, "error": "mirror.db does not exist yet; run python -m desk.mirror first."}
+        return {"ok": False, "error": f"The desk has not pulled your accounts yet. In {JOBS_AT}, run Accounts first."}
     try:
         result = _with_desk(cfg, "core", lambda desk: _core(cfg, mirror, desk))
     finally:
@@ -235,7 +252,7 @@ def _with_desk(cfg: Config, job: str, fn) -> dict:
 def run_quotes(cfg: Config, http=None, force: bool = False) -> dict:
     result = _with_desk(cfg, "quotes", lambda desk: refresh_quotes(desk, http or http_session(), force=force))
     if result.get("state") == "open" and not cfg.demo and (not result.get("key") or (result.get("errors") and not result.get("quotes"))):
-        why = "FINNHUB_API_KEY is not set" if not result.get("key") else "Finnhub is not answering"
+        why = "The Finnhub key is not set" if not result.get("key") else "Finnhub is not answering"
         publish(
             "ops",
             "Live quotes are stale",
