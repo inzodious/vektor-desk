@@ -3,7 +3,7 @@ from datetime import timedelta
 
 import pytest
 
-from desk.decisions import cleared, create_proposal, desk_history, draft, get, journal, notes, queue, snooze, summary
+from desk.decisions import DecisionError, approve, cleared, create_proposal, desk_history, dismiss, draft, get, journal, notes, pass_on, queue, snooze, summary
 from desk.decisions.__main__ import main, night, sync
 from desk.decisions.plans import save_plan
 from desk.decisions.records import subject_of
@@ -97,8 +97,146 @@ def test_a_snooze_carries_over_to_the_replacement(cfg, preflight, now, proposal)
     until = snooze(cfg, old["id"], days=7, now=now)["snoozed_until"]
     new = create_proposal(cfg, proposal(kind="hold_off", symbol=None, subject="margin"), "plan_keeper", run_id="r2", now=now + timedelta(days=1))
     assert new["status"] == "snoozed" and new["snoozed_until"] == until
+    assert new["status_reason"] == "Carries the snooze from the proposal it replaced."
     q = queue(cfg, now=now + timedelta(days=1))
     assert q["count"] == 0 and q["snoozed"] == 1
+    assert [(d["id"], d["snoozed_until"], d["status_reason"]) for d in q["snoozed_items"]] == [(new["id"], until, new["status_reason"])]
+    woken = queue(cfg, now=now + timedelta(days=8))
+    assert [d["id"] for d in woken["items"]] == [new["id"]] and woken["snoozed_items"] == []
+
+
+# ---- Replaced always points at a live proposal ----
+
+
+def test_a_proposal_out_of_date_on_arrival_expires_at_once_and_replaces_nothing(cfg, preflight, now, desk_db, proposal):
+    cash(desk_db, "2026-11-06", 900.0)
+    small = create_proposal(cfg, proposal(amount_usd=50, expires="2099-01-01"), "plan_keeper", run_id="r1", now=now)
+    cash(desk_db, "2026-11-10", 80.0)
+    later = now + timedelta(days=1)
+    calls = len(preflight["calls"])
+    big = create_proposal(cfg, proposal(amount_usd=500, as_of="2026-11-09", expires="2099-01-01"), "plan_keeper", run_id="r2", now=later)
+    assert big["status"] == "expired" and big["replaced_by"] is None and len(preflight["calls"]) == calls
+    assert big["status_reason"] == "Ready cash is $80 as of Nov 10, less than the $500 this needs."
+    assert get(cfg, big["id"])["events"][-1]["detail"] == {"check": "cash", "at": "arrival"}
+    assert [d["id"] for d in queue(cfg, now=later)["items"]] == [small["id"]]
+    assert get(cfg, small["id"])["replaced_by"] is None
+    assert {d["id"]: d["check"] for d in cleared(cfg, now=later)["items"]} == {big["id"]: "cash"}
+
+
+def test_in_one_pass_only_a_live_proposal_replaces_and_the_rest_give_their_own_reason(cfg, preflight, now, desk_db, proposal):
+    made = [
+        create_proposal(
+            cfg, proposal(amount_usd=amount, as_of=f"2026-11-0{4 + i}", expires="2099-01-01"), "plan_keeper", run_id="same", now=now + timedelta(minutes=i)
+        )
+        for i, amount in enumerate((40, 60, 500, 700))
+    ]
+    with session(cfg) as conn:
+        for i, d in enumerate(made):
+            conn.execute("UPDATE decisions SET run_id=? WHERE id=?", (f"r{i}", d["id"]))
+        conn.commit()
+    cash(desk_db, "2026-11-10", 80.0)
+    later = now + timedelta(days=1)
+    assert [d["id"] for d in queue(cfg, now=later)["items"]] == [made[1]["id"]]
+    seen = [get(cfg, d["id"]) for d in made]
+    assert seen[0]["replaced_by"] == made[1]["id"] and seen[0]["status_reason"] == "A newer proposal on the same subject replaced this one on Nov 9."
+    assert [d["replaced_by"] for d in seen[1:]] == [None, None, None]
+    assert seen[2]["status_reason"] == "Ready cash is $80 as of Nov 10, less than the $500 this needs."
+    assert seen[3]["status_reason"] == "Ready cash is $80 as of Nov 10, less than the $700 this needs."
+    for d in cleared(cfg, now=later)["items"]:
+        if d["check"] == "replaced":
+            assert d["successor"]["open"] is True and d["successor"]["id"] == made[1]["id"]
+        else:
+            assert d["successor"] is None
+
+
+def test_a_replaced_row_names_the_end_of_its_chain_when_that_one_later_goes(cfg, preflight, now, desk_db, proposal):
+    cash(desk_db, "2026-11-06", 900.0)
+    first = create_proposal(cfg, proposal(expires="2099-01-01"), "plan_keeper", run_id="r1", now=now)
+    second = create_proposal(cfg, proposal(expires="2099-01-01"), "plan_keeper", run_id="r2", now=now + timedelta(hours=1))
+    third = create_proposal(cfg, proposal(title="Buy $500 ABCD again", expires="2099-01-01"), "plan_keeper", run_id="r3", now=now + timedelta(hours=2))
+    assert [d["id"] for d in queue(cfg, now=now + timedelta(hours=3))["items"]] == [third["id"]]
+    cash(desk_db, "2026-11-10", 0.0, "pro_forma")
+    later = now + timedelta(days=1)
+    assert queue(cfg, now=later)["count"] == 0
+    seen = {d["id"]: d for d in cleared(cfg, now=later)["items"]}
+    assert [seen[d["id"]]["check"] for d in (first, second, third)] == ["replaced", "replaced", "cash"]
+    end = {"id": third["id"], "title": "Buy $500 ABCD again", "status": "expired", "open": False}
+    assert all({k: seen[d["id"]]["successor"][k] for k in end} == end for d in (first, second))
+    assert seen[first["id"]]["successor"]["status_reason"] == "Ready cash is $0 as of Nov 10 (estimated), less than the $500 this needs."
+    assert seen[third["id"]]["successor"] is None
+
+
+# ---- Nothing leaves without a trace ----
+
+
+def test_every_way_out_of_the_queue_leaves_a_row_someone_can_read(cfg, preflight, now, desk_db, proposal, monkeypatch):
+    save_plan(cfg, "PLAN", PLAN, approve=True, now=now)
+    cash(desk_db, "2026-11-06", 5000.0)
+    far = {"expires": "2099-01-01", "funding": "deposit"}
+    made = {
+        "waiting": create_proposal(cfg, proposal(symbol="AAAA", **far), "scout", run_id="s1", now=now),
+        "approved": create_proposal(cfg, proposal(symbol="BBBB", **far), "scout", run_id="s1", now=now),
+        "done": create_proposal(cfg, proposal(kind="hold_off", symbol="CCCC", **far), "risk", run_id="k1", now=now),
+        "dismissed": create_proposal(cfg, proposal(symbol="DDDD", **far), "scout", run_id="s1", now=now),
+        "passed": create_proposal(cfg, proposal(symbol="EEEE", **far), "scout", run_id="s1", now=now),
+        "snoozed": create_proposal(cfg, proposal(symbol="FFFF", **far), "scout", run_id="s1", now=now),
+        "sleeper": create_proposal(cfg, proposal(symbol="GGGG", **far), "scout", run_id="s1", now=now),
+        "replaced": create_proposal(cfg, proposal(symbol="HHHH", **far), "scout", run_id="s1", now=now),
+        "window": create_proposal(cfg, proposal(symbol="IIII", funding="deposit", expires="2026-11-10"), "tax", run_id="t1", now=now),
+        "late": create_proposal(cfg, proposal(symbol="JJJJ", funding="deposit", expires="2026-11-10"), "tax", run_id="t1", now=now),
+        "price": create_proposal(cfg, proposal(symbol="KKKK", price_min=18, price_max=22, **far), "scout", run_id="s1", now=now),
+        "cash": create_proposal(cfg, proposal(symbol="LLLL", expires="2099-01-01"), "scout", run_id="s1", now=now),
+        "plan": create_proposal(cfg, proposal(kind="trim", symbol="PLAN", shares=10, amount_usd=None, expires="2099-01-01"), "risk", run_id="k1", now=now),
+        "note": create_proposal(cfg, {"kind": "alert", "title": "Tech is over its band", "thesis": "Steer."}, "plan_keeper", run_id="p1", now=now),
+        "rejected": create_proposal(cfg, proposal(symbol="MMMM", bear_case=None), "scout", run_id="s1", now=now),
+        "malformed": create_proposal(cfg, proposal(symbol="NNNN", as_of="last week"), "scout", run_id="s1", now=now),
+        "mine": draft(cfg, {"kind": "buy", "symbol": "OOOO", "amount_usd": 10, "thesis": "Mine", "expires": "2099-01-01"}, now=now),
+    }
+    assert queue(cfg, now=now)["count"] == 14
+    approve(cfg, made["approved"]["id"], now=now)
+    approve(cfg, made["done"]["id"], now=now)
+    dismiss(cfg, made["dismissed"]["id"], now=now)
+    pass_on(cfg, made["passed"]["id"], "Not this week", now=now)
+    snooze(cfg, made["snoozed"]["id"], days=7, now=now)
+    snooze(cfg, made["sleeper"]["id"], days=7, now=now)
+    later = now + timedelta(days=2)
+    made["carried"] = create_proposal(cfg, proposal(symbol="GGGG", **far), "scout", run_id="s2", now=later)
+    made["newer"] = create_proposal(cfg, proposal(symbol="HHHH", **far), "scout", run_id="s2", now=later)
+    made["arrival"] = create_proposal(cfg, proposal(symbol="QQQQ", funding="deposit", expires="2026-11-10"), "tax", run_id="t2", now=later)
+    with pytest.raises(DecisionError):
+        approve(cfg, made["late"]["id"], now=later)
+    quote(desk_db, "KKKK", "2026-11-11T15:00:00+00:00", 23.5)
+    cash(desk_db, "2026-11-11", 0.0, "pro_forma")
+    monkeypatch.setattr("desk.decisions.records._now", lambda _=None: later)
+    night(cfg)
+
+    q = queue(cfg, now=later)
+    waiting = {d["id"] for d in q["items"]}
+    asleep = {d["id"] for d in q["snoozed_items"]}
+    gone = {i["id"]: i for day in journal(cfg, limit=500, now=later)["days"] for i in day["items"] if i["kind"] != "rule_change"}
+    by_rule = {d["id"]: d for d in cleared(cfg, now=later)["items"]}
+    ids = {k: d["id"] for k, d in made.items()}
+    assert waiting == {ids[k] for k in ("waiting", "newer", "mine")}
+    assert asleep == {ids[k] for k in ("snoozed", "carried")} and q["snoozed"] == 2 and q["to_place"] == 1
+    assert waiting | asleep | set(gone) == set(ids.values()) and not (waiting | asleep) & set(gone)
+    checks = {"sleeper": "replaced", "replaced": "replaced", "window": "window", "late": "window", "price": "price", "cash": "cash", "plan": "plan"}
+    assert {k: by_rule[ids[k]]["check"] for k in (*checks, "arrival")} == {**checks, "arrival": "window"}
+    assert set(by_rule) == {ids[k] for k in (*checks, "arrival")}
+    assert {d["id"] for d in gone.values() if d["status"] == "expired"} == set(by_rule)
+    assert all(d["status_reason"] and d["cleared_at"] for d in by_rule.values())
+    assert by_rule[ids["sleeper"]]["successor"]["id"] == ids["carried"] and by_rule[ids["sleeper"]]["successor"]["open"] is True
+    his = {"approved": "approved", "done": "done", "dismissed": "dismissed", "passed": "passed"}
+    assert {k: gone[ids[k]]["status"] for k in his} == his
+    assert {get(cfg, ids[k])["events"][-1]["event"] for k in his} == {"approved", "dismissed", "passed"}
+    kept = {"note": "logged", "rejected": "rejected", "malformed": "rejected"}
+    assert {k: gone[ids[k]]["status"] for k in kept} == kept and all(gone[ids[k]]["status_reason"] for k in kept)
+    assert made["carried"]["status"] == "snoozed" and made["arrival"]["status"] == "expired" and made["note"]["status"] == "logged"
+    with session(cfg) as conn:
+        silent = conn.execute(
+            "SELECT COUNT(*) FROM decisions d WHERE status NOT IN ('proposed', 'snoozed') AND kind != 'rule_change' AND status_reason IS NULL "
+            "AND NOT EXISTS (SELECT 1 FROM decision_events e WHERE e.decision_id = d.id AND e.event IN ('approved', 'dismissed', 'passed'))"
+        ).fetchone()[0]
+    assert silent == 0
 
 
 # ---- Notes ----

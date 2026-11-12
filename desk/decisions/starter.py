@@ -418,5 +418,4 @@ def status(cfg: Config) -> dict:
         "notices": _notices(cfg),
         "margin": margin_rate(profile.data),
         "init": None if path.exists() else INIT,
-        "starter": None if path.exists() else "docker exec vektor-desk-cron python -m desk.decisions.profile init",
     }
