@@ -26,7 +26,7 @@ GAP_MAX = timedelta(minutes=10)
 GAP_AFTER = timedelta(seconds=60)
 HOST_SILENT = timedelta(minutes=20)
 BEAT = timedelta(minutes=3)
-READY_CALLS = ("desk.engine.lab.shelf", "desk.opportunities")
+READY_CALLS = (("desk.engine.lab.shelf", None), ("desk.opportunities", "opportunities-night"))
 READY_MAX = 120
 OPEN = ("waiting", "running")
 RAN_OUT = "The night ran out before its turn."
@@ -299,15 +299,21 @@ def advance(cfg: Config, jobs: list, start: Callable[[object, str], object], bus
 
 
 def ready_lines(cfg: Config, chain: dict | None) -> list[str]:
-    lines = [s["ready"] for s in (chain or {}).get("steps", []) if s.get("ready")]
-    for path in READY_CALLS:
+    own = {s["job"]: s["ready"] for s in (chain or {}).get("steps", []) if s.get("ready")}
+    lines = list(own.values())
+    for path, job in READY_CALLS:
         try:
             said = importlib.import_module(path).ready(cfg)
         except Exception:  # noqa: BLE001, S112
             continue
-        said = jobrun.plain(said)
-        if said and said[:READY_MAX] not in lines:
-            lines.append(said[:READY_MAX])
+        said = (jobrun.plain(said) or "")[:READY_MAX]
+        if not said or said in lines:
+            continue
+        if job in own:
+            if len(said) > len(own[job]):
+                lines[lines.index(own[job])] = said
+            continue
+        lines.append(said)
     return lines
 
 

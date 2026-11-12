@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from desk.scheduler import package_jobs, parse, tick
+from desk.scheduler import all_jobs, make_job, package_jobs, parse, reap, tick
 
 
 def at(s):
@@ -47,3 +47,22 @@ def test_skips_a_job_that_is_still_running():
     job.proc.wait()
     assert tick([job], at("2026-11-09T08:02"))
     job.proc.wait()
+
+
+def test_a_job_that_runs_every_minute_gives_way_to_a_fuller_one_with_the_same_lock():
+    minutely = make_job("m", "* * * * *", ["sleep", "0.2"], name="agents-queue-now-only", lock="agents-agents-queue")
+    hourly = make_job("h", "30 1-5 * * *", ["sleep", "0.2"], name="agents-queue", lock="agents-agents-queue")
+    other = make_job("o", "* * * * *", ["true"], name="engine-quotes", lock="engine-engine-quotes")
+    jobs = [minutely, hourly, other]
+    assert [j.name for j in tick(jobs, datetime(2026, 11, 12, 4, 30))] == ["agents-queue", "engine-quotes"]
+    for job in jobs:
+        if job.proc is not None:
+            job.proc.wait()
+    reap(jobs)
+    assert [j.name for j in tick(jobs, datetime(2026, 11, 12, 4, 31))] == ["agents-queue-now-only", "engine-quotes"]
+    for job in jobs:
+        if job.proc is not None:
+            job.proc.wait()
+    reap(jobs)
+    real = {j.name: j for j in all_jobs()}
+    assert real["agents-queue"].lock == real["agents-queue-now-only"].lock and real["agents-queue-now-only"].timing.startswith("* ")
