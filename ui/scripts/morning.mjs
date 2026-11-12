@@ -176,7 +176,7 @@ const holdings = {
   running: null,
   fresh_at: at('08:44:30'),
   line: '4 of 5 holdings analysed, 2 of them today. 1 failed last night.',
-  pass: { status: 'ok', at: at('08:55:30'), note: 'Analysed FXAIX and VXUS. BND failed: the model call timed out.', next: 'Tonight from 11:05 PM' },
+  pass: { status: 'ok', at: at('08:55:30'), note: 'Analysed FXAIX and VXUS. BND failed: the model call timed out.', next: '2026-11-09T23:05:00-05:00' },
   rows: HELD,
 };
 const holdingsFresh = {
@@ -189,7 +189,7 @@ const holdingsFresh = {
   running: null,
   fresh_at: null,
   line: 'No holding has been analysed yet. The first pass runs tonight from 11:05 PM.',
-  pass: { status: 'never', at: null, note: null, next: 'Tonight from 11:05 PM' },
+  pass: { status: 'never', at: null, note: null, next: '2026-11-09T23:05:00-05:00' },
   rows: HELD.map((h) => holding(h.symbol, h.name, h.kind, h.weight_pct, 'none', { status_line: 'Not analysed yet. It is in tonight’s pass.' })),
 };
 

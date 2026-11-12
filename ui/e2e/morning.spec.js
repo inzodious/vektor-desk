@@ -156,7 +156,7 @@ test('Research is organised by holding, each with a status', async ({ page }) =>
   await expect(list.locator('[data-holding="FTEC"]')).toContainText('Analysed Thu Nov 5. It is in tonight’s pass.');
   await expect(list.locator('[data-holding="BND"]')).toContainText('Last try failed at 3:12 AM: the model call timed out.');
   await expect(list.locator('[data-holding="BND"]')).toContainText('Last try failed');
-  await expect(list).toContainText('Next pass: Tonight from 11:05 PM.');
+  await expect(list).toContainText('Next pass: Today, 11:05 PM ET.');
 
   const d = page.getByTestId('dossier');
   await expect(d).toHaveAttribute('data-symbol', 'FXAIX');
@@ -200,7 +200,7 @@ test('a holding with no analysis says why and offers to run one', async ({ page 
   await expect(page).toHaveURL(/s=BND/);
   const none = page.getByTestId('not-analysed');
   await expect(none).toContainText('No analysis of BND yet');
-  await expect(none).toContainText('Last try failed at 3:12 AM: the model call timed out. No earlier analysis. Next pass: Tonight from 11:05 PM.');
+  await expect(none).toContainText('Last try failed at 3:12 AM: the model call timed out. No earlier analysis. Next pass: Today, 11:05 PM ET.');
   await none.getByRole('button', { name: 'Analyse BND now' }).click();
   await expect(page.getByRole('dialog', { name: 'Console' })).toBeVisible();
 });

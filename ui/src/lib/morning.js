@@ -11,6 +11,14 @@ export function whenWords(iso, now = new Date()) {
   return day === todayEt(now) ? `Today, ${etTime(d)}` : `${dayWords(day)}, ${etTime(d)}`;
 }
 
+export function passWords(next, now = new Date()) {
+  if (!next) return null;
+  const text = String(next);
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(text)) return text;
+  const words = whenWords(text, now);
+  return words ? `${words} ET` : null;
+}
+
 // ---------- doors ----------
 const DOWN = 'The desk did not answer. It tries again by itself.';
 

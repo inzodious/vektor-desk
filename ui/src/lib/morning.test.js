@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { excessWords, holdingsDoor, libraryChip, libraryGroups, opportunitiesDoor, strategiesDoor, whenWords } from './morning.js';
+import { excessWords, holdingsDoor, libraryChip, libraryGroups, opportunitiesDoor, passWords, strategiesDoor, whenWords } from './morning.js';
 import { guideFor } from './guide.js';
 import { earningsLine, entryLine, heldLine, inQueue, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
 import { holdingChip } from './research.js';
@@ -110,6 +110,10 @@ describe('buying opportunities', () => {
     expect(inQueue({ decision_id: 'd_1', queued: false })).toBe(false);
     expect(inQueue({ decision_id: 'd_1' })).toBe(true);
     expect(inQueue({ decision_id: null, queued: true })).toBe(false);
+    expect(passWords('2026-11-13T00:05:00-05:00', NOW)).toBe('Fri Nov 13, 12:05 AM ET');
+    expect(passWords('2026-11-12T23:05:00-05:00', NOW)).toBe('Today, 11:05 PM ET');
+    expect(passWords('Tonight from 11:05 PM', NOW)).toBe('Tonight from 11:05 PM');
+    expect(passWords(null)).toBeNull();
   });
 });
 
