@@ -90,15 +90,16 @@ def plain(text: object) -> str | None:
 
 
 def last_words(line: str) -> dict:
+    whole = plain(line)
     try:
         said = json.loads(line)
     except ValueError:
-        return {"error": plain(line)} if line.strip() else {}
+        return {"error": whole, "detail": whole, "said": whole} if whole else {}
     if not isinstance(said, dict):
-        return {}
+        return {"said": whole}
     skipped = said.get("skipped")
     words = {key: plain(said.get(key)) for key in ("error", "ready", "detail")}
-    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, **words}
+    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, **words, "said": whole}
 
 
 def state_dir(cfg: Config) -> Path:
