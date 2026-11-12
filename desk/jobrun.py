@@ -18,6 +18,7 @@ ALIVE_WITHIN = timedelta(seconds=90)
 NAME = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 SECRETISH = re.compile(r"[A-Za-z0-9_\-+/=]{32,}")
 SAID_MAX = 300
+KEEP_RUNS = 10
 
 REFRESHES = {
     "mirror": ["freshness", "holdings", "value"],
@@ -129,8 +130,23 @@ def _read(path: Path) -> dict | None:
     return data if isinstance(data, dict) else None
 
 
+def history_file(cfg: Config, name: str) -> Path:
+    return run_dir(cfg) / "jobs-history" / f"{name}.json"
+
+
+def runs(cfg: Config, name: str) -> list[dict]:
+    kept = (_read(history_file(cfg, name)) or {}).get("runs")
+    return [r for r in kept if isinstance(r, dict)] if isinstance(kept, list) else []
+
+
 def record(cfg: Config, name: str, run: dict) -> None:
     _write(state_dir(cfg) / f"{name}.json", run)
+    if not run.get("finished"):
+        return
+    try:
+        _write(history_file(cfg, name), {"runs": [run, *runs(cfg, name)][:KEEP_RUNS]})
+    except OSError:
+        return
 
 
 def last_run(cfg: Config, name: str) -> dict | None:
@@ -331,6 +347,17 @@ def _jobs(request: Request) -> list:
 @router.get("/api/jobs")
 def get_jobs(request: Request) -> JSONResponse:
     return JSONResponse(describe(request.app.state.cfg, _jobs(request)), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/api/jobs/{name}/runs")
+def get_runs(name: str, request: Request) -> JSONResponse:
+    headers = {"Cache-Control": "no-store"}
+    entry = catalogue(_jobs(request)).get(name) if NAME.match(name) else None
+    if entry is None:
+        body = {"ok": False, "error": "unknown_job", "message": f"No scheduled job called {name[:64]!r}."}
+        return JSONResponse(body, status_code=404, headers=headers)
+    kept = runs(request.app.state.cfg, name)
+    return JSONResponse({"name": entry.name, "title": entry.title, "keeps": KEEP_RUNS, "runs": kept}, headers=headers)
 
 
 @router.post("/api/jobs/{name}/run")
