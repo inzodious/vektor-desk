@@ -67,10 +67,25 @@ test('an open month says so far and waits for its debrief', async ({ page }) => 
   await expect(page.getByTestId('rs-debrief-wait')).toContainText('The debrief lands when the month closes.');
 });
 
-test('a debrief written before the final numbers says so', async ({ page }) => {
+test('a debrief whose rewrite is late or failed says so in the desk\'s own sentence', async ({ page }) => {
   await page.goto('/results/year');
   await expect(page.getByTestId('rs-debrief')).toHaveAttribute('data-state', 'stale');
-  await expect(page.getByTestId('rs-debrief')).toContainText('Written before the final numbers.');
+  await expect(page.getByTestId('rs-debrief').locator('.rs-stale')).toHaveText('Heads up Written before the final numbers. The rewrite is running late; the next try is tomorrow at 1:40 AM.');
+  await page.goto('/results/day?scenario=rewritefail');
+  await expect(page.getByTestId('rs-debrief')).toHaveAttribute('data-state', 'stale');
+  await expect(page.getByTestId('rs-debrief').locator('.rs-stale')).toHaveText('Heads up Written before the final numbers. The rewrite did not finish; the desk tries again at 5:46 PM.');
+});
+
+test('a debrief the desk is about to rewrite shows no warning', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/results/day?scenario=rewriting');
+  const card = page.getByTestId('rs-debrief');
+  await expect(card).toHaveAttribute('data-state', 'rewriting');
+  await expect(card.locator('.rs-headline')).toBeVisible();
+  await expect(card.locator('.rs-stale')).toHaveCount(0);
+  await expect(card).not.toContainText('Heads up');
+  await expect(card).not.toContainText('Written before the final numbers');
+  expect(errors).toEqual([]);
 });
 
 test('before the first run the page is armed, not empty', async ({ page }) => {

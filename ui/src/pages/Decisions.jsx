@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
@@ -12,6 +12,7 @@ import { dayWords } from '../lib/charts.js';
 import { DECISION_TABS, kindName, needsReason, oneLine, originName } from '../lib/decisions.js';
 import { usd } from '../lib/format.js';
 import { whenWords } from '../lib/morning.js';
+import { snoozedRows, successorLine } from '../lib/queue.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 import { useGap } from '../start/context.js';
 
@@ -66,12 +67,26 @@ function Cleared() {
       <div className="rows">
         {items.map((d) => {
           const when = whenWords(d.cleared_at);
+          const next = successorLine(d);
           return (
             <div className="row still note-row" key={d.id} data-cleared={d.id}>
               <span className="l">
                 <span style={{ minWidth: 0 }}>
                   <b>{d.title}</b>
                   {d.status_reason ? <small className="wrap cleared-why">{d.status_reason}</small> : null}
+                  {next ? (
+                    <small className="wrap cleared-next" data-testid="cleared-next" data-open={next.open ? 'yes' : 'no'}>
+                      {next.text}
+                      {next.open && next.id ? (
+                        <>
+                          {' '}
+                          <Link className="link" to={`/decisions?d=${next.id}`}>
+                            Open it
+                          </Link>
+                        </>
+                      ) : null}
+                    </small>
+                  ) : null}
                   <small>
                     {originName(d.origin)}
                     {when ? ` · cleared ${when} ET` : ''}
@@ -81,6 +96,36 @@ function Cleared() {
             </div>
           );
         })}
+      </div>
+    </details>
+  );
+}
+
+// ---------- snoozed ----------
+function Snoozed({ rows, open, onToggle, onPick, cur, foldRef }) {
+  if (!rows.length) return null;
+  return (
+    <details className="card fold-card" data-testid="snoozed" ref={foldRef} open={open} onToggle={(e) => onToggle(e.currentTarget.open)}>
+      <summary>
+        <b>Snoozed</b>
+        <span className="chip">{rows.length}</span>
+        <small>Still yours to decide. Each one comes back to the queue by itself when its snooze ends.</small>
+      </summary>
+      <div className="rows">
+        {rows.map((d) => (
+          <button className={`row row-btn note-row${d.id === cur ? ' on' : ''}`} type="button" key={d.id} data-snoozed={d.id} aria-pressed={d.id === cur} onClick={() => onPick(d)}>
+            <span className="l">
+              <span style={{ minWidth: 0 }}>
+                <b>{d.title}</b>
+                {d.why ? <small className="wrap cleared-why">{d.why}</small> : null}
+                <small>
+                  {d.who}
+                  {d.back ? ` · ${d.back}` : ''}
+                </small>
+              </span>
+            </span>
+          </button>
+        ))}
       </div>
     </details>
   );
@@ -145,13 +190,16 @@ export default function Decisions() {
   const placing = useApi('/api/decisions/journal?status=approved&limit=20');
   const [desk, setDesk] = useState('all');
   const [note, setNote] = useState(null);
+  const [showSnoozed, setShowSnoozed] = useState(false);
   const detailRef = useRef(null);
+  const snoozedRef = useRef(null);
   const all = useMemo(() => queue.data?.items || [], [queue.data]);
+  const asleep = useMemo(() => snoozedRows(queue.data), [queue.data]);
   const gap = useGap('decisions.queue');
   const desks = useMemo(() => [{ v: 'all', t: 'All desks' }, ...[...new Set(all.map((d) => d.origin))].map((o) => ({ v: o, t: originName(o) }))], [all]);
   const items = desk === 'all' ? all : all.filter((d) => d.origin === desk);
   const want = params.get('d');
-  const cur = items.find((d) => d.id === want)?.id || (want && !queue.data ? want : items[0]?.id) || null;
+  const cur = items.find((d) => d.id === want)?.id || asleep.find((d) => d.id === want)?.id || (want && !queue.data ? want : items[0]?.id) || null;
   const toPlace = (placing.data?.days || []).flatMap((g) => g.items).filter((d) => d.status === 'approved');
   const reasons = all.filter(needsReason).length;
 
@@ -176,6 +224,11 @@ export default function Decisions() {
     }, { replace: true });
     queue.reload();
     placing.reload();
+  };
+
+  const openSnoozed = () => {
+    setShowSnoozed(true);
+    requestAnimationFrame(() => snoozedRef.current?.scrollIntoView({ block: 'nearest' }));
   };
 
   const tabs = <Subtabs label="Decisions views" tabs={DECISION_TABS} />;
@@ -218,7 +271,13 @@ export default function Decisions() {
         foot={
           <>
             {tabs}
-            {q.snoozed ? <span className="chip">{q.snoozed} snoozed</span> : null}
+            {q.snoozed && asleep.length ? (
+              <button className="chip chip-btn" type="button" data-testid="snoozed-chip" aria-expanded={showSnoozed} onClick={openSnoozed}>
+                {q.snoozed} snoozed
+              </button>
+            ) : q.snoozed ? (
+              <span className="chip">{q.snoozed} snoozed</span>
+            ) : null}
             {q.to_place ? <span className="chip watch">{q.to_place} to place</span> : null}
           </>
         }
@@ -255,6 +314,7 @@ export default function Decisions() {
             )}
           </div>
           <ToPlace items={toPlace} onPlaced={(d) => { setNote(`Marked placed: ${d.title}. The next mirror confirms the fill.`); placing.reload(); queue.reload(); }} />
+          <Snoozed rows={asleep} open={showSnoozed} onToggle={setShowSnoozed} onPick={pick} cur={cur} foldRef={snoozedRef} />
           <Notes />
           <Cleared />
         </div>

@@ -47,7 +47,6 @@
   "rate_pct": 12,
   "source": "default"
  },
- "starter": "docker exec vektor-desk-cron python -m desk.decisions.profile init",
  "init": {
   "method": "POST",
   "path": "/api/decisions/profile/init",

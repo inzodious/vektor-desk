@@ -21,8 +21,7 @@ for (const name of ['decisions.profile', 'decisions.profile.fresh', 'decisions.p
 }
 for (const name of ['decisions.profile.status', 'decisions.profile.status.empty', 'decisions.profile.status.failing', 'decisions.profile.status.fresh', 'decisions.profile.status.never']) {
   const d = read(name);
-  const { starter, ...rest } = d;
-  write(name, { ...rest, defaults: after(d.defaults || [], 'margin.rate_pct', 'growth.fi_target_from_plan'), margin: { rate_pct: RATE, source: 'default' }, starter });
+  write(name, { ...d, defaults: after(d.defaults || [], 'margin.rate_pct', 'growth.fi_target_from_plan'), margin: { rate_pct: RATE, source: 'default' } });
 }
 
 // ---------- the week line under a desk's meter ----------

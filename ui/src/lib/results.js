@@ -1,6 +1,7 @@
 import { dayLabel } from './charts.js';
 import { originName, kindName } from './decisions.js';
 import { usd } from './format.js';
+import { plainLine } from './jobs.js';
 import { signedPct } from './strategy.js';
 
 export const KINDS = ['day', 'week', 'month', 'year'];
@@ -186,11 +187,16 @@ export function eventWord(e) {
 }
 
 // ---------- debrief ----------
+const REWRITE_LATE = ['late', 'failed'];
+
 export function debriefState(review) {
   if (!review?.pack) return { state: 'none', hint: null };
   const d = review.debrief;
   if (!d) return { state: 'waiting', hint: review.closed ? 'The debrief desk writes this up after its next run.' : `The debrief lands when the ${KIND_WORD[review.kind] || 'period'} closes.` };
-  return { state: d.stale ? 'stale' : 'ok', hint: d.stale ? 'Written before the final numbers.' : null };
+  if (!d.stale) return { state: 'ok', hint: null };
+  const r = d.rewrite && typeof d.rewrite === 'object' ? d.rewrite : null;
+  if (!r || !REWRITE_LATE.includes(r.state)) return { state: 'rewriting', hint: null };
+  return { state: 'stale', hint: plainLine(r.words) || 'Written before the final numbers.' };
 }
 
 export function firstRunNote(index, review) {

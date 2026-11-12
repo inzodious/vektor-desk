@@ -1,7 +1,30 @@
 {
- "count": 2,
+ "count": 4,
  "days": 2,
  "items": [
+  {
+   "id": "d_20261109051000_cc03",
+   "created_at": "2026-11-09T05:10:00+00:00",
+   "updated_at": "2026-11-09T14:05:00+00:00",
+   "origin": "research",
+   "run_id": "r-seed-7",
+   "kind": "buy",
+   "title": "Buy $350 ACME",
+   "symbol": "ACME",
+   "status": "expired",
+   "status_reason": "A newer proposal on the same subject replaced this one on Nov 9.",
+   "replaced_by": "d_20261109140500_9747d0",
+   "decided_at": "2026-11-09T14:05:00+00:00",
+   "check": "replaced",
+   "cleared_at": "2026-11-09T14:05:00+00:00",
+   "successor": {
+    "id": "d_20261109140500_9747d0",
+    "title": "Buy $400 ACME",
+    "status": "proposed",
+    "status_reason": null,
+    "open": true
+   }
+  },
   {
    "id": "d_20261109051000_cc01",
    "created_at": "2026-11-09T05:10:00+00:00",
@@ -13,9 +36,34 @@
    "symbol": "ACME",
    "status": "expired",
    "status_reason": "Your ACME plan already times this sale for Nov 13, so a second proposal would double it.",
+   "replaced_by": null,
    "decided_at": "2026-11-09T13:10:00+00:00",
    "check": "plan",
-   "cleared_at": "2026-11-09T13:10:00+00:00"
+   "cleared_at": "2026-11-09T13:10:00+00:00",
+   "successor": null
+  },
+  {
+   "id": "d_20261109051000_cc04",
+   "created_at": "2026-11-09T05:10:00+00:00",
+   "updated_at": "2026-11-09T09:15:00+00:00",
+   "origin": "scout",
+   "run_id": "r-seed-7",
+   "kind": "buy",
+   "title": "Buy $200 ACME",
+   "symbol": "ACME",
+   "status": "expired",
+   "status_reason": "A newer proposal on the same subject replaced this one on Nov 9.",
+   "replaced_by": "d_20261109091500_cc05",
+   "decided_at": "2026-11-09T09:15:00+00:00",
+   "check": "replaced",
+   "cleared_at": "2026-11-09T09:15:00+00:00",
+   "successor": {
+    "id": "d_20261109091500_cc05",
+    "title": "Buy $300 ACME",
+    "status": "expired",
+    "status_reason": "ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.",
+    "open": false
+   }
   },
   {
    "id": "d_20261109051000_cc02",
@@ -28,9 +76,11 @@
    "symbol": null,
    "status": "expired",
    "status_reason": "The Plan keeper already has a margin hold-off waiting on you, so this one was a repeat.",
+   "replaced_by": null,
    "decided_at": "2026-11-09T08:40:00+00:00",
    "check": "plan",
-   "cleared_at": "2026-11-09T08:40:00+00:00"
+   "cleared_at": "2026-11-09T08:40:00+00:00",
+   "successor": null
   }
  ]
 }
