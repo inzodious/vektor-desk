@@ -1,5 +1,6 @@
 import json
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -10,6 +11,7 @@ from desk.agents.desks import get
 from desk.agents.jobs import JOBS
 from desk.agents.sources import NotReady, RealReviews
 from desk.agents.status import crew
+from desk.engine.jobs import JOBS as ENGINE_JOBS
 from desk.scheduler import package_jobs
 from tests.agents.agent_fakes import FakeDecisions
 from tests.agents.test_advisor import FakeAdvisor
@@ -52,6 +54,7 @@ class FakeReviews:
     ready: bool = True
     refuse: set = field(default_factory=set)
     recorded: dict = field(default_factory=dict)
+    shown: dict = field(default_factory=dict)
 
     def pending(self, cfg):
         if not self.ready:
@@ -62,6 +65,11 @@ class FakeReviews:
         if (kind, end) in self.refuse:
             raise ValueError("pack_digest is not the current digest")
         self.recorded[(kind, end)] = result
+
+    def view(self, cfg, kind, end=None):
+        if not self.ready:
+            raise NotReady("no review run yet")
+        return self.shown
 
 
 @dataclass
@@ -291,7 +299,9 @@ def test_schema_and_prompt():
 
 
 def test_jobs_carry_the_names_the_box_expects():
-    assert ("50 17 * * 1-5", "python -m desk.agents run debrief") in JOBS
+    assert ("46 17 * * 1-5", "python -m desk.agents run debrief") in JOBS
+    assert ("36 8 * * 1-5", "python -m desk.agents run debrief") in JOBS and ("35 8 * * 1-5", "python -m desk.engine review") in ENGINE_JOBS
+    assert ("35,45 17 * * 1-5", "python -m desk.engine review") in ENGINE_JOBS
     assert ("30 18 * * 5", "python -m desk.agents run debrief") in JOBS
     names = {j.name for j in package_jobs(["agents"])}
     assert "agents-run-debrief" in names and not any("kinds" in n for n in names)
@@ -311,3 +321,122 @@ def test_cli_run_and_dry_run(cfg, monkeypatch, capsys, sent):
     assert cli.main(["run", "debrief", "--kinds", "week"]) == 0
     assert "Debrief desk: ok, wrote week 2026-11-13, 0 failed." in capsys.readouterr().out
     assert list(box.recorded) == [("week", "2026-11-13")]
+
+
+# ---- Right after the evening review, and what the page is told ----
+
+STALE_AT = datetime(2026, 11, 12, 22, 35, 20, tzinfo=UTC)
+BEFORE = "Written before the final numbers."
+
+
+def stale_view(kind="day", end="2026-11-12", stale=True, closed=True):
+    written = {"headline": "Up a little", "written_at": "2026-11-12T21:03:00+00:00", "stale": stale}
+    return {"kind": kind, "end": end, "closed": closed, "computed_at": STALE_AT.isoformat(), "debrief": written}
+
+
+def ran(cfg, status, note, minutes=1):
+    run_id = store.start_run(cfg, "debrief", trigger="schedule", model="opus", effort="high", status=status, note=note)
+    with store.db(cfg) as conn:
+        conn.execute("UPDATE agent_runs SET started_at=? WHERE id=?", ((STALE_AT + timedelta(minutes=minutes)).isoformat(), run_id))
+
+
+def told(cfg, minutes, view=None, rows=None, profile=ON):
+    view = view or stale_view()
+    rows = [pack_row(end="2026-11-12", digest="d2", debrief_digest="d1")] if rows is None else rows
+    box = FakeReviews(rows, shown=view)
+    return debrief.rewrite(cfg, view["kind"], reviews=box, decisions=FakeDecisions(profile_data=profile), now=STALE_AT + timedelta(minutes=minutes))
+
+
+def test_the_scheduled_run_waits_for_the_review_to_finish(cfg, monkeypatch):
+    seen, naps = [[{"job": "engine-review"}], [{"job": "engine-daily"}], [{"job": "agents"}]], []
+    assert debrief.settle(cfg, busy=lambda cfg: seen.pop(0), sleep=naps.append) and naps == [debrief.REVIEW_POLL] * 2
+    assert not debrief.settle(cfg, 0, busy=lambda cfg: [{"job": "engine-review"}], sleep=naps.append)
+    order = []
+    monkeypatch.setenv("DESK_DATA_DIR", str(cfg.data_dir))
+    monkeypatch.setattr(cli, "settle", lambda cfg: order.append("settle"))
+    monkeypatch.setattr(cli, "run_debrief_desk", lambda cfg, **kw: order.append(kw["trigger"]) or debrief.DebriefReport("ok"))
+    assert cli.main(["run", "debrief"]) == 0 and cli.main(["run", "debrief", "--trigger", "manual"]) == 0
+    assert order == ["settle", "schedule", "manual"]
+
+
+def test_a_fresh_debrief_has_nothing_to_tell_the_page(cfg):
+    assert told(cfg, 1, stale_view(stale=False)) == {"kind": "day", "end": "2026-11-12", "stale": False, "rewrite": None}
+    assert debrief.rewrite(cfg, "day", reviews=FakeReviews(ready=False)) == {"kind": "day", "end": None, "stale": False, "rewrite": None}
+
+
+def test_a_stale_debrief_is_due_then_late_after_an_hour(cfg):
+    due = told(cfg, 0)
+    assert due == {"kind": "day", "end": "2026-11-12", "stale": True, "rewrite": {"state": "due", "due_at": "2026-11-12T17:46:00-05:00", "words": None}}
+    assert told(cfg, 59)["rewrite"] == {"state": "due", "due_at": "2026-11-13T01:40:00-05:00", "words": None}
+    late = told(cfg, 61)["rewrite"]
+    assert late["state"] == "late" and late["words"] == f"{BEFORE} The rewrite is running late; the next try is tomorrow at 1:40 AM."
+
+
+def test_a_rewrite_that_did_not_finish_says_when_the_next_try_is(cfg):
+    ran(cfg, "failed", "week 2026-11-13: timed out")
+    assert told(cfg, 3)["rewrite"]["state"] == "due"
+    ran(cfg, "failed", "day 2026-11-12: timed out")
+    failed = told(cfg, 3)["rewrite"]
+    assert failed == {
+        "state": "failed",
+        "due_at": "2026-11-12T17:46:00-05:00",
+        "words": f"{BEFORE} The rewrite did not finish; the desk tries again at 5:46 PM.",
+    }
+    assert told(cfg, 3, stale_view() | {"computed_at": (STALE_AT + timedelta(minutes=2)).isoformat()})["rewrite"]["state"] == "due"
+
+
+def test_a_desk_that_declined_counts_as_a_failed_rewrite(cfg):
+    ran(cfg, "busy", "Another desk was running.")
+    assert told(cfg, 3)["rewrite"]["state"] == "due"
+    ran(cfg, "over_budget", "Weekly cap reached.")
+    assert told(cfg, 3)["rewrite"]["state"] == "failed"
+
+
+def test_no_rewrite_is_coming_when_the_desk_is_off_or_the_period_is_old(cfg):
+    off = told(cfg, 1, profile={"agents": {"enabled": True, "desks": {"debrief": False}}})["rewrite"]
+    assert off == {"state": "late", "due_at": None, "words": f"{BEFORE} The Debrief desk is switched off, so it stays as written."}
+    old = told(cfg, 1, stale_view(end="2026-11-10"))["rewrite"]
+    assert old == {"state": "late", "due_at": None, "words": f"{BEFORE} The numbers were revised after it was written."}
+    week = told(cfg, 1, stale_view("week", "2026-11-13", closed=False), rows=[pack_row("week", "2026-11-13", closed=False, debrief_digest="d0")])
+    assert week["rewrite"]["state"] == "late" and week["rewrite"]["due_at"] is None
+
+
+def test_the_next_try_is_named_by_day_when_it_is_not_today(cfg):
+    saturday = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
+    view = stale_view(end="2026-11-13") | {"computed_at": (saturday - timedelta(hours=2)).isoformat()}
+    box = FakeReviews([pack_row(end="2026-11-13", digest="d2", debrief_digest="d1")], shown=view)
+    out = debrief.rewrite(cfg, "day", reviews=box, decisions=FakeDecisions(profile_data=ON), now=saturday)["rewrite"]
+    assert out["due_at"] == "2026-11-16T08:36:00-05:00" and out["words"].endswith("the next try is on Monday at 8:36 AM.")
+
+
+def test_the_page_can_ask_for_the_rewrite_state(cfg, monkeypatch):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from desk.agents.api import router
+    from desk.api.deps import get_cfg
+
+    box = FakeReviews([pack_row(end="2026-11-12", digest="d2", debrief_digest="d1")], shown=stale_view() | {"computed_at": datetime.now(UTC).isoformat()})
+    monkeypatch.setattr(debrief, "RealReviews", lambda: box)
+    monkeypatch.setattr(debrief, "RealDecisions", lambda: FakeDecisions(profile_data=ON))
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_cfg] = lambda: cfg
+    client = TestClient(app)
+    body = client.get("/api/agents/debrief").json()
+    assert (body["kind"], body["end"], body["stale"], body["rewrite"]["state"], body["rewrite"]["words"]) == ("day", "2026-11-12", True, "due", None)
+    assert client.get("/api/agents/debrief?kind=decade").status_code == 404
+
+
+def test_the_real_review_view_is_read_without_writing(cfg):
+    assert RealReviews().view(cfg, "day")["debrief"] is None
+    assert debrief.rewrite(cfg, "day", decisions=FakeDecisions(profile_data=ON)) == {"kind": "day", "end": None, "stale": False, "rewrite": None}
+
+
+def test_the_morning_run_makes_no_call_when_the_pack_did_not_change(cfg, sent):
+    seed(cfg)
+    quiet, _, fake = go(cfg, [pack_row(digest="d1", debrief_digest="d1")], trigger="schedule")
+    assert quiet.status == "ok" and quiet.note == "No new period pack to debrief." and fake.calls == []
+    assert len(store.runs(cfg, "debrief")) == 1
+    moved, box, fake = go(cfg, [pack_row(digest="d2", debrief_digest="d1")], trigger="schedule")
+    assert moved.written == ["day 2026-11-10"] and len(fake.calls) == 1 and box.recorded[("day", "2026-11-10")]["pack_digest"] == "d2"

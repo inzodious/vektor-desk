@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from desk.agents import briefs, store
 from desk.agents.console import process_queue, process_triggers, queue_retry
-from desk.agents.debrief import parse_kinds, run_debrief_desk
+from desk.agents.debrief import parse_kinds, run_debrief_desk, settle
 from desk.agents.debrief import preview as preview_debrief
 from desk.agents.desks import DESKS, Desk, get
 from desk.agents.discounts import preview as preview_discounts
@@ -229,6 +229,8 @@ def main(argv: list[str] | None = None) -> int:
         return _end(nightly.status, f"{desk.title}: {nightly.status}.{queued} {nightly.note or ''}".rstrip(), nightly.note)
     if desk.name == "debrief":
         wait = RUN_WAIT if args.trigger == "schedule" else 0.0
+        if args.trigger == "schedule":
+            settle(cfg)
         review = run_debrief_desk(cfg, kinds=parse_kinds(args.kinds), so_far=args.so_far, trigger=args.trigger, wait=wait)
         done = ", ".join(review.written) or "none"
         return _end(review.status, f"{desk.title}: {review.status}, wrote {done}, {len(review.failed)} failed. {review.note or ''}".strip(), review.note)
