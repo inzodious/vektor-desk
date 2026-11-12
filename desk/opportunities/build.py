@@ -78,10 +78,12 @@ def _signals(conn: sqlite3.Connection) -> tuple[dict, dict[str, dict]]:
     return view, latest
 
 
-def _last_case_at(conn: sqlite3.Connection) -> str | None:
-    if not _has(conn, "discount_cases"):
-        return None
-    return conn.execute("SELECT max(written_at) FROM discount_cases").fetchone()[0]
+def _last_case_at(cfg: Config, conn: sqlite3.Connection | None) -> str | None:
+    stamps = [c.get("written_at") for c in own_cases.load(cfg).values()]
+    if conn is not None and _has(conn, "discount_cases"):
+        stamps.append(conn.execute("SELECT max(written_at) FROM discount_cases").fetchone()[0])
+    found = [(t, str(s)) for s in stamps if s and (t := own_cases.parse(s)) is not None]
+    return max(found)[1] if found else None
 
 
 def _scout(cfg: Config, today: date) -> list[dict]:
@@ -566,10 +568,12 @@ def _freshness(cfg: Config, conn: sqlite3.Connection | None, view: dict | None) 
     night = last_night(cfg) or {}
     return {
         "scanner_as_of": (view or {}).get("as_of"),
-        "last_case_at": _last_case_at(conn) if conn is not None else None,
+        "last_case_at": _last_case_at(cfg, conn),
         "last_scout_at": _last_ok(cfg, "scout"),
         "night_run_at": night.get("finished_at"),
         "night_status": night.get("status"),
+        "night_summary": night.get("summary") or None,
+        "night_steps": [{k: s.get(k) for k in ("step", "status", "note")} for s in night.get("steps") or () if isinstance(s, dict)],
         "note": None,
     }
 
