@@ -62,6 +62,7 @@ Parallel workstreams stay conflict-free by owning packages, not files scattered 
 | `desk/engine/` (metrics, market data, lots, Preflight, lab) | Statistics |
 | `desk/decisions/` (decision records, queue, overrides, order tickets, rules and desk profile) | Concept |
 | `desk/agents/` (runner, adapters, prompts, desks) | AI agents |
+| `desk/opportunities/` (buying opportunities list, night step) | Opportunities thread |
 | `ui/` (the whole web app) | Dashboards and design |
 | `tests/<package>/` | The package's owner |
 | `tests/integration/` (cross-package wiring) | Lead |
@@ -90,6 +91,13 @@ Shared seams, so nobody edits another owner's code:
 | 2026-11-10 | Rework threads from the outside review (`docs/review-2026-11.md`) may edit engine and interface files across workstreams for their listed items. Every PR still goes through Lead, and workstreams re-merge `main` after each lands |
 | 2026-11-11 | Horizon is the default for heavy work until the NAS gets more RAM (his call). Only the lab's data may be sent to a worker; accounts, holdings and the Escape Vektor copy never leave the box without his decision. No broker keys on a worker |
 | 2026-11-11 | An image built off the box is loaded only when its builder's key fingerprint is listed on main and he tapped Approve builder. Lead adds the fingerprint; the tap is his |
+| 2026-11-11 | Research, Scout, Strategy, Discounts and Filings desks are on by default, by his message; an existing profile was switched on once, and the switch is recorded |
+| 2026-11-11 | Prices on every page are the newest the desk has. Only cash, share counts and deposits may wait on the bank sync. Labelling a page "behind" is not a fix |
+| 2026-11-11 | Buying opportunities are their own package, `desk/opportunities/` with `/api/opportunities`, owned by the Opportunities thread |
+| 2026-11-12 | No merges from 23:00 to 03:00 Eastern: a build that goes live before 03:00 restarts the night from the top and reruns its steps; after 03:00 it only carries on. Night fixes are batched into one merge |
+| 2026-11-12 | The Plan keeper checks once per book day; a restarted night never spends a second paid run on the same day |
+| 2026-11-12 | A desk proposal that pulls against a plan step he approved is cleared by the queue rule with its reason, without a model call |
+| 2026-11-12 | Builds on Horizon stay parked until he taps Approve builder; the NAS builds for itself meanwhile |
 | 2026-11-07 | Free services only beyond what is already paid for |
 | 2026-11-07 | Design borrows Escape Vektor's look with a single investing focus |
 | 2026-11-07 | Engine is Python; Preflight is engine code that agents call and Design renders |
