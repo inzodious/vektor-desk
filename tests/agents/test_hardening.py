@@ -14,7 +14,10 @@ from desk.runlock import job_lock
 from tests.agents.agent_fakes import SLICE, FakeDecisions, FakeEngine, answer
 
 SICK = SLICE | {"data_health": [{"check": "freshness", "status": "fail", "detail": "Mirror pulled 30.0 hours ago (limit 14)."}]}
-OLD = SLICE | {"as_of": (datetime.now(UTC) - timedelta(hours=40)).isoformat(timespec="seconds")}
+
+
+def old() -> dict:
+    return SLICE | {"as_of": (datetime.now(UTC) - timedelta(hours=40)).isoformat(timespec="seconds")}
 
 
 class NoCli:
@@ -34,10 +37,10 @@ def cli_env(cfg, monkeypatch):
 # ---- Engine health ----
 
 
-@pytest.mark.parametrize(("slice_", "words"), [(SICK, "freshness: Mirror pulled"), (OLD, "finished 40 hours ago")])
+@pytest.mark.parametrize(("slice_", "words"), [(lambda: SICK, "freshness: Mirror pulled"), (old, "finished 40 hours ago")])
 def test_desks_refuse_to_run_on_failing_or_stale_engine(cfg, slice_, words):
     fake = FakeAdapter({"plan_keeper": answer()})
-    report = run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(slice_), decisions=FakeDecisions(), adapter=fake)
+    report = run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(slice_()), decisions=FakeDecisions(), adapter=fake)
     assert report.status == "unhealthy" and words in report.note and fake.calls == []
     assert store.last_run(cfg, "plan_keeper")["status"] == "unhealthy"
     assert store.week_usage(cfg, "plan_keeper")["runs"] == 0

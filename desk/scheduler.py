@@ -21,6 +21,7 @@ RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
 LIGHT = frozenset({"engine-quotes", "engine-lots", "notify-ops", "decisions-sync", "agents-triggers"})
 ALERT_JOB = "notify-ops"
 MODE_EVERY = 30.0
+LINE_MAX = 20_000
 _LOW = {"on": False, "checked": None}
 
 
@@ -189,7 +190,7 @@ def _pump(job: Job, out) -> None:
         sys.stdout.write(line)
         sys.stdout.flush()
         if line.strip():
-            job.said = line.strip()[-2000:]
+            job.said = line.strip()[:LINE_MAX]
 
 
 def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = None) -> None:
