@@ -29,7 +29,7 @@ REFRESHES = {
     "agents-run-debrief": ["debrief"],
     "agents-run-plans": ["plans"],
 }
-STAGE_ORDER = ("mirror", "engine", "review", "desks", "paper")
+STAGE_ORDER = ("mirror", "engine", "review", "desks", "paper", "overnight")
 STAGES = {
     "mirror": "mirror",
     "engine-daily": "engine",
@@ -97,7 +97,7 @@ def last_words(line: str) -> dict:
     if not isinstance(said, dict):
         return {}
     skipped = said.get("skipped")
-    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, "error": plain(said.get("error"))}
+    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, "error": plain(said.get("error")), "ready": plain(said.get("ready"))}
 
 
 def state_dir(cfg: Config) -> Path:
@@ -197,7 +197,7 @@ def catalogue(jobs: list) -> dict[str, Entry]:
         for check in getattr(job, "refreshes", None) or REFRESHES.get(job.name, []):
             if check not in entry.refreshes:
                 entry.refreshes.append(check)
-        stage = getattr(job, "stage", "") or STAGES.get(job.name)
+        stage = getattr(job, "stage", "") or STAGES.get(job.name) or ("overnight" if getattr(job, "overnight", None) is not None else None)
         if stage in STAGE_ORDER:
             entry.stage = stage
     return out
