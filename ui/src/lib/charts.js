@@ -59,13 +59,18 @@ export function sparkPath(values, w, h) {
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+const ET_DAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+
 export function parseDay(day) {
-  const [y, m, d] = day.split('-').map(Number);
+  const text = String(day ?? '');
+  const timed = text.length > 10 ? new Date(text) : null;
+  const [y, m, d] = (timed && !Number.isNaN(timed.getTime()) ? ET_DAY.format(timed) : text).slice(0, 10).split('-').map(Number);
   return new Date(Date.UTC(y, m - 1, d));
 }
 
 export function dayLabel(day, withYear = false) {
   const d = parseDay(day);
+  if (Number.isNaN(d.getTime())) return '';
   return `${MON[d.getUTCMonth()]} ${d.getUTCDate()}${withYear ? `, ${d.getUTCFullYear()}` : ''}`;
 }
 
