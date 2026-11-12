@@ -204,6 +204,26 @@ One button fills the app, the NAS copes with little memory, and Horizon takes th
 | Workers card and worker chip | Design | ✅ (#184) |
 | H1.7: images built on the worker, signed, pinned by fingerprint on main plus Approve builder; deploys settle ten minutes | Infra + Design | ✅ (#186 to #189); not switched on until he approves a builder |
 
+## The overnight run ✅
+
+He wakes to a full desk: strategies simulated, every holding analysed, buying opportunities, one day on every page and a clear way through it (Joshua, 2026-11-11). Shipped as 1.4.0 on 2026-11-12; the first full night ran by itself on 2026-11-11.
+
+| Item | Owner | Status |
+|---|---|---|
+| The night's work in order, one heavy job at a time, 23:30 to 06:30 Eastern, with a 06:45 alert (`/api/overnight`) | Infra | ✅ (#196, #203, #216, #221, #228) |
+| X1: low-memory mode only under real pressure; the strip speaks only when a job waited | Infra + Design | ✅ (#191, #192, #210) |
+| X2: one "as of" on every page; the book catches up within minutes of the close; a day waits for its fund prices (`/api/asof`) | Day thread + Design | ✅ (#198, #202, #208, #227) |
+| X3, X4: desk text reads plainly; one ready-cash figure; margin rate default; desks never propose a buy the cash rules out | Agents + Concept + Statistics | ✅ (#193, #199, #206, #207) |
+| X5: queue rule. Newer replaces older, stale expires with a reason, proposals against his plan are cleared | Concept + Agents | ✅ (#201, #205, #226, #233, #234) |
+| Strategy library: 38 built-in strategies simulated on the worker each night, one out-of-sample table, self-check against the S&P 500 row (`/api/lab/library`) | Statistics | ✅ (#197, #204, #215, #217, #223, #232) |
+| Nightly analysis of every holding in Research; Plan keeper once per day | Agents | ✅ (#195, #213, #220, #231) |
+| Buying opportunities list with a written case on every row, grouped by what could be bought (`/api/opportunities`) | Opportunities thread | ✅ (#194, #200, #209, #212, #214, #219, #225) |
+| Navigation: This morning doors, Strategies by kind, Research by holding, live-led pages | Design | ✅ (#211, #218) |
+| Fund prices that arrive late land the same morning; scanner quality list priced daily (`/api/engine/backfill`) | Statistics | ✅ (#222, #229) |
+| Health lines point to Settings; job runs keep their last line and a short history | Statistics + Infra | ✅ (#224, #228, #230) |
+| "As held" from position sizes in the library | Statistics | ⏳ |
+| Not now fold on Buying opportunities, margin rate field in Settings, job lines on the Jobs page | Design | ⏳ |
+
 ## Next: Review rework
 
 From the outside review at 1.0.9 ([docs/review-2026-11.md](docs/review-2026-11.md), Gameplan). Rework threads may edit engine and interface files for their items; every PR goes through Lead.
