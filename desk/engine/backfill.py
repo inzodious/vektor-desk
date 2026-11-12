@@ -121,7 +121,7 @@ def due(conn: sqlite3.Connection, now: datetime) -> list[sqlite3.Row]:
             return r["last_bar"] < target
         return r["fetched_at"] is not None and r["fetched_at"][:10] < rotate
 
-    rows.sort(key=lambda r: (r["priority"], r["last_bar"] is not None, r["symbol"] in LAST))
+    rows.sort(key=lambda r: (r["priority"], r["last_bar"] is not None, (r["symbol"] in LAST) == (r["last_bar"] is not None)))
     return [r for r in rows if stale(r)]
 
 
