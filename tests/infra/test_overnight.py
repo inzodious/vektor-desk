@@ -300,6 +300,23 @@ def test_a_job_can_say_what_is_ready_on_its_last_line(cfg):
     job.proc.wait()
     reap([job], cfg)
     assert jobrun.last_run(cfg, "engine-x")["ready"] == "31 strategies tested, 9 held up out of sample"
+    assert jobrun.last_run(cfg, "engine-x")["did"] is None and overnight.outcome(jobrun.last_run(cfg, "engine-x"))[1] is None
+
+
+def test_a_step_that_worked_can_say_what_it_did(cfg):
+    said = """echo '{"ready": "6 buying opportunities", "detail": "Screened 40. Priced 12. Wrote 6 cases."}'"""
+    job = make_job("a", "0 0 1 1 *", ["sh", "-c", said], name="opportunities-night")
+    start(job, cfg, "overnight", "abc")
+    job.proc.wait()
+    reap([job], cfg)
+    run = jobrun.last_run(cfg, "opportunities-night")
+    assert (run["detail"], run["did"]) == (None, "Screened 40. Priced 12. Wrote 6 cases.")
+    assert overnight.outcome(run) == ("ok", "Screened 40. Priced 12. Wrote 6 cases.", "6 buying opportunities")
+    failed = make_job("b", "0 0 1 1 *", ["sh", "-c", """echo '{"detail": "half done"}'; exit 3"""], name="engine-y")
+    start(failed, cfg, "overnight", "abd")
+    failed.proc.wait()
+    reap([failed], cfg)
+    assert jobrun.last_run(cfg, "engine-y")["did"] is None
 
 
 # ---- What the app and the phone see ----

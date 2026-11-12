@@ -168,7 +168,7 @@ def outcome(run: dict | None) -> tuple[str, str | None, str | None]:
     if run.get("note"):
         return "skipped", run["note"], None
     ready = jobrun.plain(run.get("ready"))
-    return "ok", None, ready[:READY_MAX] if ready else None
+    return "ok", jobrun.plain(run.get("did")), ready[:READY_MAX] if ready else None
 
 
 def evening_skip(cfg: Config, name: str, since: datetime, evening: datetime) -> str | None:
