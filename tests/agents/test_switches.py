@@ -27,8 +27,10 @@ def test_app_switch_overrides_desk_yaml(cfg, app, profile, want):
     assert got["app"] is app
 
 
-def test_filings_defaults_off_and_clearing_returns_to_yaml(cfg):
-    assert switches.resolve(cfg, "filings", {}) == {"enabled": False, "source": "default", "app": None, "yaml": None}
+def test_filings_defaults_on_and_clearing_returns_to_yaml(cfg):
+    assert switches.DEFAULT_OFF == ()
+    assert switches.resolve(cfg, "filings", {}) == {"enabled": True, "source": "default", "app": None, "yaml": None}
+    assert switches.resolve(cfg, "discounts", {})["enabled"] is True
     store.set_enabled(cfg, "filings", True)
     assert switches.blocked(cfg, "filings", {"agents": {"desks": {"filings": False}}}) is None
     store.clear_enabled(cfg, "filings")
@@ -63,7 +65,7 @@ def test_status_shows_where_each_switch_comes_from(cfg):
     assert (body["enabled"], body["enabled_source"]) == (True, "desk.yaml")
     assert (tiles["plan_keeper"]["enabled"], tiles["plan_keeper"]["source"], tiles["plan_keeper"]["yaml"]) == (False, "desk.yaml", False)
     assert (tiles["risk"]["enabled"], tiles["risk"]["source"], tiles["risk"]["app"]) == (False, "app", False)
-    assert (tiles["filings"]["enabled"], tiles["filings"]["source"]) == (False, "default")
+    assert (tiles["filings"]["enabled"], tiles["filings"]["source"]) == (True, "default")
     assert tiles["plan_keeper"]["next_run"] is None
     assert set(body["guard"]) == {"on", "allowed", "ready", "why"}
 
