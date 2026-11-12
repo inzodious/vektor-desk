@@ -127,3 +127,10 @@ write('status.trouble', {
     tailnet: { state: 'trouble', kind: 'signed_out', words: signedOut, address: null, line: 'health(warnable=login-state): You are logged out.' },
   },
 });
+
+// ---------- first profile from a button ----------
+const INIT = { method: 'POST', path: '/api/decisions/profile/init', label: 'Set up my profile from my data' };
+for (const name of ['decisions.profile.status', 'decisions.profile.status.empty', 'decisions.profile.status.failing', 'decisions.profile.status.fresh', 'decisions.profile.status.never']) {
+  const d = read(name);
+  write(name, { ...d, init: d.exists ? null : INIT });
+}

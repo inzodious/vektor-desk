@@ -47,3 +47,16 @@ export function marginWords(margin) {
   const yours = margin.source === 'profile' || margin.source === 'env';
   return { rate: `${Number(rate.toFixed(3))}%`, yours, line: yours ? 'Your rate, a year' : 'A typical rate until you set your own' };
 }
+
+// ---------- first profile, from a button ----------
+export const INIT_PATH = '/api/decisions/profile/init';
+export const INIT_LABEL = 'Set up my profile from my data';
+
+export function profileInit(p) {
+  if (!p || p.exists) return null;
+  const i = p.init && typeof p.init === 'object' ? p.init : null;
+  if (!i && !p.starter) return null;
+  const path = typeof i?.path === 'string' && i.path.startsWith('/api/') ? i.path : INIT_PATH;
+  const label = typeof i?.label === 'string' && i.label.trim() ? i.label.trim() : INIT_LABEL;
+  return { path, label };
+}

@@ -219,6 +219,7 @@ const SHOTS = [
   { name: 'risk-convictions-edit', path: '/settings/risk', fixtures: true, clock: MONDAY, act: async (p) => p.locator('[data-cv="ACME"]').getByTestId('cv-edit').click() },
   { name: 'risk-convictions-add', path: '/settings/risk?scenario=empty', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('cv-add').click() },
   { name: 'settings-profile-edit', path: '/settings', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('profile-edit').click() },
+  { name: 'settings-profile-none', path: '/settings?scenario=empty', fixtures: true, clock: MONDAY, el: 'profile' },
   { name: 'mixes', path: '/strategies/mixes', fixtures: true, clock: MONDAY },
   { name: 'mixes-noprofile', path: '/strategies/mixes?scenario=noprofile', fixtures: true, clock: MONDAY },
   { name: 'mixes-table', path: '/strategies/mixes', fixtures: true, clock: MONDAY, act: async (p) => p.locator('[data-mix="safe-mix"]').getByRole('button', { name: 'Table view' }).click() },

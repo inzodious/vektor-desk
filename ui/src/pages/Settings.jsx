@@ -13,7 +13,8 @@ import { ProfileEditor } from '../settings/ProfileEditor.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
 import { Panel } from '../components/Panel.jsx';
-import { useApi } from '../lib/api.js';
+import { postJson, useApi } from '../lib/api.js';
+import { useStart } from '../start/context.js';
 import { Crew, Usage } from '../agents/Crew.jsx';
 import { useTheme } from '../lib/theme.js';
 import { ago, count, etStamp, etTime, plural } from '../lib/format.js';
@@ -21,7 +22,8 @@ import { MIRROR, THEMES, TOKEN, daysLabel, mirrorLine, summary, tokenLine } from
 import { originName } from '../lib/decisions.js';
 import { SETTINGS_TABS, settingsTabFor } from '../lib/areas.js';
 import { BACKFILL_TOP, backfillView } from '../lib/backfill.js';
-import { defaultsText, keyWord, marginWords, profileSource } from '../lib/profile.js';
+import { defaultsText, keyWord, marginWords, profileInit, profileSource } from '../lib/profile.js';
+import { plainLine } from '../lib/jobs.js';
 
 // ---------- cards ----------
 function PriceHistory() {
@@ -257,9 +259,10 @@ function MirrorTables({ mirror, open, onClose }) {
 }
 
 function Profile({ api }) {
-  const p = api.data;
-  const [copied, setCopied] = useState(null);
+  const [setup, setSetup] = useState(null);
   const [editing, setEditing] = useState(false);
+  const { reloadSetup } = useStart();
+  const p = !api.data?.exists && setup?.status ? setup.status : api.data;
   if (!p) {
     return (
       <div className="card c12" data-testid="profile">
@@ -270,14 +273,20 @@ function Profile({ api }) {
       </div>
     );
   }
-  const copy = async () => {
+  const init = profileInit(p);
+  const busy = setup?.phase === 'waiting';
+  const start = async () => {
+    setSetup({ phase: 'waiting' });
     try {
-      await navigator.clipboard.writeText(p.starter);
-      setCopied('ok');
-    } catch {
-      setCopied('fail');
+      const r = await postJson(init.path);
+      const fresh = r?.status && typeof r.status === 'object' && 'exists' in r.status ? r.status : null;
+      setSetup({ phase: 'done', text: plainLine(r?.message) || 'Your profile is set up from your data.', status: fresh });
+      api.reload();
+      reloadSetup?.();
+    } catch (e) {
+      setSetup({ phase: 'failed', text: e.status === 404 ? 'This button switches on with the next desk update.' : e.message });
+      if (e.status === 409) api.reload();
     }
-    setTimeout(() => setCopied(null), 1600);
   };
   const all = defaultsText(p);
   const margin = marginWords(p.margin);
@@ -301,19 +310,27 @@ function Profile({ api }) {
           <span className="chip watch">Heads up</span> {p.error}
         </p>
       ) : null}
-      {p.starter ? (
+      {init ? (
         <div className="prof-starter" data-testid="starter">
           <p>
-            <b>No profile yet.</b> Draft one from your data on the NAS, then edit what you like:
+            <b>No profile yet.</b> The desk can set one up from your data. Edit what you like afterwards.
           </p>
           <div className="prof-cmd">
-            <code>{p.starter}</code>
-            <button className="btn sm" type="button" onClick={copy}>
-              <Icon name={copied === 'ok' ? 'check' : 'copy'} />
-              {copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Copy failed' : 'Draft a profile from your data'}
+            <button className="btn sm" type="button" onClick={start} disabled={busy} data-testid="profile-init">
+              <Icon name="check" />
+              {busy ? 'Setting it up…' : init.label}
             </button>
+            {setup?.phase === 'failed' ? (
+              <small className="fr-msg failed" role="status" data-testid="profile-init-msg">
+                {setup.text}
+              </small>
+            ) : null}
           </div>
         </div>
+      ) : setup?.phase === 'done' || (setup?.phase === 'failed' && setup.text) ? (
+        <p className={`prof-made fr-msg ${setup.phase}`} role="status" data-testid="profile-init-msg">
+          {setup.text}
+        </p>
       ) : null}
       <div className={`mini-kpis prof-kpis${margin ? ' four' : ''}`}>
         <div>

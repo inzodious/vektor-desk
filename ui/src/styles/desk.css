@@ -864,7 +864,7 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .prof-starter { padding: 12px; border-radius: 14px; background: var(--card-2); margin-bottom: 10px; font-size: 13px; }
 .prof-starter p { margin: 0 0 8px; }
 .prof-cmd { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.prof-cmd code { flex: 1 1 260px; min-width: 0; padding: 8px 10px; border-radius: 10px; background: var(--board); color: var(--flap); font-size: 12.5px; word-break: break-all; }
+.prof-made { margin: 0 0 10px; font-size: 13px; }
 .mini-kpis.prof-kpis span { display: block; font-size: 11.5px; margin-top: 2px; color: var(--ink-2); }
 .prof-defaults { margin-top: 10px; }
 .prof-defaults .kicker { display: block; margin-bottom: 6px; }
