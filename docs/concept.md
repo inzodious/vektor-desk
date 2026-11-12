@@ -139,7 +139,7 @@ The plan desk writes through `desk.decisions.plans.save_draft`. It never changes
 ### Settings
 
 - **Desk profile:** risk band (from the risk questions), industry focus, satellite cap (share allowed outside the plan mix), growth versus income tilt, tax preferences (harvest threshold, avoid short-term gains), horizon. Stored in `desk.yaml`; every proposal records the profile version it used.
-- **Editing without SSH.** Every profile change goes through the API, which rewrites only the touched section of `desk.yaml` and keeps the old file as `desk.yaml.bak`.
+- **Editing without SSH.** Every profile change goes through the API, which rewrites only the touched section of `desk.yaml` and keeps the old file as `desk.yaml.bak`. The first profile is made by `POST /api/decisions/profile/init` (offered as `init` in `GET /profile/status` while there is none). Messages to him never name a file path or a command.
 
 | Endpoint | Does |
 |---|---|

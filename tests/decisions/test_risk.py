@@ -144,5 +144,6 @@ def test_risk_endpoints_and_profile_init(cfg, demo_cfg, app_client):
     assert client.get("/api/decisions/profile").json()["profile"]["risk"]["band"] == 3
     made = client.post("/api/decisions/profile/init")
     assert made.status_code == 200 and made.json()["changed"] is True and made.json()["status"]["exists"] is True
+    assert made.json()["message"] == "Your profile is set up from your data."
     again = client.post("/api/decisions/profile/init")
-    assert again.status_code == 409 and "already exists" in again.json()["detail"]
+    assert again.status_code == 409 and again.json()["detail"] == "You already have a profile. Open Settings to change it."
