@@ -68,6 +68,39 @@ test('theme combo picks dark and closes on outside click and Escape', async ({ p
   await expect(combo).toContainText('Graphite dark');
 });
 
+test('Data freshness lists the names whose prices are behind, and says so when none are', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/settings/data');
+  const card = page.getByTestId('price-history');
+  await expect(card).toHaveAttribute('data-state', 'behind');
+  await expect(card).toContainText('8 names still waiting on the close for Fri Nov 6, 1 of them yours. The desk asks every hour, day and night.');
+  await expect(card.locator('.chip')).toHaveText('8 behind');
+  await expect(card.locator('li')).toHaveCount(4);
+  await expect(card.locator('li').first()).toContainText('FXAIX');
+  await expect(card.locator('li').first()).toContainText('You hold it · Last close Thu Nov 5, asked Today, 6:13 AM ET');
+  await expect(card.locator('li[data-sym="NOVA"] .ph-note')).toHaveText('Tiingo did not answer for NOVA');
+  await expect(card.locator('li[data-sym="ZZNEW"]')).toContainText('No price history yet');
+  await expect(card.locator('li[data-sym="ZZNEW"] .ph-note')).toHaveText('Set aside until Mon Nov 16, 6:13 AM ET: Tiingo has no prices for ZZNEW');
+  await expect(card.locator('li[data-sym="ACME"]')).toHaveCount(0);
+  await card.getByRole('button', { name: 'Show all 8' }).click();
+  await expect(card.locator('li')).toHaveCount(8);
+  await expect(card).toContainText('Last ask, Today, 11:13 AM ET: Asked Tiingo for 8 names.');
+  await expect(card).not.toContainText('{');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+
+  await page.goto('/settings/data?scenario=current');
+  await expect(page.getByTestId('price-history')).toHaveAttribute('data-state', 'ok');
+  await expect(page.getByTestId('price-history')).toContainText('Every name the desk follows daily has its close for Fri Nov 6.');
+  await expect(page.getByTestId('price-history').locator('li')).toHaveCount(0);
+  expect(errors).toEqual([]);
+
+  await page.route('**/api/engine/backfill*', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Not Found"}' }));
+  await page.goto('/settings/data');
+  await expect(page.getByTestId('freshness')).toBeVisible();
+  await expect(page.getByTestId('price-history')).toHaveCount(0);
+});
+
 test('the gear opens Settings and the six entries reach every section', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');

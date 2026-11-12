@@ -201,6 +201,8 @@ const SHOTS = [
   { name: 'bridge-discounts-quiet', path: '/?scenario=quiet', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('open-discounts').click() },
   { name: 'settings-desk', path: '/settings', fixtures: true, clock: MONDAY },
   { name: 'settings-data', path: '/settings/data', fixtures: true, clock: MONDAY },
+  { name: 'settings-data-current', path: '/settings/data?scenario=current', fixtures: true, clock: MONDAY },
+  { name: 'settings-data-all', path: '/settings/data', fixtures: true, clock: MONDAY, full: true, act: async (p) => p.getByTestId('price-history').getByRole('button', { name: /^Show all/ }).click() },
   { name: 'settings-box', path: '/settings/box', fixtures: true, clock: MONDAY },
   { name: 'settings-box-down', path: '/settings/box?scenario=down', fixtures: true, clock: MONDAY },
   { name: 'settings-box-off', path: '/settings/box?scenario=off', fixtures: true, clock: MONDAY },

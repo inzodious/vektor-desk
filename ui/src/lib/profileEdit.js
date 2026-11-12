@@ -166,9 +166,9 @@ export function lockedGroups(editable) {
 
 // ---------- words ----------
 export function savedLine(r) {
-  if (!r?.changed) return 'Nothing changed in desk.yaml.';
+  if (!r?.changed) return 'Nothing changed.';
   const n = (r.sections || []).length;
-  return `Saved ${n === 1 ? '1 section' : `${n} sections`} as profile v${r.version}. desk.yaml kept a backup.`;
+  return `Saved ${n === 1 ? '1 section' : `${n} sections`} as profile v${r.version}. A backup was kept.`;
 }
 
 export function pendingLine(n) {

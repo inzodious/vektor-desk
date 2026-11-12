@@ -49,7 +49,7 @@ test('saving sends only the changed fields and says what it wrote', async ({ pag
   await dlg.getByRole('option', { name: 'Balanced' }).click();
   await expect(dlg.getByTestId('profile-pending')).toHaveText('3 changes to save');
   await dlg.getByTestId('profile-save').click();
-  await expect(dlg.getByTestId('profile-msg')).toHaveText('Saved 2 sections as profile v3. desk.yaml kept a backup.');
+  await expect(dlg.getByTestId('profile-msg')).toHaveText('Saved 2 sections as profile v3. A backup was kept.');
   expect(sent).toEqual({ changes: { growth: { horizon_years: 15, tilt: 'balanced' }, opportunity: { min_confidence: 0.6 } } });
 });
 
@@ -80,7 +80,7 @@ test('the margin rate shows on the profile card and saves as its own section', a
   await dlg.getByLabel('Margin rate, % a year').fill('12.075');
   await expect(dlg.getByTestId('profile-pending')).toHaveText('1 change to save');
   await dlg.getByTestId('profile-save').click();
-  await expect(dlg.getByTestId('profile-msg')).toHaveText('Saved 1 section as profile v3. desk.yaml kept a backup.');
+  await expect(dlg.getByTestId('profile-msg')).toHaveText('Saved 1 section as profile v3. A backup was kept.');
   expect(sent).toEqual({ changes: { margin: { rate_pct: 12.075 } } });
   await page.keyboard.press('Escape');
   await expect(tile).toHaveAttribute('data-source', 'yours');

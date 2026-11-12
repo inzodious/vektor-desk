@@ -70,8 +70,8 @@ describe('profile editor', () => {
   });
 
   it('words the save', () => {
-    expect(savedLine({ changed: true, sections: ['growth', 'tax'], version: 4 })).toBe('Saved 2 sections as profile v4. desk.yaml kept a backup.');
-    expect(savedLine({ changed: false })).toBe('Nothing changed in desk.yaml.');
+    expect(savedLine({ changed: true, sections: ['growth', 'tax'], version: 4 })).toBe('Saved 2 sections as profile v4. A backup was kept.');
+    expect(savedLine({ changed: false })).toBe('Nothing changed.');
     expect(pendingLine(0)).toBe('No changes yet');
     expect(pendingLine(1)).toBe('1 change to save');
     expect(pendingLine(3)).toBe('3 changes to save');
