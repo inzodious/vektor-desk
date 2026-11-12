@@ -1,0 +1,16 @@
+{
+ "target": "2026-11-06",
+ "asks": "every hour, day and night",
+ "limits": {
+  "hour": 40,
+  "day": 800,
+  "month_symbols": 400
+ },
+ "used": {
+  "hour": 0,
+  "day": 0,
+  "month_symbols": 0
+ },
+ "last_run": null,
+ "symbols": []
+}

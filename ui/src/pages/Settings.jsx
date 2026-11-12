@@ -19,9 +19,53 @@ import { ago, count, etStamp, etTime, plural } from '../lib/format.js';
 import { MIRROR, THEMES, TOKEN, daysLabel, mirrorLine, summary, tokenLine } from '../lib/status.js';
 import { originName } from '../lib/decisions.js';
 import { SETTINGS_TABS, settingsTabFor } from '../lib/areas.js';
+import { BACKFILL_TOP, backfillView } from '../lib/backfill.js';
 import { defaultsText, keyWord, marginWords, profileSource } from '../lib/profile.js';
 
 // ---------- cards ----------
+function PriceHistory() {
+  const api = useApi('/api/engine/backfill', { every: 300000 });
+  const [all, setAll] = useState(false);
+  const v = backfillView(api.data);
+  if (!v) return null;
+  const rows = all ? v.rows : v.rows.slice(0, BACKFILL_TOP);
+  return (
+    <div className="price-history" data-testid="price-history" data-state={v.state}>
+      <div className="rule">
+        <span style={{ color: `var(--${v.tone || 'ink-3'})` }}>
+          <Icon name={v.icon} />
+        </span>
+        <span>
+          <b>Price history</b>
+          <small>{v.line}</small>
+        </span>
+        <span className={`chip ${v.tone}`}>{v.chip}</span>
+      </div>
+      {rows.length ? (
+        <ul className="ph-list">
+          {rows.map((r) => (
+            <li key={r.symbol} data-sym={r.symbol}>
+              <b>{r.symbol}</b>
+              <span>
+                <small>
+                  {r.role} · {r.last}, {r.asked}
+                </small>
+                {r.note ? <small className="ph-note">{r.note}</small> : null}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {v.rows.length > BACKFILL_TOP ? (
+        <button className="link ph-more" type="button" onClick={() => setAll((x) => !x)} aria-expanded={all}>
+          {all ? 'Show fewer' : `Show all ${v.rows.length}`}
+        </button>
+      ) : null}
+      {v.lastLine ? <p className="muted ph-last">{v.lastLine}</p> : null}
+    </div>
+  );
+}
+
 function Freshness({ mirror, onOpen }) {
   const m = MIRROR[mirror.state] || MIRROR.error;
   const tables = mirror.tables ? Object.keys(mirror.tables).length : 0;
@@ -67,6 +111,7 @@ function Freshness({ mirror, onOpen }) {
           <span>{mirror.note}</span>
         </div>
       ) : null}
+      <PriceHistory />
     </div>
   );
 }

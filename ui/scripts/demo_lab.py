@@ -7,7 +7,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine import schema
 from desk.engine.lab import paper
-from desk.engine.lab.data import EXPORT_SCHEMA, data_path, ledger_path
+from desk.engine.lab.data import EXPORT_SCHEMA, data_path, ledger_path, plan_path
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.spec import SETS
 
@@ -37,7 +37,7 @@ def write_data(cfg: Config, end: str) -> None:
     path.unlink(missing_ok=True)
     conn = sqlite3.connect(path)
     conn.executescript(EXPORT_SCHEMA)
-    syms = {"SPY": ("benchmark", 0.0003, 0.010), "FXAIX": ("plan", 0.0003, 0.010), "BND": ("plan", 0.0001, 0.003)}
+    syms = {"SPY": ("benchmark", 0.0003, 0.010), "FXAIX": ("universe", 0.0003, 0.010), "BND": ("universe", 0.0001, 0.003)}
     syms |= {s: ("benchmark", None, 0.012) for s in SETS["sector_etfs"]}
     for sym, (role, base, vol) in syms.items():
         px, drift, rows = 100.0, 0.0, []
@@ -51,7 +51,7 @@ def write_data(cfg: Config, end: str) -> None:
         conn.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?)", rows)
         conn.execute("INSERT INTO symbols VALUES (?, 'fund', ?, ?, ?)", (sym, role, days[0], days[-1]))
     conn.executemany("INSERT INTO macro VALUES ('DGS3MO', ?, 2.0)", [(d,) for d in days[::5]])
-    conn.executemany("INSERT INTO plan_mix VALUES (?, ?)", list(PLAN.items()))
+    plan_path(cfg).write_text(json.dumps({"weights": PLAN}))
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
     conn.commit()
     conn.close()

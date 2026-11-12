@@ -49,3 +49,47 @@ for (const name of ['agents.status', 'agents.status.lifted']) {
     }),
   });
 }
+
+// ---------- price history: which names are behind their last close ----------
+const sym = (symbol, role, priority, o = {}) => ({ symbol, role, priority, daily: true, first_bar: '2016-01-04', last_bar: '2026-11-06', fetched_at: '2026-11-09T11:13:20+00:00', error: null, parked_until: null, behind: false, due: false, ...o });
+const late = { last_bar: '2026-11-05', behind: true, due: true };
+const backfill = {
+  target: '2026-11-06',
+  asks: 'every hour, day and night',
+  limits: { hour: 40, day: 800, month_symbols: 400 },
+  used: { hour: 8, day: 61, month_symbols: 58 },
+  last_run: {
+    finished_at: '2026-11-09T16:13:40+00:00',
+    ok: false,
+    detail: 'Asked Tiingo for 8 names. Failed: NOVA: Tiingo did not answer for NOVA. FXAIX and 5 others answered with nothing new for 2026-11-06.',
+    fetched: ['FXAIX', 'HLTH', 'IDXA', 'IDXB', 'IDXC', 'IDXD'],
+    advanced: [],
+    behind: ['FXAIX', 'HLTH', 'IDXA', 'IDXB', 'IDXC', 'IDXD'],
+    unpriced: ['ZZNEW'],
+    errors: ['NOVA: Tiingo did not answer for NOVA'],
+    error: null,
+    left: 0,
+    skipped_for_month_cap: 0,
+  },
+  symbols: [
+    sym('ACME', 'held', 0),
+    sym('BND', 'held', 0),
+    sym('FTEC', 'held', 0),
+    sym('FXAIX', 'held', 0, late),
+    sym('VXUS', 'held', 0),
+    sym('SPY', 'benchmark', 1),
+    sym('NOVA', 'watch', 2, { ...late, error: 'Tiingo did not answer for NOVA' }),
+    sym('ZZNEW', 'watch', 2, { first_bar: null, last_bar: null, behind: true, due: false, error: 'Tiingo has no prices for ZZNEW', parked_until: '2026-11-16T11:13:20+00:00' }),
+    ...['HLTH', 'IDXA', 'IDXB', 'IDXC', 'IDXD'].map((s) => sym(s, 'universe', 3, late)),
+    sym('OLDX', 'past', 3, { daily: false, last_bar: '2026-09-30', fetched_at: '2026-10-01T11:13:20+00:00' }),
+  ],
+};
+write('engine.backfill', backfill);
+const idle = { ...backfill, used: { hour: 0, day: 0, month_symbols: 0 }, last_run: null, symbols: [] };
+write('engine.backfill.fresh', idle);
+write('engine.backfill.never', idle);
+write('engine.backfill.current', {
+  ...backfill,
+  last_run: { ...backfill.last_run, ok: true, detail: 'Nothing was behind, so Tiingo was not asked.', fetched: [], behind: [], unpriced: [], errors: [] },
+  symbols: backfill.symbols.map((s) => ({ ...s, last_bar: s.daily ? '2026-11-06' : s.last_bar, first_bar: s.first_bar || '2026-10-01', behind: false, due: false, error: null, parked_until: null })),
+});

@@ -102,7 +102,7 @@ function Form({ data, msg, setMsg, onSaved }) {
         </button>
         <button className="btn sm" type="submit" disabled={busy || !n || Boolean(bad)} data-testid="profile-save">
           <Icon name="check" />
-          {busy ? 'Saving…' : 'Save to desk.yaml'}
+          {busy ? 'Saving…' : 'Save'}
         </button>
       </div>
       {msg ? (
@@ -124,9 +124,9 @@ export function ProfileEditor({ open, onClose, onSaved }) {
     onClose();
   };
   return (
-    <Panel open={open} onClose={close} title="Edit the profile" sub="Writes only the sections you change, and keeps desk.yaml.bak first." crumbs={[{ label: 'Settings', go: close }]}>
+    <Panel open={open} onClose={close} title="Edit the profile" sub="Writes only the sections you change, and keeps a backup first." crumbs={[{ label: 'Settings', go: close }]}>
       {api.loading && !d ? (
-        <p className="empty-hint">Reading desk.yaml…</p>
+        <p className="empty-hint">Reading your profile…</p>
       ) : api.error && !d ? (
         <p className="empty-hint">{editRefusal(api.error)}</p>
       ) : d ? (

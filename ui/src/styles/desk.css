@@ -1728,6 +1728,18 @@ a.chip { text-decoration: none; }
 .range-basis { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); max-width: 70ch; }
 
 /* ---------- overnight steps ---------- */
+.price-history .rule { border-bottom: 0; }
+.ph-list { list-style: none; margin: 2px 0 0; padding: 0 6px 0 36px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 22px; }
+.ph-list li { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 8px; align-items: baseline; }
+.ph-list b { font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.ph-list small { display: block; font-size: 12px; color: var(--ink-2); overflow-wrap: anywhere; }
+.ph-list .ph-note { color: var(--watch); }
+.ph-more { margin: 8px 0 0 36px; }
+.ph-last { margin: 8px 6px 0 36px; font-size: 12px; overflow-wrap: anywhere; }
+@media (max-width: 720px) {
+  .ph-list { grid-template-columns: minmax(0, 1fr); padding-left: 6px; }
+  .ph-more, .ph-last { margin-left: 6px; }
+}
 .fold-card > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; cursor: pointer; list-style: none; font-size: 14px; color: var(--ink); border-radius: 10px; }
 .fold-card > summary::-webkit-details-marker { display: none; }
 .fold-card > summary::before { content: '+'; font-weight: 800; color: var(--teal); width: 12px; }
