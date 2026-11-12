@@ -7,7 +7,7 @@ from statistics import NormalDist
 from desk.config import Config
 from desk.db import connect
 from desk.engine import catalog, gate
-from desk.engine.lab.data import lab_build, ledger_path
+from desk.engine.lab.data import data_path, lab_build, ledger_path
 from desk.engine.lab.rulebook import STAND_IN
 from desk.engine.lab.runner import PBO_BAR
 from desk.engine.lab.simcache import queue_dir
@@ -21,6 +21,8 @@ NOTE = (
 )
 N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
+YARDSTICK = "lib-buy-hold-sp500"
+SAME_PTS = 0.1
 PLAIN = (
     (("no plan mix",), "No plan of your own is loaded on the desk yet, so there is no plan mix to test. The Safe mix row is the built-in stand-in."),
     (("small-cap history",), "Small-company price history is still loading. This runs once that finishes."),
@@ -586,11 +588,13 @@ def _years(a: str | None, b: str | None) -> float | None:
     return round((datetime.fromisoformat(b) - datetime.fromisoformat(a)).days / 365.25, 1)
 
 
-def _experiment(entry: dict, body: dict, trials: int) -> dict:
+def _experiment(entry: dict, body: dict, trials: int, alone: bool = False, lean: float | None = None) -> dict:
     wf = body.get("walk_forward") or {}
     if not wf.get("days") or wf.get("excess_pts") is None:
         return {"verdict": "inconclusive", "line": "No variant produced an out-of-sample record to judge."}
     noise = body.get("noise") or {}
+    if alone and entry["id"] == YARDSTICK:
+        return _yardstick(wf)
     k = max(trials, int(noise.get("family_size") or 1), 1)
     x, band, luck = wf["excess_pts"], None, None
     if noise.get("tracking_error_pct") and noise.get("obs"):
@@ -601,7 +605,13 @@ def _experiment(entry: dict, body: dict, trials: int) -> dict:
     span = f"over {years:g} years out of sample" if years else "out of sample"
     bench = entry["benchmark"]
     overfit = body.get("pbo") is not None and body["pbo"] >= PBO_BAR
-    if x <= 0:
+    if x <= 0 and lean is not None and lean < x:
+        verdict = "within_noise"
+        line = (
+            f"Trailed {bench} by {abs(x):.1f} points a year {span}, less than the {abs(lean):.1f} points a year a row loses "
+            "by starting each test year in cash, so it is inside the noise."
+        )
+    elif x <= 0:
         verdict, line = "fell_short", f"Trailed {bench} by {abs(x):.1f} points a year {span}."
     elif band is None:
         verdict, line = "within_noise", f"Ahead of {bench} by {x:.1f} points a year {span}, on too short a record to tell from luck."
@@ -609,6 +619,12 @@ def _experiment(entry: dict, body: dict, trials: int) -> dict:
         verdict, line = "within_noise", f"Ahead of {bench} by {x:.1f} points a year {span}, but luck alone allows {band:.1f} across the {k} variants tried."
     elif overfit:
         verdict, line = "within_noise", f"Ahead of {bench} by {x:.1f} points a year {span}, but its best settings look fitted to the past."
+    elif lean is not None and lean > 0 and x - lean < band:
+        verdict = "within_noise"
+        line = (
+            f"Ahead of {bench} by {x:.1f} points a year {span}, but about {lean:.1f} of that comes from starting each test year in cash, "
+            f"which leaves it inside the {band:.1f} luck allows."
+        )
     else:
         verdict = "held_up"
         line = f"Beat {bench} by {x:.1f} points a year {span}, more than the {band:.1f} luck allows across the {k} variants tried."
@@ -621,6 +637,60 @@ def _experiment(entry: dict, body: dict, trials: int) -> dict:
         "pbo": body.get("pbo"),
         "variants": body.get("variants"),
     }
+
+
+def _yardstick(wf: dict) -> dict:
+    x = wf["excess_pts"]
+    gap = ""
+    if abs(x) >= SAME_PTS:
+        gap = (
+            f" The {abs(x):.1f} points a year it {'trails' if x < 0 else 'leads'} itself by comes mostly from each test year starting in cash "
+            "until its first monthly rebalance; most rows carry a similar gap."
+        )
+    return {
+        "verdict": None,
+        "yardstick": True,
+        "gap_pts": x,
+        "line": f"The yardstick most rows here are measured against. No plan of your own is loaded, so it is measured against itself.{gap}",
+        "out_of_sample": {key: wf.get(key) for key in ("start", "end", "ann_return_pct", "sharpe", "mdd_pct")} | {"excess_pts": None},
+    }
+
+
+def _lean(latest: dict[str, dict]) -> float | None:
+    seen = latest.get(YARDSTICK)
+    if seen is None or seen["kind"] != "experiment":
+        return None
+    x = (json.loads(seen["body"]).get("walk_forward") or {}).get("excess_pts")
+    return x if isinstance(x, int | float) and abs(x) >= SAME_PTS else None
+
+
+def _lean_note(lean: float | None) -> str:
+    start = "Every row except the deposit rules starts each test year in cash until its first rebalance."
+    if lean is None:
+        return f"{start} That leans the results a little. A corrected run is planned for tonight."
+    if lean < 0:
+        return (
+            f"{start} That costs roughly the {abs(lean):.1f} points a year the S&P 500 row shows against itself, "
+            "so a row that trails by less than that is shown as inside the noise, not as fell short. A corrected run is planned for tonight."
+        )
+    return (
+        f"{start} That adds roughly the {lean:.1f} points a year the S&P 500 row shows against itself, "
+        "so a row needs to clear its luck band by more than that to count as held up. A corrected run is planned for tonight."
+    )
+
+
+def _no_plan(cfg: Config) -> bool:
+    path = data_path(cfg)
+    if not path.exists():
+        return False
+    try:
+        conn = connect(path, readonly=True)
+        try:
+            return conn.execute("SELECT 1 FROM plan_mix LIMIT 1").fetchone() is None
+        finally:
+            conn.close()
+    except sqlite3.Error:
+        return False
 
 
 RULE_VERDICT = {"helps": "held_up", "no_clear_edge": "within_noise", "hurts": "fell_short", "inconclusive": "inconclusive"}
@@ -651,10 +721,13 @@ def _rule_row(entry: dict, body: dict) -> dict:
 def view(cfg: Config) -> dict:
     latest, done, trials = _latest(cfg)
     waiting = _queued(cfg, done)
+    alone = _no_plan(cfg)
+    lean = _lean(latest) if alone else None
     rows = []
     for entry in LIBRARY:
         row = {k: entry[k] for k in ("id", "title", "kind", "family", "description", "benchmark", "type")}
         row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
+        row |= {"yardstick": False, "gap_pts": None}
         row |= {
             "research_only": (entry.get("spec") or {}).get("universe", {}).get("type") == "french",
             "caveats": [],
@@ -670,20 +743,27 @@ def view(cfg: Config) -> dict:
                 row |= {"status": "not_run", "reason": plain(body.get("problems") or [])}
             else:
                 row |= {"status": "tested", "reason": None, "caveats": body.get("caveats") or []}
-                row |= _rule_row(entry, body) if seen["kind"] == "rule" else _experiment(entry, body, trials)
+                row |= _rule_row(entry, body) if seen["kind"] == "rule" else _experiment(entry, body, trials, alone, lean)
         rows.append(row)
     kinds = [k for k, _ in KINDS]
     rows.sort(
-        key=lambda r: (kinds.index(r["kind"]), r["status"] != "tested", ORDER.get(r["verdict"], 4), -((r["out_of_sample"] or {}).get("excess_pts") or -1e9))
+        key=lambda r: (
+            kinds.index(r["kind"]),
+            r["status"] != "tested",
+            not r["yardstick"],
+            ORDER.get(r["verdict"], 4),
+            -((r["out_of_sample"] or {}).get("excess_pts") or -1e9),
+        )
     )
     counts = {"total": len(rows), "tested": sum(r["status"] == "tested" for r in rows)}
     counts |= {v: sum(r["verdict"] == v for r in rows) for v in ("held_up", "within_noise", "fell_short", "inconclusive")}
     counts |= {s: sum(r["status"] == s for r in rows) for s in ("waiting", "not_run")}
+    counts["yardstick"] = sum(r["yardstick"] for r in rows)
     stamps = [r["tested_at"] for r in rows if r["status"] == "tested"]
     return {
         "as_of": max(stamps) if stamps else None,
         "trials": trials,
-        "note": NOTE,
+        "note": f"{NOTE} {_lean_note(lean)}",
         "counts": counts,
         "kinds": [{"key": k, "title": t} for k, t in KINDS],
         "rows": rows,
