@@ -4,6 +4,7 @@ import time
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 
+from desk.engine import NO_FINNHUB, NO_FRED, NO_SEC, skip
 from desk.engine.market import ProviderError, finnhub_key
 
 SEC_TICKERS = "https://www.sec.gov/files/company_tickers.json"
@@ -142,7 +143,7 @@ def parse_facts(symbol: str, body: dict) -> list[tuple]:
 def run_edgar(conn: sqlite3.Connection, http, symbols: list[str], *, now: datetime, sleep=time.sleep) -> dict:
     agent = sec_agent()
     if not agent:
-        return {"ok": True, "skipped": "DESK_SEC_USER_AGENT is not set"}
+        return skip(NO_SEC)
     ciks = sec_ciks(conn, http, agent, now, sleep)
     done, missing, errors = [], [], []
     for sym in symbols:
@@ -182,7 +183,7 @@ def run_edgar(conn: sqlite3.Connection, http, symbols: list[str], *, now: dateti
 def run_fred(conn: sqlite3.Connection, http, *, now: datetime) -> dict:
     key = fred_key()
     if not key:
-        return {"ok": True, "skipped": "FRED_API_KEY is not set"}
+        return skip(NO_FRED)
     done, errors = {}, []
     for series in FRED_SERIES:
         if _fresh(conn, "fred", series, now):
@@ -213,7 +214,7 @@ def run_fred(conn: sqlite3.Connection, http, *, now: datetime) -> dict:
 def run_finnhub_research(conn: sqlite3.Connection, http, symbols: list[str], *, now: datetime) -> dict:
     key = finnhub_key()
     if not key:
-        return {"ok": True, "skipped": "FINNHUB_API_KEY is not set"}
+        return skip(NO_FINNHUB)
     today = now.date()
     done, errors = [], []
     for sym in symbols:

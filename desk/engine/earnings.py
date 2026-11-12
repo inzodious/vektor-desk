@@ -3,6 +3,7 @@ import sqlite3
 import time
 from datetime import UTC, date, datetime, timedelta
 
+from desk.engine import NO_SEC, skip
 from desk.engine.filings import _text
 from desk.engine.lane import entry_session
 from desk.engine.market import ProviderError
@@ -196,7 +197,7 @@ def coverage(conn: sqlite3.Connection, limit: int = 20) -> dict:
 def run(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> dict:
     agent = sec_agent()
     if not agent:
-        return {"ok": True, "skipped": "DESK_SEC_USER_AGENT is not set"}
+        return skip(NO_SEC)
     out: dict = {"ok": True}
     try:
         out["fetch"] = fetch(conn, http, agent, now=now, sleep=sleep)

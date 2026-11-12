@@ -5,7 +5,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
-from desk.engine import alpaca, catalog, lane
+from desk.engine import NO_ALPACA, alpaca, catalog, lane, skip
 from desk.engine.market import ProviderError, session
 from desk.paper_check import NotPaper, paper_base
 
@@ -354,7 +354,7 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     hdrs = alpaca.headers()
     if hdrs is None:
-        return {"ok": True, "skipped": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"}
+        return skip(NO_ALPACA)
     try:
         broker = Broker(http, hdrs)
         account = broker.account()

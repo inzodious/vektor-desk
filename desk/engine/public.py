@@ -6,7 +6,7 @@ import time
 import zipfile
 from datetime import UTC, date, datetime, timedelta
 
-from desk.engine import KEYS_AT, backfill
+from desk.engine import NO_SEC, backfill, skip
 from desk.engine.market import ProviderError
 from desk.engine.research import SEC_GAP, _get, sec_agent, sec_ciks
 
@@ -29,7 +29,6 @@ PAGE = "R1.htm"
 PAGE_SYMBOL = re.compile(r"Trading Symbol(?:(?!</tr>).)*?<td[^>]*>\s*([A-Za-z]{1,5}(?:[.\-][A-Za-z])?)\s*<", re.S | re.I)
 FILE_SYMBOL = re.compile(r"^([a-z]{1,5})-\d{8}\.xml$", re.I)
 GIVE_UP = ("rate limit", "did not answer")
-NO_CONTACT = "no_sec_contact"
 NOT_RUN = "The public stock list has not been built yet."
 
 # ---- The 200 largest companies of mid-2011 ----
@@ -253,7 +252,7 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None, sleep=ti
     now = now or datetime.now(UTC)
     agent = sec_agent()
     if not agent:
-        return {"ok": True, "skipped": f"The SEC contact is not set. Add it in {KEYS_AT}.", "skipped_code": NO_CONTACT}
+        return skip(NO_SEC)
     if fresh(conn, now):
         return {"ok": True, "fresh": True} | summary(conn, names(conn), now)
     try:

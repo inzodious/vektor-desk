@@ -13,7 +13,7 @@ from xml.parsers import expat
 
 import requests
 
-from desk.engine import alpaca
+from desk.engine import NO_ALPACA, NO_SEC, alpaca, skip
 from desk.engine.filings import _text
 from desk.engine.market import ProviderError, trading_day
 from desk.engine.research import SEC_GAP, sec_agent
@@ -424,13 +424,9 @@ def months(conn: sqlite3.Connection, symbols: list[str] | None = None) -> int:
 def run(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> dict:
     agent = sec_agent()
     if not agent:
-        return {"ok": True, "skipped": "DESK_SEC_USER_AGENT is not set"}
+        return skip(NO_SEC)
     out: dict = {"ok": True}
-    history = (
-        (lambda: fetch_history(conn, http, history_names(conn), now=now, sleep=sleep))
-        if alpaca.headers() is not None
-        else (lambda: {"skipped": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"})
-    )
+    history = (lambda: fetch_history(conn, http, history_names(conn), now=now, sleep=sleep)) if alpaca.headers() is not None else (lambda: skip(NO_ALPACA))
     steps = (
         ("cleaned", lambda: clean_stored(conn)),
         ("bulk", lambda: fetch_bulk(conn, http, agent, now=now, sleep=sleep)),
