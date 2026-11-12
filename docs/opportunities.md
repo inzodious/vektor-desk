@@ -31,7 +31,7 @@ Names come from the scanner's universe (held, watchlist, quality list) plus anyt
 | Entry zone | Today's close down to one monthly swing lower (63-session volatility × √21, the same swing Stock plans use). For `near` rows, one to two swings under the close |
 | Size | A starter slice: 1% of the portfolio for a single stock, 2.5% for a fund. Never more than the room under the caps, never more than free cash, never on margin |
 | What would make it wrong | The case's risks, or the Skeptic's counter-case, or Scout's bear case. Plus a price: two monthly swings under today. Plus earnings inside 14 days |
-| Stance | `buy`: a written case or Scout says buy and nothing blocks it. `watch`: the case says wait, the Skeptic flagged it, a cap, rule or no-buy window blocks it, the research note says trim, or it is not on sale. `screen`: cheap by the numbers, no written case yet |
+| Stance | `buy`: a written case or Scout says buy and nothing blocks it. `watch`: the case says wait, the Skeptic flagged it, a cap, rule or no-buy window blocks it, the holding's research note says trim or avoid, or it is not on sale. `screen`: cheap by the numbers, no written case yet |
 
 A written case that says avoid drops the name from the rows and lists it under `passed` with the reason.
 
