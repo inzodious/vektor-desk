@@ -84,7 +84,7 @@ This is the heart of the desk.
   | Window passed | `expires` is behind us |
   | Price outside its zone | Latest price is outside `price_min` to `price_max`. With no zone, a desk trade expires once the price is more than 10% from the price it was written at |
   | Cash gone | A ready-cash figure newer than the proposal is below `needs_cash_usd` (a cash-funded buy uses its amount) |
-  | Unknown is not stale | No price, or a cash figure the engine marks as unreliable, never expires anything |
+  | Unknown is not stale | No price, or a cash figure the engine marks `stale`, `mismatch` or `insufficient_history`, never expires anything. A rolled-forward or inferred figure (`pro_forma`, `trimmed`, `modelled`) counts, and the reason says "estimated" |
   | Heads-up notes | `memo` and `alert` from a desk need no decision: stored as `logged`, listed by `GET /api/decisions/notes` (latest per subject), never in the queue. `hold_off` stays a queue item |
 - **Preflight.** Every candidate trade runs a checklist before an order ticket is made, shown as cockpit lights:
   - concentration after the trade versus the single-stock band,

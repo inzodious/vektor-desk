@@ -1,7 +1,7 @@
 import json
 import os
 import sqlite3
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from statistics import NormalDist
 
 from desk.config import Config
@@ -19,6 +19,7 @@ NOTE = (
     "Held up means ahead of its benchmark by more than luck allows across every variant tried in the library."
 )
 N = NormalDist()
+RETRY_AFTER = timedelta(hours=12)
 ORDER = {"held_up": 0, "within_noise": 1, "fell_short": 2, "inconclusive": 3, None: 4}
 
 SECTORS = {"type": "fund_list", "set": "sector_etfs"}
@@ -201,6 +202,36 @@ LIBRARY: tuple[dict, ...] = (
         "Hold the tenth of US stocks with the best past-year return, as in the classic momentum studies.",
         MARKET,
         {"universe": {"type": "french", "set": "momentum_deciles", "members": ["hi"]}},
+        date_range={"start": "1990-01-01"},
+    ),
+    _exp(
+        "lib-value-tilt",
+        "classic",
+        "Factor tilt",
+        "Value tilt: the cheapest companies",
+        "Hold the tenth of US stocks that are cheapest against their book value, as in the classic value studies.",
+        MARKET,
+        {"universe": {"type": "french", "set": "value_deciles", "members": ["hi"]}},
+        date_range={"start": "1990-01-01"},
+    ),
+    _exp(
+        "lib-profitability-tilt",
+        "classic",
+        "Factor tilt",
+        "Profitability tilt: the most profitable companies",
+        "Hold the tenth of US stocks with the highest operating profitability.",
+        MARKET,
+        {"universe": {"type": "french", "set": "profitability_deciles", "members": ["hi"]}},
+        date_range={"start": "1990-01-01"},
+    ),
+    _exp(
+        "lib-quality-tilt",
+        "classic",
+        "Factor tilt",
+        "Quality tilt: companies that invest carefully",
+        "Hold the tenth of US stocks that grow their assets the least, a common marker of quality.",
+        MARKET,
+        {"universe": {"type": "french", "set": "investment_deciles", "members": ["lo"]}},
         date_range={"start": "1990-01-01"},
     ),
     _exp(
@@ -465,13 +496,13 @@ def request(entry: dict, written_at: str) -> dict:
     return body | entry["request"] | {"written_at": written_at}
 
 
-def _latest(cfg: Config) -> tuple[dict[str, dict], set[str], int]:
+def _latest(cfg: Config, bodies: bool = True) -> tuple[dict[str, dict], set[str], int]:
     path = ledger_path(cfg)
     if not path.exists():
         return {}, set(), 0
     conn = connect(path, readonly=True)
     try:
-        rows = conn.execute("SELECT strategy_id, kind, result_at, body FROM lab_results ORDER BY result_at").fetchall()
+        rows = conn.execute(f"SELECT strategy_id, kind, result_at, {'body' if bodies else 'NULL AS body'} FROM lab_results ORDER BY result_at").fetchall()
         done = {r[0] for r in conn.execute("SELECT file FROM queue_done")}
         trials = conn.execute(
             "SELECT count(*) FROM (SELECT DISTINCT strategy_id, version, params FROM strategy_trials WHERE kind='full' AND strategy_id IN "
@@ -499,7 +530,7 @@ def _queued(cfg: Config, done: set[str]) -> set[str]:
 def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     try:
-        latest, done, _ = _latest(cfg)
+        latest, done, _ = _latest(cfg, bodies=False)
         waiting = _queued(cfg, done)
         folder = queue_dir(cfg)
         folder.mkdir(parents=True, exist_ok=True)
@@ -507,7 +538,7 @@ def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
         ordered = sorted(LIBRARY, key=lambda e: e["type"] == "rule")
         for i, entry in enumerate(ordered):
             seen = latest.get(entry["id"])
-            if entry["id"] in waiting or (seen and seen["kind"] != "rejected"):
+            if entry["id"] in waiting or (seen and (seen["kind"] != "rejected" or now - datetime.fromisoformat(seen["result_at"]) < RETRY_AFTER)):
                 continue
             final = folder / f"{stamp}-{i:02d}-{entry['id']}-v1-{entry['type']}.json"
             tmp = folder / f".{final.name}.tmp"

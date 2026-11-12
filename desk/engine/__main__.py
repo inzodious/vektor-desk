@@ -241,7 +241,8 @@ def run_lab_export(cfg: Config) -> dict:
 
 
 def run_lab_offer(cfg: Config) -> dict:
-    return {"ok": True, **offer_queue(cfg)}
+    late = shelf.queue_missing(cfg)
+    return {"ok": True, **({"library": late} if late.get("queued") or late.get("error") else {}), **offer_queue(cfg)}
 
 
 def run_french(cfg: Config, http=None) -> dict:

@@ -102,6 +102,9 @@ class Http:
             "F-F_Momentum_Factor_daily_CSV.zip": MOM_CSV,
             "12_Industry_Portfolios_daily_CSV.zip": INDUSTRY_CSV,
             "Portfolios_Formed_on_ME_daily_CSV.zip": SIZE_CSV,
+            "Portfolios_Formed_on_BE-ME_Daily_CSV.zip": SIZE_CSV,
+            "Portfolios_Formed_on_OP_Daily_CSV.zip": SIZE_CSV,
+            "Portfolios_Formed_on_INV_Daily_CSV.zip": SIZE_CSV,
             "F-F_Research_Data_Factors_CSV.zip": MONTHLY_CSV,
         }
         name = url.rsplit("/", 1)[-1]
@@ -121,6 +124,8 @@ def test_first_block_reads_only_value_weighted_rows():
     cols = french.pick_columns("size_deciles", header)
     assert [header[i] for i in cols] == list(french.DECILES)
     assert french.pick_columns("momentum_deciles", ["a", "b"] + [f"x{i}" for i in range(10)]) == list(range(2, 12))
+    for name in ("value_deciles", "profitability_deciles", "investment_deciles"):
+        assert [header[i] for i in french.pick_columns(name, header)] == list(french.DECILES) and french.PORTFOLIO_FILES[name].endswith("_Daily_CSV.zip")
 
 
 def test_french_job_fills_factors_and_portfolios_and_waits_a_month(desk_db):
@@ -146,7 +151,7 @@ def test_french_job_fills_factors_and_portfolios_and_waits_a_month(desk_db):
     fetched = [c for c in http.calls[calls:] if "49_Industry" not in c and "Prior_12_2" not in c]
     assert len(fetched) == 2 and any("Momentum" in c for c in fetched) and any("Formed_on_ME" in c for c in fetched)
     assert desk_db.execute("SELECT count(*) FROM french_returns WHERE set_name='size_deciles'").fetchone()[0] > 0
-    assert ("30 3 * * *", "python -m desk.engine french") in JOBS
+    assert {"schedule": "30 0 * * *", "command": "python -m desk.engine french", "overnight": 100} in JOBS
 
 
 # ---- Lab data ----
