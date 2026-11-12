@@ -272,7 +272,10 @@ def run_experiment(cfg: Config | None, conn, data: LabData, request: dict, *, no
         if known and known["status"] != "lab":
             raise SpecError([f"{spec.id} v{spec.version} is finalized ({known['status']}); a change needs a new version"])
         grid_variants = variants(spec, request.get("grid"), int(request.get("trial_budget") or 200), int(request.get("seed") or 0))
-        win = windows(data, request.get("date_range") or {}, spec.universe.get("kind"))
+        asked = dict(request.get("date_range") or {})
+        if spec.start:
+            asked["start"] = max(str(asked.get("start") or ""), spec.start)
+        win = windows(data, asked, spec.universe.get("kind"))
     except SpecError as e:
         return _reject(conn, raw, e.problems, now)
     if not known:
