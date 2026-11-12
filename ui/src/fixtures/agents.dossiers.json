@@ -32,7 +32,16 @@
     "now": null
    },
    "verdict": "avoid",
-   "what_would_change": "Two clean launches in a row.\nShare count stops growing.\nThe plan makes room for a satellite sleeve."
+   "what_would_change": "Two clean launches in a row.\nShare count stops growing.\nThe plan makes room for a satellite sleeve.",
+   "as_of": "2026-11-04",
+   "what_it_is": "A small company that builds launch vehicles and sells rides to orbit.",
+   "valuation_note": "Priced for a launch schedule it has not yet kept.",
+   "risks": [
+    "A failed launch grounds the fleet for months.",
+    "It needs to raise cash again within a year."
+   ],
+   "fit": "It is a single stock outside the plan, half a percent of the book and inside the single-stock band.",
+   "verdict_line": "Stay out of more. One scrubbed launch resets the timeline and the price."
   }
  },
  {
@@ -73,7 +82,16 @@
     "now": 32
    },
    "verdict": "hold",
-   "what_would_change": "Top three weights pass 50%.\nForward P/E above 35x.\nThe plan drops the tech tilt."
+   "what_would_change": "Top three weights pass 50%.\nForward P/E above 35x.\nThe plan drops the tech tilt.",
+   "as_of": "2026-11-05",
+   "what_it_is": "A fund that owns US technology companies.",
+   "valuation_note": "Rich against its own history, held up by fast earnings growth.",
+   "risks": [
+    "Two companies make up over a third of the fund.",
+    "Technology falls further than the market in a sell-off."
+   ],
+   "fit": "It is at the top of its band, so new money goes elsewhere. The tilt is a choice, not the plan’s core.",
+   "verdict_line": "Hold. It sits at the top of its band, so new money goes elsewhere."
   }
  },
  {
@@ -100,6 +118,76 @@
    },
    "verdict": "watch",
    "what_would_change": "Price under $28 with the offering done.\nFirst operating profit."
+  }
+ },
+ {
+  "symbol": "FXAIX",
+  "run_id": 412,
+  "created_at": "2026-11-09T08:41:09+00:00",
+  "dossier": {
+   "symbol": "FXAIX",
+   "as_of": "2026-11-09",
+   "what_it_is": "A fund that owns the 500 largest US companies in proportion to their size. It makes money when US business as a whole does.",
+   "thesis": "It is the cheapest way to own US large companies and it is the core the plan is built around.",
+   "changes_since_last": null,
+   "valuation_range": {
+    "low": 17,
+    "high": 24,
+    "now": 22,
+    "basis": "price to next year’s earnings, x"
+   },
+   "valuation_note": "Fair to slightly rich. Earnings growth is carrying the price, not hope.",
+   "risks": [
+    "A third of the fund sits in ten companies.",
+    "A US recession hits every holding at once."
+   ],
+   "bear_case": "It is concentrated in a handful of very large technology companies, and it has not been cheap for years.",
+   "fit": "It is 59% of the book against a 60% target, so the next deposit still goes here. It suits a moderate risk level.",
+   "verdict": "add",
+   "verdict_line": "Add on schedule. It is the core of the book and still under its band.",
+   "what_would_change": "It drifts more than 5 points over its target.\nThe plan changes its core fund.",
+   "sources": [
+    {
+     "title": "Fund fact sheet (synthetic)",
+     "url": "https://example.com/synthetic/fund-facts",
+     "date": "2026-10-31"
+    }
+   ]
+  }
+ },
+ {
+  "symbol": "VXUS",
+  "run_id": 413,
+  "created_at": "2026-11-09T08:44:30+00:00",
+  "dossier": {
+   "symbol": "VXUS",
+   "as_of": "2026-11-09",
+   "what_it_is": "A fund that owns companies outside the United States, in developed and emerging markets.",
+   "thesis": "It spreads the book beyond one country and one currency, at a lower price than US stocks.",
+   "changes_since_last": null,
+   "valuation_range": {
+    "low": 11,
+    "high": 16,
+    "now": 13,
+    "basis": "price to next year’s earnings, x"
+   },
+   "valuation_note": "Cheap against its own history and against US stocks.",
+   "risks": [
+    "A stronger dollar cuts returns for a US holder.",
+    "Emerging markets can fall hard and stay down."
+   ],
+   "bear_case": "It has trailed US stocks for a decade and nothing forces that to end.",
+   "fit": "It is 13.7% of the book against a 15% target: the furthest under, so it is first in line for new money.",
+   "verdict": "add",
+   "verdict_line": "Add. It is the furthest under its target.",
+   "what_would_change": "It reaches its target weight.\nThe plan drops its international sleeve.",
+   "sources": [
+    {
+     "title": "Fund fact sheet (synthetic)",
+     "url": "https://example.com/synthetic/fund-facts",
+     "date": "2026-10-31"
+    }
+   ]
   }
  }
 ]

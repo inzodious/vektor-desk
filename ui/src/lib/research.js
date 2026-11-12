@@ -2,7 +2,8 @@ import { parseDay } from './charts.js';
 import { pct, usd } from './format.js';
 
 export const RESEARCH_TABS = [
-  { to: '/research', label: 'Dossiers', end: true },
+  { to: '/research', label: 'Holdings', end: true },
+  { to: '/research/opportunities', label: 'Opportunities' },
   { to: '/research/sources', label: 'Sources' },
   { to: '/research/watchlist', label: 'Watchlist' },
   { to: '/research/calendar', label: 'Calendar' },
@@ -37,6 +38,18 @@ export const SOURCE_WORD = { primary: { t: 'Primary', tone: 'ok' }, web: { t: 'W
 
 export function isLink(s) {
   return /^https?:\/\//i.test(s?.url || '');
+}
+
+const HOLD_STATUS = {
+  running: { t: 'Running now', tone: 'info' },
+  waiting: { t: 'In tonight’s pass', tone: 'info' },
+  failed: { t: 'Last try failed', tone: 'watch' },
+  none: { t: 'Not analysed yet', tone: '' },
+};
+
+export function holdingChip(h) {
+  if (h?.verdict && VERDICT[h.verdict]) return VERDICT[h.verdict];
+  return HOLD_STATUS[h?.status] || { t: 'Analysed', tone: '' };
 }
 
 export function verdictOf(d) {

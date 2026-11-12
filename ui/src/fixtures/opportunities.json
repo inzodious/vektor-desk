@@ -1,0 +1,237 @@
+{
+ "as_of": "2026-11-09",
+ "built_at": "2026-11-09T15:05:00+00:00",
+ "advice_only": true,
+ "freshness": {
+  "scanner_as_of": "2026-11-09",
+  "last_case_at": "2026-11-09T07:20:00+00:00",
+  "last_scout_at": "2026-11-09T08:40:00+00:00",
+  "night_run_at": "2026-11-09T08:41:00+00:00",
+  "night_status": "ok",
+  "note": "1 of these has no written case yet. The numbers stand on their own; the cases are written overnight."
+ },
+ "headline": "1 worth buying now, 3 to watch. Top: QUAL, 12% under its high.",
+ "counts": {
+  "total": 4,
+  "buy": 1,
+  "watch": 2,
+  "screen": 1,
+  "held": 2,
+  "outside": 2,
+  "with_case": 2
+ },
+ "note": null,
+ "profile": {
+  "source": "default_moderate",
+  "label": "Moderate",
+  "single_stock_max_pct": 5,
+  "speculative_max_pct": 5,
+  "note": "No risk check on file yet, so sizes use the Moderate band: 5% a single stock, 5% for all single stocks together."
+ },
+ "cash": {
+  "free_usd": 142,
+  "account": "individual",
+  "next_deposit_usd": 500,
+  "next_deposit_on": "2026-11-18",
+  "note": "Sizes come from free cash first, then the next deposit. Never from margin."
+ },
+ "method": "Ranked by how unusual the discount is for that name, lifted by a written buy case or a Scout idea. It is a sort, not a forecast.",
+ "rows": [
+  {
+   "rank": 1,
+   "symbol": "QUAL",
+   "name": "Synthetic Quality Factor ETF",
+   "kind": "fund",
+   "held": false,
+   "weight_pct": 0,
+   "sources": [
+    "scanner",
+    "case"
+   ],
+   "source_label": "Discount scanner + written case",
+   "stance": "buy",
+   "stance_label": "Worth buying now",
+   "why_now": "A broad sell-off pulled quality names down with everything else; earnings estimates for the fund’s top holdings have not moved. Cheap for a reason that looks temporary.",
+   "facts": [
+    "12.1% under its 52-week high",
+    "First close 10% under the high on Nov 6",
+    "Cheaper than 81% of its last 5 years",
+    "2.4% above its 200-day average"
+   ],
+   "entry": {
+    "low": 171.2,
+    "high": 180.4,
+    "price": 180.4,
+    "in_zone": true,
+    "basis": "Today's close down to one monthly swing lower. Split the buy in two."
+   },
+   "size": {
+    "usd": 100,
+    "shares": 0.55,
+    "pct_points": 0.6,
+    "room_usd": 400,
+    "funding": "cash",
+    "limited_by": "free cash",
+    "note": "A starter slice, cut to the cash that is free today.",
+    "blocked": null
+   },
+   "wrong_if": "If the sell-off is the start of an earnings downturn, quality falls less but still falls. Off below $162.00, two monthly swings under today.",
+   "invalid_below": 162,
+   "case": {
+    "verdict": "buy",
+    "confidence": 0.62,
+    "horizon_days": 120,
+    "written_at": "2026-11-09T07:12:00+00:00"
+   },
+   "decision_id": null,
+   "next_earnings": null,
+   "as_of": "2026-11-09",
+   "score": 78
+  },
+  {
+   "rank": 2,
+   "symbol": "NOVA",
+   "name": "Nova Semiconductor Corp",
+   "kind": "stock",
+   "held": false,
+   "weight_pct": 0,
+   "sources": [
+    "scout"
+   ],
+   "source_label": "Scout idea",
+   "stance": "watch",
+   "stance_label": "Watch: Skeptic disagreed",
+   "why_now": "Scout: order backlog doubled year over year while the price sits 18% under its high after a guidance cut the company tied to one customer.",
+   "facts": [
+    "18.3% under its 52-week high",
+    "Scout confidence 55%"
+   ],
+   "entry": {
+    "low": 41,
+    "high": 45.5,
+    "price": 45.5,
+    "in_zone": true,
+    "basis": "Today's close down to one monthly swing lower. Split the buy in two."
+   },
+   "size": {
+    "usd": 0,
+    "shares": 0,
+    "pct_points": 0,
+    "room_usd": 820,
+    "funding": "wait",
+    "limited_by": "Skeptic",
+    "note": "Nothing to buy until the Skeptic’s point is answered.",
+    "blocked": null
+   },
+   "wrong_if": "Skeptic: one customer is 40% of sales, so the guidance cut may repeat. Off below $36.90.",
+   "invalid_below": 36.9,
+   "case": null,
+   "decision_id": "d_20261109_0007",
+   "next_earnings": {
+    "date": "2026-11-18",
+    "days": 9
+   },
+   "as_of": "2026-11-09",
+   "score": 64
+  },
+  {
+   "rank": 3,
+   "symbol": "ACME",
+   "name": "Acme Launch Corp",
+   "kind": "stock",
+   "held": true,
+   "weight_pct": 0.5,
+   "sources": [
+    "scanner",
+    "case"
+   ],
+   "source_label": "Discount scanner + written case",
+   "stance": "watch",
+   "stance_label": "Watch: a loss sale is planned",
+   "why_now": "Fell 6.8% on a scrubbed launch. The case has not changed, but buying now would void the planned loss sale.",
+   "facts": [
+    "31.0% under its 52-week high",
+    "Fell 6.8% on Nov 6, a 2.3-sigma day"
+   ],
+   "entry": {
+    "low": 24.1,
+    "high": 28.9,
+    "price": 28.9,
+    "in_zone": true,
+    "basis": "Today's close down to one monthly swing lower. Split the buy in two."
+   },
+   "size": {
+    "usd": 0,
+    "shares": 0,
+    "pct_points": 0,
+    "room_usd": 0,
+    "funding": "wait",
+    "limited_by": "loss-sale window",
+    "note": "Nothing to add while the loss sale is planned.",
+    "blocked": "A buy in any account would void the planned loss sale."
+   },
+   "wrong_if": "Another scrubbed launch would keep pressing the price. Off below $19.30.",
+   "invalid_below": 19.3,
+   "case": {
+    "verdict": "wait",
+    "confidence": 0.58,
+    "horizon_days": 60,
+    "written_at": "2026-11-09T07:20:00+00:00"
+   },
+   "decision_id": null,
+   "next_earnings": null,
+   "as_of": "2026-11-09",
+   "score": 51
+  },
+  {
+   "rank": 4,
+   "symbol": "VXUS",
+   "name": "Synthetic International Index ETF",
+   "kind": "fund",
+   "held": true,
+   "weight_pct": 13.7,
+   "sources": [
+    "standing"
+   ],
+   "source_label": "On sale by the numbers",
+   "stance": "screen",
+   "stance_label": "Cheap by the numbers, no written case yet",
+   "why_now": "10.4% under its 52-week high, which is 2.1 of its usual monthly swings, and still above its 200-day average.",
+   "facts": [
+    "10.4% under its 52-week high",
+    "1.1% above its 200-day average"
+   ],
+   "entry": {
+    "low": 58.2,
+    "high": 61.3,
+    "price": 61.3,
+    "in_zone": true,
+    "basis": "Today's close down to one monthly swing lower. Split the buy in two."
+   },
+   "size": {
+    "usd": 42,
+    "shares": 0.69,
+    "pct_points": 0.3,
+    "room_usd": 800,
+    "funding": "cash",
+    "limited_by": "free cash",
+    "note": "What is left of free cash after the row above; the rest waits for the next deposit.",
+    "blocked": null
+   },
+   "wrong_if": "No written case yet, so nobody has checked why it fell. Off below $55.10, two monthly swings under today.",
+   "invalid_below": 55.1,
+   "case": null,
+   "decision_id": null,
+   "next_earnings": null,
+   "as_of": "2026-11-09",
+   "score": 44
+  }
+ ],
+ "passed": [
+  {
+   "symbol": "BND",
+   "name": "Synthetic Total Bond ETF",
+   "reason": "Written case says avoid: cheap for a reason that looks lasting."
+  }
+ ]
+}

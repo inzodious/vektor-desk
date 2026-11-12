@@ -12,6 +12,7 @@ import Results from './pages/Results.jsx';
 import Decisions from './pages/Decisions.jsx';
 import Journal from './pages/Journal.jsx';
 import Research from './pages/Research.jsx';
+import Opportunities from './pages/Opportunities.jsx';
 import ResearchSources from './pages/ResearchSources.jsx';
 import Watchlist from './pages/Watchlist.jsx';
 import ResearchCalendar from './pages/ResearchCalendar.jsx';
@@ -68,6 +69,7 @@ export default function App() {
                 <Route path="decisions/flight" element={<Flight />} />
                 <Route path="decisions/*" element={<NotFound />} />
                 <Route path="research" element={<Research />} />
+                <Route path="research/opportunities" element={<Opportunities />} />
                 <Route path="research/sources" element={<ResearchSources />} />
                 <Route path="research/watchlist" element={<Watchlist />} />
                 <Route path="research/calendar" element={<ResearchCalendar />} />

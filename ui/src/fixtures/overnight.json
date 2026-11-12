@@ -1,0 +1,68 @@
+{
+ "night": "2026-11-08",
+ "state": "done",
+ "started_at": "2026-11-09T04:30:02+00:00",
+ "finished_at": "2026-11-09T08:55:30+00:00",
+ "build": "716e203",
+ "restarts": 0,
+ "starts": "23:30",
+ "ends": "06:30",
+ "summary": "4 of 5 steps done. Not done: Write the debrief.",
+ "steps": [
+  {
+   "id": "mirror",
+   "job": "mirror",
+   "title": "Mirror",
+   "state": "ok",
+   "detail": null,
+   "ready": null,
+   "started_at": "2026-11-09T04:30:02+00:00",
+   "finished_at": "2026-11-09T04:30:40+00:00"
+  },
+  {
+   "id": "engine-daily",
+   "job": "engine-daily",
+   "title": "Engine daily",
+   "state": "skipped",
+   "detail": "It already ran on the version that is live.",
+   "ready": null,
+   "started_at": null,
+   "finished_at": "2026-11-09T04:31:00+00:00"
+  },
+  {
+   "id": "strategies",
+   "job": "strategies",
+   "title": "Queue the strategy library",
+   "state": "ok",
+   "detail": null,
+   "ready": "24 strategies tested, 5 held up out of sample",
+   "started_at": "2026-11-09T04:31:02+00:00",
+   "finished_at": "2026-11-09T04:33:10+00:00"
+  },
+  {
+   "id": "agents-run-research",
+   "job": "agents-run-research",
+   "title": "Analyse every holding",
+   "state": "ok",
+   "detail": null,
+   "ready": "4 holdings analysed",
+   "started_at": "2026-11-09T07:40:00+00:00",
+   "finished_at": "2026-11-09T08:55:30+00:00"
+  },
+  {
+   "id": "agents-run-debrief",
+   "job": "agents-run-debrief",
+   "title": "Write the debrief",
+   "state": "failed",
+   "detail": "The model call timed out.",
+   "ready": null,
+   "started_at": "2026-11-09T08:55:31+00:00",
+   "finished_at": "2026-11-09T09:05:31+00:00"
+  }
+ ],
+ "ready": [
+  "24 strategies tested, 5 held up out of sample",
+  "4 holdings analysed",
+  "4 buying opportunities"
+ ]
+}

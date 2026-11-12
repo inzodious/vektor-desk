@@ -1,0 +1,35 @@
+{
+ "symbol": "VXUS",
+ "run_id": 413,
+ "created_at": "2026-11-09T08:44:30+00:00",
+ "dossier": {
+  "symbol": "VXUS",
+  "as_of": "2026-11-09",
+  "what_it_is": "A fund that owns companies outside the United States, in developed and emerging markets.",
+  "thesis": "It spreads the book beyond one country and one currency, at a lower price than US stocks.",
+  "changes_since_last": null,
+  "valuation_range": {
+   "low": 11,
+   "high": 16,
+   "now": 13,
+   "basis": "price to next year’s earnings, x"
+  },
+  "valuation_note": "Cheap against its own history and against US stocks.",
+  "risks": [
+   "A stronger dollar cuts returns for a US holder.",
+   "Emerging markets can fall hard and stay down."
+  ],
+  "bear_case": "It has trailed US stocks for a decade and nothing forces that to end.",
+  "fit": "It is 13.7% of the book against a 15% target: the furthest under, so it is first in line for new money.",
+  "verdict": "add",
+  "verdict_line": "Add. It is the furthest under its target.",
+  "what_would_change": "It reaches its target weight.\nThe plan drops its international sleeve.",
+  "sources": [
+   {
+    "title": "Fund fact sheet (synthetic)",
+    "url": "https://example.com/synthetic/fund-facts",
+    "date": "2026-10-31"
+   }
+  ]
+ }
+}

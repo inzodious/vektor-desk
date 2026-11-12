@@ -1,0 +1,41 @@
+{
+ "as_of": null,
+ "built_at": "2026-11-09T15:05:00+00:00",
+ "advice_only": true,
+ "freshness": {
+  "scanner_as_of": null,
+  "last_case_at": null,
+  "last_scout_at": null,
+  "night_run_at": null,
+  "night_status": null,
+  "note": null
+ },
+ "headline": "No list yet: the engine has not run.",
+ "counts": {
+  "total": 0,
+  "buy": 0,
+  "watch": 0,
+  "screen": 0,
+  "held": 0,
+  "outside": 0,
+  "with_case": 0
+ },
+ "note": "No list yet: the engine has not run. It fills in after the next engine run.",
+ "profile": {
+  "source": "default_moderate",
+  "label": "Moderate",
+  "single_stock_max_pct": 5,
+  "speculative_max_pct": 5,
+  "note": "No risk check on file yet, so sizes use the Moderate band: 5% a single stock, 5% for all single stocks together."
+ },
+ "cash": {
+  "free_usd": null,
+  "account": null,
+  "next_deposit_usd": null,
+  "next_deposit_on": null,
+  "note": "Sizes come from free cash first, then the next deposit. Never from margin."
+ },
+ "method": "Ranked by how unusual the discount is for that name, lifted by a written buy case or a Scout idea. It is a sort, not a forecast.",
+ "rows": [],
+ "passed": []
+}

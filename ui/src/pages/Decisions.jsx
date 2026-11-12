@@ -8,11 +8,44 @@ import { ProposalCard } from '../decisions/ProposalCard.jsx';
 import { Detail } from '../decisions/Detail.jsx';
 import { accountLabel } from '../live/context.js';
 import { postJson, useApi } from '../lib/api.js';
-import { DECISION_TABS, kindName, needsReason, originName } from '../lib/decisions.js';
+import { dayWords } from '../lib/charts.js';
+import { DECISION_TABS, kindName, needsReason, oneLine, originName } from '../lib/decisions.js';
 import { usd } from '../lib/format.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 import { useGap } from '../start/context.js';
 
+
+// ---------- heads-up notes ----------
+function Notes() {
+  const api = useApi('/api/decisions/notes?days=7', { every: 300000 });
+  const items = Array.isArray(api.data?.items) ? api.data.items : [];
+  if (!items.length) return null;
+  return (
+    <div className="card" style={{ '--i': 3 }} data-testid="notes">
+      <div className="card-head">
+        <span className="tag sky">Heads-up notes</span>
+        <span className="chip">Nothing to decide</span>
+      </div>
+      <div className="rows">
+        {items.map((d) => (
+          <div className="row still note-row" key={d.id} data-note={d.id}>
+            <span className="l">
+              <span style={{ minWidth: 0 }}>
+                <b>{d.title}</b>
+                {d.thesis ? <small className="wrap">{oneLine(d.thesis)}</small> : null}
+                <small>
+                  {originName(d.origin)}
+                  {dayWords(d.as_of || d.created_at) ? ` · as of ${dayWords(d.as_of || d.created_at)}` : ''}
+                </small>
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="empty-hint">The latest note from each desk, for the last {api.data.days || 7} days. Older ones are in the Journal.</p>
+    </div>
+  );
+}
 
 // ---------- to place ----------
 function ToPlace({ items, onPlaced }) {
@@ -183,6 +216,7 @@ export default function Decisions() {
             )}
           </div>
           <ToPlace items={toPlace} onPlaced={(d) => { setNote(`Marked placed: ${d.title}. The next mirror confirms the fill.`); placing.reload(); queue.reload(); }} />
+          <Notes />
         </div>
         <div className="c7 detail" ref={detailRef}>
           {cur ? (

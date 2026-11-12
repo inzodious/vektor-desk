@@ -5,7 +5,7 @@ import { useConsole } from './consoleContext.js';
 import { useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { useMetrics } from '../lib/metrics.js';
-import { dayLabel, parseDay, periodStart } from '../lib/charts.js';
+import { dayLabel, dayWords, parseDay, periodStart } from '../lib/charts.js';
 import { etStamp, plural } from '../lib/format.js';
 import { SOURCE_WORD, coreFund, eventsOf, fmtBasis, freshness, isLink, isPriceBasis, keyNumbers, rangeGeo, rangeLine, rebase, sourceKind, triggersOf, verdictOf } from '../lib/research.js';
 
@@ -190,7 +190,8 @@ export function Dossier({ entry, today }) {
         <div className="card-head">
           <span style={{ display: 'grid', gap: 2, minWidth: 0 }}>
             <span className="kicker">
-              Research desk · {etStamp(entry.created_at) || 'never'} · {plural((d.sources || []).length, 'source')}
+              Research desk · {etStamp(entry.created_at) || 'never'}
+              {dayWords(d.as_of) ? ` · numbers as of ${dayWords(d.as_of)}` : ''} · {plural((d.sources || []).length, 'source')}
             </span>
             <h2 className="dossier-title">
               <button type="button" className="sym sym-btn" data-sym={sym}>
@@ -209,9 +210,20 @@ export function Dossier({ entry, today }) {
             </button>
           </span>
         </div>
+        {d.verdict_line || d.what_it_is ? (
+          <div className="dossier-lead" data-testid="dossier-lead">
+            {d.verdict_line ? <p className="dossier-call">{d.verdict_line}</p> : null}
+            {d.what_it_is ? (
+              <p className="muted">
+                <b>What it is.</b> {d.what_it_is}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="split">
           <div>
             <RangeStrip range={d.valuation_range} nowValue={nowPrice} />
+            {d.valuation_note ? <p className="empty-hint" data-testid="valuation-note">{d.valuation_note}</p> : null}
             {d.changes_since_last ? (
               <div className="note" style={{ marginTop: 10 }}>
                 <Icon name="swap" />
@@ -262,6 +274,30 @@ export function Dossier({ entry, today }) {
           )}
         </div>
       </div>
+      {d.risks?.length || d.fit ? (
+        <div className="grid inner">
+          {d.risks?.length ? (
+            <div className={`card ${d.fit ? 'c7' : 'c12'}`} data-testid="dossier-risks">
+              <div className="card-head">
+                <span className="tag coral">Risks</span>
+              </div>
+              <ul className="dossier-risks">
+                {d.risks.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {d.fit ? (
+            <div className={`card ${d.risks?.length ? 'c5' : 'c12'}`} data-testid="dossier-fit">
+              <div className="card-head">
+                <span className="tag mint">Fit with your plan</span>
+              </div>
+              <p className="dossier-fit">{d.fit}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <KeyNumbers symbol={sym} />
       <div className="grid inner">
         <Events symbol={sym} today={today} />

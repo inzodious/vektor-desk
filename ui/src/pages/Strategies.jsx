@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
 import { LabHero } from '../lab/parts.jsx';
 import { Leaderboard } from '../lab/Leaderboard.jsx';
+import { Library } from '../lab/Library.jsx';
 import { useApi } from '../lib/api.js';
 import { plural } from '../lib/format.js';
 import { PAPER_DAYS, dayOf, STAGES, paperProgress, signedPts, splitStrategies, stageCounts, statusOf } from '../lib/strategy.js';
@@ -59,11 +60,20 @@ function StrategyRow({ s }) {
 // ---------- page ----------
 export default function Strategies() {
   const api = useApi('/api/lab/strategies');
+  const lib = useApi('/api/lab/library', { every: 300000 });
+  const tested = lib.data?.counts?.tested || 0;
   const d = api.data;
-  const list = splitStrategies(d);
+  const list = splitStrategies(d).filter((s) => !(lib.data && s.library));
   const counts = stageCounts(list);
 
-  const big = d ? (
+  const big = tested ? (
+    <>
+      <b>{tested}</b>
+      <span className="muted">
+        tested overnight · {lib.data.counts.held_up || 'none'} held up · {counts.paper + counts.eligible} on paper
+      </span>
+    </>
+  ) : d ? (
     <>
       <b>{counts.paper + counts.eligible}</b>
       <span className="muted">
@@ -92,6 +102,7 @@ export default function Strategies() {
         <>
           <GapNote k="strategies.race" />
           <GapNote k="settings.risk_check" />
+          <Library api={lib} />
           <Leaderboard />
           <StageRail counts={counts} />
           <section className="grid">

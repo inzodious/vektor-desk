@@ -1,0 +1,64 @@
+{
+ "night": "2026-11-09",
+ "state": "idle",
+ "started_at": null,
+ "finished_at": null,
+ "build": null,
+ "restarts": 0,
+ "starts": "23:30",
+ "ends": "06:30",
+ "summary": "Tonight’s run starts at 23:30.",
+ "steps": [
+  {
+   "id": "mirror",
+   "job": "mirror",
+   "title": "Mirror",
+   "state": "waiting",
+   "detail": null,
+   "ready": null,
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "engine-daily",
+   "job": "engine-daily",
+   "title": "Engine daily",
+   "state": "waiting",
+   "detail": null,
+   "ready": null,
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "strategies",
+   "job": "strategies",
+   "title": "Queue the strategy library",
+   "state": "waiting",
+   "detail": null,
+   "ready": null,
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "agents-run-research",
+   "job": "agents-run-research",
+   "title": "Analyse every holding",
+   "state": "waiting",
+   "detail": null,
+   "ready": null,
+   "started_at": null,
+   "finished_at": null
+  },
+  {
+   "id": "agents-run-debrief",
+   "job": "agents-run-debrief",
+   "title": "Write the debrief",
+   "state": "waiting",
+   "detail": null,
+   "ready": null,
+   "started_at": null,
+   "finished_at": null
+  }
+ ],
+ "ready": []
+}

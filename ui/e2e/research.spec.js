@@ -7,8 +7,8 @@ test.beforeEach(async ({ page }) => {
 
 test('research opens the newest dossier with its verdict, range and sources', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/research');
-  await expect(page.locator('.ph-big')).toContainText('3');
+  await page.goto('/research?s=FTEC');
+  await expect(page.locator('.ph-big')).toContainText('4 of 5');
   await expect(page.locator('.ph-big')).toContainText('1 deep dive queued for tonight');
   const d = page.getByTestId('dossier');
   await expect(d).toHaveAttribute('data-symbol', 'FTEC');
@@ -24,7 +24,7 @@ test('research opens the newest dossier with its verdict, range and sources', as
 
 test('picking a dossier swaps the detail and keeps it in the URL', async ({ page }) => {
   await page.goto('/research');
-  await page.getByTestId('dossier-list').getByRole('button', { name: /ACME/ }).click();
+  await page.getByTestId('holding-list').getByRole('button', { name: /ACME/ }).click();
   await expect(page).toHaveURL(/s=ACME/);
   const d = page.getByTestId('dossier');
   await expect(d).toHaveAttribute('data-symbol', 'ACME');
@@ -35,9 +35,17 @@ test('picking a dossier swaps the detail and keeps it in the URL', async ({ page
   await expect(d.getByTestId('events').locator('.chip.info')).toHaveText('Coming up');
 });
 
-test('the show combo filters held and not held dossiers', async ({ page }) => {
+test('names you do not hold sit under the holdings, and an older desk keeps the show combo', async ({ page }) => {
   await page.goto('/research');
   const list = page.getByTestId('dossier-list');
+  await expect(list).toContainText('Other names');
+  await expect(list.locator('.dossier-row')).toHaveCount(1);
+  await expect(list.locator('.dossier-row')).toContainText('NOVA');
+
+  await page.route('**/api/agents/holdings*', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Not Found"}' }));
+  await page.goto('/research');
+  await expect(page.getByTestId('holding-list')).toHaveCount(0);
+  await expect(list).toContainText('Dossiers');
   await list.getByRole('button', { name: /^Show/ }).click();
   await page.getByRole('option', { name: 'Not held' }).click();
   await expect(list.locator('.dossier-row')).toHaveCount(1);
@@ -46,6 +54,7 @@ test('the show combo filters held and not held dossiers', async ({ page }) => {
 
 test('no dossiers asks for a deep dive instead of showing blanks', async ({ page }) => {
   await page.route('**/api/agents/dossiers', (r) => r.fulfill({ json: [] }));
+  await page.route('**/api/agents/holdings*', (route) => route.fulfill({ status: 404, contentType: 'application/json', body: '{"detail":"Not Found"}' }));
   await page.goto('/research');
   await expect(page.locator('.ph-big')).toContainText('0');
   await expect(page.getByText('No dossier open')).toBeVisible();
@@ -60,7 +69,7 @@ test('refresh now opens the console set to run now for that symbol', async ({ pa
     sent = r.request().postDataJSON();
     return r.fulfill({ status: 201, json: { id: 9, status: 'queued', desk: 'research', question: sent.question, symbol: sent.symbol, run_now: 1 } });
   });
-  await page.goto('/research');
+  await page.goto('/research?s=FTEC');
   await page.getByRole('button', { name: 'Refresh now' }).click();
   const dlg = page.getByRole('dialog', { name: 'Console' });
   await expect(dlg.getByLabel('Ask a desk')).toHaveValue('Refresh the FTEC dossier');
@@ -159,7 +168,7 @@ test('the search button works on a phone too', async ({ page }) => {
 test('sources list every citation and filter by kind', async ({ page }) => {
   await page.goto('/research/sources');
   const s = page.getByTestId('sources');
-  await expect(s.locator('.src')).toHaveCount(8);
+  await expect(s.locator('.src')).toHaveCount(10);
   await s.getByRole('button', { name: /^Kind/ }).click();
   await page.getByRole('option', { name: 'Primary' }).click();
   await expect(s.locator('.src')).toHaveCount(5);

@@ -1,0 +1,42 @@
+{
+ "count": 2,
+ "days": 7,
+ "items": [
+  {
+   "id": "d_20261109133500_aa01",
+   "created_at": "2026-11-09T13:35:00+00:00",
+   "updated_at": "2026-11-09T13:35:00+00:00",
+   "origin": "plan_keeper",
+   "run_id": "r-seed-9",
+   "kind": "memo",
+   "title": "Margin is back to zero",
+   "symbol": null,
+   "thesis": "The debit was paid off by the last deposit, so nothing accrues this month.",
+   "subject": "margin",
+   "as_of": "2026-11-09",
+   "valid": null,
+   "expires_at": null,
+   "status": "logged",
+   "status_reason": "A heads-up that needs no decision, so it is kept in the journal.",
+   "replaced_by": null
+  },
+  {
+   "id": "d_20261109133500_aa02",
+   "created_at": "2026-11-09T13:35:00+00:00",
+   "updated_at": "2026-11-09T13:35:00+00:00",
+   "origin": "risk",
+   "run_id": "r-seed-9",
+   "kind": "memo",
+   "title": "One fund makes up most of the book",
+   "symbol": null,
+   "thesis": "FXAIX is 59% of the portfolio, which is the plan. Nothing to do.",
+   "subject": "concentration",
+   "as_of": "2026-11-09",
+   "valid": null,
+   "expires_at": null,
+   "status": "logged",
+   "status_reason": "A heads-up that needs no decision, so it is kept in the journal.",
+   "replaced_by": null
+  }
+ ]
+}

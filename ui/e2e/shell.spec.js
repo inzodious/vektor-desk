@@ -62,7 +62,7 @@ test('each area shows its own subtabs', async ({ page }) => {
     ['/portfolio/risk', 'Portfolio views', ['Holdings', 'Stock plans', 'Risk', 'Tax']],
     ['/strategies', 'Strategies views', ['Race', 'Mixes', 'My habits']],
     ['/strategies/sector-momentum', 'Strategies views', ['Race', 'Mixes', 'My habits']],
-    ['/research/compare', 'Research views', ['Dossiers', 'Sources', 'Watchlist', 'Calendar', 'Compare', 'Boards']],
+    ['/research/compare', 'Research views', ['Holdings', 'Opportunities', 'Sources', 'Watchlist', 'Calendar', 'Compare', 'Boards']],
   ];
   for (const [path, label, tabs] of groups) {
     await page.goto(path);
