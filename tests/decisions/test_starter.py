@@ -66,12 +66,12 @@ def test_init_from_demo_mirror_writes_a_valid_draft_once(demo_cfg):
 
 def test_status_lists_what_is_still_default(demo_cfg):
     before = status(demo_cfg)
-    assert before["exists"] is False and before["source"] == "defaults" and "profile init" in before["starter"]
+    assert before["exists"] is False and before["source"] == "defaults" and "starter" not in before
     assert before["init"] == {"method": "POST", "path": "/api/decisions/profile/init", "label": "Set up my profile from my data"}
     assert "deposits" in before["defaults"] and "risk_level" in before["defaults"]
     init(demo_cfg, today=TODAY)
     after = status(demo_cfg)
-    assert after["exists"] is True and after["starter"] is None and after["init"] is None and after["error"] is None
+    assert after["exists"] is True and "starter" not in after and after["init"] is None and after["error"] is None
     assert {"tax.wash_sale_accounts", "industry_focus.themes", "agents.desks"} <= set(after["set"]) and "deposits" in after["defaults"]
     assert {"risk_level", "agents.enabled", "tax.harvest_threshold_usd", "opportunity.satellite_cap_pct"} <= set(after["defaults"])
     assert after["agents_enabled"] is False and after["desks_on"] == [] and after["deposits_mode"] == "auto"

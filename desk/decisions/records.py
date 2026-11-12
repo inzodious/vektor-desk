@@ -29,6 +29,7 @@ CLEARED_DAYS = 2
 SUBJECT_MAX = 80
 REPLACED = "A newer proposal on the same subject replaced this one on {day}."
 NOTE_REASON = "A heads-up that needs no decision, so it is kept in the journal."
+CARRIED = "Carries the snooze from the proposal it replaced."
 EXPIRY_TRADING_DAYS = 5
 FILL_WINDOW_DAYS = 10
 UNMATCHED_DAYS = 90
@@ -370,8 +371,9 @@ def _insert(cfg: Config, conn: sqlite3.Connection, c: dict, *, origin: str, run_
     did = new_id(now)
     expires = expiry(c["expires"], now, cfg.timezone) if status == "proposed" else None
     valid = dict(c["valid"] or {})
-    if status == "proposed" and c["symbol"] and c["kind"] in TRADE_KINDS:
-        seen = _Facts(conn).latest(c["symbol"])
+    facts = _Facts(conn) if status == "proposed" else None
+    if facts and c["symbol"] and c["kind"] in TRADE_KINDS:
+        seen = facts.latest(c["symbol"])
         if seen:
             valid["price_at"] = seen[0]
     record = {
@@ -410,9 +412,12 @@ def _insert(cfg: Config, conn: sqlite3.Connection, c: dict, *, origin: str, run_
     with conn:
         conn.execute(f"INSERT INTO decisions ({', '.join(record)}) VALUES ({', '.join('?' * len(record))})", tuple(record.values()))
         log_event(conn, did, status, reason=reason, at=at)
-        if status == "proposed" and origin != "you" and record["run_id"] is not None:
+        found = stale_reason(to_dict(_get(conn, did)), facts, at, cfg.timezone) if facts and origin != "you" else None
+        if found:
+            _close(conn, did, at, "expired", found[1], {"check": found[0], "at": "arrival"})
+        elif facts and origin != "you" and record["run_id"] is not None:
             _replace(conn, record, at, cfg.timezone)
-    if status == "proposed":
+    if status == "proposed" and not found:
         d = to_dict(_get(conn, did))
         checked = run_preflight(cfg, conn, d, at)
         with conn:
@@ -436,8 +441,8 @@ def _replace(conn: sqlite3.Connection, new: dict, at: str, tz: str) -> int:
         if r["status"] == "snoozed" and r["snoozed_until"] and r["snoozed_until"] > at:
             held = max(held or "", r["snoozed_until"])
     if held and new["status"] == "proposed":
-        _update(conn, new["id"], at, status="snoozed", snoozed_until=held)
-        log_event(conn, new["id"], "snoozed", reason="Carried over from the proposal this one replaces.", detail={"until": held}, at=at)
+        _update(conn, new["id"], at, status="snoozed", snoozed_until=held, status_reason=CARRIED)
+        log_event(conn, new["id"], "snoozed", reason=CARRIED, detail={"until": held, "carried": True}, at=at)
     return len(rows)
 
 
@@ -451,7 +456,9 @@ def create_proposal(cfg: Config, proposal: dict, desk: str, run_id=None, skeptic
     reason = rejection(c)
     status = "rejected" if reason else "logged" if c["kind"] in NOTE_KINDS else "proposed"
     with session(cfg) as conn:
-        return _insert(cfg, conn, c, origin=desk, run_id=run_id, status=status, reason=reason, now=_now(now), skeptic=skeptic)
+        return _insert(
+            cfg, conn, c, origin=desk, run_id=run_id, status=status, reason=NOTE_REASON if status == "logged" else reason, now=_now(now), skeptic=skeptic
+        )
 
 
 def reject_proposal(cfg: Config, proposal: dict, desk: str, reason: str, run_id=None, *, now: datetime | None = None) -> dict:
@@ -721,6 +728,16 @@ def stale_reason(d: dict, facts: _Facts, at: str, tz: str) -> tuple[str, str] | 
     return ("cash", reason) if reason else None
 
 
+def _survivor(live: dict[tuple[str, str], dict], rank: dict[str, int], d: dict) -> dict | None:
+    top = d
+    while top["origin"] != "you":
+        nxt = live.get((top["origin"], top["subject"]))
+        if nxt is None or rank[nxt["id"]] <= rank[top["id"]] or nxt["run_id"] == top["run_id"]:
+            break
+        top = nxt
+    return None if top is d else top
+
+
 def tidy(cfg: Config, conn: sqlite3.Connection, at: str) -> dict:
     tz = cfg.timezone
     out = {"notes": 0, "replaced": 0, "expired": 0}
@@ -728,7 +745,9 @@ def tidy(cfg: Config, conn: sqlite3.Connection, at: str) -> dict:
     if not rows:
         return out
     facts = _Facts(conn)
-    newest: dict[tuple[str, str], dict] = {}
+    rank = {d["id"]: n for n, d in enumerate(rows)}
+    live: dict[tuple[str, str], dict] = {}
+    stale: dict[str, tuple[str, str]] = {}
     with conn:
         for d in rows:
             if not d["subject"]:
@@ -737,19 +756,22 @@ def tidy(cfg: Config, conn: sqlite3.Connection, at: str) -> dict:
             if d["origin"] != "you" and d["kind"] in NOTE_KINDS:
                 out["notes"] += _close(conn, d["id"], at, "logged", NOTE_REASON, status="logged", expires_at=None)
                 d["status"] = "logged"
-            elif d["origin"] != "you":
-                newest[(d["origin"], d["subject"])] = newest[(d["origin"], derived_subject(d))] = d
-        for d in rows:
-            if d["status"] not in OPEN:
-                continue
-            top = newest.get((d["origin"], d["subject"]))
-            if top and top["id"] != d["id"] and d["run_id"] != top["run_id"]:
-                reason = REPLACED.format(day=day_words(top["created_at"], tz))
-                out["replaced"] += _close(conn, d["id"], at, "replaced", reason, {"by": top["id"]}, replaced_by=top["id"])
                 continue
             found = stale_reason(d, facts, at, tz)
             if found:
-                out["expired"] += _close(conn, d["id"], at, "expired", found[1], {"check": found[0]})
+                stale[d["id"]] = found
+            elif d["origin"] != "you":
+                live[(d["origin"], d["subject"])] = live[(d["origin"], derived_subject(d))] = d
+        for d in rows:
+            if d["status"] not in OPEN:
+                continue
+            top = _survivor(live, rank, d)
+            if top:
+                reason = REPLACED.format(day=day_words(top["created_at"], tz))
+                out["replaced"] += _close(conn, d["id"], at, "replaced", reason, {"by": top["id"]}, replaced_by=top["id"])
+            elif d["id"] in stale:
+                check, reason = stale[d["id"]]
+                out["expired"] += _close(conn, d["id"], at, "expired", reason, {"check": check})
     return out
 
 
@@ -762,10 +784,10 @@ def queue(cfg: Config, *, now: datetime | None = None) -> dict:
             "ORDER BY expires_at IS NULL, expires_at, created_at DESC",
             (at,),
         ).fetchall()
-        snoozed = conn.execute("SELECT COUNT(*) FROM decisions WHERE status='snoozed' AND snoozed_until > ?", (at,)).fetchone()[0]
+        asleep = conn.execute("SELECT * FROM decisions WHERE status='snoozed' AND snoozed_until > ? ORDER BY snoozed_until, created_at", (at,)).fetchall()
         waiting = conn.execute("SELECT COUNT(*) FROM decisions WHERE status='approved'").fetchone()[0]
     items = [to_dict(r) for r in rows]
-    return {"count": len(items), "snoozed": snoozed, "to_place": waiting, "items": items}
+    return {"count": len(items), "snoozed": len(asleep), "to_place": waiting, "items": items, "snoozed_items": [to_dict(r) for r in asleep]}
 
 
 def notes(cfg: Config, *, days: int = NOTE_DAYS, now: datetime | None = None) -> dict:
@@ -831,6 +853,19 @@ def clear_contradictions(cfg: Config, conn: sqlite3.Connection, moment: datetime
     return cleared
 
 
+def _successor(conn: sqlite3.Connection, d: dict) -> dict | None:
+    seen, last, nxt = {d["id"]}, None, d["replaced_by"]
+    while nxt and nxt not in seen:
+        row = conn.execute("SELECT id, title, status, status_reason, replaced_by FROM decisions WHERE id=?", (nxt,)).fetchone()
+        if row is None:
+            break
+        seen.add(nxt)
+        last, nxt = row, row["replaced_by"]
+    if last is None:
+        return None
+    return {"id": last["id"], "title": last["title"], "status": last["status"], "status_reason": last["status_reason"], "open": last["status"] in OPEN}
+
+
 def cleared(cfg: Config, *, days: int = CLEARED_DAYS, now: datetime | None = None) -> dict:
     moment = _now(now)
     since = now_iso(moment - timedelta(days=max(1, min(int(days), 90))))
@@ -848,6 +883,7 @@ def cleared(cfg: Config, *, days: int = CLEARED_DAYS, now: datetime | None = Non
             ).fetchone()
             d["check"] = "replaced" if last and last["event"] == "replaced" else (loads(last["detail"]) or {}).get("check") if last else None
             d["cleared_at"] = d["decided_at"]
+            d["successor"] = _successor(conn, d)
             items.append(d)
     return {"count": len(items), "days": days, "items": items}
 
