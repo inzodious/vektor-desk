@@ -13,7 +13,7 @@ import requests
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import ENGINE_VERSION, broker, core, discounts, earnings, filings, french, insider, lane, paper_exec, review, schema, triggers, universe
+from desk.engine import ENGINE_VERSION, asof, broker, core, discounts, earnings, filings, french, insider, lane, paper_exec, review, schema, triggers, universe
 from desk.engine.backfill import never_fetched, run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.kinds import offer_queue
@@ -74,14 +74,53 @@ def _core(cfg: Config, mirror, desk) -> dict:
 
 def run_daily(cfg: Config) -> dict:
     history = run_history(cfg)
+    closes = run_closes(cfg)
     held = run_holdings(cfg)
     if not held.get("ok"):
         return held
     filled = _fill_backcast(cfg, held)
     if filled and filled.get("fetched"):
         held = run_holdings(cfg)
-    out = {"ok": True, "history": history, "holdings": held, "core": run_core(cfg)}
+    out = {"ok": True, "history": history, "closes": closes, "holdings": held, "core": run_core(cfg)}
     return out | {"backfill": filled} if filled else out
+
+
+def run_closes(cfg: Config) -> dict:
+    desk = connect(cfg.desk_db)
+    try:
+        schema.apply(desk)
+        settled = asof.settle(desk)
+        return settled | asof.stamp(desk)
+    finally:
+        desk.close()
+
+
+def run_restate(cfg: Config) -> dict:
+    desk = connect(cfg.desk_db)
+    try:
+        schema.apply(desk)
+        check = asof.pending(desk)
+        last = desk.execute("SELECT detail FROM engine_runs WHERE job='restate' AND ok=1 ORDER BY id DESC LIMIT 1").fetchone()
+    finally:
+        desk.close()
+    if not check["due"]:
+        return {"ok": True, "skipped": check["why"]}
+    if last and json.loads(last["detail"] or "{}").get("signature") == check["signature"]:
+        return {"ok": True, "skipped": "Already restated on these closes and quotes."}
+    started = now_iso()
+    daily = run_daily(cfg)
+    reviewed = run_review(cfg) if daily.get("ok") else {"ok": False, "skipped": "the daily pass failed"}
+    result = {"ok": bool(daily.get("ok") and reviewed.get("ok")), "why": check["why"], "signature": check["signature"], "daily": daily, "review": reviewed}
+    desk = connect(cfg.desk_db)
+    try:
+        with desk:
+            desk.execute(
+                "INSERT INTO engine_runs (job, started_at, finished_at, ok, detail, engine_version) VALUES ('restate', ?, ?, ?, ?, ?)",
+                (started, now_iso(), int(result["ok"]), json.dumps(result), ENGINE_VERSION),
+            )
+    finally:
+        desk.close()
+    return result
 
 
 def _fill_backcast(cfg: Config, held: dict) -> dict | None:
@@ -265,6 +304,7 @@ JOBS = {
     "earnings": run_earnings,
     "discounts": run_discounts,
     "review": run_review,
+    "restate": run_restate,
     "quotes": run_quotes,
     "backfill": run_market_backfill,
     "lookthrough": run_lookthrough,

@@ -2,6 +2,7 @@ import sqlite3
 
 from desk.config import Config
 from desk.db import connect
+from desk.engine import asof
 from desk.engine.lots import current_lots
 from desk.engine.tax import held_long
 
@@ -11,7 +12,7 @@ SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
         "value": ("value.market@portfolio", "value.market@account", "value.day_change", "value.gain", "flow.net_contrib", "income.dividends"),
         "cash": ("cash.*",),
         "drift": ("plan.weight", "plan.target", "plan.drift", "plan.drift_max", "plan.in_mix", "plan.next_deposit", "plan.adherence"),
-        "rules": ("plan.rules", "plan.single_stock"),
+        "rules": ("plan.rules", "plan.rule_breaks", "plan.single_stock"),
         "margin": ("margin.*",),
         "benchmarks": ("bm.plan_shadow", "bm.sp500_shadow", "bm.excess"),
     },
@@ -24,7 +25,7 @@ SECTIONS: dict[str, dict[str, tuple[str, ...]]] = {
     "risk": {
         "risk": ("risk.*",),
         "margin": ("margin.*",),
-        "concentration": ("value.weight@holding", "plan.single_stock", "plan.rules"),
+        "concentration": ("value.weight@holding", "plan.single_stock", "plan.rules", "plan.rule_breaks"),
         "returns": ("ret.twr@portfolio", "value.day_change", "bm.excess"),
         "signals": ("sig.dilution", "sig.earnings_days", "sig.insider_net"),
         "macro": ("macro.*",),
@@ -73,8 +74,11 @@ def _matches(pattern: str, metric_id: str, scope: str) -> bool:
     return metric_id.startswith(name[:-1]) if name.endswith("*") else metric_id == name
 
 
+FLAG_MEANING = "A yes or no flag, not a count: 1 means the rule holds, 0 means it is broken. plan.rule_breaks counts what breaks it."
+
+
 def _item(r: sqlite3.Row) -> dict:
-    return {
+    item = {
         "metric_id": r["metric_id"],
         "scope": r["scope"],
         "scope_id": r["scope_id"],
@@ -84,6 +88,9 @@ def _item(r: sqlite3.Row) -> dict:
         "as_of": r["as_of"],
         "quality": r["quality"],
     }
+    if r["unit"] == "flag" and r["value"] is not None:
+        item |= {"state": "holds" if r["value"] == 1 else "broken", "meaning": FLAG_MEANING}
+    return item
 
 
 def _has(conn: sqlite3.Connection, table: str) -> bool:
@@ -158,6 +165,8 @@ def desk_slice(cfg: Config, desk: str) -> dict:
             for r in conn.execute("SELECT check_name, status, detail FROM data_health WHERE as_of=? ORDER BY check_name", (as_of,))
         ]
         run = conn.execute("SELECT finished_at FROM engine_runs WHERE job='core' AND ok=1 ORDER BY id DESC LIMIT 1").fetchone()
+        book = asof.view(conn)
     finally:
         conn.close()
-    return {"desk": desk, "as_of": (run["finished_at"] if run else None) or as_of, "data_as_of": as_of, "data_health": health, "sections": sections}
+    day = {k: book[k] for k in ("day", "provisional", "words", "previous_day", "prices")}
+    return {"desk": desk, "as_of": (run["finished_at"] if run else None) or as_of, "data_as_of": as_of, "day": day, "data_health": health, "sections": sections}
