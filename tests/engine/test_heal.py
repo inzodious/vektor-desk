@@ -302,6 +302,31 @@ def test_the_five_minute_catch_up_does_the_asking_and_a_dry_run_asks_for_nothing
     assert "heal" not in quiet
 
 
+def test_during_the_overnight_run_only_prices_are_asked_for_so_the_book_and_the_night_are_left_alone(cfg):
+    rows = [("closes", "warn", heal.FIXES, heal.BACKFILL), ("freshness", "fail", heal.BLOCKS, heal.ACCOUNTS), ("research", "warn", heal.FIXES, heal.RESEARCH)]
+    rows += [("lookthrough", "warn", heal.FIXES, heal.LOOKTHROUGH)]
+    health_rows(cfg, rows)
+    desk = connect(cfg.desk_db)
+    with desk:
+        desk.execute("UPDATE data_health SET say=NULL")
+    desk.close()
+    held = {heal.ACCOUNTS: heal.NIGHT, heal.RESEARCH: heal.NIGHT, heal.LOOKTHROUGH: heal.NIGHT, heal.DAILY: heal.NIGHT}
+    for at in (datetime(2026, 11, 13, 4, 35, tzinfo=UTC), datetime(2026, 11, 13, 8, 0, tzinfo=UTC), datetime(2026, 11, 13, 11, 25, tzinfo=UTC)):
+        beat(cfg, at)
+        night = heal.run(cfg, now=at, jobs=engine_jobs())
+        assert night["waiting"] | held == night["waiting"] and set(night["asked"]) <= {heal.BACKFILL} and heal.DAILY not in asked(cfg)
+        jobrun.take_requests(cfg)
+    assert heal.read_state(cfg).keys() == {heal.BACKFILL}
+    for at, expected in ((datetime(2026, 11, 13, 4, 25, tzinfo=UTC), "23:25 ET"), (datetime(2026, 11, 13, 11, 35, tzinfo=UTC), "06:35 ET")):
+        heal._write_state(cfg, {})
+        for last in jobrun.requests_dir(cfg).glob("*.last"):
+            last.unlink()
+        beat(cfg, at)
+        day = heal.run(cfg, now=at, jobs=engine_jobs())
+        assert set(day["asked"]) == {heal.BACKFILL, heal.ACCOUNTS, heal.RESEARCH, heal.LOOKTHROUGH, heal.DAILY}, expected
+        jobrun.take_requests(cfg)
+
+
 @pytest.mark.parametrize("gone", ["no table", "no file"])
 def test_with_no_health_yet_nothing_is_asked(cfg, gone):
     if gone == "no table":

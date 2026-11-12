@@ -151,6 +151,7 @@ Every non-ok detail ends with `Fix:` and the one step that clears it. That detai
 |---|---|
 | Never asked | While that job is queued, running or waiting its turn, inside its cool-down, or when the scheduler is not running |
 | A price one session late | No job: the hourly backfill already asks |
+| During the overnight run (23:30 to 06:30 ET) | Only the price backfill is asked for. Accounts, Research, Look-through and Daily numbers wait until 06:30, so a self-asked run can never move the book day or disturb the night's steps |
 | After 3 tries | The cool-down is 6 times longer. For prices, and for any `fail`, the sentence adds "The desk has tried 3 times and it has not cleared. Settings, Box shows why." and a `fixes_itself` price check becomes `needs_you` |
 | State | `run/heal.json`: per job, when it was asked, how many tries, which checks. A job whose checks are ok again is forgotten |
 | Payload | Each check: `check_name, status, detail, kind, counts, job, heal {job, asked_at, attempts, stuck}, diagnosis`. Top level: `status` (fail if any fail, warn if any `needs_you`, else ok) and `kinds` (count per kind) |
