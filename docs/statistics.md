@@ -905,7 +905,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 ### As built (phase 9b)
 
-**French data.** Engine job `french` (00:30 nightly, before `lab-export`; skips files fetched in the last 25 days) downloads the daily zips into `desk.db`:
+**French data.** Engine job `french` (first of the engine's steps in the night's order, `"overnight": 100`, with 00:30 as its fallback time, so new files reach the same night's `lab-export`; skips files fetched in the last 25 days) downloads the daily zips into `desk.db`:
 
 | Table | From | Holds |
 |---|---|---|
@@ -1068,7 +1068,7 @@ Not on the shelf: the as-held mix. A backtest of today's holdings is the hindsig
 
 | Step | When | What happens |
 |---|---|---|
-| Queue | End of `lab-export` (00:55), before the offer to a worker | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Experiments sort before rules. An entry the lab refused is queued again the next evening. A second run the same night queues nothing |
+| Queue | End of `lab-export` (00:55), before the offer to a worker; `lab-offer` repeats it each minute of the lab hours, so a build that lands after 00:55 still queues that night | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Experiments sort before rules. An entry the lab refused is queued again once 12 hours have passed. A second run the same night queues nothing |
 | Run | Lab, with a worker first | Experiments are `lab.sims` jobs like any other; deposit rules run in the lab itself. The lab keeps waiting for an offered file while the worker has answered something in the last `DESK_LAB_WORKER_WAIT_MIN` minutes, then runs what is left |
 | Count | Ledger | Every shelf strategy has `parent_id: "library"`, so they are one family and each variant counts toward the trial count. `insider-` and `drift-` ids also count in those gate families |
 | Report | `GET /api/lab/library` | One row per entry, sorted by kind, verdict, then excess |

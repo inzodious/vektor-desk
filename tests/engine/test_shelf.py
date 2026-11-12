@@ -234,8 +234,23 @@ def test_an_entry_the_lab_refused_is_explained_and_tried_again_the_next_evening(
     process_queue(cfg, now=NOW)
     (row,) = shelf.view(cfg)["rows"]
     assert row["status"] == "not_run" and "small-cap history is not in the lab yet" in row["reason"] and row["verdict"] is None
+    assert shelf.queue_missing(cfg, now=NOW + timedelta(hours=11))["queued"] == 0
     assert shelf.queue_missing(cfg, now=NOW + timedelta(days=1))["queued"] == 1
     assert shelf.view(cfg)["rows"][0]["status"] == "waiting"
+
+
+def test_a_build_that_lands_after_the_export_still_queues_the_library_that_night(stocked, monkeypatch):
+    from desk.engine.__main__ import run_lab_offer
+
+    cfg = stocked
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ("lib-60-40", "lib-harvest")))
+    monkeypatch.setattr(shelf, "IDS", frozenset({"lib-60-40", "lib-harvest"}))
+    made = store.add_worker(cfg, "Horizon")
+    store.beat(cfg, made["id"], {})
+    first = run_lab_offer(cfg)
+    assert first["library"] == {"queued": 2, "of": 2} and first["offered"] == 1
+    again = run_lab_offer(cfg)
+    assert "library" not in again and again["offered"] == 0 and len(list(simcache.queue_dir(cfg).glob("*.json"))) == 2
 
 
 def test_the_export_queues_the_library_before_it_offers_and_never_waits_its_turn(stocked):

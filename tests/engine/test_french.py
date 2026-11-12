@@ -151,7 +151,7 @@ def test_french_job_fills_factors_and_portfolios_and_waits_a_month(desk_db):
     fetched = [c for c in http.calls[calls:] if "49_Industry" not in c and "Prior_12_2" not in c]
     assert len(fetched) == 2 and any("Momentum" in c for c in fetched) and any("Formed_on_ME" in c for c in fetched)
     assert desk_db.execute("SELECT count(*) FROM french_returns WHERE set_name='size_deciles'").fetchone()[0] > 0
-    assert ("30 0 * * *", "python -m desk.engine french") in JOBS
+    assert {"schedule": "30 0 * * *", "command": "python -m desk.engine french", "overnight": 100} in JOBS
 
 
 # ---- Lab data ----
