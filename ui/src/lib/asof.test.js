@@ -52,7 +52,7 @@ describe('one clock', () => {
     expect(v.ticking).toBe(true);
     expect(v.shown).toBe('2026-11-12');
     expect(v.day).toBe('2026-11-11');
-    expect(v.books).toBe('Last closing run: Wed Nov 11');
+    expect(v.books).toBe('Book as of Wed Nov 11, at the close');
     expect(v.figures).toEqual({ change: '−$251', pct: '−0.61%', tone: 'dn', cash: '$603', pending: '$250', margin: '$1,500' });
     const late = asOfView({ ...FINAL, behind: { sessions: 1, reason: 'Closing quotes are in for Thu Nov 12.' }, live: { ...LIVE, state: 'after', words: 'Thu Nov 12, last quotes 7:40 PM ET' } }, NOW);
     expect(late.text).toBe('As of Thu Nov 12, last quotes 7:40 PM ET');

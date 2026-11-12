@@ -71,7 +71,7 @@ export function asOfView(d, now = new Date()) {
     ticking: Boolean(live && /^Live\b/.test(quoted)),
     provisional: Boolean(d.provisional) && !older,
     behind: live ? null : behind,
-    books: older ? `Last closing run: ${dayWords(d.day)}` : null,
+    books: older ? `Book as of ${book}` : null,
     title: [live ? `Prices: ${quoted}. Cash, margin and the review come from the closed book, ${book}.` : d.words, behind].filter(Boolean).join(' ') || null,
     tone: behind && !live ? 'watch' : '',
     numbers,

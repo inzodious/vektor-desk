@@ -63,7 +63,7 @@ test('with the market open every page leads with the live day and its change, ne
   const seen = await walk(page, '');
   seen.forEach((c) => expect(c).toEqual({ day: '2026-11-09', words: 'As of Mon Nov 9, 11:40 AM ET', change: '−$86', cash: '$142', margin: 'none' }));
   await expect(page.getByTestId('asof')).toContainText('Live');
-  await expect(page.getByTestId('asof-book')).toHaveText('Last closing run: Fri Nov 6');
+  await expect(page.getByTestId('asof-book')).toHaveText('Book as of Fri Nov 6, at the close');
   await expect(page.getByTestId('asof')).not.toContainText('+$53');
 
   await page.goto('/');
@@ -87,7 +87,7 @@ test('after the close, with the closing run still to come, every page shows the 
   const line = page.getByTestId('asof');
   await expect(line).not.toContainText('Behind');
   await expect(line).not.toContainText('+$53');
-  await expect(page.getByTestId('asof-book')).toHaveText('Last closing run: Fri Nov 6');
+  await expect(page.getByTestId('asof-book')).toHaveText('Book as of Fri Nov 6, at the close');
   await expect(line).toHaveAttribute('title', /Closing quotes are in for Mon Nov 9/);
 
   await page.goto('/?scenario=afterclose');
