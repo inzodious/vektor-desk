@@ -32,6 +32,7 @@ EARLY_CLOSE = {date(2026, 11, 27), date(2026, 12, 24), date(2027, 11, 26)}
 CALENDAR_YEARS = {d.year for d in NYSE_HOLIDAYS}
 
 BENCHMARKS = ("SPY", "VTI", "VXUS", "AGG", "QQQ", "IWM", "XLK", "XLF", "XLV", "XLE", "XLI", "XLY", "XLP", "XLU", "XLB", "XLRE", "XLC")
+QUALITY = ("VOO", "VTI", "QQQ", "VXUS", "QUAL", "SCHD", "VGT", "FTEC", "SMH", "MSFT", "AAPL", "GOOGL", "AMZN", "NVDA", "ASML", "COST", "V", "JPM")
 
 FINNHUB_QUOTE = "https://finnhub.io/api/v1/quote"
 TIINGO_DAILY = "https://api.tiingo.com/tiingo/daily/{symbol}/prices"

@@ -673,11 +673,11 @@ Limits: leftover swings are drawn month by month and holding by holding, so a fu
 
 ## Discount-day scanner
 
-Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run.
+Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run. The `backfill` job (hourly 01:10 to 06:10 ET) scans again whenever it fetched prices, so a name priced from Tiingo is scored on its newest close before the morning.
 
 | Piece | Rule |
 |---|---|
-| Names | Held (latest holdings, cash left out), then the watchlist, then the quality list (`discounts.QUALITY`: broad ETFs and a dozen large quality names, added to the backfill). A name keeps its first list |
+| Names | Held (latest holdings, cash left out), then the watchlist, then the quality list (`market.QUALITY`: broad ETFs and a dozen large quality names). The backfill registers the quality list itself and refetches it every day like the watchlist, whatever role a name already has. A name keeps its first list |
 | Prices | `price_bars` (adjusted), else `alpaca_bars`, extended with today's `prices_daily` close. A name needs 60 sessions |
 | Measures | Day move; its z-score against the root-mean-square of the prior 252 daily moves; drop from the 252-session high; 1-year return |
 | Valuation | `pe_annual` (price ÷ the latest 10-K diluted EPS) when that EPS is positive, else `price_vs_5y_avg`. `pctile_own` = share of the last 5 years' month-end values at or below today |

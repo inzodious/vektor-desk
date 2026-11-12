@@ -7,8 +7,8 @@ from datetime import UTC, date, datetime, timedelta
 from desk.config import Config
 from desk.db import connect
 from desk.engine.backfill import add_symbols
+from desk.engine.market import QUALITY
 
-QUALITY = ("VOO", "VTI", "QQQ", "VXUS", "QUAL", "SCHD", "VGT", "FTEC", "SMH", "MSFT", "AAPL", "GOOGL", "AMZN", "NVDA", "ASML", "COST", "V", "JPM")
 LISTS = ("held", "watchlist", "quality")
 HIGH_DAYS = 252
 Z_DAYS = 252
