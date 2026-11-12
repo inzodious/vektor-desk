@@ -23,6 +23,8 @@ CASH_SLACK = 1.0
 NO_BUYS = re.compile(r"\bno (new )?buys?\b|\bno buying\b|\bpause (all )?buy")
 BUY_KINDS = {"buy", "deposit_route"}
 NOTED = "logged"
+OFF_QUEUE = (NOTED, "snoozed", "expired", "rejected")
+NO_SKEPTIC = ("rejected", "expired")
 
 
 @dataclass
@@ -39,23 +41,38 @@ class Report:
     def status(self) -> str:
         return self.outcome.status
 
+    def having(self, status: str) -> list[dict]:
+        return [r for r in self.created if r.get("status") == status]
+
     @property
     def notes(self) -> list[dict]:
-        return [r for r in self.created if r.get("status") == NOTED]
+        return self.having(NOTED)
+
+    @property
+    def snoozed(self) -> list[dict]:
+        return self.having("snoozed")
+
+    @property
+    def late(self) -> list[dict]:
+        return self.having("expired")
 
     @property
     def refused(self) -> list[dict]:
-        return self.rejected + [r for r in self.created if r.get("status") == "rejected"]
+        return self.rejected + self.having("rejected")
 
     @property
     def waiting(self) -> list[dict]:
-        return [r for r in self.created if r.get("status") not in (NOTED, "rejected")]
+        return [r for r in self.created if r.get("status") not in OFF_QUEUE]
 
     @property
     def tally(self) -> str:
         parts = [_count(len(self.waiting), "proposal")]
         if self.notes:
             parts.append(_count(len(self.notes), "note"))
+        if self.snoozed:
+            parts.append(f"{len(self.snoozed)} snoozed")
+        if self.late:
+            parts.append(f"{len(self.late)} out of date on arrival")
         return ", ".join([*parts, f"{len(self.refused)} rejected"])
 
 
@@ -351,7 +368,7 @@ def run_proposal_desk(
                 continue
             record = decisions.create(cfg, wording.stamp(p, name, slice_), name, run_id)
             report.created.append(record)
-            if name in SKEPTIC_FOR and p.get("kind") in SKEPTIC_KINDS and record.get("status") != "rejected":
+            if name in SKEPTIC_FOR and p.get("kind") in SKEPTIC_KINDS and record.get("status") not in NO_SKEPTIC:
                 verdict = _skeptic(cfg, p, record, idx, decisions, adapter)
                 if verdict:
                     report.skeptic.append(verdict)

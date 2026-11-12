@@ -7,7 +7,7 @@ from desk.agents.pipeline import Report, run_proposal_desk
 from desk.agents.sources import RealDecisions, RealEngine
 from desk.db import apply_schemas
 from desk.decisions import desk_history, records
-from tests.agents.agent_fakes import SLICE, FakeEngine, answer, proposal
+from tests.agents.agent_fakes import SLICE, FakeDecisions, FakeEngine, answer, proposal
 
 PROFILE = """
 agents:
@@ -81,6 +81,35 @@ def test_the_tally_follows_what_the_record_did_with_each_proposal(live_cfg):
 
 def test_a_quiet_run_keeps_the_old_line():
     assert Report(None).tally == "0 proposals, 0 rejected"
+
+
+class Sorting(FakeDecisions):
+    def create(self, cfg, p, desk, run_id):
+        return super().create(cfg, p, desk, run_id) | {"status": p["title"]}
+
+
+def test_snoozed_and_out_of_date_items_are_counted_apart_and_skip_the_skeptic(cfg):
+    asked = answer(*(proposal(kind="buy", title=t, bear_case="It may fall.") for t in ("proposed", "snoozed", "expired", "rejected")))
+    asked |= {"dossier": {"symbol": "FUNDA"}}
+    fake = FakeAdapter({"research": asked, "skeptic": {"verdict": "agree", "counter_case": "None found."}})
+    report = run_proposal_desk(cfg, "research", engine=FakeEngine(SLICE), decisions=Sorting(), adapter=fake, symbol="FUNDA")
+    assert report.tally == "1 proposal, 1 snoozed, 1 out of date on arrival, 1 rejected"
+    assert [c["desk"] for c in fake.calls].count("skeptic") == 2
+    assert console._answer(report).splitlines()[1:] == [
+        "1 proposal(s) added to the queue.",
+        "1 proposal(s) kept the snooze of the one replaced.",
+        "1 proposal(s) out of date on arrival, listed under Cleared.",
+        "1 proposal(s) turned down by the desk's checks.",
+    ]
+
+
+def test_standing_includes_items_hidden_by_a_snooze(cfg, monkeypatch):
+    shown = {"origin": "risk", "kind": "hold_off", "symbol": "TICKA", "subject": "hold_off:TICKA", "title": "Pause TICKA", "thesis": "x"}
+    hidden = shown | {"origin": "plan_keeper", "symbol": None, "subject": "margin", "title": "Let deposits pay the margin first"}
+    monkeypatch.setattr("desk.agents.sources._fn", lambda name, attr: lambda cfg: {"items": [shown], "snoozed_items": [hidden], "snoozed": 1})
+    assert [i["subject"] for i in RealDecisions().standing(cfg)] == ["hold_off:TICKA", "margin"]
+    monkeypatch.setattr("desk.agents.sources._fn", lambda name, attr: lambda cfg: {"items": [shown], "snoozed": 1})
+    assert [i["title"] for i in RealDecisions().standing(cfg)] == ["Pause TICKA"]
 
 
 def test_real_profile_switches_desks_off_by_default(demo_cfg):

@@ -77,7 +77,8 @@ class RealDecisions:
 
     def standing(self, cfg: Config) -> list[dict]:
         keys = ("origin", "kind", "symbol", "subject", "title")
-        return [{k: i.get(k) for k in keys} for i in _fn("desk.decisions", "queue")(cfg).get("items") or ()]
+        queue = _fn("desk.decisions", "queue")(cfg)
+        return [{k: i.get(k) for k in keys} for i in [*(queue.get("items") or ()), *(queue.get("snoozed_items") or ())]]
 
     def create(self, cfg: Config, proposal: dict, desk: str, run_id: str) -> dict:
         return _fn("desk.decisions", "create_proposal")(cfg, proposal, desk, run_id=run_id)
