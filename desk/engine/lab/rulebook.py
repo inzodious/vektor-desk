@@ -439,6 +439,7 @@ def _quantiles(xs: list[float]) -> dict:
         "p50_pts": q(0.5),
         "p95_pts": q(0.95),
         "share_better": round(sum(1 for x in xs if x > 0) / len(xs), 4),
+        "share_worse": round(sum(1 for x in xs if x < 0) / len(xs), 4),
     }
 
 

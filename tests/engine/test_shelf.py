@@ -180,6 +180,51 @@ def test_a_lump_sum_can_be_spread_over_months(stocked):
         rulebook.parse({"id": "x", "rule": "spread", "params": {"months": 6}, "mix": {"SPY": 1.0}, "start_value": 0}, data)
 
 
+def rule_body(horizon: dict, verdict: str = "no_clear_edge") -> dict:
+    params = {"band_pts": 10.0}
+    return {
+        "variants": [{"params": params, "horizons": [{"years": 5, "starts": 0}, {"years": 10, "starts": 14, **horizon}]}],
+        "best": params,
+        "verdict": verdict,
+    }
+
+
+def test_a_start_month_the_rule_did_not_change_is_not_counted_as_worse():
+    entry = next(e for e in shelf.LIBRARY if e["id"] == "lib-rebalance-bands-plan")
+    stored = {"p5_pts": -0.6, "p50_pts": 0.0, "p95_pts": -0.0, "share_better": 0.0}
+    old = shelf._rule_row(entry, rule_body(stored))
+    assert old["verdict"] == "within_noise" and "worse" not in old["line"] and "+0.0" not in old["line"] and "-0.0" not in old["line"]
+    assert old["line"] == (
+        "No clear edge: a typical 0.0 points of the money put in over 10 years against the same deposits, invested plainly; "
+        "never ahead, and no different in at least half of 14 start months."
+    )
+    counted = shelf._rule_row(entry, rule_body(stored | {"share_worse": 0.2857}))
+    assert counted["line"].endswith("ahead in 0%, behind in 29% and no different in 71% of 14 start months.") and counted["rule"]["share_worse"] == 0.2857
+    flat = shelf._rule_row(entry, rule_body(stored | {"p5_pts": -0.04, "share_worse": 0.0714}, verdict="hurts"))
+    assert flat["verdict"] == "within_noise" and flat["line"].startswith(
+        "No difference: within a tenth of a point of the same deposits, invested plainly in nearly every one of 14 start months over 10 years."
+    )
+    clear = shelf._rule_row(entry, rule_body({"p5_pts": -9.0, "p50_pts": -5.37, "p95_pts": -2.1, "share_better": 0.0, "share_worse": 1.0}, verdict="hurts"))
+    assert (
+        clear["verdict"] == "fell_short"
+        and clear["line"].startswith("Hurt: a typical -5.4 points")
+        and clear["line"].endswith("ahead in 0% and behind in 100% of 14 start months.")
+    )
+    earlier = shelf._rule_row(entry, rule_body({"p5_pts": -2.6, "p50_pts": 2.44, "p95_pts": 5.3, "share_better": 0.7857}))
+    assert earlier["line"].endswith(
+        "a typical +2.4 points of the money put in over 10 years against the same deposits, invested plainly; ahead in 79% of 14 start months."
+    )
+    assert rulebook._quantiles([0.0, 0.0, -1.0, 2.0]) | {"mean_pts": 0} == {
+        "starts": 4,
+        "mean_pts": 0,
+        "p5_pts": -1.0,
+        "p50_pts": 0.0,
+        "p95_pts": 0.0,
+        "share_better": 0.25,
+        "share_worse": 0.25,
+    }
+
+
 # ---- Queue and results ----
 
 
@@ -210,6 +255,7 @@ def test_the_library_is_queued_once_run_and_reported_out_of_sample_only(stocked,
         assert "train" not in text and "full" not in text and "in_sample" not in text
         if r["type"] == "rule":
             assert r["rule"]["starts"] > 0 and r["out_of_sample"] is None
+            assert r["rule"]["share_better"] + r["rule"]["share_worse"] <= 1.0001 and "worse" not in r["line"]
             continue
         x, band = r["out_of_sample"]["excess_pts"], r["noise"]["band_pts"]
         assert r["noise"]["trials"] == view["trials"] and band > 0 and 0 <= r["noise"]["luck"] <= 1

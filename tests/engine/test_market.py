@@ -3,9 +3,9 @@ from datetime import UTC, datetime
 from desk.db import connect
 from desk.engine import schema
 from desk.engine.__main__ import run_holdings, run_market_backfill, run_quotes
-from desk.engine.backfill import add_symbols, usage
+from desk.engine.backfill import add_symbols, due, usage
 from desk.engine.live import live_view
-from desk.engine.market import last_trading_day, session
+from desk.engine.market import BENCHMARKS, QUALITY, last_trading_day, session
 from tests.engine.helpers import closes_doc, position, snapshot
 
 IND = "individual-1111"
@@ -157,6 +157,29 @@ def test_backfill_fetches_history_then_tops_up_and_respects_caps(cfg, mirror, mo
     assert http.calls[0][1]["startDate"] == "2005-01-01"
     assert add_symbols(conn, ["SPY", "NEWCO"], "held") == 2
     assert conn.execute("SELECT role, priority FROM market_symbols WHERE symbol='SPY'").fetchone()[:] == ("held", 0)
+    conn.close()
+
+
+def test_the_scanners_names_are_refetched_daily_and_scanned_again(cfg, monkeypatch):
+    monkeypatch.setenv("TIINGO_API_KEY", "k")
+    conn = connect(cfg.desk_db)
+    schema.apply(conn)
+    add_symbols(conn, ["NVDA", "OLDCO"], "past")
+    with conn:
+        conn.execute("UPDATE market_symbols SET first_bar='2026-01-02', last_bar='2026-11-09', fetched_at='2026-11-10T06:10:00+00:00'")
+    now = datetime(2026, 11, 12, 9, 10, tzinfo=UTC)
+    assert [r["symbol"] for r in due(conn, now)] == ["NVDA"]
+    assert [r["symbol"] for r in due(conn, datetime(2027, 2, 12, 9, 10, tzinfo=UTC))] == ["NVDA", "OLDCO"]
+    monkeypatch.setattr("desk.engine.backfill.datetime", type("D", (datetime,), {"now": staticmethod(lambda tz=None: now)}))
+    http = FakeHttp(bars={"NVDA": [bar(d, 100.0) for d in ("2026-11-09", "2026-11-10", "2026-11-11")]})
+    first = run_market_backfill(cfg, http)
+    assert first["fetched"] == ["NVDA"] and first["discounts"]["ok"] is True
+    assert len(http.calls) == len(set(BENCHMARKS) | set(QUALITY)) <= 40
+    row = conn.execute("SELECT role, priority, last_bar FROM market_symbols WHERE symbol='NVDA'").fetchone()
+    assert row[:] == ("past", 3, "2026-11-11")
+    assert conn.execute("SELECT count(*) FROM market_symbols WHERE role='universe'").fetchone()[0] == len(set(QUALITY) - set(BENCHMARKS) - {"NVDA"})
+    again = run_market_backfill(cfg, http)
+    assert again["fetched"] == [] and "discounts" not in again
     conn.close()
 
 
