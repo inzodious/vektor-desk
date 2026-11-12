@@ -31,12 +31,12 @@ export function keyWord(key) {
 export function profileSource(p) {
   if (!p) return null;
   if (p.source === 'defaults' || !p.exists) return 'Built-in defaults';
-  return 'desk.yaml';
+  return 'Your profile';
 }
 
 export function defaultsText(p) {
   const list = (p?.defaults || []).map(keyWord);
-  if (!list.length) return 'Everything is set in desk.yaml.';
+  if (!list.length) return 'Everything is set in your profile.';
   if (p?.set?.length === 0) return 'Every setting is still the default.';
   return null;
 }

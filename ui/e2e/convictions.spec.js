@@ -52,7 +52,7 @@ test('adding a hold sends the band from the suggestion and reloads', async ({ pa
   await card.getByTestId('cv-symbol').fill('nova');
   await card.getByTestId('cv-note-input').fill('  Fresh idea  ');
   await card.getByTestId('cv-save').click();
-  await expect(card.getByTestId('cv-msg')).toHaveText('Saved. NOVA now holds 0% to 10%. desk.yaml kept a backup.');
+  await expect(card.getByTestId('cv-msg')).toHaveText('Saved. NOVA now holds 0% to 10%. A backup was kept.');
   expect(sent).toEqual({ symbol: 'NOVA', method: 'PUT', body: { band_min_pct: 0, band_max_pct: 10, note: 'Fresh idea' } });
 });
 

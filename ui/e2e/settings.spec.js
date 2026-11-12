@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { MONDAY_MIDDAY, overflow, watchErrors } from './helpers.js';
 
@@ -153,4 +154,44 @@ test('each settings tab stays within three phone screens and two desktop screens
     const m = await page.evaluate(() => ({ h: document.documentElement.scrollHeight, v: window.innerHeight }));
     expect(m.h / m.v, path).toBeLessThanOrEqual(phone ? 3.6 : 2.2);
   }
+});
+
+test('Box lists each service as up or down in words, closed until opened', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/settings/box');
+  const card = page.getByTestId('services');
+  await expect(card).toHaveJSProperty('open', false);
+  await expect(card.locator('summary')).toContainText('All running');
+  await expect(card.locator('summary')).toContainText('All 5 desk services are running.');
+  await card.locator('summary').click();
+  await expect(card.locator('.job-row')).toHaveCount(5);
+  await expect(card.locator('[data-service="api"]')).toContainText('The app');
+  await expect(card.locator('[data-service="api"]')).toContainText('Up');
+  await expect(card.locator('[data-service="api"]')).toContainText('The app has been running for 3 hours.');
+  await expect(card).not.toContainText('vektor-desk-');
+  await expect(card).not.toContainText('100.64.0.10');
+  await expect(card.getByTestId('services-link')).toHaveCount(0);
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+
+  await page.goto('/settings/box?scenario=trouble');
+  await expect(card.locator('summary')).toContainText('Needs a look');
+  await card.locator('summary').click();
+  await expect(card.locator('[data-service="tailscale"]')).toContainText('Restarting');
+  await expect(card.locator('[data-service="tailscale"]')).toContainText('The Tailscale link keeps stopping and starting.');
+  await expect(card.locator('summary')).toContainText('The box is signed out of your tailnet. Add a new auth key in Settings, then Redeploy.');
+  await expect(card.getByTestId('services-link')).toHaveCount(0);
+  await expect(card).not.toContainText('login-state');
+  const t = await overflow(page);
+  expect(t.scroll).toBeLessThanOrEqual(t.view);
+  expect(errors).toEqual([]);
+});
+
+test('an older desk that sends no services draws no Services card', async ({ page }) => {
+  const { containers, ...older } = JSON.parse(readFileSync(new URL('../src/fixtures/status.json', import.meta.url), 'utf8'));
+  expect(containers.services).toHaveLength(5);
+  await page.route('**/api/status*', (route) => route.fulfill({ json: older }));
+  await page.goto('/settings/box');
+  await expect(page.getByTestId('jobs')).toBeVisible();
+  await expect(page.getByTestId('services')).toHaveCount(0);
 });

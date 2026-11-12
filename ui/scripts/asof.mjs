@@ -121,7 +121,12 @@ write('asof.lagging', { ...evening, provisional: false, status: 'final', words: 
 write('asof.behind', { ...base, at: `${MONDAY}T22:21:40+00:00`, expected_day: MONDAY, behind: { sessions: 1, reason: 'No closing quotes or official closes for Mon Nov 9 yet. The next engine run picks them up.' }, live: null, market: { state: 'closed', day: MONDAY } });
 
 // ---------- afterclose: the closing run has not landed, the quotes have ----------
-write('live.afterclose', { ...closed, state: 'after', day: MONDAY, as_of: `${MONDAY}T23:40:00+00:00`, holdings_date: FRIDAY, value: 16513.99, day_change: 120.5, day_change_pct: 0.74 });
+const quoted = (r) => r.source === 'holdings' && r.symbol !== 'FXAIX';
+const moved = 120.5 / closed.rows.filter(quoted).reduce((a, r) => a + r.value, 0);
+const cents = (n) => Math.round(n * 100) / 100;
+const afterRows = closed.rows.map((r) => (quoted(r) ? { ...r, source: 'finnhub', price: cents(r.price * (1 + moved)), value: cents(r.value * (1 + moved)), day_change: cents(r.value * moved) } : r));
+write('live.afterclose', { ...closed, rows: afterRows, state: 'after', day: MONDAY, as_of: `${MONDAY}T23:40:00+00:00`, holdings_date: FRIDAY, value: 16513.99, day_change: 120.5, day_change_pct: 0.74 });
+write('live.intraday.noticks', { day: MONDAY, symbols: {} });
 write('asof.afterclose', {
   ...base,
   at: `${MONDAY}T22:21:40+00:00`,

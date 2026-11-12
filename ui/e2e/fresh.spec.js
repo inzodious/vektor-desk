@@ -11,7 +11,8 @@ test('the profile card shows version, source, desks and what is still default', 
   const card = page.getByTestId('profile');
   await expect(card).toHaveAttribute('data-source', 'file');
   await expect(card).toContainText('v3');
-  await expect(card).toContainText('desk.yaml');
+  await expect(card).toContainText('Your profile');
+  await expect(card).not.toContainText('desk.yaml');
   await expect(card).toContainText('4 on');
   await expect(card).toContainText('Plan keeper, Risk desk');
   await expect(card.getByTestId('still-default').locator('.chip')).toHaveCount(13);
@@ -28,7 +29,7 @@ test('without desk.yaml the card offers the starter command', async ({ page, con
   await expect(card).toContainText('Built-in defaults');
   await expect(card.getByTestId('starter').locator('code')).toHaveText('docker exec vektor-desk-cron python -m desk.decisions.profile init');
   await expect(card.getByTestId('still-default')).toContainText('Every setting is still the default.');
-  await card.getByRole('button', { name: 'Draft desk.yaml from your data' }).click();
+  await card.getByRole('button', { name: 'Draft a profile from your data' }).click();
   await expect(card.getByRole('button', { name: /Copied|Copy failed/ })).toBeVisible();
 });
 

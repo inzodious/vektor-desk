@@ -105,7 +105,7 @@ function Guard({ guard, desks, busy, onSet }) {
 }
 
 // ---------- crew tiles ----------
-const SOURCE = { app: 'Set here', 'desk.yaml': 'From desk.yaml', default: 'Default' };
+const SOURCE = { app: 'Set here', 'desk.yaml': 'From your profile', default: 'Default' };
 
 function Tile({ d, allOn, busy, onFlip, onFollow, now }) {
   const key = DESK_KEY[d.desk] || 'plan';
@@ -142,7 +142,7 @@ function Tile({ d, allOn, busy, onFlip, onFollow, now }) {
             <>
               {' · '}
               <button className="link" type="button" disabled={busy} onClick={() => onFollow(d.desk)}>
-                Follow desk.yaml ({d.yaml ? 'on' : 'off'})
+                Follow your profile ({d.yaml ? 'on' : 'off'})
               </button>
             </>
           ) : null}

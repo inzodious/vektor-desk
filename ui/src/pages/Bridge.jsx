@@ -193,7 +193,7 @@ export default function Bridge() {
       </section>
       <ValueDrawer open={drill === 'value'} onClose={closeDrill} accounts={accounts} total={live.value} symbols={ctx.symbols} />
       <ExcessDrawer open={drill === 'excess'} onClose={closeDrill} m={m} lastDay={live.holdings_date || m.asOf} />
-      <HoldingsDrawer open={drill === 'holdings'} onClose={closeDrill} symbols={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} accounts={accounts} />
+      <HoldingsDrawer open={drill === 'holdings'} onClose={closeDrill} symbols={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} state={live.state} accounts={accounts} />
       <MixDrawer open={drill === 'mix'} onClose={closeDrill} funds={funds} limits={limits} values={values} m={m} reference={reference} />
       <DiscountsDrawer open={drill === 'discounts'} onClose={closeDrill} api={discounts} />
       <CashDrawer open={drill === 'cash'} onClose={closeDrill} m={m} accounts={accounts} />

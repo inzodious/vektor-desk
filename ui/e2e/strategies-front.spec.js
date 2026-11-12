@@ -66,7 +66,7 @@ test('desks show where each switch comes from and wait for the guard', async ({ 
   await expect(card.getByTestId('guard')).toContainText('Only Plan keeper and Tax desk run for now');
   await expect(card.locator('[data-desk="risk"]')).toHaveAttribute('data-guarded', 'true');
   await expect(card.locator('[data-desk="risk"]')).toContainText('Next: When the guard lifts');
-  await expect(card.locator('[data-desk="tax"] .crew-src')).toHaveText('From desk.yaml');
+  await expect(card.locator('[data-desk="tax"] .crew-src')).toHaveText('From your profile');
   await expect(card.locator('[data-desk="filings"]')).toBeVisible();
 });
 
@@ -99,7 +99,7 @@ test('a lifted guard can go back, and an app switch can follow desk.yaml again',
   const card = page.getByTestId('crew');
   await expect(card.getByTestId('guard')).toContainText('Guard lifted.');
   await expect(card.locator('[data-desk="risk"]')).not.toContainText('When the guard lifts');
-  await card.locator('[data-desk="scout"]').getByRole('button', { name: 'Follow desk.yaml (off)' }).click();
+  await card.locator('[data-desk="scout"]').getByRole('button', { name: 'Follow your profile (off)' }).click();
   await card.getByRole('button', { name: 'Put the guard back' }).click();
   await expect.poll(() => calls).toEqual(['DELETE /api/agents/scout/enabled', 'PUT /api/agents/guard']);
 });

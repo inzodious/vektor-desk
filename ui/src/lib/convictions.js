@@ -29,7 +29,7 @@ export function weightLine(item, dayLabel = (d) => d) {
 }
 
 export function nudgeLine(item) {
-  if (item?.enabled === false) return 'Paused in desk.yaml, so the single-stock cap applies again.';
+  if (item?.enabled === false) return 'Paused in your profile, so the single-stock cap applies again.';
   if (item?.status === 'above') return `Above ${pct(item.band_max_pct)}. The desk suggests a trim once a week until it’s back inside.`;
   if (item?.status === 'below') return `Under ${pct(item.band_min_pct)}. Nothing to do unless you want it back up.`;
   if (item?.status === 'inside') return 'Inside its band. No nudges.';
@@ -95,7 +95,7 @@ export function bandBody(form) {
 export function savedText(r, symbol) {
   if (!r?.changed) return `Nothing changed for ${symbol}.`;
   const band = r.item ? ` now holds ${bandText(r.item)}` : '';
-  return `Saved. ${symbol}${band}. desk.yaml kept a backup.`;
+  return `Saved. ${symbol}${band}. A backup was kept.`;
 }
 
 export function droppedText(r, symbol) {
@@ -105,7 +105,7 @@ export function droppedText(r, symbol) {
 export function editRefusal(e) {
   if (!e) return null;
   const said = e.message && !/^The desk API answered|^HTTP /.test(e.message) ? e.message : null;
-  if (e.status === 409) return said || 'There’s no desk.yaml yet. Write one from the first-run checklist.';
+  if (e.status === 409) return said || 'There’s no profile yet. Write one from the first-run checklist.';
   if (e.status === 404) return said || 'This switches on with the next desk update.';
   if (e.status === 422) return said || 'The desk refused that change, so nothing was written.';
   if (e.status) return `The desk answered ${e.status}. Nothing was written.`;
