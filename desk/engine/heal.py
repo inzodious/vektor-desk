@@ -3,7 +3,7 @@ import os
 import sqlite3
 from datetime import date, datetime, timedelta
 
-from desk import jobrun
+from desk import jobrun, overnight
 from desk.config import Config
 from desk.db import connect
 from desk.runlock import run_dir
@@ -20,6 +20,8 @@ COOLDOWN = {
 }
 FOLLOW = (ACCOUNTS, RESEARCH, LOOKTHROUGH)
 ESCALATE = (BACKFILL,)
+AT_NIGHT = (BACKFILL,)
+NIGHT = "night"
 PATIENCE = 3
 SLOW = 6
 STATE = "heal.json"
@@ -140,7 +142,11 @@ def run(cfg: Config, *, now: datetime | None = None, jobs: list | None = None) -
     out: dict = {"asked": [], "waiting": {}}
     if want:
         jobs = jobs if jobs is not None else _jobs()
+    night = overnight.night_of(overnight.local(cfg, now)) is not None
     for name, checks in want.items():
+        if night and name not in AT_NIGHT:
+            out["waiting"][name] = NIGHT
+            continue
         s = state.get(name) or {}
         tries = int(s.get("attempts") or 0)
         wait = COOLDOWN.get(name, COOLDOWN[ACCOUNTS]) * (SLOW if tries >= PATIENCE else 1)
