@@ -48,7 +48,7 @@ export function firstRunSteps({ status, jobs, health, profile, agents, board, ri
     {
       id: 'profile',
       title: 'Write your desk profile',
-      line: 'Your rules, limits and desks in desk.yaml. Defaults work until you do.',
+      line: 'Your rules, limits and desks, in your profile. Defaults work until you do.',
       state: !ready(profile) ? 'loading' : p?.exists ? 'done' : 'todo',
       action: p?.exists ? { kind: 'link', to: '/settings', label: 'Open the profile' } : { kind: 'post', path: '/api/decisions/profile/init', label: 'Write it now' },
     },

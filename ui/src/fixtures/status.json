@@ -29,5 +29,75 @@
   "expires": "2027-11-03",
   "days_left": 359
  },
- "running": []
+ "running": [],
+ "containers": {
+  "state": "ok",
+  "checked_at": "2026-11-09T16:40:00+00:00",
+  "fresh": true,
+  "note": "All 5 desk services are running.",
+  "services": [
+   {
+    "name": "api",
+    "title": "the app",
+    "container": "vektor-desk-api",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "The app has been running for 3 hours."
+   },
+   {
+    "name": "cron",
+    "title": "the scheduler",
+    "container": "vektor-desk-cron",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "The scheduler has been running for 3 hours."
+   },
+   {
+    "name": "caddy",
+    "title": "the web server",
+    "container": "vektor-desk-caddy",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "The web server has been running for 3 hours."
+   },
+   {
+    "name": "ntfy",
+    "title": "phone alerts",
+    "container": "vektor-desk-ntfy",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "Phone alerts has been running for 3 hours."
+   },
+   {
+    "name": "tailscale",
+    "title": "the Tailscale link",
+    "container": "vektor-desk-tailscale",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "The Tailscale link has been running for 3 hours."
+   }
+  ],
+  "tailnet": {
+   "state": "ok",
+   "kind": null,
+   "words": "Tailscale is signed in and running on the box, at 100.64.0.10.",
+   "address": "100.64.0.10",
+   "line": null
+  }
+ }
 }

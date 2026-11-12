@@ -19,7 +19,7 @@ test('holdings shows the board, KPIs, drift, rules, funds and the deposit split'
   await expect(page.getByTestId('tax-calendar')).toHaveCount(0);
   await expect(page.locator('.drift-row')).toHaveCount(4);
   await expect(page.locator('.rule', { hasText: 'Drift limit 5 points' })).toContainText('Passing');
-  await expect(page.getByText('desk.yaml rules v1')).toBeVisible();
+  await expect(page.getByText('Profile rules v1')).toBeVisible();
   const deposit = page.locator('.card', { hasText: 'Next deposit' }).last();
   await expect(deposit).toContainText('Modelled');
   await expect(deposit.getByTestId('split').locator('.row')).toHaveCount(3);

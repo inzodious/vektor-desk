@@ -1,5 +1,6 @@
 import { Spark } from './Spark.jsx';
 import { flapText, pct, px, usd } from '../lib/format.js';
+import { sessionWord } from '../live/context.js';
 
 export function Flap({ text, size = 5 }) {
   const chars = flapText(text).padEnd(size, ' ').split('');
@@ -14,7 +15,7 @@ export function Flap({ text, size = 5 }) {
   );
 }
 
-export function Board({ rows, names = {}, intraday = {}, label = 'Live holdings', nav = false, onPick }) {
+export function Board({ rows, names = {}, intraday = {}, label = 'Live holdings', nav = false, state = nav ? 'open' : 'closed', onPick }) {
   return (
     <div className="board" role="table" aria-label={label}>
       <div className="board-row head" role="row">
@@ -71,7 +72,7 @@ export function Board({ rows, names = {}, intraday = {}, label = 'Live holdings'
               {usd(r.value)}
             </span>
             <span role="cell" className="sp">
-              {series && series.length > 1 ? <Spark values={series} base={r.prev_close} color={up ? '#7fe3c2' : '#ffd677'} /> : <span className="nm">{r.source !== 'holdings' ? (nav ? 'No ticks yet' : 'Closing quote') : nav ? 'Prices at 4 PM' : 'Last close'}</span>}
+              {series && series.length > 1 ? <Spark values={series} base={r.prev_close} color={up ? '#7fe3c2' : '#ffd677'} /> : <span className="nm" data-testid="board-session">{sessionWord(r.source, state)}</span>}
             </span>
           </div>
         );

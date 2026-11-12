@@ -171,10 +171,10 @@ export function ExcessDrawer({ open, onClose, m, lastDay }) {
 }
 
 // ---------- holdings ----------
-export function HoldingsDrawer({ open, onClose, symbols, names, intraday, nav, accounts }) {
+export function HoldingsDrawer({ open, onClose, symbols, names, intraday, nav, state, accounts }) {
   return (
     <Panel open={open} onClose={onClose} kind="sheet" title="Holdings" sub={`${plural(symbols.length, 'holding')} across ${plural(accounts.length, 'account')}. Pick a row for its symbol sheet.`} crumbs={[{ label: 'Bridge', go: onClose }]}>
-      <Board rows={symbols} names={names} intraday={intraday} nav={nav} onPick={(sym) => onClose(sym)} />
+      <Board rows={symbols} names={names} intraday={intraday} nav={nav} state={state} onPick={(sym) => onClose(sym)} />
       <Link className="btn sm ghost" style={{ justifySelf: 'start' }} to="/portfolio" data-testid="to-portfolio">
         Open Portfolio
         <Icon name="right" />

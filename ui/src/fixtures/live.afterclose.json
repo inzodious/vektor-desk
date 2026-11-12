@@ -24,21 +24,21 @@
    "account": "individual-0001",
    "symbol": "FTEC",
    "shares": 11.551172,
-   "price": 250.53,
+   "price": 255.1,
    "prev_close": 250.53,
-   "value": 2893.92,
-   "day_change": 0,
-   "source": "holdings"
+   "value": 2946.73,
+   "day_change": 52.81,
+   "source": "finnhub"
   },
   {
    "account": "individual-0001",
    "symbol": "VXUS",
    "shares": 29.684112,
-   "price": 62.95,
+   "price": 64.1,
    "prev_close": 62.95,
-   "value": 1868.61,
-   "day_change": 0,
-   "source": "holdings"
+   "value": 1902.71,
+   "day_change": 34.1,
+   "source": "finnhub"
   },
   {
    "account": "hsa-0002",
@@ -54,31 +54,31 @@
    "account": "individual-0001",
    "symbol": "BND",
    "shares": 8.725014,
-   "price": 77.35,
+   "price": 78.76,
    "prev_close": 77.35,
-   "value": 674.88,
-   "day_change": 0,
-   "source": "holdings"
+   "value": 687.19,
+   "day_change": 12.31,
+   "source": "finnhub"
   },
   {
    "account": "hsa-0002",
    "symbol": "FTEC",
    "shares": 2.310224,
-   "price": 250.53,
+   "price": 255.1,
    "prev_close": 250.53,
-   "value": 578.78,
-   "day_change": 0,
-   "source": "holdings"
+   "value": 589.34,
+   "day_change": 10.56,
+   "source": "finnhub"
   },
   {
    "account": "hsa-0002",
    "symbol": "VXUS",
    "shares": 5.936828,
-   "price": 62.95,
+   "price": 64.1,
    "prev_close": 62.95,
-   "value": 373.72,
-   "day_change": 0,
-   "source": "holdings"
+   "value": 380.54,
+   "day_change": 6.82,
+   "source": "finnhub"
   },
   {
    "account": "individual-0001",
@@ -94,21 +94,21 @@
    "account": "hsa-0002",
    "symbol": "BND",
    "shares": 1.745133,
-   "price": 77.35,
+   "price": 78.76,
    "prev_close": 77.35,
-   "value": 134.99,
-   "day_change": 0,
-   "source": "holdings"
+   "value": 137.45,
+   "day_change": 2.46,
+   "source": "finnhub"
   },
   {
    "account": "individual-0001",
    "symbol": "ACME",
    "shares": 26.055237,
-   "price": 3.03,
+   "price": 3.09,
    "prev_close": 3.03,
-   "value": 78.95,
-   "day_change": 0,
-   "source": "holdings"
+   "value": 80.39,
+   "day_change": 1.44,
+   "source": "finnhub"
   }
  ],
  "benchmarks": {}

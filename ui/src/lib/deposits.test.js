@@ -15,7 +15,7 @@ describe('deposit words', () => {
 
   it('says activity does the talking in auto mode', () => {
     expect(emptyText('auto')).toMatch(/read from your activity/);
-    expect(emptyText('listed')).toMatch(/desk\.yaml/);
+    expect(emptyText('listed')).toBe('No deposit schedule in your profile yet.');
   });
 });
 
