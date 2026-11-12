@@ -102,7 +102,7 @@ Buys first, then by score. The score is a sort key from 0 to 100: depth of the d
 
 List cases goes through `run_discount_desk(discounts=ListSource(...), trigger="schedule", limit=n)`: the desk's own prompt, schema, switch, guard, lock and weekly allowance, with the hit built from the row's `numbers` in the scanner's shape. The cap is six cases a night across both steps (18 hours back). A row with a case is no longer a `screen`, so a second run pays for nothing.
 
-Safe to start twice. It records the night in `data/run/opportunities/night.json` and ends with one JSON line for the morning alert: `{"ready": "6 buying opportunities, 2 rated a buy"}` or `{"skipped": "why"}`. `desk.opportunities.ready(cfg)` returns the same line at any time.
+Safe to start twice. It records the night in `data/run/opportunities/night.json` and ends with one JSON line for the morning alert: `{"ready": "6 buying opportunities, 2 rated a buy; 3 cases written overnight", "detail": "<every step's line>"}` or `{"skipped": "why"}`. `desk.opportunities.ready(cfg)` returns the same `ready` line at any time. The steps' own lines are also in the payload under `freshness.night_summary` and `freshness.night_steps`, because the overnight page only shows `ready` for a step that ended ok.
 
 The list never waits for the night job. Rows without a case show as `screen` and `freshness.note` says how many.
 
@@ -115,7 +115,7 @@ The list never waits for the night job. Rows without a case show as `screen` and
 | `as_of`, `built_at` | The desk's day; when this answer was built |
 | `asof` | `day`, `words`, `status`, `provisional`, `expected_day`, `behind`, straight from `desk.engine.asof` |
 | `prices` | `day` (newest price on the list), `words`, `older[]` (`symbol`, `price_as_of`, `held`) |
-| `freshness` | `scanner_as_of`, `last_case_at`, `last_scout_at`, `night_run_at`, `night_status` (`ok`, `partial`, `waiting`), `note` |
+| `freshness` | `scanner_as_of`, `last_case_at` (newest case of either kind), `last_scout_at`, `night_run_at`, `night_status` (`ok`, `partial`, `waiting`), `night_summary`, `night_steps[]` (`step`, `status`, `note`), `note` |
 | `headline`, `counts`, `note` | One line for the door; totals by stance, held and outside, `with_case` and `written` (rows with a case, a Scout idea or a research note); the reason when the list is empty |
 | `profile`, `cash`, `method` | The band sizes use; free cash, margin debit and next deposit; how rows are ranked |
 | `rows[]` | `rank`, `symbol`, `name`, `kind`, `held`, `weight_pct`, `sources`, `source_label`, `stance`, `stance_label`, `why_now`, `facts`, `entry`, `size`, `wrong_if`, `invalid_below`, `case`, `decision_id`, `queued`, `not_queued`, `research_verdict`, `research`, `numbers`, `next_earnings`, `as_of`, `price_as_of`, `price_source`, `price_at`, `price_behind`, `analysis_as_of`, `since_analysis_pct`, `as_of_words`, `score` |
