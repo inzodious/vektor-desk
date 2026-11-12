@@ -91,8 +91,11 @@ test('a desk that does not serve them yet says so, and one that fails says that'
 test('Strategies leads with the overnight table, grouped by kind, with honest words', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/strategies');
-  await expect(page.locator('.ph-big')).toContainText('24');
-  await expect(page.locator('.ph-big')).toContainText('tested overnight · 5 held up');
+  await expect(page.getByTestId('strat-count')).toHaveText('24');
+  await expect(page.locator('.ph-big')).toContainText('of 26 tested overnight · 5 held up · 7 on paper or eligible');
+  await expect(page.getByTestId('lb-lede')).toContainText('7 racers on paper');
+  await expect(page.getByTestId('stages').locator('[data-stage="paper"] b')).toHaveText('6');
+  await expect(page.getByTestId('stages').locator('[data-stage="eligible"] b')).toHaveText('1');
   const lib = page.getByTestId('library');
   await expect(lib).toContainText('Every result is out of sample.');
   await expect(lib.locator('.lib-group')).toHaveCount(3);
@@ -123,6 +126,16 @@ test('before the first night the table lists every strategy with its reason, and
   await expect(lib).toContainText('26 waiting for their first run');
   await expect(lib.locator('.lib-row').first()).toContainText('In tonight’s queue. The lab starts at 1 AM.');
   await expect(lib.locator('.lib-row').first()).toContainText('Waiting');
+  await expect(page.getByTestId('strat-count')).toHaveText('26');
+  await expect(page.locator('.ph-big')).toContainText('on tonight’s list, waiting for their first run');
+
+  await page.route('**/api/lab/strategies', (r) => r.fulfill({ json: { strategies: [], rules: [], features: [], grammar: {} } }));
+  await page.goto('/strategies');
+  await expect(page.getByTestId('library')).toBeVisible();
+  await expect(page.getByTestId('strategies')).toHaveCount(0);
+  await expect(page.locator('main')).not.toContainText('Nothing in the lab yet');
+  await expect(page.locator('.ph-big')).toContainText('7 on paper or eligible');
+  await page.unroute('**/api/lab/strategies');
 
   await page.route('**/api/lab/library*', (route) => route.fulfill(NOT_FOUND));
   await page.goto('/strategies');
@@ -150,12 +163,35 @@ test('Research is organised by holding, each with a status', async ({ page }) =>
   await expect(d.getByTestId('dossier-lead')).toContainText('Add on schedule. It is the core of the book and still under its band.');
   await expect(d.getByTestId('dossier-lead')).toContainText('What it is. A fund that owns the 500 largest US companies');
   await expect(d.getByTestId('valuation-note')).toHaveText('Fair to slightly rich. Earnings growth is carrying the price, not hope.');
+  await expect(d.getByTestId('range-label')).toHaveText('Valuation range · Price against next year’s earnings');
+  await expect(d.locator('.range .lab').first()).toHaveText('17x');
+  await expect(d.locator('.range')).not.toContainText('$');
+  await expect(d).toContainText('Now 22x: inside the range, upper half.');
   await expect(d.getByTestId('dossier-risks').locator('li')).toHaveCount(2);
   await expect(d.getByTestId('dossier-fit')).toContainText('It is 59% of the book against a 60% target');
   await expect(d).toContainText('numbers as of Mon Nov 9');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
+});
+
+test('an older dossier with a long method note prints it as plain text and its multiples without a dollar sign', async ({ page }) => {
+  const basis = 'Forward P/E on the listed shares (price ÷ next-year consensus EPS). Low 22x = the recent trough reading; high 33x = the five-year average. Now 24.57x at the close of $100.00.';
+  await page.route('**/api/agents/dossiers', async (route) => {
+    const res = await route.fetch();
+    const rows = await res.json();
+    await route.fulfill({ json: rows.map((r) => (r.symbol === 'FTEC' ? { ...r, dossier: { ...r.dossier, valuation_range: { low: 22, high: 33, now: 24.57, basis } } } : r)) });
+  });
+  await page.goto('/research?s=FTEC');
+  const d = page.getByTestId('dossier');
+  await expect(d.getByTestId('range-label')).toHaveText('Valuation range · Forward P/E on the listed shares');
+  await expect(d.getByTestId('range-basis')).toHaveText(basis);
+  await expect(d.getByTestId('range-basis')).toHaveCSS('text-transform', 'none');
+  await expect(d.locator('.range .lab').first()).toHaveText('22x');
+  await expect(d.locator('.range .lab').last()).toHaveText('33x');
+  await expect(d).toContainText('Now 24.6x: inside the range, lower half.');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
 });
 
 test('a holding with no analysis says why and offers to run one', async ({ page }) => {

@@ -5,6 +5,7 @@ import { Leaderboard } from '../lab/Leaderboard.jsx';
 import { Library } from '../lab/Library.jsx';
 import { useApi } from '../lib/api.js';
 import { plural } from '../lib/format.js';
+import { boardHead } from '../lib/leaderboard.js';
 import { PAPER_DAYS, dayOf, STAGES, paperProgress, signedPts, splitStrategies, stageCounts, statusOf } from '../lib/strategy.js';
 import { GapNote } from '../start/EmptyState.jsx';
 
@@ -57,27 +58,54 @@ function StrategyRow({ s }) {
   );
 }
 
+function StrategyList({ list, off, loading }) {
+  return (
+    <div className="card c8 top" data-testid="strategies">
+      <div className="card-head">
+        <span className="tag">Strategies</span>
+        <span className="chip">{off ? `${off} off the track` : 'Newest first by stage'}</span>
+      </div>
+      {list.length ? (
+        <div className="rows">
+          {list.map((s) => (
+            <StrategyRow s={s} key={`${s.id}-${s.version}`} />
+          ))}
+        </div>
+      ) : (
+        <p className="empty-hint">{loading ? 'Opening the ledger…' : 'Nothing in the lab yet. Ask the Strategy desk from the Console to turn a research idea into a spec.'}</p>
+      )}
+    </div>
+  );
+}
+
 // ---------- page ----------
 export default function Strategies() {
   const api = useApi('/api/lab/strategies');
   const lib = useApi('/api/lab/library', { every: 300000 });
-  const tested = lib.data?.counts?.tested || 0;
+  const board = useApi('/api/engine/lab/leaderboard');
   const d = api.data;
-  const list = splitStrategies(d).filter((s) => !(lib.data && s.library));
-  const counts = stageCounts(list);
+  const all = splitStrategies(d);
+  const list = all.filter((s) => !(lib.data && s.library));
+  const staged = stageCounts(all);
+  const head = boardHead(board.data);
+  const eligible = Math.max(staged.eligible, head.eligible);
+  const paper = Math.max(staged.paper, head.racing - head.eligible);
+  const counts = { ...staged, paper, eligible };
+  const racing = paper + eligible;
+  const shelf = lib.data?.counts?.total ? lib.data.counts : null;
+  const onPaper = `${racing} ${eligible ? 'on paper or eligible' : 'racing on paper'}`;
+  const bare = Boolean(shelf) && !list.length && !api.loading;
 
-  const big = tested ? (
+  const big = shelf ? (
     <>
-      <b>{tested}</b>
-      <span className="muted">
-        tested overnight · {lib.data.counts.held_up || 'none'} held up · {counts.paper + counts.eligible} on paper
-      </span>
+      <b data-testid="strat-count">{shelf.tested || shelf.total}</b>
+      <span className="muted">{shelf.tested ? `of ${shelf.total} tested overnight · ${shelf.held_up || 'none'} held up · ${onPaper}` : `on tonight’s list, waiting for their first run · ${onPaper}`}</span>
     </>
   ) : d ? (
     <>
-      <b>{counts.paper + counts.eligible}</b>
+      <b data-testid="strat-count">{racing}</b>
       <span className="muted">
-        {counts.eligible ? 'on paper or eligible' : 'on paper'} · {plural(list.length, 'strategy', 'strategies')}
+        {eligible ? 'on paper or eligible' : 'on paper'} · {plural(Math.max(all.length, head.racing), 'strategy', 'strategies')}
       </span>
     </>
   ) : (
@@ -103,26 +131,12 @@ export default function Strategies() {
           <GapNote k="strategies.race" />
           <GapNote k="settings.risk_check" />
           <Library api={lib} />
-          <Leaderboard />
+          <Leaderboard api={board} />
           <StageRail counts={counts} />
           <section className="grid">
-            <div className="card c8 top" data-testid="strategies">
-              <div className="card-head">
-                <span className="tag">Strategies</span>
-                <span className="chip">{counts.off ? `${counts.off} off the track` : 'Newest first by stage'}</span>
-              </div>
-              {list.length ? (
-                <div className="rows">
-                  {list.map((s) => (
-                    <StrategyRow s={s} key={`${s.id}-${s.version}`} />
-                  ))}
-                </div>
-              ) : (
-                <p className="empty-hint">{api.loading ? 'Opening the ledger…' : 'Nothing in the lab yet. Ask the Strategy desk from the Console to turn a research idea into a spec.'}</p>
-              )}
-            </div>
-            <div className="stack c4">
-              <div className="card">
+            {bare ? null : <StrategyList list={list} off={counts.off} loading={api.loading} />}
+            <div className={bare ? 'stack c12' : 'stack c4'}>
+              <div className={bare ? 'card honest wide' : 'card honest'}>
                 <div className="card-head">
                   <span className="tag mint">How the lab stays honest</span>
                 </div>

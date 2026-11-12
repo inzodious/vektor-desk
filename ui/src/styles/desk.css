@@ -1192,7 +1192,7 @@ tr.fl-you td { font-weight: 700; color: var(--ink); }
 @media (max-width: 640px) { .pe-bar { bottom: -18px; } }
 
 /* ---------- today's run ---------- */
-.run-stages { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.run-stages { list-style: none; margin: 6px 0 0; padding: 0; display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); }
 .run-stage { position: relative; display: grid; gap: 8px; justify-items: start; padding-right: 12px; min-width: 0; }
 .run-stage::before { content: ''; position: absolute; left: 22px; right: 0; top: 10px; height: 2px; background: repeating-linear-gradient(90deg, var(--line-2) 0 6px, transparent 6px 11px); }
 .run-stage:last-child::before { display: none; }
@@ -1698,3 +1698,13 @@ a.chip { text-decoration: none; }
 .ph-guide { margin: 0; font-size: 12.5px; color: var(--ink-2); max-width: 60ch; }
 .ph-guide a { font-weight: 700; color: var(--teal-ink); white-space: nowrap; }
 .ph-guide a:hover { text-decoration: underline; }
+
+/* ---------- strategies without a hand-written list ---------- */
+@media (min-width: 761px) {
+  .honest.wide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 22px; }
+  .honest.wide .card-head { grid-column: 1 / -1; }
+  .honest.wide .rule { border-bottom: 0; align-items: start; }
+}
+
+/* ---------- valuation basis ---------- */
+.range-basis { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); max-width: 70ch; }

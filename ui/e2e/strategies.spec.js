@@ -9,8 +9,8 @@ test('the race lists stages and strategies with paper progress, and rule tests s
   const errors = watchErrors(page);
   await page.goto('/strategies');
   await expect(page.locator('.ph-big')).toContainText('on paper');
-  await expect(page.getByTestId('stages').locator('[data-stage="paper"]')).toContainText('1');
-  await expect(page.getByTestId('stages').locator('.stage.lit')).toHaveCount(2);
+  await expect(page.getByTestId('stages').locator('[data-stage="paper"] b')).toHaveText('6');
+  await expect(page.getByTestId('stages').locator('.stage.lit')).toHaveCount(3);
   const list = page.getByTestId('strategies');
   await expect(list.locator('[data-strategy]')).toHaveCount(3);
   await expect(list.locator('[data-strategy]').first()).toHaveAttribute('data-strategy', 'sector-momentum');
@@ -27,8 +27,11 @@ test('the race lists stages and strategies with paper progress, and rule tests s
 
 test('an empty lab says how to start', async ({ page }) => {
   await page.route('**/api/lab/strategies', (r) => r.fulfill({ json: { strategies: [], rules: [], features: [], grammar: {} } }));
+  await page.route('**/api/lab/library*', (r) => r.fulfill({ status: 404, json: { detail: 'Not Found' } }));
+  await page.route('**/api/engine/lab/leaderboard*', (r) => r.fulfill({ json: { as_of: '2026-11-06', rows: [], groups: [] } }));
   await page.goto('/strategies');
   await expect(page.getByTestId('strategies')).toContainText('Nothing in the lab yet');
+  await expect(page.getByTestId('strat-count')).toHaveText('0');
   await expect(page.getByTestId('stages').locator('.stage.lit')).toHaveCount(0);
   await page.goto('/strategies/habits');
   await expect(page.getByTestId('rules')).toContainText('No rule tests yet');

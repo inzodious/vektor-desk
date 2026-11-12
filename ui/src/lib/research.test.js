@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allSources, cleanSymbol, directionWord, eventWord, filingChip, coreFund, eventsOf, freshness, keyNumbers, overnightStart, rangeGeo, rangeLine, rateLines, rebase, sourceKind, triggersOf, upcomingOf, verdictOf } from './research.js';
+import { allSources, basisParts, cleanSymbol, fmtBasis, isPriceBasis, directionWord, eventWord, filingChip, coreFund, eventsOf, freshness, keyNumbers, overnightStart, rangeGeo, rangeLine, rateLines, rebase, sourceKind, triggersOf, upcomingOf, verdictOf } from './research.js';
 
 describe('research helpers', () => {
   it('grades sources by where they come from', () => {
@@ -35,6 +35,20 @@ describe('research helpers', () => {
     expect(rangeLine({ low: 2.4, high: 4.2, basis: 'price per share, $' }, 3.03)).toBe('Now $3.03: inside the range, lower half.');
     expect(rangeLine({ low: 24, high: 35, basis: 'forward P/E' })).toContain("isn't tracked");
     expect(rangeLine({ low: 24, high: 35, basis: 'forward P/E', now: 40 })).toBe('Now 40x: above the range.');
+    const long = 'Forward P/E on the listed shares (price ÷ next-year consensus EPS). Low 22x = the recent trough reading; high 33x = five-year average. Now 24.57x at the close of $100.00.';
+    expect(isPriceBasis(long)).toBe(false);
+    expect(fmtBasis(22, long)).toBe('22x');
+    expect(rangeLine({ low: 22, high: 33, now: 24.57, basis: long })).toBe('Now 24.6x: inside the range, lower half.');
+    expect(basisParts(long)).toEqual({ label: 'Forward P/E on the listed shares', note: long });
+    expect(basisParts('forward P/E')).toEqual({ label: 'forward P/E', note: null });
+    expect(isPriceBasis('Price per share from 3 to 5 times next year’s sales.')).toBe(true);
+    expect(fmtBasis(18, 'Price per share from 3 to 5 times next year’s sales.')).toBe('$18.00');
+    expect(fmtBasis(21, 'price to next year’s earnings, x')).toBe('21x');
+    expect(fmtBasis(22, 'Price of the shares against earnings', 'multiple')).toBe('22x');
+    expect(fmtBasis(18, 'Forward P/E', 'price')).toBe('$18.00');
+    expect(fmtBasis(4.2, 'Price per share', 'percent')).toBe('4.2%');
+    expect(fmtBasis(4.2, 'Price per share', null)).toBe('4.2');
+    expect(isPriceBasis('Price per share', null)).toBe(false);
   });
 
   it('rebases two price series on shared days', () => {

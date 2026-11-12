@@ -134,7 +134,8 @@
     "low": 17,
     "high": 24,
     "now": 22,
-    "basis": "price to next year’s earnings, x"
+    "unit": "multiple",
+    "basis": "Price against next year’s earnings"
    },
    "valuation_note": "Fair to slightly rich. Earnings growth is carrying the price, not hope.",
    "risks": [
@@ -169,7 +170,8 @@
     "low": 11,
     "high": 16,
     "now": 13,
-    "basis": "price to next year’s earnings, x"
+    "unit": "multiple",
+    "basis": "Price against next year’s earnings"
    },
    "valuation_note": "Cheap against its own history and against US stocks.",
    "risks": [
