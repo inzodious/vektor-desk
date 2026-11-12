@@ -23,7 +23,8 @@ N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
 REFRESH_AFTER = timedelta(days=30)
 REV = 2
-OUTDATED = "were measured before the lab's latest fix and are run again tonight; until then their numbers lean a little."
+OUTDATED = "were measured before the lab's latest fix and are being run again; until then their numbers lean a little."
+LEVEL_PTS = 0.2
 YARDSTICK = "lib-buy-hold-sp500"
 PLAIN = (
     (("no plan mix",), "No plan of your own is loaded on the desk yet, so there is no plan mix to test. The Safe mix row is the built-in stand-in."),
@@ -562,15 +563,26 @@ def _outdated(entry: dict, seen: dict) -> bool:
     return seen["kind"] != "rejected" and seen["rev"] < entry["rev"]
 
 
-def _due(entry: dict, seen: dict, now: datetime) -> bool:
-    age = now - datetime.fromisoformat(seen["result_at"])
-    if seen["kind"] != "rejected":
-        return age >= (RETRY_AFTER if _outdated(entry, seen) else REFRESH_AFTER)
+def _tried(sid: str, done: set[str]) -> datetime | None:
+    stamps = [name[:16] for name in done if f"-{sid}-v1-" in name]
     try:
-        build = json.loads(seen["body"] or "{}").get("lab_build")
+        return datetime.strptime(max(stamps), "%Y%m%dT%H%M%SZ").replace(tzinfo=UTC) if stamps else None
     except ValueError:
-        build = None
-    return build != lab_build() or age >= RETRY_AFTER
+        return None
+
+
+def _due(entry: dict, seen: dict, now: datetime, done: set[str]) -> bool:
+    made = datetime.fromisoformat(seen["result_at"])
+    if seen["kind"] == "rejected":
+        try:
+            build = json.loads(seen["body"] or "{}").get("lab_build")
+        except ValueError:
+            build = None
+        return build != lab_build() or now - made >= RETRY_AFTER
+    if not _outdated(entry, seen):
+        return now - made >= REFRESH_AFTER
+    tried = _tried(entry["id"], done)
+    return tried is None or tried <= made.astimezone(UTC) or now - tried >= RETRY_AFTER
 
 
 def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
@@ -584,7 +596,7 @@ def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
         ordered = sorted(LIBRARY, key=lambda e: e["type"] == "rule")
         for i, entry in enumerate(ordered):
             seen = latest.get(entry["id"])
-            if entry["id"] in waiting or (seen and not _due(entry, seen, now)):
+            if entry["id"] in waiting or (seen and not _due(entry, seen, now, done)):
                 continue
             final = folder / f"{stamp}-{i:02d}-{entry['id']}-v1-{entry['type']}.json"
             tmp = folder / f".{final.name}.tmp"
@@ -764,11 +776,20 @@ def view(cfg: Config) -> dict:
     counts["yardstick"] = sum(r["yardstick"] for r in rows)
     counts["outdated"] = old = sum(r["outdated"] for r in rows)
     several = "All of these" if old == counts["tested"] else "Some of these"
+    gap = next((r["gap_pts"] for r in rows if r["yardstick"] and not r["outdated"] and r["gap_pts"] is not None), None)
+    level = gap is None or abs(gap) < LEVEL_PTS
+    note = f"{NOTE} {several} {OUTDATED}" if old else NOTE
+    if not level:
+        note += (
+            f" The S&P 500 row is measured against itself and should read level, but it is off by {abs(gap):.1f} points a year, "
+            "so every row except the deposit rules may lean by about that much. This is being looked into."
+        )
     stamps = [r["tested_at"] for r in rows if r["status"] == "tested"]
     return {
         "as_of": max(stamps) if stamps else None,
         "trials": trials,
-        "note": f"{NOTE} {several} {OUTDATED}" if old else NOTE,
+        "note": note,
+        "self_check": None if gap is None else {"gap_pts": gap, "level": level},
         "counts": counts,
         "kinds": [{"key": k, "title": t} for k, t in KINDS],
         "rows": rows,

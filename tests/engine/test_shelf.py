@@ -346,7 +346,14 @@ def test_the_sp500_row_reads_as_the_yardstick_when_there_is_no_plan_to_compare_i
     assert first["out_of_sample"]["excess_pts"] is None and first["out_of_sample"]["ann_return_pct"] is not None
     assert view["counts"]["tested"] == 2 and view["counts"]["yardstick"] == 1 and view["counts"]["fell_short"] == (other["verdict"] == "fell_short")
     assert other["yardstick"] is False and abs(first["gap_pts"]) < 0.05
-    assert view["note"] == shelf.NOTE and "cash" not in view["note"]
+    assert view["note"] == shelf.NOTE and "cash" not in view["note"] and view["self_check"] == {"gap_pts": first["gap_pts"], "level": True}
+    ledger = sqlite3.connect(runner.ledger_path(cfg))
+    ledger.execute("UPDATE lab_results SET body = json_set(body, '$.walk_forward.excess_pts', 0.6) WHERE strategy_id='lib-buy-hold-sp500'")
+    ledger.commit()
+    ledger.close()
+    off = shelf.view(cfg)
+    assert off["self_check"] == {"gap_pts": 0.6, "level": False} and off["rows"][0]["verdict"] is None
+    assert off["note"].startswith(shelf.NOTE) and "should read level, but it is off by 0.6 points a year" in off["note"]
 
 
 def test_a_strategy_is_invested_from_the_first_day_of_every_test_year(stocked):
@@ -400,8 +407,7 @@ def test_a_result_from_an_older_revision_is_flagged_and_run_again(stocked, monke
     before = shelf.view(cfg)
     assert before["counts"]["outdated"] == 2 and all(r["outdated"] and r["status"] == "tested" for r in before["rows"])
     assert before["note"] == f"{shelf.NOTE} All of these {shelf.OUTDATED}"
-    assert shelf.queue_missing(cfg, now=NOW + timedelta(hours=11))["queued"] == 0
-    later = NOW + timedelta(hours=20)
+    later = NOW + timedelta(minutes=5)
     assert shelf.queue_missing(cfg, now=later) == {"queued": 2, "of": 2}
     assert shelf.queue_missing(cfg, now=later + timedelta(minutes=1))["queued"] == 0
     waiting = shelf.view(cfg)
@@ -409,7 +415,7 @@ def test_a_result_from_an_older_revision_is_flagged_and_run_again(stocked, monke
     process_queue(cfg, now=later)
     after = shelf.view(cfg)
     assert after["counts"]["outdated"] == 0 and after["note"] == shelf.NOTE and after["as_of"] == later.isoformat(timespec="seconds")
-    assert after["trials"] == before["trials"]
+    assert after["trials"] == before["trials"] and after["self_check"] is None
     assert ledger.execute("SELECT count(DISTINCT strategy_id || params || window || kind) FROM strategy_trials").fetchone()[0] == trials
     ledger.close()
     assert shelf.queue_missing(cfg, now=later + timedelta(days=29))["queued"] == 0
@@ -418,6 +424,20 @@ def test_a_result_from_an_older_revision_is_flagged_and_run_again(stocked, monke
     bumped = {r["id"]: r["outdated"] for r in shelf.view(cfg)["rows"]}
     assert bumped == {"lib-60-40": True, "lib-dip-reserve": False}
     assert shelf.view(cfg)["note"] == f"{shelf.NOTE} Some of these {shelf.OUTDATED}"
+
+
+def test_an_outdated_row_whose_rerun_left_no_result_waits_before_another_try():
+    entry = {"id": "lib-60-40", "rev": 2}
+    seen = {"kind": "experiment", "rev": 1, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
+    now = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
+    made = "20261112T055500Z-03-lib-60-40-v1-experiment.json"
+    tried = "20261112T084500Z-03-lib-60-40-v1-experiment.json"
+    other = "20261112T084500Z-04-lib-60-40-plus-v1-experiment.json"
+    assert shelf._due(entry, seen, now, set()) and shelf._due(entry, seen, now, {made}) and shelf._due(entry, seen, now, {made, other})
+    assert not shelf._due(entry, seen, now, {made, tried})
+    assert shelf._due(entry, seen, now + timedelta(hours=12), {made, tried})
+    current = seen | {"rev": 2}
+    assert not shelf._due(entry, current, now, {made}) and shelf._due(entry, current, now + timedelta(days=31), {made})
 
 
 def test_every_fund_in_a_built_in_mix_is_known_to_the_lab():
