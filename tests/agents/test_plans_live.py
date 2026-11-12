@@ -5,6 +5,7 @@ import pytest
 
 from desk.agents import advisor, console, plans, store
 from desk.agents.sources import RealAdvisor, RealPlanFacts, RealPlans
+from desk.decisions import plan as ledger
 from desk.decisions import plans as record
 from tests.agents.agent_fakes import FakeDecisions
 from tests.agents.test_advisor import FakeAdvisor
@@ -16,6 +17,13 @@ NOW = datetime(2026, 11, 11, 23, 0, tzinfo=UTC)
 @pytest.fixture(autouse=True)
 def quiet(monkeypatch):
     monkeypatch.setattr("desk.agents.alerts.publish", lambda *a, **k: True)
+
+
+@pytest.fixture(autouse=True)
+def pinned_clock(monkeypatch):
+    real = ledger._today
+    monkeypatch.setattr(ledger, "_today", lambda cfg, now=None: real(cfg, now or NOW))
+    monkeypatch.setattr(plans, "_today", lambda cfg, today=None: today or WED)
 
 
 def run(cfg, answer, today=WED, **kw):
@@ -116,12 +124,10 @@ def test_runs_on_the_engines_real_plan_facts(cfg, monkeypatch):
     assert asked.note == "WTCH isn't a holding in today's plan facts."
 
 
-def test_upcoming_steps_reach_the_desks_as_dates_and_purposes_only(cfg, monkeypatch):
+def test_upcoming_steps_reach_the_desks_as_dates_and_purposes_only(cfg):
     console.ask(cfg, "plans", json.dumps(PINS), symbol="TICKA")
     run(cfg, draft())
     record.approve_plan(cfg, "TICKA", now=NOW)
-    real = record.open_steps
-    monkeypatch.setattr(record, "open_steps", lambda cfg, days=0, now=None: real(cfg, days=days, now=NOW))
     steps = RealAdvisor().steps(cfg, advisor.STEPS_AHEAD_DAYS)
     sale = next(s for s in steps if s["kind"] == "harvest")
     assert (sale["symbol"], sale["due"], sale["until"], sale["status"]) == ("TICKA", "2026-12-07", "2026-12-15", "upcoming") and sale["purpose"]
