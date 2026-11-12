@@ -36,7 +36,7 @@ def test_watchlist_routes(cfg, app_client, monkeypatch):
         r = client.post("/api/engine/watchlist", json={"symbol": bad})
         assert r.status_code == 400 and words in r.json()["detail"]
     r = client.delete("/api/engine/watchlist/MSFT")
-    assert r.status_code == 400 and "DESK_WATCHLIST" in r.json()["detail"]
+    assert r.status_code == 400 and r.json()["detail"].startswith("MSFT is on the watchlist from the box's own setup") and "DESK_" not in r.json()["detail"]
     assert client.delete("/api/engine/watchlist/TSLA").status_code == 400
     gone = client.delete("/api/engine/watchlist/nvda").json()
     assert gone["removed"] == "NVDA" and [r["symbol"] for r in gone["symbols"]] == ["AAPL", "MSFT"]
