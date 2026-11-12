@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from desk.engine.market import EARLY_CLOSE, ET, session, trading_day
 
 CLOSE_GRACE = timedelta(seconds=60)
+CLOSES_LAND = "official closes land, usually the same evening; fund prices can follow the next morning."
 KEEP_DAYS = 7
 WAIT_DAYS = 7
 NAMED = 3
@@ -340,7 +341,7 @@ def view(conn: sqlite3.Connection | None, *, now: datetime | None = None) -> dic
             }
     if quoted:
         when = f", {time_words(_stamp(at))}" if at else ""
-        words = f"{day_words(day)}{when}. Provisional until official closes land overnight."
+        words = f"{day_words(day)}{when}. Provisional until {CLOSES_LAND}"
     elif provisional:
         words = f"{day_words(day)}, at the close. Waiting on the official close for {names(priced['waiting'])}; the day is restated when it lands."
     else:
