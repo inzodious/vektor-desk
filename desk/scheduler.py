@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from desk import jobrun, memory
+from desk import jobrun, memory, overnight
 from desk.config import Config
 from desk.packages import seams
 from desk.runlock import BUSY
@@ -58,6 +58,7 @@ class Job:
     refreshes: tuple[str, ...] = ()
     stage: str = ""
     heavy: bool = True
+    overnight: int | None = None
     proc: subprocess.Popen | None = field(default=None, repr=False)
     waiting: dict | None = field(default=None, repr=False)
     group: dict | None = field(default=None, repr=False)
@@ -89,6 +90,7 @@ def make_job(
     stage: str = "",
     heavy: bool | None = None,
     title: str = "",
+    overnight: int | None = None,
 ) -> Job:
     parts = timing.split()
     if len(parts) != 5:
@@ -110,6 +112,7 @@ def make_job(
         refreshes=refreshes,
         stage=stage,
         heavy=name not in LIGHT if heavy is None else heavy,
+        overnight=overnight,
     )
 
 
@@ -140,14 +143,28 @@ def package_jobs(only: list[str] | None = None) -> list[Job]:
                 timing, command, name = entry["schedule"], entry["command"], entry.get("name")
                 refreshes, stage = tuple(str(c) for c in entry.get("refreshes") or ()), str(entry.get("stage") or "")
                 heavy, title = bool(entry["heavy"]) if "heavy" in entry else None, str(entry.get("title") or "")
+                place = entry.get("overnight")
+                place = place if isinstance(place, int) and not isinstance(place, bool) else None
             else:
-                timing, command, name, refreshes, stage, heavy, title = entry[0], entry[1], None, (), "", None, ""
+                timing, command, name, refreshes, stage, heavy, title, place = entry[0], entry[1], None, (), "", None, "", None
             cmd = shlex.split(command) if isinstance(command, str) else list(command)
             lock = re.sub(r"[^A-Za-z0-9_-]+", "-", f"{pkg}-{name}")[:60] if name else lock_name(pkg, cmd)
             held = ["python", "-m", "desk.runlock", "--hold", lock, "--", *cmd]
             job_id = jobrun.job_name(pkg, cmd, name)
             jobs.append(
-                make_job(f"{pkg}.jobs[{i}]", timing, held, name=job_id, package=pkg, lock=lock, refreshes=refreshes, stage=stage, heavy=heavy, title=title)
+                make_job(
+                    f"{pkg}.jobs[{i}]",
+                    timing,
+                    held,
+                    name=job_id,
+                    package=pkg,
+                    lock=lock,
+                    refreshes=refreshes,
+                    stage=stage,
+                    heavy=heavy,
+                    title=title,
+                    overnight=place,
+                )
             )
     return jobs
 
@@ -194,6 +211,7 @@ def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = N
         "note": None,
         "error": None,
         "oom": None,
+        "ready": None,
     }
     _record(cfg, job)
 
@@ -223,6 +241,7 @@ def reap(jobs: list[Job], cfg: Config | None = None) -> None:
             detail = None if rc == 0 else "another run held the lock" if rc == BUSY else f"exit {rc}; see docker logs vektor-desk-cron"
             job.run.update(finished=jobrun.stamp(jobrun.now_utc()), result=result, exit_code=rc, detail=detail)
             job.run.update(note=said.get("skipped") if rc == 0 else None, error=said.get("error") if result == "failed" else None)
+            job.run.update(ready=said.get("ready") if rc == 0 else None)
             stopped = _stopped_for_memory(job, rc, cfg)
             if stopped is not None:
                 scope, group = stopped
@@ -247,7 +266,7 @@ def reap(jobs: list[Job], cfg: Config | None = None) -> None:
             start(teller, cfg, "memory")
 
 
-# ---- Low-memory mode: heavy jobs one at a time ----
+# ---- Heavy jobs one at a time: in low-memory mode, and while the overnight run is going ----
 
 
 def low(cfg: Config | None, every: float = MODE_EVERY) -> bool:
@@ -275,14 +294,26 @@ def _heavy_running(jobs: list[Job]) -> bool:
     return any(j.heavy and j.proc is not None for j in jobs)
 
 
+def one_at_a_time(cfg: Config | None) -> bool:
+    if cfg is None:
+        return False
+    if low(cfg):
+        return True
+    try:
+        return overnight.active(cfg)
+    except Exception as e:  # noqa: BLE001
+        log(f"couldn't read the overnight run: {e!r}")
+        return False
+
+
 def launch(jobs: list[Job], job: Job, cfg: Config | None, trigger: str, request_id: str | None = None) -> str:
-    if not (job.heavy and low(cfg) and _heavy_running(jobs)):
+    if not (job.heavy and _heavy_running(jobs) and one_at_a_time(cfg)):
         start(job, cfg, trigger, request_id)
         return "started"
     if trigger == "schedule" and job.timing.startswith("* "):
         return "skipped"
     job.waiting = {"trigger": trigger, "request_id": request_id, "since": jobrun.stamp(jobrun.now_utc())}
-    log(f"{job.line} waits its turn: low-memory mode runs heavy jobs one at a time")
+    log(f"{job.line} waits its turn: heavy jobs run one at a time in low-memory mode and during the overnight run")
     _save_waiting(jobs, cfg)
     return "waiting"
 
@@ -291,7 +322,7 @@ def drain(jobs: list[Job], cfg: Config | None) -> list[Job]:
     started = []
     queue = sorted((j for j in jobs if j.waiting is not None), key=lambda j: j.waiting["since"])
     for job in queue:
-        if low(cfg) and _heavy_running(jobs):
+        if _heavy_running(jobs) and one_at_a_time(cfg):
             break
         ask = job.waiting
         start(job, cfg, ask["trigger"], ask["request_id"])
@@ -305,6 +336,14 @@ def _busy(jobs: list[Job], name: str) -> bool:
     return any(j.name == name and (j.proc is not None or j.waiting is not None) for j in jobs)
 
 
+def _in_tonights_run(cfg: Config, job: Job) -> bool:
+    try:
+        return overnight.covers(cfg, job.name, jobrun.now_utc())
+    except Exception as e:  # noqa: BLE001
+        log(f"couldn't read the overnight run: {e!r}")
+        return False
+
+
 def tick(jobs: list[Job], t: datetime, cfg: Config | None = None) -> list[Job]:
     reap(jobs, cfg)
     started = []
@@ -313,6 +352,9 @@ def tick(jobs: list[Job], t: datetime, cfg: Config | None = None) -> list[Job]:
             continue
         if _busy(jobs, job.name):
             log(f"{job.line} skipped: still running from last time")
+            continue
+        if cfg is not None and _in_tonights_run(cfg, job):
+            log(f"{job.line} skipped: tonight's run has it")
             continue
         if launch(jobs, job, cfg, "schedule") == "started":
             started.append(job)
@@ -344,6 +386,13 @@ def run_chain(jobs: list[Job], cfg: Config) -> None:
         startrun.advance(cfg, jobs, lambda job, rid: launch(jobs, job, cfg, "start", rid), lambda name: _busy(jobs, name))
     except Exception as e:  # noqa: BLE001
         log(f"start chain stopped on an error and will try again: {e!r}")
+
+
+def run_night(jobs: list[Job], cfg: Config) -> None:
+    try:
+        overnight.advance(cfg, jobs, lambda job, rid: launch(jobs, job, cfg, "overnight", rid), lambda name: _busy(jobs, name))
+    except Exception as e:  # noqa: BLE001
+        log(f"the overnight run stopped on an error and will try again: {e!r}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -380,6 +429,7 @@ def main(argv: list[str] | None = None) -> int:
         drain(jobs, cfg)
         serve_requests(jobs, cfg)
         run_chain(jobs, cfg)
+        run_night(jobs, cfg)
         wait = (t - datetime.now(zone)).total_seconds()
         if wait > 0:
             time.sleep(min(wait, jobrun.PICKUP_SECONDS))
