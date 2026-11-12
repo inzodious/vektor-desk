@@ -249,6 +249,11 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
     return {}
 
 
+def local_only(raw: object) -> bool:
+    universe = raw.get("universe") if isinstance(raw, dict) else None
+    return isinstance(universe, dict) and universe.get("set") == HELD_SET
+
+
 def set_mix(data: LabData, name: str) -> dict[str, float]:
     return data.held_mix if name == HELD_SET else data.plan_mix
 

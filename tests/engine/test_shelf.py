@@ -10,7 +10,7 @@ from desk.api.app import create_app
 from desk.engine import kinds, lab
 from desk.engine.jobs import JOBS
 from desk.engine.lab import rulebook, runner, shelf, simcache
-from desk.engine.lab.data import EXPORT_SCHEMA, data_path, load
+from desk.engine.lab.data import EXPORT_SCHEMA, data_path, held_path, load
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
 from desk.engine.lab.spec import HINDSIGHT, SETS, SpecError, parse, resolve, variants
@@ -70,9 +70,6 @@ def lab_file(tmp_path_factory):
     conn.executemany("INSERT INTO macro VALUES ('DGS3MO', ?, 2.0)", [(d,) for d in days[::5]])
     conn.executemany("INSERT INTO plan_mix VALUES (?, ?)", [("SPY", 0.6), ("VXUS", 0.2), ("AGG", 0.2)])
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
-    conn.executemany("INSERT INTO held_mix VALUES (?, ?)", [("SPY", 0.5), ("STK0", 0.3), ("FTEC", 0.2)])
-    conn.execute("INSERT INTO settings VALUES ('held_mix_covered', '0.88')")
-    conn.execute("INSERT INTO settings VALUES ('held_mix_as_of', '2024-12-31')")
     conn.commit()
     conn.close()
     return path
@@ -83,6 +80,7 @@ def stocked(cfg, lab_file):
     path = data_path(cfg)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(lab_file.read_bytes())
+    held_path(cfg).write_text(json.dumps({"as_of": "2024-12-31", "covered": 0.88, "weights": {"SPY": 0.5, "STK0": 0.3, "FTEC": 0.2}}))
     return cfg
 
 
@@ -551,7 +549,7 @@ def test_the_export_queues_the_library_before_it_offers_and_never_waits_its_turn
     made = store.add_worker(cfg, "Horizon")
     store.beat(cfg, made["id"], {})
     out = run_lab_export(cfg)
-    experiments = sum(e["type"] == "experiment" for e in shelf.LIBRARY)
+    experiments = sum(e["type"] == "experiment" and not e.get("hindsight") for e in shelf.LIBRARY)
     assert out["library"] == {"queued": len(shelf.LIBRARY), "of": len(shelf.LIBRARY)}
     assert out["worker"]["offered"] == experiments == len(store.in_state(cfg, "queued"))
     entry = next(e for e in JOBS if isinstance(e, dict) and e["command"].endswith("lab-export"))

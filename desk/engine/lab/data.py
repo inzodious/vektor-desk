@@ -25,7 +25,6 @@ CREATE TABLE bars (
 CREATE TABLE symbols (symbol TEXT PRIMARY KEY, kind TEXT NOT NULL, role TEXT, first TEXT, last TEXT) WITHOUT ROWID;
 CREATE TABLE macro (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
 CREATE TABLE plan_mix (symbol TEXT PRIMARY KEY, weight REAL NOT NULL) WITHOUT ROWID;
-CREATE TABLE held_mix (symbol TEXT PRIMARY KEY, weight REAL NOT NULL) WITHOUT ROWID;
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
 CREATE TABLE factors (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
 CREATE TABLE french (set_name TEXT NOT NULL, name TEXT NOT NULL, date TEXT NOT NULL, ret REAL NOT NULL, PRIMARY KEY (set_name, name, date)) WITHOUT ROWID;
@@ -33,6 +32,8 @@ CREATE TABLE insider (symbol TEXT NOT NULL, known TEXT NOT NULL, owner INTEGER N
 CREATE TABLE smallcap (symbol TEXT NOT NULL, month TEXT NOT NULL, PRIMARY KEY (symbol, month)) WITHOUT ROWID;
 CREATE TABLE earnings (symbol TEXT NOT NULL, known TEXT NOT NULL, surprise REAL NOT NULL);
 """
+HELD_FILE = "held.json"
+WORKER_ROLES = {"held": "universe", "watch": "universe", "past": None}
 SMALLCAP_KIND = "stock"
 SMALL_CAPS = "small_caps"
 SMALLCAP_ROLE = "small_cap"
@@ -54,6 +55,10 @@ def lab_dir(cfg: Config) -> Path:
 
 def data_path(cfg: Config) -> Path:
     return lab_dir(cfg) / "data" / "lab.db"
+
+
+def held_path(cfg: Config) -> Path:
+    return data_path(cfg).with_name(HELD_FILE)
 
 
 def ledger_path(cfg: Config) -> Path:
@@ -91,7 +96,7 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
                     add, (tuple(r) for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM alpaca_bars WHERE symbol=?", (sym,)))
                 )
         bars = out.execute("SELECT count(*) FROM bars").fetchone()[0]
-        roles = {r["symbol"]: r["role"] for r in desk.execute("SELECT symbol, role FROM market_symbols")}
+        roles = {r["symbol"]: WORKER_ROLES.get(r["role"], r["role"]) for r in desk.execute("SELECT symbol, role FROM market_symbols")}
         roles |= {sym: roles.get(sym) or SMALLCAP_ROLE for sym in small}
         spans = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, min(date), max(date) FROM bars GROUP BY symbol")}
         rows = []
@@ -114,9 +119,6 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
         ).fetchone()
         settings = {"exported_at": now.isoformat(timespec="seconds"), "marginal_rate_pct": str(rate[0]) if rate else None}
         held, covered, held_day = _held_mix(desk, spans)
-        if held:
-            out.executemany("INSERT INTO held_mix VALUES (?, ?)", list(held.items()))
-            settings |= {"held_mix_as_of": held_day, "held_mix_covered": str(covered)}
         if small and _has(desk, "insider_buys"):
             from desk.engine.insider import coverage
 
@@ -131,7 +133,26 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
     finally:
         out.close()
     os.replace(tmp, final)
+    _write_held(final.with_name(HELD_FILE), held, covered, held_day)
     return {"ok": True, "path": str(final), "symbols": len(spans), "bars": bars, "french_rows": french_rows, "small_caps": len(small), "held_mix": len(held)}
+
+
+def _write_held(path: Path, weights: dict[str, float], covered: float | None, day: str | None) -> None:
+    if not weights:
+        path.unlink(missing_ok=True)
+        return
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.write_text(json.dumps({"as_of": day, "covered": covered, "weights": weights}, sort_keys=True))
+    os.replace(tmp, path)
+
+
+def read_held(path: Path) -> dict:
+    try:
+        body = json.loads(path.read_text())
+        weights = {str(s): float(w) for s, w in (body.get("weights") or {}).items() if float(w) > 0}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return {}
+    return {"as_of": body.get("as_of"), "covered": body.get("covered"), "weights": weights} if weights else {}
 
 
 def _held_mix(desk: sqlite3.Connection, priced) -> tuple[dict[str, float], float | None, str | None]:
@@ -355,7 +376,6 @@ def load(path: Path) -> LabData:
             d.append(r[1])
             v.append(r[2])
         plan = {r[0]: r[1] for r in conn.execute("SELECT symbol, weight FROM plan_mix")}
-        held = {r[0]: r[1] for r in conn.execute("SELECT symbol, weight FROM held_mix")} if _has(conn, "held_mix") else {}
         settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings")}
         factors: dict[str, dict[str, float]] = {}
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factors'").fetchone():
@@ -387,6 +407,9 @@ def load(path: Path) -> LabData:
         ref = FRENCH_MARKET if market is not None else None
     if not ref:
         raise NotReady("The lab data has no prices yet.")
+    held = read_held(path.with_name(HELD_FILE))
+    if held:
+        settings |= {"held_mix_as_of": held["as_of"], "held_mix_covered": str(held["covered"]) if held["covered"] is not None else None}
     return LabData(
         series,
         kinds,
@@ -401,5 +424,5 @@ def load(path: Path) -> LabData:
         insider=insider,
         smallcap=smallcap,
         earnings=earnings,
-        held_mix=held,
+        held_mix=held.get("weights") or {},
     )

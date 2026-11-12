@@ -15,7 +15,7 @@ from desk.engine.lab import factors, rulebook, simcache, stats
 from desk.engine.lab.data import FRENCH_KIND, SMALL_CAPS, LabData, data_path, lab_build, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
 from desk.engine.lab.simcache import Cache, Run
-from desk.engine.lab.spec import HELD_SET, Spec, SpecError, Variant, parse, resolve, variants
+from desk.engine.lab.spec import HELD_SET, Spec, SpecError, Variant, local_only, parse, resolve, variants
 
 HOLDOUT_YEARS = 2
 DEFAULT_CUTOFF = "2026-06-30"
@@ -559,7 +559,7 @@ def sims(path: Path, request: dict) -> dict:
     data = load(path)
     snapshot = simcache.snapshot_hash(path)
     out = {"kind": simcache.KIND, "key": simcache.job_key(snapshot, request), "snapshot": snapshot, "request": request, "rows": []}
-    if request.get("request") != "experiment":
+    if request.get("request") != "experiment" or local_only(request.get("spec")):
         return out | {"status": "nothing_to_simulate"}
     scratch = sqlite3.connect(":memory:")
     scratch.row_factory = sqlite3.Row
