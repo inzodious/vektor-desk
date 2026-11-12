@@ -696,24 +696,46 @@ def _no_plan(cfg: Config) -> bool:
 RULE_VERDICT = {"helps": "held_up", "no_clear_edge": "within_noise", "hurts": "fell_short", "inconclusive": "inconclusive"}
 
 
+def _tenth(x: float) -> float:
+    return round(x, 1) or 0.0
+
+
+def _split(h: dict) -> str:
+    n, ahead = h["starts"], round(h["share_better"] * 100)
+    if h.get("share_worse") is None:
+        if not h["share_better"] and not _tenth(h["p50_pts"]):
+            return f"never ahead, and no different in at least half of {n} start months"
+        return f"ahead in {ahead}% of {n} start months"
+    behind = round(h["share_worse"] * 100)
+    same = max(0, 100 - ahead - behind)
+    if not same:
+        return f"ahead in {ahead}% and behind in {behind}% of {n} start months"
+    return f"ahead in {ahead}%, behind in {behind}% and no different in {same}% of {n} start months"
+
+
 def _rule_row(entry: dict, body: dict) -> dict:
     best = next((v for v in body.get("variants") or [] if v.get("params") == body.get("best")), None) or {}
     h = next((x for x in sorted(best.get("horizons") or [], key=lambda x: -x["years"]) if x.get("starts")), None)
     verdict = RULE_VERDICT.get(str(body.get("verdict")), "inconclusive")
     if not h:
         return {"verdict": "inconclusive", "line": "Not enough history before the two-year holdout to judge this rule.", "variants": body.get("trials")}
-    worse = round((1 - h["share_better"]) * 100)
-    lead = {"held_up": "Helped", "within_noise": "No clear edge", "fell_short": "Hurt"}.get(verdict, "Unclear")
-    line = (
-        f"{lead}: a typical {h['p50_pts']:+.1f} points of the money put in over {h['years']} years against {entry['benchmark'].lower()}, "
-        f"and worse in {worse}% of {h['starts']} start months."
-    )
+    bench = entry["benchmark"].lower()
+    if not any(_tenth(h[k]) for k in ("p5_pts", "p50_pts", "p95_pts")):
+        verdict = "within_noise"
+        line = (
+            f"No difference: within a tenth of a point of {bench} in nearly every one of {h['starts']} start months over {h['years']} years. "
+            "The rule seldom acted, or changed little when it did."
+        )
+    else:
+        lead = {"held_up": "Helped", "within_noise": "No clear edge", "fell_short": "Hurt"}.get(verdict, "Unclear")
+        typical = _tenth(h["p50_pts"])
+        line = f"{lead}: a typical {f'{typical:+.1f}' if typical else '0.0'} points of the money put in over {h['years']} years against {bench}; {_split(h)}."
     if any(str(c).startswith(STAND_IN) for c in body.get("caveats") or []):
         line = f"Run on the built-in safe mix, as no plan of your own is loaded. {line}"
     return {
         "verdict": verdict,
         "line": line,
-        "rule": {"horizon_years": h["years"], **{k: h.get(k) for k in ("starts", "p5_pts", "p50_pts", "p95_pts", "share_better")}},
+        "rule": {"horizon_years": h["years"], **{k: h.get(k) for k in ("starts", "p5_pts", "p50_pts", "p95_pts", "share_better", "share_worse")}},
         "variants": body.get("trials"),
     }
 
