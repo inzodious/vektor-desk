@@ -25,6 +25,7 @@ RESTARTS = 6
 GAP_MAX = timedelta(minutes=10)
 GAP_AFTER = timedelta(seconds=60)
 HOST_SILENT = timedelta(minutes=20)
+BEAT = timedelta(minutes=3)
 READY_CALLS = ("desk.engine.lab.shelf", "desk.opportunities")
 READY_MAX = 120
 OPEN = ("waiting", "running")
@@ -75,7 +76,8 @@ def load(cfg: Config) -> dict | None:
     return chain if chain and isinstance(chain.get("steps"), list) else None
 
 
-def save(cfg: Config, chain: dict) -> None:
+def save(cfg: Config, chain: dict, now: datetime) -> None:
+    chain["beat"] = jobrun.stamp(now)
     jobrun._write(chain_file(cfg), chain)
 
 
@@ -98,7 +100,12 @@ def covers(cfg: Config, name: str, now: datetime) -> bool:
     chain = load(cfg)
     if chain is None or chain.get("night") != night_of(local(cfg, now)):
         return False
-    return any(s["job"] == name and s["kind"] == "night" and s["state"] in (*OPEN, "ok") for s in chain["steps"])
+    step = next((s for s in chain["steps"] if s["job"] == name and s["kind"] == "night"), None)
+    if step is None:
+        return False
+    beat = jobrun.parse_stamp(chain.get("beat"))
+    alive = beat is not None and now - beat <= BEAT
+    return step["state"] == "ok" or (step["state"] in OPEN and alive)
 
 
 # ---- Steps ----
@@ -237,7 +244,7 @@ def advance(cfg: Config, jobs: list, start: Callable[[object, str], object], bus
     chain = load(cfg)
     if chain is not None and chain["state"] == "running" and chain["night"] != night:
         _run_out(cfg, chain, busy, now)
-        save(cfg, chain)
+        save(cfg, chain, now)
         if chain["state"] == "running":
             return chain
     if night is None:
@@ -250,7 +257,7 @@ def advance(cfg: Config, jobs: list, start: Callable[[object, str], object], bus
         else:
             _carry_on(chain, jobs)
     if chain["state"] != "running":
-        save(cfg, chain)
+        save(cfg, chain, now)
         return chain
     by_name: dict[str, object] = {}
     for job in jobs:
@@ -284,7 +291,7 @@ def advance(cfg: Config, jobs: list, start: Callable[[object, str], object], bus
             step["request_id"] = secrets.token_hex(6)
             start(job, step["request_id"])
         break
-    save(cfg, chain)
+    save(cfg, chain, now)
     return chain
 
 
