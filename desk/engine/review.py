@@ -818,7 +818,18 @@ def _debrief(conn: sqlite3.Connection, kind: str, end: str) -> dict | None:
     return json.loads(d["body"]) | {"model": d["model"], "written_at": d["written_at"], "pack_digest": d["pack_digest"]}
 
 
-def review_view(conn: sqlite3.Connection | None, kind: str, end: str | None = None) -> dict:
+def _rewrite(cfg: Config | None, answer: dict) -> dict | None:
+    if cfg is None:
+        return None
+    try:
+        from desk.agents.debrief import rewrite_for
+
+        return rewrite_for(cfg, answer)
+    except Exception:
+        return None
+
+
+def review_view(conn: sqlite3.Connection | None, kind: str, end: str | None = None, cfg: Config | None = None) -> dict:
     empty = {"kind": kind, "start": None, "end": end, "as_of": None, "closed": False, "final": False, "computed_at": None, "digest": None}
     empty |= {"pack": None, "debrief": None}
     if kind not in KINDS:
@@ -831,7 +842,7 @@ def review_view(conn: sqlite3.Connection | None, kind: str, end: str | None = No
     debrief = _debrief(conn, kind, row["end"])
     if debrief:
         debrief["stale"] = debrief["pack_digest"] != row["digest"]
-    return {
+    answer = {
         "kind": kind,
         "start": row["start"],
         "end": row["end"],
@@ -843,6 +854,9 @@ def review_view(conn: sqlite3.Connection | None, kind: str, end: str | None = No
         "pack": json.loads(row["pack"]),
         "debrief": debrief,
     }
+    if debrief:
+        debrief["rewrite"] = _rewrite(cfg, answer)
+    return answer
 
 
 def index_view(conn: sqlite3.Connection | None) -> dict:

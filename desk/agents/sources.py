@@ -249,9 +249,21 @@ class Reviews(Protocol):
 
     def record(self, cfg: Config, kind: str, end: str, result: dict) -> object: ...
 
+    def view(self, cfg: Config, kind: str, end: str | None = None) -> dict: ...
+
 
 @dataclass
 class RealReviews:
+    def view(self, cfg: Config, kind: str, end: str | None = None) -> dict:
+        show = _fn("desk.engine.review", "review_view")
+        if not cfg.desk_db.exists():
+            return dict(show(None, kind, end))
+        conn = _module("desk.db").connect(cfg.desk_db, readonly=True)
+        try:
+            return dict(show(conn, kind, end))
+        finally:
+            conn.close()
+
     def pending(self, cfg: Config) -> list[dict]:
         return [dict(r) for r in _guarded("desk.engine.review", "pending", cfg)]
 

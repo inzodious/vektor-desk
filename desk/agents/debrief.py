@@ -1,13 +1,18 @@
 import json
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 
 from desk.agents import advisor, alerts, briefs, store, switches, wording
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.runner import run_desk
 from desk.agents.sources import Advisor, Decisions, NotReady, Plans, RealDecisions, RealPlans, RealReviews, Reviews
+from desk.agents.status import next_run
 from desk.config import Config
+from desk.runlock import running
 
 NAME = "debrief"
 KINDS = ("day", "week", "month", "year")
@@ -17,6 +22,13 @@ PLAN_FIELDS = ("symbol", "status", "role", "weight_band", "weight_pct", "band_st
 STEP_FIELDS = ("kind", "text", "due", "until", "when", "status", "by")
 TEXT = {"headline": 120, "what_happened": 700, "why": 700, "against_decisions": 500}
 NO_DECISIONS = "No decisions to judge in this period."
+REVIEW_JOBS = ("engine-daily", "engine-review")
+REVIEW_WAIT = 600
+REVIEW_POLL = 5
+LATE_AFTER = timedelta(hours=1)
+FAILED = ("failed", "timeout")
+DECLINED = ("disabled", "guarded", "over_budget", "unhealthy", "not_ready")
+BEFORE = "Written before the final numbers."
 
 
 @dataclass
@@ -238,3 +250,79 @@ def preview(
     if not queue:
         return report, ""
     return report, build_prompt(queue[0], advisor.gather(cfg, advice), _plans(cfg, plans or RealPlans()))
+
+
+# ---- After the review ----
+
+
+def settle(cfg: Config, wait: float = REVIEW_WAIT, *, busy: Callable = running, sleep: Callable = time.sleep) -> bool:
+    deadline = time.monotonic() + wait
+    while any(j.get("job") in REVIEW_JOBS for j in busy(cfg)):
+        if time.monotonic() >= deadline:
+            return False
+        sleep(REVIEW_POLL)
+    return True
+
+
+# ---- What the page reads ----
+
+
+def _at(text: object) -> datetime:
+    try:
+        t = datetime.fromisoformat(str(text))
+    except ValueError:
+        return datetime.min.replace(tzinfo=UTC)
+    return t if t.tzinfo else t.replace(tzinfo=UTC)
+
+
+def _when(due_at: str, now: datetime, zone: ZoneInfo) -> str:
+    t, today = datetime.fromisoformat(due_at).astimezone(zone), now.astimezone(zone).date()
+    clock = t.strftime("%I:%M %p").lstrip("0")
+    if t.date() == today:
+        return f"at {clock}"
+    if t.date() == today + timedelta(days=1):
+        return f"tomorrow at {clock}"
+    return f"on {t.strftime('%A')} at {clock}"
+
+
+def _gave_up(cfg: Config, name: str, since: datetime) -> bool:
+    for run in store.runs(cfg, NAME, 30):
+        if _at(run["started_at"]) <= since:
+            continue
+        if run["status"] in DECLINED or (run["status"] in FAILED and str(run["note"] or "").startswith(f"{name}:")):
+            return True
+    return False
+
+
+def rewrite_for(cfg: Config, view: dict, *, reviews: Reviews | None = None, decisions: Decisions | None = None, now: datetime | None = None) -> dict | None:
+    written = view.get("debrief") or {}
+    if not written.get("stale"):
+        return None
+    now = now or datetime.now(UTC)
+    zone = ZoneInfo(cfg.timezone)
+    name = label(view)
+    since = max(_at(view.get("computed_at")), _at(written.get("written_at")))
+    off = switches.blocked(cfg, NAME, _profile(cfg, decisions or RealDecisions()))
+    try:
+        coming = not off and any(label(r) == name for r in due((reviews or RealReviews()).pending(cfg), KINDS, False))
+    except NotReady:
+        coming = False
+    due_at = next_run(get(NAME), now, zone) if coming else None
+    if not due_at:
+        why = "The Debrief desk is switched off, so it stays as written." if off else "The numbers were revised after it was written."
+        return {"state": "late", "due_at": None, "words": f"{BEFORE} {why}"}
+    if _gave_up(cfg, name, since):
+        return {"state": "failed", "due_at": due_at, "words": f"{BEFORE} The rewrite did not finish; the desk tries again {_when(due_at, now, zone)}."}
+    if now - since > LATE_AFTER:
+        return {"state": "late", "due_at": due_at, "words": f"{BEFORE} The rewrite is running late; the next try is {_when(due_at, now, zone)}."}
+    return {"state": "due", "due_at": due_at, "words": None}
+
+
+def rewrite(cfg: Config, kind: str = "day", end: str | None = None, *, reviews: Reviews | None = None, decisions: Decisions | None = None, now=None) -> dict:
+    reviews = reviews or RealReviews()
+    try:
+        view = reviews.view(cfg, kind, end)
+    except NotReady:
+        view = {"kind": kind, "end": end, "debrief": None}
+    stale = bool((view.get("debrief") or {}).get("stale"))
+    return {"kind": kind, "end": view.get("end"), "stale": stale, "rewrite": rewrite_for(cfg, view, reviews=reviews, decisions=decisions, now=now)}

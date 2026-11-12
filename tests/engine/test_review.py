@@ -469,9 +469,11 @@ def test_reviews_api(cfg, monkeypatch, app_client):
         "written_at",
         "pack_digest",
         "stale",
+        "rewrite",
     }
     assert (
         debrief["stale"] is False
+        and debrief["rewrite"] is None
         and debrief["headline"] == DEBRIEF["headline"]
         and debrief["next_steps"][0] == {"text": "Review the ACME band.", "symbol": "ACME"}
     )
@@ -483,4 +485,42 @@ def test_reviews_api(cfg, monkeypatch, app_client):
         conn.execute("UPDATE series_daily SET value = value + 10 WHERE date='2026-11-06' AND series_id='value'")
     review.run(cfg, None, conn, now=MONDAY)
     assert api.get("/api/engine/reviews?kind=week").json()["debrief"]["stale"] is True
+    conn.close()
+
+
+def test_a_stale_debrief_carries_what_the_debrief_desk_says_about_its_rewrite(cfg, monkeypatch, app_client):
+    from desk.agents import debrief as desk
+
+    api = app_client(packages=["engine"])
+    conn = seeded(cfg, monkeypatch)
+    review.run(cfg, None, conn, now=NOW)
+    week = review.pending(cfg)[1]
+    review.record(cfg, "week", "2026-11-06", DEBRIEF | {"pack_digest": week["digest"]})
+    asked = []
+    due = {"state": "due", "due_at": "2026-11-09T17:46:00-05:00", "words": None}
+
+    def says(cfg, answer):
+        asked.append((answer["kind"], answer["end"], answer["computed_at"], answer["debrief"]["stale"], answer["debrief"]["written_at"]))
+        return due if answer["debrief"]["stale"] else None
+
+    monkeypatch.setattr(desk, "rewrite_for", says, raising=False)
+    fresh = api.get("/api/engine/reviews?kind=week").json()
+    assert fresh["debrief"]["rewrite"] is None and asked[0][:2] == ("week", "2026-11-06") and asked[0][3] is False
+    with conn:
+        conn.execute("UPDATE series_daily SET value = value + 10 WHERE date='2026-11-06' AND series_id='value'")
+    review.run(cfg, None, conn, now=MONDAY)
+    stale = api.get("/api/engine/reviews?kind=week").json()
+    assert stale["debrief"]["stale"] is True and stale["debrief"]["rewrite"] == due
+    assert asked[1] == ("week", "2026-11-06", stale["computed_at"], True, stale["debrief"]["written_at"])
+    assert review.review_view(conn, "week")["debrief"]["rewrite"] is None and len(asked) == 2
+
+    def broken(cfg, answer):
+        raise RuntimeError("the desk could not say")
+
+    monkeypatch.setattr(desk, "rewrite_for", broken, raising=False)
+    quiet = api.get("/api/engine/reviews?kind=week").json()
+    assert quiet["debrief"]["stale"] is True and quiet["debrief"]["rewrite"] is None
+    monkeypatch.delattr(desk, "rewrite_for", raising=False)
+    assert api.get("/api/engine/reviews?kind=week").json()["debrief"]["rewrite"] is None
+    assert api.get("/api/engine/reviews?kind=day").json()["debrief"] is None
     conn.close()
