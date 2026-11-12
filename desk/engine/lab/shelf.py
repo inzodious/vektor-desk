@@ -7,7 +7,7 @@ from statistics import NormalDist
 from desk.config import Config
 from desk.db import connect
 from desk.engine import catalog, gate
-from desk.engine.lab.data import data_path, lab_build, ledger_path, plan_path, read_plan
+from desk.engine.lab.data import PUBLIC_COVERAGE, data_path, lab_build, ledger_path, plan_path, read_plan
 from desk.engine.lab.rulebook import STAND_IN
 from desk.engine.lab.runner import PBO_BAR
 from desk.engine.lab.simcache import queue_dir
@@ -19,6 +19,9 @@ HINDSIGHT_LINE = "Hindsight, not a test: you hold these knowing how they did, an
 LEAN_AHEAD = "Ahead, but it leans on hindsight:"
 LEAN_BARRED = "Not counted as held up, because the stock list is small and includes names you hold or held."
 LEAN_WORDS = "Leans on hindsight: the stock list is small and includes names you hold or held."
+THIN_AHEAD = "Ahead, but too little of the stock list has prices:"
+THIN_BARRED = "Not counted as held up until 90% of the list is priced."
+THIN_WORDS = "Research only: under 90% of the stock list has prices."
 HINDSIGHT_NOTE = "The rows for what you hold today are hindsight, not a test, and are never counted as held up."
 KINDS = (("classic", "Old and tested"), ("practical", "Practical"), ("novel", "Novel and creative"))
 SPY, PLAN, MARKET, SMALL = "S&P 500 (SPY)", "Your plan's mix", "US stock market (French)", "Small caps (IWM)"
@@ -46,11 +49,12 @@ NOTE = (
 BAR_NOTE = "The luck bar counts all {trials} variants tried across the library, not only a row's own, so it rises for every row as strategies are added."
 N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
+LOADING_RETRY = timedelta(hours=20)
 REFRESH_AFTER = timedelta(days=30)
 HINDSIGHT_REFRESH = timedelta(days=7)
 REV = 2
 MIX_REV = 3
-SCREEN_REV = 4
+SCREEN_REV = 5
 OUTDATED = "were measured before the lab's latest fix and are being run again; until then their numbers lean a little."
 LEVEL_PTS = 0.2
 YARDSTICK = "lib-buy-hold-sp500"
@@ -58,6 +62,7 @@ PLAIN = (
     (("no plan mix",), "No plan of your own is loaded on the desk yet, so there is no plan mix to test. The Safe mix row is the built-in stand-in."),
     (("no held mix",), "The desk has not sent the lab what you hold yet. This runs the night after the next lab export."),
     (("small-cap history",), "Small-company price history is still loading. This runs once that finishes."),
+    (("public stock list",), "The public stock list is still loading its prices. This runs once that finishes."),
     (("is not in the lab yet",), "Its data file has not reached the lab yet. This runs the night after the file arrives."),
     (("no price history", "too little price history"), "Most of its funds have no price history in the lab yet."),
     (("no common history", "too late for anything", "needs 2.5 or more"), "Its funds have not all traded long enough to test before the two-year holdout."),
@@ -810,7 +815,8 @@ def _latest(cfg: Config, bodies: bool = True) -> tuple[dict[str, dict], set[str]
     try:
         body = "body" if bodies else "CASE WHEN kind='rejected' THEN body END AS body"
         rows = conn.execute(
-            f"SELECT strategy_id, kind, result_at, json_extract(body, '$.library_rev') AS rev, {body} FROM lab_results ORDER BY result_at"
+            f"SELECT strategy_id, kind, result_at, json_extract(body, '$.library_rev') AS rev, "
+            f"json_extract(body, '$.{PUBLIC_COVERAGE}.loading') AS loading, {body} FROM lab_results ORDER BY result_at"
         ).fetchall()
         done = {r[0] for r in conn.execute("SELECT file FROM queue_done")}
         trials = conn.execute(
@@ -823,7 +829,9 @@ def _latest(cfg: Config, bodies: bool = True) -> tuple[dict[str, dict], set[str]
     finally:
         conn.close()
     latest = {
-        r["strategy_id"]: {"kind": r["kind"], "result_at": r["result_at"], "rev": r["rev"] or 1, "body": r["body"]} for r in rows if r["strategy_id"] in IDS
+        r["strategy_id"]: {"kind": r["kind"], "result_at": r["result_at"], "rev": r["rev"] or 1, "loading": r["loading"] or 0, "body": r["body"]}
+        for r in rows
+        if r["strategy_id"] in IDS
     }
     return latest, done, trials
 
@@ -859,6 +867,8 @@ def _due(entry: dict, seen: dict, now: datetime, done: set[str]) -> bool:
             build = None
         return build != lab_build() or now - made >= RETRY_AFTER
     if not _outdated(entry, seen):
+        if seen.get("loading"):
+            return now - made >= LOADING_RETRY
         return now - made >= (HINDSIGHT_REFRESH if entry.get("hindsight") else REFRESH_AFTER)
     tried = _tried(entry["id"], done)
     return tried is None or tried <= made.astimezone(UTC) or now - tried >= RETRY_AFTER
@@ -1021,6 +1031,12 @@ def _rule_row(entry: dict, body: dict) -> dict:
     }
 
 
+def _barred(row: dict, ahead: str, barred: str, words: str) -> dict:
+    if row["verdict"] == "held_up":
+        return {"verdict": "within_noise", "line": f"{ahead} {row['line'][0].lower()}{row['line'][1:]} {barred}"}
+    return {"line": f"{row['line']} {words}"} if row["line"] else {}
+
+
 def view(cfg: Config) -> dict:
     latest, done, trials = _latest(cfg)
     waiting = _queued(cfg, done)
@@ -1031,8 +1047,10 @@ def view(cfg: Config) -> dict:
         row["benchmark_words"] = BENCH_WORDS[entry["benchmark"]]
         row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
         row |= {"yardstick": False, "gap_pts": None, "outdated": False, "hindsight": bool(entry.get("hindsight"))}
-        row["leans_on_hindsight"] = lean = (entry.get("spec") or {}).get("universe", {}).get("type") == "screen"
+        screen = (entry.get("spec") or {}).get("universe", {}).get("type") == "screen"
         row |= {
+            "leans_on_hindsight": False,
+            "thin_coverage": False,
             "research_only": (entry.get("spec") or {}).get("universe", {}).get("type") == "french",
             "caveats": [],
             "detail": f"/api/lab/strategies/{entry['id']}",
@@ -1051,12 +1069,13 @@ def view(cfg: Config) -> dict:
                     row |= _rule_row(entry, body)
                 else:
                     row |= _hindsight(entry, body) if row["hindsight"] else _experiment(entry, body, trials, alone)
-                if lean:
+                cover = body.get(PUBLIC_COVERAGE)
+                if screen and cover is None:
+                    row["leans_on_hindsight"] = True
                     row["caveats"] = [SCREEN_HINDSIGHT, *(c for c in row["caveats"] if c != SCREEN_HINDSIGHT)]
-                    if row["verdict"] == "held_up":
-                        row |= {"verdict": "within_noise", "line": f"{LEAN_AHEAD} {row['line'][0].lower()}{row['line'][1:]} {LEAN_BARRED}"}
-                    elif row["line"]:
-                        row["line"] = f"{row['line']} {LEAN_WORDS}"
+                    row |= _barred(row, LEAN_AHEAD, LEAN_BARRED, LEAN_WORDS)
+                elif screen and not cover.get("enough"):
+                    row |= {"thin_coverage": True, "research_only": True} | _barred(row, THIN_AHEAD, THIN_BARRED, THIN_WORDS)
         rows.append(row)
     kinds = [k for k, _ in KINDS]
     rows.sort(

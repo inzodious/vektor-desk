@@ -10,10 +10,10 @@ from desk.api.app import create_app
 from desk.engine import kinds, lab
 from desk.engine.jobs import JOBS
 from desk.engine.lab import rulebook, runner, shelf, sim, simcache
-from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, data_path, held_path, load, plan_path
+from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, PUBLIC_COVERAGE, PUBLIC_ROLE, data_path, held_path, load, plan_path
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
-from desk.engine.lab.spec import HINDSIGHT, SCREEN_HINDSIGHT, SETS, SpecError, local_only, parse, resolve, variants
+from desk.engine.lab.spec import HINDSIGHT, PUBLIC_EXITS, SCREEN_HINDSIGHT, SETS, SpecError, local_only, parse, resolve, variants
 from desk.engine.market import LIBRARY_FUNDS
 from desk.worker import store
 
@@ -31,6 +31,8 @@ FRENCH = (
     ("industry_12", tuple(f"Ind{i}" for i in range(12))),
     ("industry_49", tuple(f"I{i}" for i in range(49))),
 )
+COVERED = {"as_of": "2013-06-28", "tests_from": "2014-01-02", "listed": 8, "priced": 8, "loading": 0, "missing": 0, "stopped": 0, "pct": 100.0, "enough": True}
+ON_THE_LIST = "Tested on the 8 largest US companies of mid-2013, a list that owes nothing to what you hold. All 8 have prices."
 SUBSET = ("lib-60-40", "lib-vol-cap", "lib-size-small", "lib-trend-dip", "lib-plan-mix", "insider-momentum-filter", "lib-dip-reserve", "lib-lump-sum-spread")
 
 
@@ -59,7 +61,7 @@ def lab_file(tmp_path_factory):
             px *= 1 + drift + rng.gauss(0, vol)
             rows.append((sym, d, px * (1 + rng.gauss(0, 0.002)), px, px, 5e6))
         conn.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?)", rows)
-        kind, role = ("etf", "benchmark") if sym in FUNDS else ("stock", "universe" if sym in STOCKS else "small_cap")
+        kind, role = ("etf", "benchmark") if sym in FUNDS else ("stock", PUBLIC_ROLE if sym in STOCKS else "small_cap")
         conn.execute("INSERT INTO symbols VALUES (?, ?, ?, ?, ?)", (sym, kind, role, days[0], days[-1]))
     months = sorted({d[:7] for d in days})
     conn.executemany("INSERT INTO smallcap VALUES (?, ?)", [(s, m) for s in SMALLS for m in months])
@@ -72,6 +74,7 @@ def lab_file(tmp_path_factory):
     conn.executemany("INSERT INTO macro VALUES ('DGS3MO', ?, 2.0)", [(d,) for d in days[::5]])
     path.with_name(PLAN_FILE).write_text(json.dumps({"weights": {"SPY": 0.6, "VXUS": 0.2, "AGG": 0.2}}))
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
+    conn.execute("INSERT INTO settings VALUES (?, ?)", (PUBLIC_COVERAGE, json.dumps(COVERED)))
     conn.commit()
     conn.close()
     return path
@@ -585,24 +588,44 @@ def test_every_row_says_what_it_is_measured_against_and_the_note_says_how_the_lu
     assert "all 3 variants tried across the library" in after["note"] and {r["noise"]["trials"] for r in after["rows"]} == {3}
 
 
-def test_stock_screen_rows_say_they_lean_on_hindsight_even_on_a_result_stored_before_the_caveat(stocked, monkeypatch):
-    cfg = stocked
-    data = load(data_path(cfg))
-    screens = [e["id"] for e in shelf.LIBRARY if (e.get("spec") or {}).get("universe", {}).get("type") == "screen"]
-    assert len(screens) == 6 and all(SCREEN_HINDSIGHT in parse(spec_of(sid), data).caveats for sid in screens)
-    assert SCREEN_HINDSIGHT not in parse(spec_of("lib-three-fund"), data).caveats
-    ids = ("lib-stock-momentum", "lib-three-fund")
-    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
-    monkeypatch.setattr(shelf, "IDS", frozenset(ids))
-    shelf.queue_missing(cfg, now=NOW)
-    process_queue(cfg, now=NOW)
+def restamp(cfg, change):
     conn = sqlite3.connect(shelf.ledger_path(cfg))
     with conn:
         for sid, body in conn.execute("SELECT strategy_id, body FROM lab_results").fetchall():
             old = json.loads(body)
-            old["caveats"] = [c for c in old.get("caveats") or [] if c != SCREEN_HINDSIGHT]
+            change(old)
             conn.execute("UPDATE lab_results SET body=? WHERE strategy_id=?", (json.dumps(old), sid))
     conn.close()
+
+
+def before_the_public_list(body):
+    body.pop(PUBLIC_COVERAGE, None)
+    body["caveats"] = [c for c in body.get("caveats") or [] if c not in (ON_THE_LIST, PUBLIC_EXITS)]
+
+
+def test_stock_screen_rows_say_what_list_they_ran_on_and_only_a_result_from_before_it_leans_on_hindsight(stocked, monkeypatch):
+    cfg = stocked
+    data = load(data_path(cfg))
+    screens = [e["id"] for e in shelf.LIBRARY if (e.get("spec") or {}).get("universe", {}).get("type") == "screen"]
+    assert len(screens) == 6
+    for sid in screens:
+        spec = parse(spec_of(sid), data)
+        assert spec.caveats[:2] == [ON_THE_LIST, PUBLIC_EXITS] and SCREEN_HINDSIGHT not in spec.caveats and "survivorship" not in " ".join(spec.caveats)
+        assert spec.start == "2014-01-02"
+    assert ON_THE_LIST not in parse(spec_of("lib-three-fund"), data).caveats
+    ids = ("lib-stock-momentum", "lib-three-fund")
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
+    monkeypatch.setattr(shelf, "IDS", frozenset(ids))
+    waiting = {r["id"]: r for r in shelf.view(cfg)["rows"]}["lib-stock-momentum"]
+    assert not waiting["leans_on_hindsight"] and not waiting["thin_coverage"] and not waiting["research_only"]
+    shelf.queue_missing(cfg, now=NOW)
+    process_queue(cfg, now=NOW)
+    rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    screen, mix = rows["lib-stock-momentum"], rows["lib-three-fund"]
+    assert screen["status"] == "tested" and screen["caveats"][:2] == [ON_THE_LIST, PUBLIC_EXITS] and not screen["leans_on_hindsight"]
+    assert not screen["thin_coverage"] and "wipe" not in PUBLIC_EXITS and "last price" in PUBLIC_EXITS
+    assert "hindsight" not in screen["line"] and "S&P 500 (SPY)" in screen["line"] and not screen["research_only"]
+    restamp(cfg, before_the_public_list)
     rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
     screen, mix = rows["lib-stock-momentum"], rows["lib-three-fund"]
     assert screen["leans_on_hindsight"] and screen["caveats"][0] == SCREEN_HINDSIGHT and screen["caveats"].count(SCREEN_HINDSIGHT) == 1
@@ -610,7 +633,7 @@ def test_stock_screen_rows_say_they_lean_on_hindsight_even_on_a_result_stored_be
     assert not mix["leans_on_hindsight"] and SCREEN_HINDSIGHT not in mix["caveats"] and "hindsight" not in mix["line"]
 
 
-def test_a_row_that_leans_on_hindsight_can_never_read_held_up(stocked, monkeypatch):
+def test_a_screen_can_read_held_up_only_on_a_well_covered_public_list(stocked, monkeypatch):
     cfg = stocked
     ids = ("lib-stock-momentum", "lib-three-fund")
     monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
@@ -624,6 +647,20 @@ def test_a_row_that_leans_on_hindsight_can_never_read_held_up(stocked, monkeypat
     monkeypatch.setattr(shelf, "_experiment", lambda *a, **k: dict(won))
     view = shelf.view(cfg)
     rows = {r["id"]: r for r in view["rows"]}
+    assert rows["lib-stock-momentum"]["verdict"] == "held_up" and rows["lib-stock-momentum"]["line"] == won["line"] and view["counts"]["held_up"] == 2
+    restamp(cfg, lambda body: body.update({PUBLIC_COVERAGE: COVERED | {"priced": 7, "missing": 1, "pct": 87.5, "enough": False}}))
+    view = shelf.view(cfg)
+    rows = {r["id"]: r for r in view["rows"]}
+    screen, mix = rows["lib-stock-momentum"], rows["lib-three-fund"]
+    assert screen["verdict"] == "within_noise" and screen["thin_coverage"] and screen["research_only"] and not screen["leans_on_hindsight"]
+    assert screen["line"] == (
+        "Ahead, but too little of the stock list has prices: beat S&P 500 (SPY) by 6.1 points a year over 6 years out of sample, more than the 4.0 luck "
+        "allows across the 3 variants tried. Not counted as held up until 90% of the list is priced."
+    )
+    assert mix["verdict"] == "held_up" and not mix["thin_coverage"] and view["counts"]["held_up"] == 1
+    restamp(cfg, before_the_public_list)
+    view = shelf.view(cfg)
+    rows = {r["id"]: r for r in view["rows"]}
     screen, mix = rows["lib-stock-momentum"], rows["lib-three-fund"]
     assert screen["verdict"] == "within_noise" and mix["verdict"] == "held_up" and view["counts"]["held_up"] == 1
     assert screen["line"] == (
@@ -631,6 +668,42 @@ def test_a_row_that_leans_on_hindsight_can_never_read_held_up(stocked, monkeypat
         "across the 3 variants tried. Not counted as held up, because the stock list is small and includes names you hold or held."
     )
     assert mix["line"] == won["line"] and shelf.ready(cfg).endswith("1 held up out of sample")
+
+
+def test_a_screen_waits_while_the_list_loads_and_a_result_from_mid_load_runs_again_the_next_night(stocked):
+    cfg = stocked
+    path = data_path(cfg)
+
+    def cover(**change):
+        conn = sqlite3.connect(path)
+        with conn:
+            conn.execute("UPDATE settings SET value=? WHERE key=?", (json.dumps(COVERED | change), PUBLIC_COVERAGE))
+        conn.close()
+        return load(path)
+
+    raw = spec_of("lib-stock-momentum")
+    with pytest.raises(SpecError, match="still loading its prices: 3 of 8 are in and 5 are on the way") as loading:
+        parse(raw, cover(priced=3, loading=5, pct=37.5, enough=False))
+    with pytest.raises(SpecError, match="has no prices in the lab yet") as empty:
+        parse(raw, cover(priced=0, loading=8, pct=0.0, enough=False))
+    still = "The public stock list is still loading its prices. This runs once that finishes."
+    assert shelf.plain(loading.value.problems) == shelf.plain(empty.value.problems) == still
+    thin = parse(raw, cover(priced=6, missing=2, pct=75.0, enough=False))
+    assert thin.caveats[0] == (
+        "Tested on the 8 largest US companies of mid-2013, a list that owes nothing to what you hold. 6 of them have prices. "
+        "The 2 without were mostly bought or failed, so the result still leans to survivors by that much. "
+        "That is under 90%, so this stays research only."
+    )
+    nearly = parse(raw, cover(listed=200, priced=187, loading=4, missing=9, pct=93.5))
+    assert nearly.caveats[0] == (
+        "Tested on the 200 largest US companies of mid-2013, a list that owes nothing to what you hold. 187 of them have prices. "
+        "4 more are still loading. The 9 without were mostly bought or failed, so the result still leans to survivors by that much."
+    )
+    entry = next(e for e in shelf.LIBRARY if e["id"] == "lib-stock-momentum")
+    seen = {"kind": "experiment", "rev": shelf.SCREEN_REV, "result_at": "2026-11-13T06:10:00+00:00", "loading": 4, "body": None}
+    assert not shelf._due(entry, seen, datetime(2026, 11, 13, 18, 30, tzinfo=UTC), set())
+    assert shelf._due(entry, seen, datetime(2026, 11, 14, 5, 55, tzinfo=UTC), set())
+    assert not shelf._due(entry, seen | {"loading": 0}, datetime(2026, 11, 14, 5, 55, tzinfo=UTC), set())
 
 
 def test_the_library_grew_and_each_kind_names_its_new_rows():
@@ -663,12 +736,13 @@ def test_a_stock_in_the_plan_is_screened_and_costed_like_any_other_so_a_worker_a
         parse(spec_of("lib-60-40") | {"universe": {"type": "fund_list", "symbols": ["SPY", "STK0"]}, "sizing": "equal"}, box)
 
 
-def test_stock_screens_are_run_again_now_that_no_name_is_kept_out_for_being_his():
+def test_stock_screens_are_run_again_on_the_public_stock_list():
     screens = {e["id"] for e in shelf.LIBRARY if e["rev"] == shelf.SCREEN_REV}
     assert screens == {e["id"] for e in shelf.LIBRARY if e["type"] == "experiment" and e["spec"]["universe"].get("type") == "screen"}
-    assert len(screens) == 6 and shelf.SCREEN_REV > shelf.MIX_REV
-    seen = {"kind": "experiment", "rev": shelf.MIX_REV, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
-    assert all(shelf._outdated(e, seen) == (e["id"] in screens) for e in shelf.LIBRARY)
+    assert len(screens) == 6 and shelf.SCREEN_REV == 5 > shelf.MIX_REV
+    for rev in (shelf.MIX_REV, 4):
+        seen = {"kind": "experiment", "rev": rev, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
+        assert all(shelf._outdated(e, seen) == (e["id"] in screens) for e in shelf.LIBRARY)
 
 
 def test_mixes_that_held_cash_for_a_fund_not_yet_trading_are_run_again():

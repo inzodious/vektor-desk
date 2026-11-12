@@ -12,7 +12,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine import gate
 from desk.engine.lab import factors, rulebook, simcache, stats
-from desk.engine.lab.data import FRENCH_KIND, SMALL_CAPS, LabData, data_path, lab_build, lab_dir, ledger_path, load
+from desk.engine.lab.data import FRENCH_KIND, PUBLIC_COVERAGE, SCREEN_KIND, SMALL_CAPS, LabData, data_path, lab_build, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
 from desk.engine.lab.simcache import Cache, Run
 from desk.engine.lab.spec import HELD_SET, Spec, SpecError, Variant, local_only, parse, resolve, variants
@@ -347,6 +347,8 @@ def run_experiment(cfg: Config | None, conn, data: LabData, request: dict, *, no
         "analyses": _analyses(cfg, data, spec, request.get("analyses") or [], full, favorite, win, factor, cache),
         "caveats": spec.caveats + _caveats(spec, factor),
     } | ({"library_rev": int(request["library_rev"])} if request.get("library_rev") else {})
+    if spec.universe.get("kind") == SCREEN_KIND:
+        body[PUBLIC_COVERAGE] = data.coverage(PUBLIC_COVERAGE)
     return _record(conn, spec, "experiment", body, now)
 
 
@@ -485,7 +487,8 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
     factor_ran = bars["factor"] is not None
     computed = [x for k, x in bars.items() if k != "factor" or factor_ran]
     verdict = "fail" if any(x is False for x in computed) else ("pass" if computed and all(x is True for x in computed) else "inconclusive")
-    research = spec.universe.get("kind") == FRENCH_KIND or spec.universe.get("set") == HELD_SET
+    thin = spec.universe.get("kind") == SCREEN_KIND and not (data.coverage(PUBLIC_COVERAGE) or {}).get("enough")
+    research = spec.universe.get("kind") == FRENCH_KIND or spec.universe.get("set") == HELD_SET or thin
     status = {"pass": "research" if research else "paper", "fail": "failed", "inconclusive": "inconclusive"}[verdict]
     _close(conn, spec, status)
     body = {

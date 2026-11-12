@@ -17,11 +17,12 @@ from desk.engine.__main__ import run_holdings, run_lab_export
 from desk.engine.backfill import add_symbols
 from desk.engine.lab import __main__ as lab_main
 from desk.engine.lab import library as features
-from desk.engine.lab import paper, runner, shelf, simcache, stats
-from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, held_path, ledger_path, load, plan_path
+from desk.engine.lab import paper, runner, shelf, sim, simcache, stats
+from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, held_path, ledger_path, load, own_path, plan_path
 from desk.engine.lab.runner import ledger, process_queue
 from desk.engine.lab.sim import _year_tax, pick, simulate
 from desk.engine.lab.spec import SETS, SpecError, local_only, parse, resolve, variants
+from desk.engine.market import QUALITY
 from desk.worker import registry, snapshots, store
 from desk.worker.__main__ import apply as worker_apply
 from tests.engine.test_preflight import seed
@@ -190,6 +191,116 @@ def test_simulator_trades_next_open_with_costs_taxes_and_delisting(cfg):
     assert "XLE" in late.delisted
     assert _year_tax({"st": 1000.0, "lt": -400.0}, 0.0, 0.24) == (pytest.approx(144.0), 0.0)
     assert _year_tax({"st": -500.0, "lt": 0.0}, -100.0, 0.24) == (0.0, -600.0)
+
+
+# ---- Stock screens on the public stock list ----
+
+SCREEN = SPEC | {
+    "id": "public-momentum",
+    "universe": {"type": "screen", "min_history_days": 252, "min_price": 1},
+    "signals": [{"metric_id": "ret", "window": "126d", "transform": "rank"}],
+    "entry": {"top_n": "param:top_n"},
+    "exit": "rebalance",
+    "params": {"top_n": {"min": 3, "max": 6, "default": 6}},
+    "benchmark": "SPY",
+}
+LISTED = {"as_of": "2011-06-30", "tests_from": "2012-01-03", "listed": 6, "priced": 6, "loading": 0, "missing": 0, "stopped": 2, "pct": 100.0, "enough": True}
+
+
+def public_lab(cfg, behind=3):
+    days = write_lab_db(cfg)
+    rng = random.Random(3)
+    ends = {"P0": behind, "P1": behind, "P2": 0, "P3": behind, "BOUGHT": 200, "FAILED": 300, "MINE": 0}
+    conn = sqlite3.connect(data_path(cfg))
+    for sym, cut in ends.items():
+        kept = days[: len(days) - cut]
+        px, rows = 100.0, []
+        for i, d in enumerate(kept):
+            px *= 1 + rng.gauss(0.0003, 0.01)
+            if sym == "FAILED" and len(kept) - i <= 60:
+                px *= 0.975
+            rows.append((sym, d, px, px, px, 5e6))
+        conn.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?)", rows)
+        conn.execute("INSERT INTO symbols VALUES (?, 'stock', ?, ?, ?)", (sym, "universe" if sym == "MINE" else "public", kept[0], kept[-1]))
+    conn.execute("INSERT INTO settings VALUES ('public_coverage', ?)", (json.dumps(LISTED),))
+    conn.commit()
+    conn.close()
+    return days, load(data_path(cfg))
+
+
+def test_a_screen_picks_only_from_the_public_stock_list_and_starts_when_the_list_was_knowable(cfg):
+    days, data = public_lab(cfg)
+    spec = parse(SCREEN, data)
+    assert spec.start == "2012-01-03" and spec.caveats[0].startswith("Tested on the 6 largest US companies of mid-2011")
+    day = days[600]
+    assert sorted(sim.universe(data, spec, day)) == ["BOUGHT", "FAILED", "P0", "P1", "P2", "P3"]
+    assert data.calendar[-1] == days[-1] and data.calendar_for("screen")[-1] == data.end_for("screen") == days[-4]
+    assert data.calendar_for("fund_list") == data.calendar and runner.windows(data, {}, "screen")["holdout_start"] == "2022-12-26"
+    queue(cfg, experiment(SCREEN, grid={"top_n": [6]}, date_range={"start": "2005-01-03"}), "001-screen.json")
+    assert len(process_queue(cfg, now=NOW)["done"]) == 1
+    led = sqlite3.connect(ledger_path(cfg))
+    body = json.loads(led.execute("SELECT body FROM lab_results WHERE strategy_id='public-momentum' AND kind='experiment'").fetchone()[0])
+    led.close()
+    assert body["windows"]["start"] == "2012-01-03" and body["public_coverage"] == LISTED and body["caveats"][0] == spec.caveats[0]
+    conn = sqlite3.connect(data_path(cfg))
+    with conn:
+        conn.execute("UPDATE symbols SET role='universe' WHERE role='public'")
+    conn.close()
+    assert sim.universe(load(data_path(cfg)), spec, day) == [] and lab.universe_ready(cfg, "screen") is False
+
+
+def test_a_name_a_few_days_behind_is_not_gone_and_a_bought_out_name_leaves_at_its_last_price(cfg):
+    days, data = public_lab(cfg)
+    spec = parse(SCREEN, data)
+    v = resolve(spec, {"top_n": 6})
+    res = simulate(data, spec, v, "2022-06-01", days[-1])
+    assert res.days[-1] == days[-4] and res.delisted == ["FAILED", "BOUGHT"]
+    assert sim.exit_haircut(data, "BOUGHT") == 0.0 and sim.exit_haircut(data, "FAILED") == sim.exit_haircut(data, "XLE") == sim.DELIST_HAIRCUT
+    assert sim.exit_haircut(data, "BOUGHT", 1.0) == 1.0
+    kind, harsh = (simulate(data, spec, v, "2022-06-01", days[-1], delist_haircut=x) for x in (0.0, sim.DELIST_HAIRCUT))
+    assert harsh.values[-1] < res.values[-1] < kind.values[-1]
+    _, wide = public_lab(cfg, behind=10)
+    assert wide.end_for("screen") == days[-11] and simulate(wide, spec, v, "2022-06-01", days[-1]).delisted == ["FAILED", "BOUGHT"]
+    _, stalled = public_lab(cfg, behind=25)
+    late = simulate(stalled, spec, v, "2022-06-01", days[-1])
+    assert stalled.end_for("screen") == late.days[-1] == days[-26] and late.delisted == ["FAILED", "BOUGHT"]
+    conn = sqlite3.connect(data_path(cfg))
+    with conn:
+        conn.execute("DELETE FROM bars WHERE symbol='P1' AND date > ?", (days[-40],))
+    conn.close()
+    straggler = load(data_path(cfg))
+    assert straggler.end_for("screen") == days[-26] and simulate(straggler, spec, v, "2022-06-01", days[-1]).delisted == ["FAILED", "BOUGHT", "P1"]
+    funds = parse(SPEC | {"exit": "rebalance"}, data)
+    path = data_path(cfg)
+    for cut, gone in ((5, False), (11, True)):
+        write_lab_db(cfg)
+        conn = sqlite3.connect(path)
+        with conn:
+            conn.execute("DELETE FROM bars WHERE symbol='XLU' AND date > ?", (days[-1 - cut],))
+        conn.close()
+        late = simulate(load(path), funds, resolve(funds, {"top_n": 11, "lookback": 21}), "2024-06-03", days[-1])
+        assert ("XLU" in late.delisted) is gone
+
+
+def test_a_pass_on_a_thinly_covered_list_is_research_and_never_goes_to_paper(cfg, monkeypatch):
+    public_lab(cfg)
+    monkeypatch.setattr(runner, "_bars", lambda *a, **k: {"excess_interval": True, "deflated_sharpe": True, "pbo": True, "factor": None, "holdout": True})
+
+    def finalized(sid, cover):
+        conn = sqlite3.connect(data_path(cfg))
+        with conn:
+            conn.execute("UPDATE settings SET value=? WHERE key='public_coverage'", (json.dumps(LISTED | cover),))
+        conn.close()
+        queue(cfg, experiment(SCREEN | {"id": sid}, grid={"top_n": [6]}), f"001-{sid}.json")
+        queue(cfg, {"request": "finalize", "strategy_id": sid, "version": 1}, f"002-{sid}.json")
+        process_queue(cfg, now=NOW)
+        return lab.desk_view(cfg, sid)
+
+    thin = finalized("thin-list", {"priced": 5, "missing": 1, "pct": 83.3, "enough": False})
+    assert thin["final"]["verdict"] == "pass" and thin["status"] == "research" and thin["final"]["paper_start"] is None
+    assert thin["tear_sheet"]["caveats"][0].endswith("That is under 90%, so this stays research only.")
+    full = finalized("full-list", {})
+    assert full["status"] == "paper" and full["final"]["paper_start"] == load(data_path(cfg)).end_for("screen")
 
 
 YOUNG = "2016-01-04"
@@ -447,23 +558,53 @@ def test_nothing_about_what_is_held_or_planned_is_in_the_file_a_worker_downloads
     add_symbols(desk, ["ACME"], "plan")
     add_symbols(desk, ["NEWCO"], "watch")
     add_symbols(desk, ["VXUS"], "past")
+    add_symbols(desk, ["BIGCO", "MSFT"], "held")
+    with desk:
+        days = ("2026-11-02", "2026-11-03", "2026-11-04")
+        for sym in ("BIGCO", "OTHERCO", "MSFT"):
+            desk.executemany("INSERT INTO price_bars (symbol, date, open, close, adj_close) VALUES (?, ?, 50, 51, 51)", [(sym, d) for d in days])
+        listed = (
+            "INSERT INTO public_stocks VALUES (?, ?, ?, 5e10, '2011-06-30', '', ?, 'sec_list', '2005-01-03', '2026-11-04', ?, 1, '2026-11-05T15:30:00+00:00')"
+        )
+        desk.executemany(listed, [(1, 11, "Big Co", "BIGCO", "priced"), (2, 12, "Other Co", "OTHERCO", "priced"), (3, 13, "Lost Co", "LOSTCO", "missing")])
     desk.close()
-    assert run_lab_export(cfg)["held_mix"] == 2 and held_path(cfg).exists()
+    result = run_lab_export(cfg)
+    assert result["held_mix"] == 2 and held_path(cfg).exists() and result["public_stocks"] == 2 and result["kept_on_box"] == 2
     assert json.loads(plan_path(cfg).read_text()) == {"weights": {"ACME": 0.3875, "FXAIX": 0.6125}}
     out = served_to_a_worker(cfg, tmp_path)
     tables = [r[0] for r in out.execute("SELECT name FROM sqlite_master WHERE type='table'")]
     columns = [c[1] for t in tables for c in out.execute(f"PRAGMA table_info({t})")]
     assert not any(word in name for word in ("held", "plan", "weight") for name in (*tables, *columns))
     symbols = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, kind, role FROM symbols")}
-    assert {symbols[s][1] for s in ("FXAIX", "ACME", "NEWCO")} == {"universe"} and symbols["VXUS"] == ("fund", "benchmark")
+    assert symbols["FXAIX"] == ("fund", "universe") and symbols["VXUS"] == ("fund", "benchmark") and symbols["MSFT"][1] == "universe"
     assert not {"held", "watch", "past", "plan"} & {role for _, role in symbols.values()}
-    assert symbols["ACME"][0] == "stock" and symbols["FXAIX"][0] == "fund"
+    assert symbols["BIGCO"] == symbols["OTHERCO"] == ("stock", "public")
+    assert not {"ACME", "NEWCO"} & (set(symbols) | {r[0] for r in out.execute("SELECT DISTINCT symbol FROM bars")})
+    lists = {"BIGCO", "OTHERCO"} | set(QUALITY) | {r[0] for r in out.execute("SELECT symbol FROM smallcap")}
+    assert {s for s, (kind, _) in symbols.items() if kind not in ("fund", "etf")} <= lists
+    assert {r[0] for r in out.execute("SELECT DISTINCT symbol FROM bars")} == set(symbols)
+    cover = json.loads(out.execute("SELECT value FROM settings WHERE key='public_coverage'").fetchone()[0])
+    assert cover == {
+        "as_of": "2011-06-30",
+        "tests_from": "2012-01-03",
+        "listed": 3,
+        "priced": 2,
+        "loading": 0,
+        "missing": 1,
+        "stopped": 0,
+        "pct": 66.7,
+        "enough": False,
+    }
     words = " ".join(str(v) for t in tables if t != "bars" for r in out.execute(f"SELECT * FROM {t}") for v in r)
     out.close()
     assert not any(word in words for word in ("held", "plan", "individual", "0.8333", "0.1667", "0.6125", "0.3875"))
     worker_side = load(tmp_path / "worker" / "lab.db")
     assert worker_side.held_mix == {} and worker_side.plan_mix == {} and "held_mix_as_of" not in worker_side.settings
-    assert load(data_path(cfg)).plan_mix == {"ACME": 0.3875, "FXAIX": 0.6125}
+    box = load(data_path(cfg))
+    assert box.plan_mix == {"ACME": 0.3875, "FXAIX": 0.6125} and own_path(cfg).exists()
+    assert set(box.series) - set(worker_side.series) == {"ACME", "NEWCO"} and box.kinds["ACME"] == "stock" and set(box.held_mix) == {"FXAIX", "ACME"}
+    assert box.series["BIGCO"].adj == worker_side.series["BIGCO"].adj and box.calendar == worker_side.calendar
+    assert box.calendar_for("screen") == worker_side.calendar_for("screen")
     for sid, why in (("lib-as-held", "no held mix"), ("lib-plan-mix", "no plan mix")):
         request = shelf.request(next(e for e in shelf.LIBRARY if e["id"] == sid), "2026-11-12T00:00:00+00:00")
         with pytest.raises(SpecError, match=why):

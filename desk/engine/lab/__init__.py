@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from desk.config import Config
 from desk.db import connect
 from desk.engine.french import PORTFOLIO_FILES
-from desk.engine.lab.data import NotReady, data_path, ledger_path
+from desk.engine.lab.data import PUBLIC_ROLE, SCREEN_KIND, NotReady, data_path, ledger_path
 from desk.engine.lab.library import TRANSFORMS, catalog
 from desk.engine.lab.rulebook import RULES
 
@@ -32,7 +32,9 @@ def grammar() -> dict:
         "universe": {
             "fund_list": "symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks | plan_mix (the plan at its target weights). "
             '{"type": "fund_list", "set": "sector_etfs"}',
-            "screen": "single stocks in the backfill universe; min_history_days, min_price. Carries a survivorship caveat",
+            "screen": "single stocks from the public stock list: the largest US companies by public float at a fixed past date, companies that "
+            "were later bought or failed included; never picked from what the owner holds. min_history_days, min_price. Tests start the January "
+            'after the list date; under 90% of the list priced, a pass is research only. {"type": "screen", "min_history_days": 300, "min_price": 5}',
             "small_caps": 'point-in-time US small caps from insider-filing names since 2016; min_price (default 2); benchmark IWM. {"type": "small_caps"}',
             "french": "Ken French research portfolios, no survivorship bias, daily from 1963 on the factor calendar. set: "
             + " | ".join(PORTFOLIO_FILES)
@@ -72,6 +74,8 @@ def universe_ready(cfg: Config, kind: str) -> bool:
     try:
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (table,)).fetchone() is None:
             return False
+        if kind == SCREEN_KIND:
+            return conn.execute("SELECT 1 FROM symbols WHERE role=? LIMIT 1", (PUBLIC_ROLE,)).fetchone() is not None
         return conn.execute(f"SELECT 1 FROM {table} LIMIT 1").fetchone() is not None
     finally:
         conn.close()
