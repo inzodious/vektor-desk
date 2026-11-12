@@ -16,6 +16,11 @@ FINNHUB_PROFILE = "https://finnhub.io/api/v1/stock/profile2"
 
 NPORT_FORMS = ("NPORT-P", "NPORT-P/A")
 NPORT_SCAN = 40
+SERIES_LIST = "https://www.sec.gov/cgi-bin/browse-edgar"
+SERIES_ENTRY = re.compile(r"<accession-number>\s*([\d-]+)\s*</accession-number>.*?<filing-date>\s*(\d{4}-\d{2}-\d{2})\s*</filing-date>", re.S)
+SERIES_COUNT = 10
+STAND_INS = {"SPY": ("VOO", "IVV"), "QQQ": ("QQQM",)}
+MISS = "nport_miss"
 NPORT_REFRESH_DAYS = 30
 PROFILE_DAYS = 90
 FINNHUB_GAP = 1.05
@@ -236,17 +241,18 @@ def run_nport(conn: sqlite3.Connection, http, funds: list[str], *, now: datetime
     if not agent:
         return skip(NO_SEC)
     series = fund_series(conn, http, agent, now, sleep)
+    ciks = {r["symbol"]: r["cik"] for r in conn.execute("SELECT symbol, cik FROM sec_tickers")}
     titles = title_map(conn)
-    done, missing, errors = [], [], []
+    done, missing, errors, stand_ins = [], [], [], {}
     for fund in funds:
         if _fresh(conn, "nport", fund, now, hours=24 * NPORT_REFRESH_DAYS):
             continue
-        if fund not in series:
-            missing.append(fund)
-            continue
-        cik, want = series[fund]
         try:
-            found = _scan(conn, http, agent, cik, want, now, sleep)
+            found, via = _find(conn, http, agent, fund, series, ciks, now, sleep), None
+            for other in STAND_INS.get(fund, ()) if not found else ():
+                found, via = _find(conn, http, agent, other, series, ciks, now, sleep), other
+                if found:
+                    break
         except ProviderError as e:
             errors.append(f"{fund}: {e}")
             with conn:
@@ -256,6 +262,8 @@ def run_nport(conn: sqlite3.Connection, http, funds: list[str], *, now: datetime
             continue
         if not found:
             missing.append(fund)
+            with conn:
+                _log(conn, MISS, fund, True, now)
             continue
         acc, parsed = found
         rows = [
@@ -270,27 +278,55 @@ def run_nport(conn: sqlite3.Connection, http, funds: list[str], *, now: datetime
             conn.executemany("INSERT INTO fund_holdings VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", list(merged.values()))
             _log(conn, "nport", fund, True, now)
         done.append(fund)
-    return {"ok": not errors, "funds": done, "missing": missing, "errors": errors}
+        if via:
+            stand_ins[fund] = via
+    return {"ok": not errors, "funds": done, "missing": missing, "errors": errors} | ({"stand_ins": stand_ins} if stand_ins else {})
 
 
-def _scan(conn, http, agent, cik: int, want: str, now: datetime, sleep):
+def _find(conn, http, agent: str, fund: str, series: dict[str, tuple[int, str]], ciks: dict[str, int], now: datetime, sleep):
+    if fund in series:
+        cik, want = series[fund]
+        return _scan(conn, http, agent, cik, want, now, sleep)
+    if fund in ciks:
+        return _scan(conn, http, agent, ciks[fund], None, now, sleep)
+    return None
+
+
+def series_filings(http, agent: str, series_id: str, sleep) -> list[tuple[str, str, str]]:
+    ask = {"action": "getcompany", "CIK": series_id, "type": "NPORT-P", "dateb": "", "owner": "include", "count": str(SERIES_COUNT), "output": "atom"}
+    res = http.get(SERIES_LIST, params=ask, headers={"User-Agent": agent}, timeout=60)
+    sleep(research.SEC_GAP)
+    if res.status_code == 429:
+        raise ProviderError("SEC rate limit")
+    if res.status_code != 200:
+        return []
+    return [(acc, "primary_doc.xml", day) for acc, day in SERIES_ENTRY.findall(res.text or "")]
+
+
+def registrant_filings(http, agent: str, cik: int, sleep) -> list[tuple[str, str, str]]:
     subs = _get(http, SEC_SUBMISSIONS.format(cik=cik), "SEC", headers={"User-Agent": agent}) or {}
     sleep(research.SEC_GAP)
     recent = (subs.get("filings") or {}).get("recent") or {}
     accs, forms, docs, filed = (recent.get(k) or [] for k in ("accessionNumber", "form", "primaryDocument", "filingDate"))
-    cut = (now.date() - timedelta(days=200)).isoformat()
-    picks = [
+    return [
         (accs[i], docs[i] if i < len(docs) else "primary_doc.xml", filed[i] if i < len(filed) else "")
         for i in range(len(accs))
         if i < len(forms) and forms[i] in NPORT_FORMS
     ]
+
+
+def _scan(conn, http, agent, cik: int, want: str | None, now: datetime, sleep):
+    picks = (series_filings(http, agent, want, sleep) if want else []) or registrant_filings(http, agent, cik, sleep)
+    cut = (now.date() - timedelta(days=200)).isoformat()
     picks.sort(key=lambda p: p[2], reverse=True)
-    for acc, doc, day in picks[:NPORT_SCAN]:
-        if day and day < cut:
+    tried = 0
+    for acc, doc, day in picks:
+        if (day and day < cut) or tried >= NPORT_SCAN:
             break
         known = conn.execute("SELECT series_id FROM nport_filings WHERE accession=?", (acc,)).fetchone()
-        if known and known[0] != want:
+        if want and known and known[0] != want:
             continue
+        tried += 1
         xml_doc = doc if doc.endswith(".xml") and "/" not in doc else "primary_doc.xml"
         text = _text_get(http, SEC_ARCHIVE.format(cik=cik, acc=acc.replace("-", ""), doc=xml_doc), agent)
         sleep(research.SEC_GAP)
@@ -302,7 +338,7 @@ def _scan(conn, http, agent, cik: int, want: str, now: datetime, sleep):
             continue
         with conn:
             conn.execute("INSERT OR REPLACE INTO nport_filings VALUES (?, ?, ?, ?, ?)", (acc, cik, parsed["series"] or "", parsed["period"], day))
-        if parsed["series"] == want:
+        if want is None or parsed["series"] == want:
             return acc, parsed
     return None
 
@@ -427,14 +463,17 @@ def metrics(out, desk: sqlite3.Connection, kinds: dict[str, str], profiles: dict
         for e in view["rows"]
     ]
     missing = sorted(f for f, v in view["funds"].items() if not v["holdings"] and f not in SECTOR_FUNDS)
-    listed = [f for f in missing if LISTED.match(f)]
+    since = (date.fromisoformat(out.as_of) - timedelta(days=NPORT_REFRESH_DAYS)).isoformat()
+    looked = {r[0] for r in desk.execute("SELECT DISTINCT symbol FROM api_calls WHERE provider=? AND at >= ?", (MISS, since))}
+    listed = [f for f in missing if LISTED.match(f) and f not in looked]
+    unfiled = [f for f in missing if LISTED.match(f) and f in looked]
     if listed:
         sec = bool(os.environ.get("DESK_SEC_USER_AGENT"))
         fix = "the weekly look-through job fills them" if sec else key_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
         out.h(
             "lookthrough",
             "warn",
-            f"No N-PORT holdings yet for {', '.join(missing)}. Fix: {fix}.",
+            f"No N-PORT holdings yet for {', '.join(listed)}. Fix: {fix}.",
             f"What {heal.listed(listed)} {'holds' if len(listed) == 1 else 'hold'} inside is not in yet. "
             + ("The desk fetches it by itself, within a week at most." if sec else f"To fetch it, {fix}."),
             heal.FIXES if sec else heal.NEEDS,
@@ -446,7 +485,11 @@ def metrics(out, desk: sqlite3.Connection, kinds: dict[str, str], profiles: dict
             "ok",
             f"Look-through covers {view['coverage']:.0f}% of invested value. {', '.join(missing)} have no public filing, so each counts as one holding.",
             f"The desk can see inside funds making up {view['coverage']:.0f}% of what you have invested. "
-            "Funds that publish no holdings, such as retirement-plan funds, count as one holding each.",
+            + (
+                f"It found no public holdings list for {heal.listed(unfiled)}, so {'each counts' if len(unfiled) > 1 else 'it counts'} as one holding."
+                if unfiled
+                else "Funds that publish no holdings, such as retirement-plan funds, count as one holding each."
+            ),
         )
     elif stale:
         out.h(

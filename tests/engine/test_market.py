@@ -4,7 +4,7 @@ from desk.db import connect
 from desk.engine import backfill, jobs, schema
 from desk.engine.__main__ import run_holdings, run_market_backfill, run_quotes
 from desk.engine.backfill import ASK_MINUTE, ASK_WORDS, DAILY, NO_PRICES, add_symbols, due, parked_until, usage
-from desk.engine.live import live_view
+from desk.engine.live import NO_MARKET_PRICE, REFUSED_ALL, live_view
 from desk.engine.market import BENCHMARKS, LIBRARY_FUNDS, QUALITY, last_trading_day, session
 from tests.engine.helpers import closes_doc, position, snapshot
 
@@ -21,8 +21,9 @@ class Res:
 
 
 class FakeHttp:
-    def __init__(self, quotes=None, bars=None, status=200):
+    def __init__(self, quotes=None, bars=None, status=200, refuse=None):
         self.quotes = quotes or {}
+        self.refuse = refuse or {}
         self.bars = bars or {}
         self.status = status
         self.calls = []
@@ -34,6 +35,8 @@ class FakeHttp:
         if self.status != 200:
             return Res(self.status, {})
         if "finnhub" in url:
+            if params["symbol"] in self.refuse:
+                return Res(self.refuse[params["symbol"]], {})
             q = self.quotes.get(params["symbol"])
             return Res(200, q or {"c": 0, "t": 0})
         symbol = url.split("/daily/")[1].split("/")[0].upper()
@@ -98,6 +101,37 @@ def test_quotes_live_value_and_mutual_fund_fallback(cfg, mirror, monkeypatch):
     conn.close()
     assert view["state"] == "open" and view["value"] == 1300.0 and view["day_change"] == 0.0 and view["quality"] == "ok"
     assert "SPY" in view["benchmarks"]
+
+
+def test_a_fund_with_no_market_price_or_a_symbol_finnhub_will_not_quote_does_not_fail_the_quotes(cfg, mirror, monkeypatch):
+    seed(mirror)
+    later = "2026-11-04T22:20:00.000000Z"
+    mirror.put("snapshots", 1, snapshot(1, "2026-11-04T08:00", 1900.0, 3), at=later)
+    mirror.put("positions", 3, position(3, 1, IND, "TRGT50", 12, 600.0), at=later)
+    mirror.pull("2026-11-04T22:30:00+00:00")
+    run_holdings(cfg)
+    desk = connect(cfg.desk_db)
+    with desk:
+        desk.execute(
+            "INSERT INTO market_symbols (symbol, role, priority, added_at, fetched_at, error) VALUES ('TRGT50', 'held', 0, ?, ?, ?)",
+            ("2026-11-04T22:00:00+00:00", "2026-11-09T14:13:00+00:00", f"{NO_PRICES} for TRGT50"),
+        )
+    desk.close()
+    monkeypatch.setenv("FINNHUB_API_KEY", "k")
+    monkeypatch.setattr("desk.engine.live.now_utc", lambda: et(2026, 11, 9, 10, 0))
+    spy = {"SPY": {"c": 600.0, "pc": 590.0, "t": 1794240000}}
+    http = FakeHttp(quotes=spy, refuse={"FXAIX": 403, "TRGT50": 403})
+    result = run_quotes(cfg, http)
+    assert result["ok"] and result["errors"] == [] and result["missing"] == []
+    assert (result["quotes"], result["not_quoted"], result["off_market"]) == (2, ["FXAIX"], 1)
+    assert [p["symbol"] for u, p in http.calls if "finnhub" in u] == ["FXAIX", "SPY"]
+    monkeypatch.setattr("desk.engine.live.now_utc", lambda: et(2026, 11, 9, 10, 5))
+    down = run_quotes(cfg, FakeHttp(quotes=spy, refuse={"FXAIX": 500}))
+    assert not down["ok"] and down["errors"] == ["FXAIX: Finnhub 500 for FXAIX"]
+    monkeypatch.setattr("desk.engine.live.now_utc", lambda: et(2026, 11, 9, 10, 10))
+    locked = run_quotes(cfg, FakeHttp(refuse={"FXAIX": 403, "SPY": 403}))
+    assert not locked["ok"] and locked["errors"] == [REFUSED_ALL] and locked["not_quoted"] == ["FXAIX", "SPY"]
+    assert NO_MARKET_PRICE == NO_PRICES
 
 
 def test_quotes_skip_when_closed_and_throttle_extended_hours(cfg, mirror, monkeypatch):

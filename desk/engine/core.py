@@ -1108,7 +1108,8 @@ def _modelled_check(out: Out, lots: list[dict], rows: list[dict]) -> Check:
     diffs = [
         f"{a} {s}: lots {lot_sh.get((a, s), 0):g} vs held {held.get((a, s), 0):g}" for a, s in keys if abs(lot_sh.get((a, s), 0) - held.get((a, s), 0)) > 1e-3
     ]
-    notes = [f"{a} {s} {text}" for (a, s), text in sorted((out.book.notes if out.book else {}).items())]
+    rebuilt = {lot["account"] for lot in lots if lot.get("quality") == "modelled"}
+    notes = [f"{a} {s} {text}" for (a, s), text in sorted((out.book.notes if out.book else {}).items()) if a in rebuilt]
     head = f"Lots rebuilt from the Fidelity history ({LOT_METHOD})"
     if not diffs and not notes:
         return Check("shares", "ok", f"{head} match holdings.", "Tax lots rebuilt from your Fidelity history match what you hold.")
@@ -1132,24 +1133,30 @@ def _flows_check(implied: dict[tuple[str, str], float], holdings, cover: dict[st
         return Check(
             "flows", "ok", f"The {last} snapshot matches prices plus recorded activity.", "Your latest account read matches prices plus recorded activity."
         )
-    parts = "; ".join(f"{a} {v:+,.2f}" for a, v in sorted(mine.items()))
     covered = sorted(a for a in mine if a in (cover or {}) and cover[a][0] <= last <= cover[a][1])
+    other = sorted(a for a in mine if a not in covered)
+
+    def parts(accounts: list[str]) -> str:
+        return "; ".join(f"{a} {mine[a]:+,.2f}" for a in accounts)
+
+    counted = "counted as money in or out, not return (deposits, payroll contributions or a margin buy Escape Vektor didn't log)"
     if covered:
+        rest = f" Also {parts(other)} in accounts with no Fidelity history, {counted}." if other else ""
+        several = len(covered) > 1
         return Check(
             "flows",
-            "warn",
-            f"The {last} snapshot moved {parts} beyond prices and recorded activity, and Fidelity history covers {', '.join(covered)} on that day, "
-            "so the gap is a missing or misread row, not unlogged money. Counted as money in or out for now. "
-            f"Fix: upload a fresh Fidelity history JSON in {INBOX_AT}; if it stays, send the account and date to the statistics thread.",
-            f"{heal.count(len(covered))} account{'s' if len(covered) > 1 else ''} moved by more than prices and your recorded activity explain. "
-            f"Upload a fresh Fidelity history in {INBOX_AT}.",
-            heal.NEEDS,
+            "ok",
+            f"The {last} snapshot moved {parts(covered)} beyond prices and recorded activity, and Fidelity history covers {', '.join(covered)} on that day. "
+            "A history lists a day's deposits, dividends and interest a day or two later, so no upload clears this today; counted as money in or out "
+            f"until a later history shows what it was. If it is still there in a history exported two days later, it is a missing or misread row.{rest}",
+            f"{heal.count(len(covered))} Fidelity account{'s' if several else ''} moved by more than prices and your recorded activity explain. "
+            "Fidelity lists a day's deposits and dividends a day or two later, so the desk counts the difference as money in or out "
+            f"until a later history shows what it was.",
         )
     return Check(
         "flows",
         "ok",
-        f"The {last} snapshot moved {parts} beyond prices and recorded activity; counted as money in or out, not return "
-        "(deposits, payroll contributions or a margin buy Escape Vektor didn't log).",
+        f"The {last} snapshot moved {parts(other)} beyond prices and recorded activity; {counted}.",
         "Money the desk had not seen recorded, such as a deposit or a payroll contribution, was counted as money in or out, not as return.",
     )
 

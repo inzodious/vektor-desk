@@ -3,13 +3,15 @@ import os
 import sqlite3
 from datetime import UTC, date, datetime, time, timedelta
 
-from desk.engine.market import BENCHMARKS, ET, ProviderError, finnhub_key, finnhub_quote, held_symbols, latest_close, session
+from desk.engine.market import BENCHMARKS, ET, NoQuote, ProviderError, finnhub_key, finnhub_quote, held_symbols, latest_close, session
 
 KEEP_DAYS = 7
 FRESH_MINUTES = 10
 EXTENDED_EVERY = 30
 CLOSE_SETTLE = timedelta(minutes=2)
 LIVE_STATES = ("pre", "open", "after")
+NO_MARKET_PRICE = "Tiingo has no daily prices"
+REFUSED_ALL = "Finnhub refused every symbol it was asked for"
 
 
 def now_utc() -> datetime:
@@ -30,6 +32,12 @@ def yardstick_symbols(conn: sqlite3.Connection) -> set[str]:
     return out
 
 
+def off_market(conn: sqlite3.Connection) -> set[str]:
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='market_symbols'").fetchone() is None:
+        return set()
+    return {r[0] for r in conn.execute("SELECT symbol FROM market_symbols WHERE last_bar IS NULL AND error LIKE ?", (f"{NO_MARKET_PRICE}%",))}
+
+
 def refresh_quotes(conn: sqlite3.Connection, http, *, now: datetime | None = None, force: bool = False) -> dict:
     now = now or now_utc()
     sess = session(now)
@@ -41,12 +49,18 @@ def refresh_quotes(conn: sqlite3.Connection, http, *, now: datetime | None = Non
         return {"ok": True, "skipped": f"market {sess.state}, refreshed {last}"}
     key = finnhub_key()
     stamp = now.isoformat(timespec="seconds")
-    rows, missing, errors = [], [], []
+    rows, missing, errors, refused = [], [], [], []
+    unlisted = off_market(conn)
+    asked = skipped = 0
     for symbol in quote_symbols(conn):
         q = None
-        if key:
+        skipped += symbol in unlisted
+        if key and symbol not in unlisted:
+            asked += 1
             try:
                 q = finnhub_quote(http, symbol, key)
+            except NoQuote:
+                refused.append(symbol)
             except ProviderError as e:
                 errors.append(f"{symbol}: {e}")
                 if "rate limit" in str(e):
@@ -59,14 +73,17 @@ def refresh_quotes(conn: sqlite3.Connection, http, *, now: datetime | None = Non
             prev = latest_close(conn, symbol, before=last[0])
             closed_at = datetime.combine(date.fromisoformat(last[0]), time(16, 0), ET).isoformat()
             rows.append((symbol, closed_at, last[1], prev[1] if prev else None, "close", stamp))
-        else:
+        elif symbol not in unlisted:
             missing.append(symbol)
+    if asked and len(refused) == asked:
+        errors.append(REFUSED_ALL)
     cut = (now - timedelta(days=KEEP_DAYS)).isoformat(timespec="seconds")
     with conn:
         conn.executemany("INSERT OR REPLACE INTO quotes_live VALUES (?, ?, ?, ?, ?, ?)", rows)
         conn.execute("DELETE FROM quotes_live WHERE fetched_at < ?", (cut,))
         conn.executemany("INSERT INTO api_calls (provider, at, symbol, ok) VALUES ('finnhub', ?, ?, 1)", [(stamp, r[0]) for r in rows if r[4] == "finnhub"])
-    return {"ok": not errors, "state": sess.state, "quotes": len(rows), "missing": missing, "errors": errors, "key": bool(key)}
+    out = {"ok": not errors, "state": sess.state, "quotes": len(rows), "missing": missing, "errors": errors, "key": bool(key)}
+    return out | {"not_quoted": refused, "off_market": skipped}
 
 
 def _et_day(at: str) -> str:

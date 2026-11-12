@@ -444,9 +444,46 @@ def test_flow_gaps_on_a_broker_covered_account_are_called_out():
     holdings = {FRI: [{"source": "snapshot"}]}
     implied = {(IND, FRI): -812.5}
     assert core._flows_check(implied, holdings)[1] == "ok"
-    _, status, detail = core._flows_check(implied, holdings, {IND: ("2026-09-01", SAT)})
-    assert status == "warn" and "missing or misread row" in detail and "-812.50" in detail
+    covered = core._flows_check(implied, holdings, {IND: ("2026-09-01", SAT)})
+    assert covered[1] == "ok" and covered.kind is None and "no upload clears this today" in covered[2] and "-812.50" in covered[2]
+    assert covered.say.startswith("One Fidelity account moved by more than prices and your recorded activity explain.")
+    assert "Upload" not in covered.say and "upload" not in covered.say
     assert core._flows_check(implied, holdings, {IND: ("2026-09-01", THU)})[1] == "ok"
+
+
+def test_a_flow_gap_never_asks_for_a_fidelity_upload_to_fix_an_account_that_is_not_at_fidelity():
+    holdings = {FRI: [{"source": "snapshot"}]}
+    implied = {(IND, FRI): -812.5, (HSA, FRI): 40.0, (K401, FRI): 512.25}
+    check = core._flows_check(implied, holdings, {IND: ("2026-09-01", SAT), HSA: ("2026-09-01", FRI)})
+    assert check[1] == "ok" and check.kind is None and check.job is None
+    assert check.say.startswith("Two Fidelity accounts moved")
+    head, tail = check[2].split(" Also ")
+    assert "-812.50" in head and "+40.00" in head and "+512.25" not in head and K401 not in head
+    assert tail.startswith(f"{K401} +512.25 in accounts with no Fidelity history")
+    alone = core._flows_check({(K401, FRI): 512.25}, holdings, {IND: ("2026-09-01", SAT)})
+    assert alone[1] == "ok" and "Fidelity" not in alone.say and "+512.25" in alone[2]
+
+
+def test_a_lot_export_for_an_account_clears_the_notes_its_rebuilt_lots_left(cfg):
+    class Book:
+        notes = {(IND, "OLDY"): "sold 4 more shares than the history holds, so they were bought before 2025-01-01"}
+
+    class Out:
+        book = Book()
+
+    rows = [
+        {"account": IND, "symbol": "ROKT", "shares": 10.0, "is_cash": 0},
+        {"account": HSA, "symbol": "FXAIX", "shares": 3.0, "is_cash": 0},
+    ]
+    rebuilt = [
+        {"account": IND, "symbol": "ROKT", "shares": 10.0, "quality": "modelled"},
+        {"account": HSA, "symbol": "FXAIX", "shares": 3.0, "quality": "modelled"},
+    ]
+    before = core._modelled_check(Out(), rebuilt, rows)
+    assert before[1] == "warn" and before.kind == "needs_you" and "OLDY" in before[2] and "upload a lot export" in before.say
+    exported = [{"account": IND, "symbol": "ROKT", "shares": 10.0, "quality": "ok"}, rebuilt[1]]
+    after = core._modelled_check(Out(), exported, rows)
+    assert after[1] == "ok" and "OLDY" not in after[2]
 
 
 def test_unmatched_mirror_rows_are_info_and_unmapped_accounts_warn():

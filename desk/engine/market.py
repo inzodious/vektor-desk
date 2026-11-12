@@ -36,6 +36,7 @@ LIBRARY_FUNDS = ("TLT", "IEF", "BIL", "GLD", "DBC", "EFA", "EEM", "VNQ", "HYG", 
 QUALITY = ("VOO", "VTI", "QQQ", "VXUS", "QUAL", "SCHD", "VGT", "FTEC", "SMH", "MSFT", "AAPL", "GOOGL", "AMZN", "NVDA", "ASML", "COST", "V", "JPM")
 
 FINNHUB_QUOTE = "https://finnhub.io/api/v1/quote"
+NOT_QUOTED = (403, 404, 422)
 TIINGO_DAILY = "https://api.tiingo.com/tiingo/daily/{symbol}/prices"
 
 
@@ -97,6 +98,10 @@ class ProviderError(RuntimeError):
     pass
 
 
+class NoQuote(ProviderError):
+    pass
+
+
 def finnhub_key() -> str:
     return os.environ.get("FINNHUB_API_KEY", "").strip()
 
@@ -109,6 +114,8 @@ def finnhub_quote(http, symbol: str, key: str) -> dict | None:
     res = http.get(FINNHUB_QUOTE, params={"symbol": symbol, "token": key}, timeout=20)
     if res.status_code == 429:
         raise ProviderError("Finnhub rate limit")
+    if res.status_code in NOT_QUOTED:
+        raise NoQuote(f"Finnhub does not quote {symbol}")
     if res.status_code != 200:
         raise ProviderError(f"Finnhub {res.status_code} for {symbol}")
     body = res.json() or {}

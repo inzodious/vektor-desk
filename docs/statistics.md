@@ -111,12 +111,12 @@ Before metrics are published for a day, the engine checks:
 | Check | Pass when |
 |---|---|
 | Value | Shares × close per account is within $1 or 0.05% of SimpleFIN's account value. A price-only gap is `warn` and names the biggest gaps; positions that don't add up are `fail` |
-| Shares | The lot export's shares per symbol equal the positions' shares exactly. Rebuilt lots name the method, and warn per symbol where they differ from holdings or the history misses opening shares |
+| Shares | The lot export's shares per symbol equal the positions' shares exactly. Rebuilt lots name the method, and warn per symbol where they differ from holdings or the history misses opening shares. A note is kept only for an account whose lots are still rebuilt, so a lot export for that account clears it |
 | History | Shows the Fidelity history's dates, rows and accounts, and how many Escape Vektor rows it replaced. Warns when Escape Vektor rows inside those dates have no broker match, or a broker account has no Escape Vektor account with the same last 4 digits |
 | Cash | Change in cash equals flows plus trades plus income, within $0.01 |
 | Freshness | Mirror pull under 14 hours old |
 | Closes | Every held symbol has a close for the last trading day, or is a code nothing prices. A name one session behind warns with when the desk asks again (`backfill.ASK_WORDS`) and nothing to do; more than one session behind points to Backfill in Settings, Box. A held name whose last ask failed or found no prices says so, with when it is asked again |
-| Flows | Lists any snapshot-day change that prices and recorded activity don't explain. The engine counts it as money in or out, not return (unlogged deposits, payroll contributions, a margin buy without a debit row). Always `ok`; it's there to explain the number |
+| Flows | Lists any snapshot-day change that prices and recorded activity don't explain. The engine counts it as money in or out, not return (unlogged deposits, payroll contributions, a margin buy without a debit row). Always `ok`; it's there to explain the number. For an account the Fidelity history covers on that day it says a history lists a day's deposits and dividends a day or two later; it never asks for an upload, because none would clear it that day, and the long form lists accounts with no Fidelity history apart |
 | Market keys | Tiingo, Finnhub, FRED, the SEC contact and the Alpaca paper keys are all set; any missing one warns in plain words ("the Tiingo key") and its fix points to Settings, Data, Keys. No health line names a setting variable, a shell command or a file path: fixes point to Settings (Keys and Inbox under Data, job buttons under Box). The words live in `desk.engine.KEY_WORDS` and `key_fix` |
 | Symbol kinds | Every holding is known as a fund or a stock: Escape Vektor's profiles, then SEC's fund list, the benchmark ETFs, ticker shape (5 letters ending in X, plan codes with digits) and SEC titles |
 
@@ -127,7 +127,7 @@ Every non-ok detail ends with `Fix:` and the one step that clears it. That detai
 | Kind | Means | Counts toward `status` | Examples |
 |---|---|---|---|
 | `fixes_itself` | The desk is already on it; the sentence says when | No | A fund price not out yet; broker totals from an older price; fund breakdowns not fetched yet |
-| `needs_you` | Only a file or a setting of his can clear it | Yes, as `warn` | A fresh Fidelity history; a lot export; a missing key; the tax rate |
+| `needs_you` | Only a file or a setting of his can clear it, and the sentence names the step that does | Yes, as `warn` | A history whose account names do not match; a lot export; a missing key; the tax rate |
 | `blocks` | Numbers cannot be trusted until it clears (every `fail`) | Yes, as `fail` | Accounts not read for over 14 hours; positions that do not add up; no holdings |
 
 | Sentence rule | |
@@ -464,7 +464,9 @@ Standard comparisons: actual vs plan shadow vs S&P 500 shadow; fund vs fund insi
 | Step | Source | Notes |
 |---|---|---|
 | Fund to series | SEC `company_tickers_mf.json` | Weekly; `sec_funds` |
-| Latest N-PORT | Fund trust's submissions, newest `NPORT-P` whose series matches | Up to 40 documents scanned per fund; each document's series is cached in `nport_filings`, so a trust is read once a quarter. Refreshed every 30 days |
+| Latest N-PORT | The fund's own filing list (EDGAR company browse by series id, `NPORT-P`, atom), so one document is fetched however many funds the trust has | If that list is empty: the trust's submissions, up to 40 documents a run, skipping documents already known to be another fund's (`nport_filings`), so each run gets further. Refreshed every 30 days |
+| Not on the fund list | A one-fund trust listed as a company (SPY, QQQ) is read from its own `NPORT-P` filings, whatever series they name | If it has none, `STAND_INS` reads a fund on the same index in its place (SPY through VOO or IVV); the job result lists `stand_ins` |
+| Not found | The run logs the miss (`api_calls`, provider `nport_miss`) and tries again next week | The health line promises a fund only until a run has looked for it; after a miss it reads ok and says the fund counts as one holding |
 | Holdings | `primary_doc.xml` | Name, CUSIP, ticker, percent of net assets, asset category, country into `fund_holdings`. Ticker from the filing, else the SEC company title match. DTDs are refused |
 | Sectors | Finnhub `stock/profile2` | Top underlyings plus direct stocks, up to `DESK_SECTOR_PROFILES` (default 150) a run, refreshed every 90 days, about one call a second; `sym_profiles` |
 
@@ -1114,7 +1116,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 
 | When | Runs |
 |---|---|
-| Every 5 min, 9:30 to 16:00 ET weekdays | Quotes, live value, day change, intraday drawdown, margin call distance |
+| Every 5 min, 9:30 to 16:00 ET weekdays | Quotes, live value, day change, intraday drawdown, margin call distance. A fund nothing prices is not asked for, and a symbol Finnhub will not quote keeps its last close (`not_quoted`); neither fails the run. It fails on a rate limit, a server error, or when every symbol asked for is refused |
 | After each mirror (8:00, 17:00 ET) | Reconciliation, holdings, flows, returns, drift, rules, margin, tax (if lots are fresh), risk, correlations, scenarios, look-through exposure, signals, brief for the agents. Comparisons are computed on request |
 | Nightly | Tiingo, EDGAR, FRED pulls (the scorecard and patterns refresh with each core run) |
 | Nightly, 00:55 | `lab-export`: fresh `lab/data/lab.db`, then paper portfolios replay to the newest bar. Queued lab experiments run 01:00 to 06:00 ET under `job_lock("lab")` |
