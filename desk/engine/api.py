@@ -568,9 +568,10 @@ def reviews_index(request: Request) -> JSONResponse:
 
 @router.get("/api/engine/reviews")
 def reviews_view(request: Request, kind: str = "day", end: str | None = None) -> JSONResponse:
-    conn = _open(get_cfg(request))
+    cfg = get_cfg(request)
+    conn = _open(cfg)
     try:
-        return _json(review.review_view(conn, kind, end))
+        return _json(review.review_view(conn, kind, end, cfg))
     finally:
         if conn is not None:
             conn.close()
