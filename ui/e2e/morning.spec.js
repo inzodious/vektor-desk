@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { MONDAY_MIDDAY, ROUTES, overflow, watchErrors } from './helpers.js';
+
+const NIGHT = JSON.parse(readFileSync(new URL('../src/fixtures/overnight.json', import.meta.url), 'utf8'));
 
 const NOT_FOUND = { status: 404, contentType: 'application/json', body: '{"detail":"Not Found"}' };
 
@@ -59,16 +62,13 @@ test('What ran overnight is a closed fold that lists each step with the line it 
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
 
-  await page.route('**/api/overnight*', async (route) => {
-    const res = await route.fetch();
-    const night = await res.json();
-    night.steps[0].detail = '{"accounts": 4, "rows": 212}';
-    await route.fulfill({ response: res, json: night });
-  });
+  const raw = { ...NIGHT, steps: NIGHT.steps.map((s, i) => (i ? s : { ...s, detail: '{"accounts": 4, "rows": 212}' })) };
+  await page.route('**/api/overnight*', (route) => route.fulfill({ json: raw }));
   await page.goto('/');
   await page.getByTestId('night-steps').locator('summary').click();
   await expect(page.getByTestId('night-steps').locator('li')).toHaveCount(5);
   await expect(page.getByTestId('night-steps')).not.toContainText('{');
+  await page.unroute('**/api/overnight*');
 
   await page.goto('/?scenario=fresh');
   await expect(page.getByTestId('morning')).toBeVisible();
