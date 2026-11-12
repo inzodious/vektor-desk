@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from './Icon.jsx';
+import { useApi } from '../lib/api.js';
 import { memoryStrip } from '../lib/memory.js';
 import { useStart } from '../start/context.js';
 
@@ -17,7 +18,8 @@ function readHidden() {
 export function MemoryStrip() {
   const { memory } = useStart();
   const [hidden, setHidden] = useState(readHidden);
-  const strip = memoryStrip(memory);
+  const detail = useApi(memory?.low_memory ? '/api/memory' : null, { every: 60000 });
+  const strip = memoryStrip(memory, detail.data);
   if (!strip || hidden === strip.key) return null;
   const hide = () => {
     setHidden(strip.key);

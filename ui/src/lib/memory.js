@@ -81,13 +81,18 @@ export function memoryView(block, now = new Date()) {
 }
 
 // ---------- the one-line strip ----------
-export function memoryStrip(mem) {
+const LONG_WAIT_MS = 5 * 60 * 1000;
+
+export function memoryStrip(mem, detail = null, now = new Date()) {
   if (!mem || typeof mem !== 'object') return null;
   const killed = Number(mem.killed) || 0;
-  const low = Boolean(mem.low_memory);
-  if (!low && !killed) return null;
+  const late = (detail?.waiting || [])
+    .map((w) => ({ title: jobWord({ name: w.job, title: w.title }).title, since: w.since, ms: now - new Date(w.since) }))
+    .filter((w) => Number.isFinite(w.ms) && w.ms >= LONG_WAIT_MS)
+    .sort((a, b) => b.ms - a.ms)[0];
+  if (!killed && !late) return null;
   const parts = [];
-  if (low) parts.push('Low-memory mode is on, so heavy jobs run one at a time.');
+  if (late) parts.push(`${late.title} has waited ${Math.floor(late.ms / 60000)} minutes for its turn.`);
   if (killed) parts.push(`${killed === 1 ? 'One thing was' : `${killed} things were`} stopped for memory in the last two days.`);
-  return { key: `${low ? 1 : 0}:${killed}`, tone: killed ? 'watch' : 'info', head: killed ? 'The box is short on memory' : 'Taking it slow', line: parts.join(' '), to: '/settings/box#memory', label: 'See memory' };
+  return { key: `${late ? late.since : 0}:${killed}`, tone: killed ? 'watch' : 'info', head: killed ? 'The box ran short on memory' : 'A job is waiting on memory', line: parts.join(' '), to: '/settings/box#memory', label: 'See memory' };
 }

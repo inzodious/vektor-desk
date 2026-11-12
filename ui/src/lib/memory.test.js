@@ -67,9 +67,17 @@ describe('memory', () => {
   it('keeps the strip to one line, and only when there is something to say', () => {
     expect(memoryStrip(null)).toBeNull();
     expect(memoryStrip({ state: 'ok', low_memory: false, killed: 0, note: 'fine' })).toBeNull();
-    expect(memoryStrip(started.memory)).toMatchObject({ key: '1:3', tone: 'watch', head: 'The box is short on memory', to: '/settings/box#memory' });
-    expect(memoryStrip(started.memory).line).toBe('Low-memory mode is on, so heavy jobs run one at a time. 3 things were stopped for memory in the last two days.');
-    expect(memoryStrip({ low_memory: true, killed: 0 })).toMatchObject({ key: '1:0', tone: 'info', head: 'Taking it slow' });
+    expect(memoryStrip({ low_memory: true, killed: 0, note: 'Low-memory mode is on.' })).toBeNull();
+    expect(memoryStrip(started.memory)).toMatchObject({ key: '0:3', tone: 'watch', head: 'The box ran short on memory', to: '/settings/box#memory' });
+    expect(memoryStrip(started.memory).line).toBe('3 things were stopped for memory in the last two days.');
     expect(memoryStrip({ low_memory: false, killed: 1 }).line).toBe('One thing was stopped for memory in the last two days.');
+  });
+
+  it('speaks up about a wait only once a job has waited five minutes', () => {
+    const calm = { low_memory: true, killed: 0 };
+    const waiting = (since) => ({ waiting: [{ job: 'engine-review', title: 'Engine review', since }] });
+    expect(memoryStrip(calm, waiting('2026-11-09T22:38:00Z'), NOW)).toBeNull();
+    expect(memoryStrip(calm, waiting('2026-11-09T22:29:00Z'), NOW)).toMatchObject({ key: '2026-11-09T22:29:00Z:0', tone: 'info', head: 'A job is waiting on memory', line: 'Results review has waited 12 minutes for its turn.' });
+    expect(memoryStrip({ low_memory: true, killed: 2 }, waiting('2026-11-09T22:29:00Z'), NOW).line).toBe('Results review has waited 12 minutes for its turn. 2 things were stopped for memory in the last two days.');
   });
 });
