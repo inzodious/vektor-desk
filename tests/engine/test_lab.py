@@ -18,10 +18,10 @@ from desk.engine.backfill import add_symbols
 from desk.engine.lab import __main__ as lab_main
 from desk.engine.lab import library as features
 from desk.engine.lab import paper, runner, shelf, simcache, stats
-from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, held_path, ledger_path, load
+from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, held_path, ledger_path, load, plan_path
 from desk.engine.lab.runner import ledger, process_queue
 from desk.engine.lab.sim import _year_tax, pick, simulate
-from desk.engine.lab.spec import SETS, SpecError, parse, resolve, variants
+from desk.engine.lab.spec import SETS, SpecError, local_only, parse, resolve, variants
 from desk.worker import registry, snapshots, store
 from desk.worker.__main__ import apply as worker_apply
 from tests.engine.test_preflight import seed
@@ -88,7 +88,6 @@ def write_lab_db(cfg, end="2024-12-31", drop=()):
         conn.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?)", rows)
         conn.execute("INSERT INTO symbols VALUES (?, 'fund', 'benchmark', ?, ?)", (sym, rows[0][1], rows[-1][1]))
     conn.executemany("INSERT INTO macro VALUES ('DGS3MO', ?, 2.0)", [(d,) for d in days[::5]])
-    conn.execute("INSERT INTO plan_mix VALUES ('SPY', 1.0)")
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
     conn.commit()
     conn.close()
@@ -415,29 +414,56 @@ def served_to_a_worker(cfg, tmp_path) -> sqlite3.Connection:
     return sqlite3.connect(target)
 
 
-def test_nothing_about_what_is_held_is_in_the_file_a_worker_downloads(cfg, mirror, tmp_path):
+def test_nothing_about_what_is_held_or_planned_is_in_the_file_a_worker_downloads(cfg, mirror, tmp_path):
     seed(mirror)
+    funds = [{"ticker": "FXAIX", "target_weight": 0.6125}, {"ticker": "ACME", "target_weight": 0.3875}]
+    mirror.put("plans", "p2", {"loadedAt": "2026-11-05T00:00:00Z", "plan": {"funds": funds}})
+    mirror.pull("2026-11-05T13:00:00Z")
     run_holdings(cfg)
     desk = connect(cfg.desk_db)
-    add_symbols(desk, ["FXAIX", "ACME"], "held")
+    add_symbols(desk, ["FXAIX"], "held")
+    add_symbols(desk, ["ACME"], "plan")
     add_symbols(desk, ["NEWCO"], "watch")
     add_symbols(desk, ["VXUS"], "past")
     desk.close()
     assert run_lab_export(cfg)["held_mix"] == 2 and held_path(cfg).exists()
+    assert json.loads(plan_path(cfg).read_text()) == {"weights": {"ACME": 0.3875, "FXAIX": 0.6125}}
     out = served_to_a_worker(cfg, tmp_path)
     tables = [r[0] for r in out.execute("SELECT name FROM sqlite_master WHERE type='table'")]
-    columns = [c[1] for t in tables if t != "plan_mix" for c in out.execute(f"PRAGMA table_info({t})")]
-    assert not any("held" in name or "weight" in name for name in (*tables, *columns))
-    roles = dict(out.execute("SELECT symbol, role FROM symbols"))
-    assert roles["FXAIX"] == roles["ACME"] == roles["NEWCO"] == "universe" and roles["VXUS"] is None
-    assert not {"held", "watch", "past"} & set(roles.values())
+    columns = [c[1] for t in tables for c in out.execute(f"PRAGMA table_info({t})")]
+    assert not any(word in name for word in ("held", "plan", "weight") for name in (*tables, *columns))
+    symbols = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, kind, role FROM symbols")}
+    assert {symbols[s][1] for s in ("FXAIX", "ACME", "NEWCO", "VXUS")} == {"universe"}
+    assert not {"held", "watch", "past", "plan"} & {role for _, role in symbols.values()}
+    assert symbols["ACME"][0] == "stock" and symbols["FXAIX"][0] == "fund"
     words = " ".join(str(v) for t in tables if t != "bars" for r in out.execute(f"SELECT * FROM {t}") for v in r)
     out.close()
-    assert "held" not in words and "individual" not in words and "0.8333" not in words and "0.1667" not in words
+    assert not any(word in words for word in ("held", "plan", "individual", "0.8333", "0.1667", "0.6125", "0.3875"))
     worker_side = load(tmp_path / "worker" / "lab.db")
-    assert worker_side.held_mix == {} and "held_mix_as_of" not in worker_side.settings
-    with pytest.raises(SpecError, match="no held mix"):
-        parse(shelf.request(next(e for e in shelf.LIBRARY if e["id"] == "lib-as-held"), "2026-11-12T00:00:00+00:00")["spec"], worker_side)
+    assert worker_side.held_mix == {} and worker_side.plan_mix == {} and "held_mix_as_of" not in worker_side.settings
+    assert load(data_path(cfg)).plan_mix == {"ACME": 0.3875, "FXAIX": 0.6125}
+    for sid, why in (("lib-as-held", "no held mix"), ("lib-plan-mix", "no plan mix")):
+        request = shelf.request(next(e for e in shelf.LIBRARY if e["id"] == sid), "2026-11-12T00:00:00+00:00")
+        with pytest.raises(SpecError, match=why):
+            parse(request["spec"], worker_side)
+        assert runner.sims(tmp_path / "worker" / "lab.db", request)["status"] == "nothing_to_simulate"
+
+
+def test_with_a_plan_loaded_a_test_judged_against_it_stays_on_the_box(cfg):
+    write_lab_db(cfg)
+    own = experiment(spec=SPEC | {"id": "against-the-plan"})
+    named = experiment(spec=SPEC | {"id": "against-spy", "benchmark": "SPY"})
+    assert "benchmark" not in own["spec"] and not local_only(own["spec"]) and local_only(own["spec"], plan=True)
+    assert not local_only(named["spec"], plan=True) and not local_only({"universe": {"type": "french", "set": "size_10"}}, plan=True)
+    queue(cfg, own, "001-own.json")
+    queue(cfg, named, "002-named.json")
+    made = store.add_worker(cfg, "Horizon")
+    store.beat(cfg, made["id"], {}, now=NOW)
+    plan_path(cfg).write_text(json.dumps({"weights": {"XLK": 0.5, "XLE": 0.5}}))
+    assert kinds.offer_queue(cfg, now=NOW) == {"offered": 1, "wait_minutes": 10.0}
+    assert list(simcache.read_offers(cfg)["files"]) == ["002-named.json"]
+    plan_path(cfg).unlink()
+    assert kinds.offer_queue(cfg, now=NOW)["offered"] == 1 and sorted(simcache.read_offers(cfg)["files"]) == ["001-own.json", "002-named.json"]
 
 
 def test_the_held_mix_leaves_out_what_nothing_prices_and_goes_when_nothing_is_held(cfg, mirror):

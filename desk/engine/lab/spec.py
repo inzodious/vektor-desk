@@ -21,6 +21,8 @@ MIN_WEIGHT_PRESENT = 0.5
 MIN_LIVE = 0.9
 PLAN_SET = "plan_mix"
 HELD_SET = "held_mix"
+FRENCH_TYPES = ("french", "french_portfolios", "ff")
+SMALLCAP_TYPES = (SMALL_CAPS, "small_cap", "smallcaps")
 MIX_SETS = {PLAN_SET: "there is no plan mix in the lab data yet", HELD_SET: "there is no held mix in the lab data yet"}
 HINDSIGHT = "Today's holdings tested on the past. You chose them knowing how they had done, so this is hindsight, not evidence; a pass never goes to paper."
 SHELTERED = ("hsa", "ira", "roth", "401k", "401(k)")
@@ -216,11 +218,11 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
             return {}
         if data is not None:
             known = [s for s in symbols if weights is None or s in data.series]
-            stocks = [s for s in known if data.kinds.get(s, "unknown") not in FUND_KINDS and s not in BENCHMARKS and s not in data.plan_mix]
+            stocks = [s for s in known if data.kinds.get(s, "unknown") not in FUND_KINDS and s not in BENCHMARKS]
             if stocks:
                 problems.append(f"{', '.join(stocks)} are not funds; single stocks enter only through a screen, never a hand-picked list")
         return {"kind": "fund_list", "symbols": symbols, "set": name}
-    if kind in ("french", "french_portfolios", "ff"):
+    if kind in FRENCH_TYPES:
         name = str(u.get("set") or "")
         if name not in PORTFOLIO_FILES:
             problems.append(f"a french universe needs a set: {', '.join(PORTFOLIO_FILES)}")
@@ -237,7 +239,7 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
     if kind == "screen":
         caveats.append("Screens run over today's backfill list, which skips companies that vanished before the backfill: survivorship bias.")
         return {"kind": "screen", "min_history_days": int(u.get("min_history_days") or 252), "min_price": float(u.get("min_price") or 5.0)}
-    if kind in (SMALL_CAPS, "small_cap", "smallcaps"):
+    if kind in SMALLCAP_TYPES:
         if data is not None and not data.smallcap:
             problems.append("small-cap history is not in the lab yet; the engine's insider job builds it")
             return {}
@@ -249,9 +251,14 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
     return {}
 
 
-def local_only(raw: object) -> bool:
-    universe = raw.get("universe") if isinstance(raw, dict) else None
-    return isinstance(universe, dict) and universe.get("set") == HELD_SET
+def local_only(raw: object, plan: bool = False) -> bool:
+    if not isinstance(raw, dict):
+        return False
+    universe = raw.get("universe") if isinstance(raw.get("universe"), dict) else {}
+    if universe.get("set") in MIX_SETS:
+        return True
+    own = str(universe.get("type") or universe.get("kind") or "").lower() in (*FRENCH_TYPES, *SMALLCAP_TYPES)
+    return plan and not raw.get("benchmark") and not own
 
 
 def set_mix(data: LabData, name: str) -> dict[str, float]:

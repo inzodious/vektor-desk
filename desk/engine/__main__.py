@@ -266,13 +266,13 @@ def run_quotes(cfg: Config, http=None, force: bool = False) -> dict:
     return result
 
 
-def _kinds(cfg: Config) -> dict[str, str]:
+def _kinds(cfg: Config, plan: bool = True) -> dict[str, str]:
     mirror = open_mirror(cfg)
     if mirror is None:
         return {}
     desk = connect(cfg.desk_db, readonly=True) if cfg.desk_db.exists() else None
     try:
-        return core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror)), desk)
+        return core.symbol_kinds(mirror, core.plan_targets(core.latest_plan(mirror)) if plan else {}, desk)
     finally:
         mirror.close()
         if desk is not None:
@@ -296,7 +296,7 @@ def run_lab_export(cfg: Config) -> dict:
     finally:
         if mirror:
             mirror.close()
-    kinds = _kinds(cfg)
+    kinds = _kinds(cfg, plan=False)
 
     def work(desk):
         exported = lab_data.export(cfg, desk, kinds, targets)

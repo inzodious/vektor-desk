@@ -67,7 +67,7 @@ def universe(data: LabData, spec: Spec, day: str) -> list[str]:
         return sorted(out)
     out = []
     for sym, s in data.series.items():
-        if data.kinds.get(sym) in FUND_KINDS or sym in data.plan_mix:
+        if data.kinds.get(sym) in FUND_KINDS:
             continue
         if data.roles.get(sym) not in ("universe", "held", "watch"):
             continue
@@ -78,7 +78,7 @@ def universe(data: LabData, spec: Spec, day: str) -> list[str]:
 
 
 def _bps(data: LabData, sym: str, i: int) -> float:
-    if data.kinds.get(sym) in (*FUND_KINDS, FRENCH_KIND) or sym in data.plan_mix:
+    if data.kinds.get(sym) in (*FUND_KINDS, FRENCH_KIND):
         return FUND_BPS
     s = data.series[sym]
     vols = [v * p for v, p in zip(s.volume[max(0, i - 20) : i + 1], s.adj[max(0, i - 20) : i + 1], strict=True) if v]
