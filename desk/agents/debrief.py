@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from desk.agents import advisor, alerts, briefs, store, switches
+from desk.agents import advisor, alerts, briefs, store, switches, wording
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.runner import run_desk
@@ -110,7 +110,7 @@ def _steps(steps: object) -> list[dict]:
 
 def result_for(answer: dict, row: dict, model: str, run_id: int, now: datetime | None = None) -> tuple[dict, int]:
     numbers, dropped = cited(answer.get("numbers_cited"), row)
-    out = {k: str(answer.get(k) or "").strip()[:n] for k, n in TEXT.items()}
+    out = {k: str(wording.tidy(str(answer.get(k) or "").strip()))[:n] for k, n in TEXT.items()}
     out["against_decisions"] = out["against_decisions"] or NO_DECISIONS
     out |= {
         "watch": [str(w).strip()[:160] for w in (answer.get("watch") or []) if str(w).strip()][:4],
