@@ -300,6 +300,7 @@ def test_schema_and_prompt():
 
 def test_jobs_carry_the_names_the_box_expects():
     assert ("46 17 * * 1-5", "python -m desk.agents run debrief") in JOBS
+    assert ("36 8 * * 1-5", "python -m desk.agents run debrief") in JOBS and ("35 8 * * 1-5", "python -m desk.engine review") in ENGINE_JOBS
     assert ("35,45 17 * * 1-5", "python -m desk.engine review") in ENGINE_JOBS
     assert ("30 18 * * 5", "python -m desk.agents run debrief") in JOBS
     names = {j.name for j in package_jobs(["agents"])}
@@ -405,7 +406,7 @@ def test_the_next_try_is_named_by_day_when_it_is_not_today(cfg):
     view = stale_view(end="2026-11-13") | {"computed_at": (saturday - timedelta(hours=2)).isoformat()}
     box = FakeReviews([pack_row(end="2026-11-13", digest="d2", debrief_digest="d1")], shown=view)
     out = debrief.rewrite(cfg, "day", reviews=box, decisions=FakeDecisions(profile_data=ON), now=saturday)["rewrite"]
-    assert out["due_at"] == "2026-11-16T17:46:00-05:00" and out["words"].endswith("the next try is on Monday at 5:46 PM.")
+    assert out["due_at"] == "2026-11-16T08:36:00-05:00" and out["words"].endswith("the next try is on Monday at 8:36 AM.")
 
 
 def test_the_page_can_ask_for_the_rewrite_state(cfg, monkeypatch):
@@ -430,3 +431,12 @@ def test_the_page_can_ask_for_the_rewrite_state(cfg, monkeypatch):
 def test_the_real_review_view_is_read_without_writing(cfg):
     assert RealReviews().view(cfg, "day")["debrief"] is None
     assert debrief.rewrite(cfg, "day", decisions=FakeDecisions(profile_data=ON)) == {"kind": "day", "end": None, "stale": False, "rewrite": None}
+
+
+def test_the_morning_run_makes_no_call_when_the_pack_did_not_change(cfg, sent):
+    seed(cfg)
+    quiet, _, fake = go(cfg, [pack_row(digest="d1", debrief_digest="d1")], trigger="schedule")
+    assert quiet.status == "ok" and quiet.note == "No new period pack to debrief." and fake.calls == []
+    assert len(store.runs(cfg, "debrief")) == 1
+    moved, box, fake = go(cfg, [pack_row(digest="d2", debrief_digest="d1")], trigger="schedule")
+    assert moved.written == ["day 2026-11-10"] and len(fake.calls) == 1 and box.recorded[("day", "2026-11-10")]["pack_digest"] == "d2"
