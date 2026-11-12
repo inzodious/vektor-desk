@@ -135,7 +135,7 @@ def test_a_fund_price_a_day_late_says_when_it_is_expected_and_why_it_waits(cfg, 
     status, detail = health(cfg, now=MON_NIGHT)["closes"]
     assert status == "warn" and "the overnight backfill" not in detail
     assert f"Closes for FTIHX, FXAIX stop at {FRI}. A fund's price for a day can arrive hours after the others." in detail
-    assert "The desk asks for it every hour from 1:10 AM to 12:10 PM ET, and the day's numbers follow once it lands. Fix: nothing to do yet." in detail
+    assert "The desk asks for it every hour, day and night, and the day's numbers follow once it lands. Fix: nothing to do yet." in detail
     desk = connect(cfg.desk_db)
     sync_roles(desk, MON_NIGHT)
     with desk:

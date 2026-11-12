@@ -13,10 +13,10 @@ TICKER = re.compile(r"^[A-Z]{1,5}$")
 ROTATE_DAYS = 90
 NO_PRICES = "Tiingo has no daily prices"
 NO_ANSWER = "Tiingo did not answer"
-ASK_HOURS = (1, 12)
+ASK_MINUTE = 13
 PARK_DAYS = 7
 HELD_PARK_HOURS = 20
-ASK_WORDS = "every hour from 1:10 AM to 12:10 PM ET"
+ASK_WORDS = "every hour, day and night"
 
 
 def _int_env(name: str, default: int) -> int:

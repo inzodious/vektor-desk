@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from desk.db import connect
 from desk.engine import jobs, schema
 from desk.engine.__main__ import run_holdings, run_market_backfill, run_quotes
-from desk.engine.backfill import ASK_HOURS, ASK_WORDS, NO_PRICES, add_symbols, due, parked_until, usage
+from desk.engine.backfill import ASK_MINUTE, ASK_WORDS, NO_PRICES, add_symbols, due, parked_until, usage
 from desk.engine.live import live_view
 from desk.engine.market import BENCHMARKS, QUALITY, last_trading_day, session
 from tests.engine.helpers import closes_doc, position, snapshot
@@ -320,10 +320,41 @@ def test_the_backfill_view_shows_every_name_and_why_it_waits(cfg, app_client, mo
     )
 
 
+def test_the_evening_run_fetches_that_days_closes_and_a_late_fund_follows_the_hour_it_lands(cfg, monkeypatch):
+    conn = ledger(cfg, [("ETFA", "held", "2026-11-10", None, None), ("FUNDA", "held", "2026-11-10", None, None)])
+    monkeypatch.setenv("TIINGO_API_KEY", "k")
+    http = FakeHttp(bars={s: [bar(d, 100.0) for d in WEEK[:2]] for s in {*BENCHMARKS, *QUALITY, "ETFA", "FUNDA"}})
+    at(monkeypatch, datetime(2026, 11, 11, 22, 13, tzinfo=UTC))
+    afternoon = run_market_backfill(cfg, http)
+    assert afternoon["target"] == "2026-11-10" and afternoon["behind"] == [] and afternoon["left"] == 0
+    for symbol in http.bars:
+        if symbol != "FUNDA":
+            http.bars[symbol].append(bar("2026-11-11", 101.0))
+    asked = len(http.calls)
+    at(monkeypatch, datetime(2026, 11, 12, 0, 13, tzinfo=UTC))
+    evening = run_market_backfill(cfg, http)
+    assert evening["target"] == "2026-11-11" and "ETFA" in evening["advanced"] and evening["behind"] == ["FUNDA"] and evening["left"] == 0
+    assert len(http.calls) - asked == len(http.bars)
+    at(monkeypatch, datetime(2026, 11, 12, 3, 13, tzinfo=UTC))
+    waiting = run_market_backfill(cfg, http)
+    assert waiting["fetched"] == ["FUNDA"] and waiting["behind"] == ["FUNDA"]
+    http.bars["FUNDA"].append(bar("2026-11-11", 51.0))
+    at(monkeypatch, datetime(2026, 11, 12, 5, 13, tzinfo=UTC))
+    landed = run_market_backfill(cfg, http)
+    assert landed["advanced"] == ["FUNDA"] and landed["detail"] == "Asked Tiingo for 1 name. New bars for FUNDA."
+    conn.close()
+
+
 def test_the_backfill_schedule_matches_the_words_health_uses():
     lines = [j if isinstance(j, tuple) else (j["schedule"], j["command"]) for j in jobs.JOBS]
     schedule = next(s for s, command in lines if command.endswith(" backfill"))
-    assert schedule == f"10 {ASK_HOURS[0]}-{ASK_HOURS[1]} * * *" and ASK_WORDS == "every hour from 1:10 AM to 12:10 PM ET"
+    assert schedule == f"{ASK_MINUTE} * * * *" and ASK_WORDS == "every hour, day and night"
+
+
+def test_the_backfill_runs_off_the_deploy_check_and_the_restate_minutes():
+    lines = [j if isinstance(j, tuple) else (j["schedule"], j["command"]) for j in jobs.JOBS]
+    restate = next(s for s, command in lines if command.endswith(" restate"))
+    assert restate == "2-57/5 * * * *" and ASK_MINUTE % 5 not in (0, 2)
 
 
 def test_stale_quotes_page_ops_during_market_hours(cfg, mirror, monkeypatch):
