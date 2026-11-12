@@ -85,6 +85,16 @@ def test_auto_turns_on_under_the_floor_and_only_off_again_with_room(cfg, monkeyp
     assert memory.refresh(cfg, later, info=ROOMY, group={})["on"] is False
 
 
+def test_auto_stays_on_for_half_an_hour_after_something_was_stopped_for_memory(cfg, monkeypatch):
+    monkeypatch.setenv("DESK_LOW_MEMORY", "auto")
+    roomy = TIGHT | {"available_mb": 2400}
+    assert memory.refresh(cfg, NOW, info=roomy, group={})["on"] is False
+    memory.record_kill(cfg, "engine-daily", "Engine daily", "cap", NOW)
+    held = memory.refresh(cfg, NOW + timedelta(minutes=29), info=roomy, group={})
+    assert held["on"] is True and held["why"] == "Something was stopped for memory in the last 30 minutes."
+    assert memory.refresh(cfg, NOW + timedelta(minutes=31), info=roomy, group={})["on"] is False
+
+
 def test_a_fresh_scheduler_verdict_is_trusted_and_a_stale_one_is_not(cfg, monkeypatch):
     monkeypatch.setenv("DESK_LOW_MEMORY", "auto")
     memory.refresh(cfg, NOW, info=TIGHT, group={})
