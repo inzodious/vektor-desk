@@ -11,7 +11,7 @@ from pathlib import Path
 from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
-from desk import jobrun
+from desk import jobrun, overnight
 from desk.config import Config
 from desk.runlock import run_dir
 
@@ -271,6 +271,22 @@ def waiting(cfg: Config) -> list[dict]:
     return sorted(out, key=lambda w: str(w["since"]))
 
 
+def night_on(cfg: Config) -> bool:
+    try:
+        return overnight.active(cfg)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def turns(cfg: Config) -> tuple[list[dict], list[dict]]:
+    queue = waiting(cfg)
+    return ([], queue) if queue and night_on(cfg) else (queue, [])
+
+
+def waiting_for(cfg: Config) -> str:
+    return "night" if night_on(cfg) else "memory"
+
+
 def note(info: dict | None, low: dict, queue: list[dict], events: list[dict]) -> str:
     if info is None:
         words = "The box's memory can't be read from here."
@@ -295,7 +311,7 @@ def status(cfg: Config, now: datetime | None = None, info: dict | None = None) -
     low = low_memory(cfg, now, info=info)
     host = host_report(cfg, now)
     events = killed(cfg, now, host)
-    queue = waiting(cfg)
+    queue, night = turns(cfg)
     state = "unknown" if info is None else "tight" if info["available_mb"] < TIGHT_MB else "ok"
     return {
         "state": state,
@@ -306,6 +322,7 @@ def status(cfg: Config, now: datetime | None = None, info: dict | None = None) -
         "scheduler": (jobrun._read(state_file(cfg)) or {}).get("scheduler"),
         "low_memory": {k: low.get(k) for k in ("on", "mode", "why", "since", "paused")} | {"low_mb": LOW_MB, "roomy_mb": ROOMY_MB},
         "waiting": queue,
+        "queued_for_night": night,
         "killed": events,
         "host_seen": host is not None and bool(host.get("fresh")),
         "note": note(info, low, queue, events),

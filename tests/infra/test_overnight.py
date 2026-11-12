@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
-from desk import jobrun, notify, overnight, scheduler
+from desk import jobrun, memory, notify, overnight, scheduler
 from desk.api.app import create_app
 from desk.scheduler import launch, make_job, reap, start, tick
 
@@ -229,6 +229,34 @@ def test_while_the_night_runs_heavy_jobs_take_turns_and_a_fallback_schedule_line
     assert [j.name for j in scheduler.drain(everything, cfg)] == ["engine-french"]
     other.proc.wait()
     reap(everything, cfg)
+
+
+def test_a_job_held_behind_the_nights_step_is_held_once_and_is_not_a_memory_wait(cfg, tmp_path, monkeypatch):
+    monkeypatch.setenv("DESK_LOW_MEMORY", "off")
+    went_live(cfg, datetime(2026, 11, 11, 14, 0, tzinfo=ET), monkeypatch=monkeypatch)
+    jobs = jobs_for(tmp_path, {"agents-portfolio": "sleep 0.5"})
+    restate = make_job("restate", "2-57/5 * * * *", ["true"], name="engine-restate")
+    everything = [*jobs, restate]
+    monkeypatch.setattr(jobrun, "now_utc", lambda: NIGHT.astimezone(ZoneInfo("UTC")))
+    overnight.advance(cfg, everything, lambda job, rid: launch(everything, job, cfg, "overnight", rid), lambda n: scheduler._busy(everything, n), NIGHT)
+    assert tick(everything, NIGHT + timedelta(minutes=2), cfg) == [] and restate.proc is None
+    held = dict(restate.waiting)
+    assert held["trigger"] == "schedule"
+    assert tick(everything, NIGHT + timedelta(minutes=7), cfg) == [] and restate.waiting == held
+    seen = memory.status(cfg)
+    assert seen["waiting"] == [] and [w["job"] for w in seen["queued_for_night"]] == ["engine-restate"]
+    assert seen["low_memory"]["on"] is False and "Waiting for a turn" not in seen["note"]
+    rows = {r["name"]: r for r in jobrun.describe(cfg, everything)["jobs"]}
+    assert (rows["engine-restate"]["waiting"], rows["engine-restate"]["waiting_for"]) == (True, "night")
+    for job in everything:
+        if job.proc is not None:
+            job.proc.wait()
+    reap(everything, cfg)
+    assert [j.name for j in scheduler.drain(everything, cfg)] == ["engine-restate"]
+    restate.proc.wait()
+    reap(everything, cfg)
+    seen = memory.status(cfg)
+    assert seen["waiting"] == [] and seen["queued_for_night"] == []
 
 
 def test_a_fallback_line_runs_when_the_night_has_stalled_or_the_step_did_not_work(cfg, tmp_path, monkeypatch):

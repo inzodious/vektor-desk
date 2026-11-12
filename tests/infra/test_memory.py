@@ -145,6 +145,10 @@ def test_heavy_jobs_take_turns_and_light_ones_do_not_wait(cfg, monkeypatch):
     assert [w["job"] for w in memory.waiting(cfg)] == ["engine-review", "mirror"]
     rows = {r["name"]: r for r in jobrun.describe(cfg, jobs)["jobs"]}
     assert rows["engine-review"]["waiting"] is True and rows["engine-review"]["can_run"] is False and rows["engine-daily"]["waiting"] is False
+    assert (rows["engine-review"]["waiting_for"], rows["engine-daily"]["waiting_for"]) == ("memory", None)
+    seen = memory.status(cfg)
+    assert [w["job"] for w in seen["waiting"]] == ["engine-review", "mirror"] and seen["queued_for_night"] == []
+    assert "Waiting for a turn: " in seen["note"]
     assert jobrun.request_run(cfg, jobs, "engine-review")[0] == 409
     assert drain(jobs, cfg) == []
     finish(a)
