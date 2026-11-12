@@ -244,3 +244,27 @@ test('the brief’s “as of” reads as a day whatever shape the desk sends, an
   await expect(page.getByTestId('brief-foot')).toHaveCount(0);
   await expect(page.getByTestId('brief')).not.toContainText('NaN');
 });
+
+test('after the close the board names the closing figures and never says No ticks yet', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.route('**/api/live/intraday*', (route) => route.fulfill({ json: { day: '2026-11-09', symbols: {} } }));
+  await page.goto('/?scenario=afterclose');
+  await page.getByTestId('open-holdings').click();
+  const drawer = page.getByRole('dialog');
+  const cells = drawer.getByTestId('board-session');
+  await expect(cells).toHaveCount(5);
+  await expect(drawer.getByRole('table', { name: 'Live holdings' })).not.toContainText('No ticks yet');
+  await expect(cells.filter({ hasText: 'Closing quote' })).toHaveCount(4);
+  await expect(cells.filter({ hasText: 'Prior close' })).toHaveCount(1);
+
+  await page.goto('/portfolio?scenario=afterclose');
+  const board = page.getByTestId('holdings-board');
+  await expect(board.getByTestId('board-session')).toHaveCount(5);
+  await expect(board).not.toContainText('No ticks yet');
+  await expect(board.getByRole('row').filter({ hasText: 'ACME' }).getByTestId('board-session')).toHaveText('Closing quote');
+
+  await page.goto('/portfolio?scenario=closed');
+  await expect(page.getByTestId('holdings-board').getByTestId('board-session')).toHaveCount(5);
+  await expect(page.getByTestId('holdings-board')).not.toContainText('No ticks yet');
+  expect(errors).toEqual([]);
+});

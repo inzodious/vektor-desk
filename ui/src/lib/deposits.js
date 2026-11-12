@@ -25,7 +25,7 @@ export function seenText(d) {
 }
 
 export function emptyText(mode) {
-  return mode === 'auto' ? 'Deposits are read from your activity. None on a steady rhythm right now.' : 'No deposit schedule in desk.yaml yet.';
+  return mode === 'auto' ? 'Deposits are read from your activity. None on a steady rhythm right now.' : 'No deposit schedule in your profile yet.';
 }
 
 // ---------- money in ----------

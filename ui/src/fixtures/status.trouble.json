@@ -1,0 +1,103 @@
+{
+ "version": "0.5.0",
+ "demo": false,
+ "mirror": {
+  "state": "ok",
+  "last_ok": "2026-11-09T13:00:04+00:00",
+  "age_hours": 3.7,
+  "last_error": null,
+  "tables": {
+   "activity": 412,
+   "checkins": 38,
+   "medals": 21,
+   "merchantRules": 64,
+   "paystubs": 0,
+   "plans": 3,
+   "positions": 96,
+   "prefs": 1,
+   "priceCloses": 1830,
+   "prices": 24,
+   "quests": 17,
+   "snapshots": 12,
+   "statements": 9,
+   "transactions": 1288,
+   "xpEvents": 540
+  }
+ },
+ "claude_token": {
+  "state": "ok",
+  "expires": "2027-11-03",
+  "days_left": 359
+ },
+ "running": [],
+ "containers": {
+  "state": "trouble",
+  "checked_at": "2026-11-09T16:40:00+00:00",
+  "fresh": true,
+  "note": "The Tailscale link keeps stopping and starting. The box is signed out of your tailnet. Add a new auth key in Settings, then Redeploy.",
+  "services": [
+   {
+    "name": "api",
+    "title": "the app",
+    "container": "vektor-desk-api",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "The app has been running for 3 hours."
+   },
+   {
+    "name": "cron",
+    "title": "the scheduler",
+    "container": "vektor-desk-cron",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "The scheduler has been running for 3 hours."
+   },
+   {
+    "name": "caddy",
+    "title": "the web server",
+    "container": "vektor-desk-caddy",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "The web server has been running for 3 hours."
+   },
+   {
+    "name": "ntfy",
+    "title": "phone alerts",
+    "container": "vektor-desk-ntfy",
+    "status": "Up 3 hours",
+    "state": "up",
+    "up_seconds": 11400,
+    "exit_code": null,
+    "restarted_alone": false,
+    "words": "Phone alerts has been running for 3 hours."
+   },
+   {
+    "name": "tailscale",
+    "title": "the Tailscale link",
+    "container": "vektor-desk-tailscale",
+    "status": "Restarting (1) 20 seconds ago",
+    "state": "restarting",
+    "up_seconds": null,
+    "exit_code": 1,
+    "restarted_alone": false,
+    "words": "The Tailscale link keeps stopping and starting."
+   }
+  ],
+  "tailnet": {
+   "state": "trouble",
+   "kind": "signed_out",
+   "words": "The box is signed out of your tailnet. Add a new auth key in Settings, then Redeploy.",
+   "address": null,
+   "line": "health(warnable=login-state): You are logged out."
+  }
+ }
+}

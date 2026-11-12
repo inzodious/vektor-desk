@@ -9,6 +9,13 @@ export const useSymbol = () => useContext(SymbolContext);
 
 export const LIVE_STATES = ['pre', 'open', 'after'];
 
+export function sessionWord(source, state) {
+  const fund = source === 'holdings';
+  if (state === 'pre' || state === 'open') return fund ? 'Prices at 4 PM' : 'No ticks yet';
+  if (state === 'after') return fund ? 'Prior close' : 'Closing quote';
+  return fund ? 'Last close' : 'Closing quote';
+}
+
 const ACCOUNTS = { individual: 'Individual', hsa: 'HSA', roth: 'Roth IRA', ira: 'IRA', '401k': '401(k)', brokerage: 'Brokerage', joint: 'Joint' };
 
 export function accountLabel(key) {

@@ -27,7 +27,7 @@ function Rules({ rules, m, version, reference }) {
     <div className="card c5" style={{ '--i': 8 }} data-testid="rules-card">
       <div className="card-head">
         <span className="tag coral">Rules</span>
-        <span className="acts">{version != null ? <span className="chip">desk.yaml rules v{version}</span> : null}</span>
+        <span className="acts">{version != null ? <span className="chip">Profile rules v{version}</span> : null}</span>
       </div>
       {rules.length ? (
         rules.map((r) => {
@@ -46,11 +46,11 @@ function Rules({ rules, m, version, reference }) {
           );
         })
       ) : (
-        <p className="empty-hint">No rules in desk.yaml yet.</p>
+        <p className="empty-hint">No rules in your profile yet.</p>
       )}
       <div className="note" style={{ marginTop: 8 }}>
         <Icon name="info" />
-        <span>Rules are checked by Preflight before every proposal. Changing one makes a new desk.yaml version and is logged like a decision.</span>
+        <span>Rules are checked by Preflight before every proposal. Changing one makes a new profile version and is logged like a decision.</span>
       </div>
     </div>
   );
@@ -313,7 +313,7 @@ export default function Holdings() {
                   </span>
                 </span>
               </div>
-              <Board rows={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} />
+              <Board rows={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} state={live?.state} />
             </div>
           ) : null}
           <div className="card c7" style={{ '--i': 7 }} data-testid="drift-card" data-judged={reference.judged ? 'yes' : 'no'}>

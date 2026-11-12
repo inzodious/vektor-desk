@@ -93,3 +93,37 @@ write('engine.backfill.current', {
   last_run: { ...backfill.last_run, ok: true, detail: 'Nothing was behind, so Tiingo was not asked.', fetched: [], behind: [], unpriced: [], errors: [] },
   symbols: backfill.symbols.map((s) => ({ ...s, last_bar: s.daily ? '2026-11-06' : s.last_bar, first_bar: s.first_bar || '2026-10-01', behind: false, due: false, error: null, parked_until: null })),
 });
+
+// ---------- the box's services ----------
+const svc = (name, title, state, words, o = {}) => ({ name, title, container: `vektor-desk-${name}`, status: state === 'up' ? 'Up 3 hours' : 'Restarting (1) 20 seconds ago', state, up_seconds: state === 'up' ? 11400 : null, exit_code: state === 'up' ? null : 1, restarted_alone: false, words, ...o });
+const running = [
+  svc('api', 'the app', 'up', 'The app has been running for 3 hours.'),
+  svc('cron', 'the scheduler', 'up', 'The scheduler has been running for 3 hours.'),
+  svc('caddy', 'the web server', 'up', 'The web server has been running for 3 hours.'),
+  svc('ntfy', 'phone alerts', 'up', 'Phone alerts has been running for 3 hours.'),
+  svc('tailscale', 'the Tailscale link', 'up', 'The Tailscale link has been running for 3 hours.'),
+];
+const status = read('status');
+write('status', {
+  ...status,
+  containers: {
+    state: 'ok',
+    checked_at: '2026-11-09T16:40:00+00:00',
+    fresh: true,
+    note: 'All 5 desk services are running.',
+    services: running,
+    tailnet: { state: 'ok', kind: null, words: 'Tailscale is signed in and running on the box, at 100.64.0.10.', address: '100.64.0.10', line: null },
+  },
+});
+const signedOut = 'The box is signed out of your tailnet. Add a new auth key in Settings, then Redeploy.';
+write('status.trouble', {
+  ...status,
+  containers: {
+    state: 'trouble',
+    checked_at: '2026-11-09T16:40:00+00:00',
+    fresh: true,
+    note: `The Tailscale link keeps stopping and starting. ${signedOut}`,
+    services: [...running.slice(0, 4), svc('tailscale', 'the Tailscale link', 'restarting', 'The Tailscale link keeps stopping and starting.')],
+    tailnet: { state: 'trouble', kind: 'signed_out', words: signedOut, address: null, line: 'health(warnable=login-state): You are logged out.' },
+  },
+});

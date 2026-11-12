@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { accountLabel, groupLive, priceStatus } from './context.js';
+import { accountLabel, groupLive, priceStatus, sessionWord } from './context.js';
 import live from '../fixtures/live.json';
 import closed from '../fixtures/live.closed.json';
 import stale from '../fixtures/live.stale.json';
@@ -29,6 +29,22 @@ describe('live grouping', () => {
     expect(priceStatus(live, row('finnhub')).text).toBe('Live');
     expect(priceStatus(stale, row('finnhub')).text).toBe('Quotes delayed');
     expect(priceStatus(closed, row('holdings')).text).toBe('Close Nov 6');
+  });
+});
+
+describe('session cell without ticks', () => {
+  it('says no ticks only while the market can still trade', () => {
+    expect(sessionWord('finnhub', 'open')).toBe('No ticks yet');
+    expect(sessionWord('finnhub', 'pre')).toBe('No ticks yet');
+    expect(sessionWord('holdings', 'open')).toBe('Prices at 4 PM');
+  });
+  it('names the closing figure after the bell', () => {
+    for (const state of ['after', 'closed', undefined]) {
+      expect(sessionWord('finnhub', state)).toBe('Closing quote');
+      expect(sessionWord('close', state)).toBe('Closing quote');
+    }
+    expect(sessionWord('holdings', 'after')).toBe('Prior close');
+    expect(sessionWord('holdings', 'closed')).toBe('Last close');
   });
 });
 

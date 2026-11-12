@@ -6,6 +6,7 @@ import { Jobs } from '../settings/Jobs.jsx';
 import { Box } from '../settings/Box.jsx';
 import { Memory } from '../settings/Memory.jsx';
 import { Workers } from '../settings/Workers.jsx';
+import { Services } from '../settings/Services.jsx';
 import { Inbox } from '../settings/Inbox.jsx';
 import { Keys } from '../settings/Keys.jsx';
 import { ProfileEditor } from '../settings/ProfileEditor.jsx';
@@ -265,7 +266,7 @@ function Profile({ api }) {
         <div className="card-head">
           <span className="tag mint">Desk profile</span>
         </div>
-        <p className="empty-hint">{api.loading ? 'Reading desk.yaml…' : 'The profile status did not answer.'}</p>
+        <p className="empty-hint">{api.loading ? 'Reading your profile…' : 'The profile status did not answer.'}</p>
       </div>
     );
   }
@@ -303,13 +304,13 @@ function Profile({ api }) {
       {p.starter ? (
         <div className="prof-starter" data-testid="starter">
           <p>
-            <b>No desk.yaml yet.</b> Draft one from your data on the NAS, then edit what you like:
+            <b>No profile yet.</b> Draft one from your data on the NAS, then edit what you like:
           </p>
           <div className="prof-cmd">
             <code>{p.starter}</code>
             <button className="btn sm" type="button" onClick={copy}>
               <Icon name={copied === 'ok' ? 'check' : 'copy'} />
-              {copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Copy failed' : 'Draft desk.yaml from your data'}
+              {copied === 'ok' ? 'Copied' : copied === 'fail' ? 'Copy failed' : 'Draft a profile from your data'}
             </button>
           </div>
         </div>
@@ -520,6 +521,7 @@ export default function Settings({ tab = 'desk' }) {
             <Workers />
             <Jobs />
             <Box />
+            <Services containers={s.containers} />
             <Token token={s.claude_token} />
           </>
         ) : null}

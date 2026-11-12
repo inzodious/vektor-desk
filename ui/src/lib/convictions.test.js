@@ -63,14 +63,14 @@ describe('conviction holds', () => {
   });
 
   it('words what the write did', () => {
-    expect(savedText({ changed: true, item: orbt }, 'ORBT')).toBe('Saved. ORBT now holds 2% to 8%. desk.yaml kept a backup.');
+    expect(savedText({ changed: true, item: orbt }, 'ORBT')).toBe('Saved. ORBT now holds 2% to 8%. A backup was kept.');
     expect(savedText({ changed: false }, 'ORBT')).toBe('Nothing changed for ORBT.');
     expect(droppedText({ changed: true }, 'ORBT')).toMatch(/single-stock cap covers it again/);
   });
 
   it('turns refusals into plain words', () => {
     expect(editRefusal({ status: 422, message: 'band_min_pct must be at most band_max_pct' })).toBe('band_min_pct must be at most band_max_pct');
-    expect(editRefusal({ status: 409, message: 'The desk API answered 409.' })).toMatch(/no desk.yaml yet/);
+    expect(editRefusal({ status: 409, message: 'The desk API answered 409.' })).toMatch(/no profile yet/);
     expect(editRefusal({ status: 404, message: 'ACME has no conviction hold' })).toBe('ACME has no conviction hold');
     expect(editRefusal({ status: 500, message: 'x' })).toBe('The desk answered 500. Nothing was written.');
     expect(editRefusal({ status: 0, message: 'x' })).toMatch(/didn’t answer/);
