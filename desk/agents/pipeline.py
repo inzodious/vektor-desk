@@ -2,7 +2,7 @@ import json
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
-from desk.agents import advisor, alerts, briefs, store, switches
+from desk.agents import advisor, alerts, briefs, store, switches, wording
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.runner import Outcome, run_desk
@@ -223,7 +223,8 @@ def run_proposal_desk(
     if not outcome.ok:
         return Report(outcome, note=outcome.note, symbol=symbol)
     answer = outcome.result.structured or {}
-    summary = str(answer.get("summary") or "")
+    summary = wording.tidy(str(answer.get("summary") or ""))
+    answer = answer | {"summary": summary}
     proposals = [p for p in answer.get("proposals") or () if isinstance(p, dict)]
     store.save_brief(cfg, outcome.run_id, name, slice_.get("as_of"), digest, version, summary, json.dumps(answer, sort_keys=True))
     if name == "research" and isinstance(answer.get("dossier"), dict):
@@ -244,7 +245,7 @@ def run_proposal_desk(
             if problems:
                 report.rejected.append(decisions.reject(cfg, p, name, "Numbers don't match the brief: " + "; ".join(problems), run_id))
                 continue
-            record = decisions.create(cfg, p, name, run_id)
+            record = decisions.create(cfg, wording.stamp(p, name, slice_), name, run_id)
             report.created.append(record)
             if name in SKEPTIC_FOR and p.get("kind") in SKEPTIC_KINDS and record.get("status") != "rejected":
                 verdict = _skeptic(cfg, p, record, idx, decisions, adapter)

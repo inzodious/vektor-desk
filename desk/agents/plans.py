@@ -4,7 +4,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from desk.agents import advisor, alerts, briefs, store, switches
+from desk.agents import advisor, alerts, briefs, store, switches, wording
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.runner import run_desk
@@ -561,7 +561,7 @@ def run_plan_desk(
             continue
         streak = 0
         answer = out.result.structured or {}
-        summary = _text(answer.get("summary"), 200)
+        summary = _text(wording.tidy(answer.get("summary")), 200)
         _, dropped = cited(answer.get("numbers_cited"), item.row)
         report.dropped_numbers += dropped
         report.reasons[item.symbol] = item.reasons
