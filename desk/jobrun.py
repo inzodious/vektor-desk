@@ -97,7 +97,8 @@ def last_words(line: str) -> dict:
     if not isinstance(said, dict):
         return {}
     skipped = said.get("skipped")
-    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, "error": plain(said.get("error")), "ready": plain(said.get("ready"))}
+    words = {key: plain(said.get(key)) for key in ("error", "ready", "detail")}
+    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, **words}
 
 
 def state_dir(cfg: Config) -> Path:

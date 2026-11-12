@@ -254,7 +254,7 @@ Every night the scheduler runs the night's work in order, one heavy job at a tim
 | 06:30 | Steps that haven't started are closed as "The night ran out before its turn." A running one finishes |
 | 06:45 | `notify-morning` sends one alert on `desk-research`: what is ready, then what didn't finish. It opens the Bridge |
 
-A night job must be safe to start twice in a night and must skip what it already did. Its last printed line, as JSON, may say `{"ready": "14 holdings analysed"}` (shown on the step and in the alert) or `{"skipped": "why"}`. Work that isn't a cron job (the lab container, a worker) is not a step; `ready(cfg)` in `desk.engine.lab.shelf` or `desk.opportunities`, when present, adds its line to the alert.
+A night job must be safe to start twice in a night and must skip what it already did. Its last printed line, as JSON, may say `{"ready": "14 holdings analysed"}` (shown on the step and in the alert) or `{"skipped": "why"}`. Beside `ready` it may add `"detail"`: one line, 300 characters at most, on what the run did; a step that ended ok shows it as its `detail`, and it never goes in the alert. Work that isn't a cron job (the lab container, a worker) is not a step; `ready(cfg)` in `desk.engine.lab.shelf` or `desk.opportunities`, when present, adds its line to the alert.
 
 | Call | Answers |
 |---|---|
