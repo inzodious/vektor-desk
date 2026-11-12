@@ -276,6 +276,41 @@ def test_built_in_mixes_run_without_a_plan_when_their_funds_are_unlabelled(stock
     assert shelf.queue_missing(cfg, now=later + timedelta(hours=13))["queued"] == 1
 
 
+PAIR = ("lib-buy-hold-sp500", "lib-60-40")
+
+
+def test_the_sp500_row_reads_as_the_yardstick_when_there_is_no_plan_to_compare_it_with(stocked, monkeypatch):
+    cfg = stocked
+    conn = sqlite3.connect(data_path(cfg))
+    conn.execute("DELETE FROM plan_mix")
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in PAIR))
+    monkeypatch.setattr(shelf, "IDS", frozenset(PAIR))
+    shelf.queue_missing(cfg, now=NOW)
+    process_queue(cfg, now=NOW)
+    view = shelf.view(cfg)
+    first, other = view["rows"]
+    assert first["id"] == "lib-buy-hold-sp500" and first["status"] == "tested" and first["yardstick"] and first["verdict"] is None
+    assert first["line"].startswith("The yardstick most rows here are measured against. No plan of your own is loaded, so it is measured against itself.")
+    assert "Your plan's mix" not in first["line"] and "starting in cash" in first["line"]
+    assert first["out_of_sample"]["excess_pts"] is None and first["out_of_sample"]["ann_return_pct"] is not None
+    assert view["counts"]["tested"] == 2 and view["counts"]["yardstick"] == 1 and view["counts"]["fell_short"] == (other["verdict"] == "fell_short")
+    assert other["yardstick"] is False
+
+
+def test_with_a_plan_the_sp500_row_is_judged_against_it(stocked, monkeypatch):
+    cfg = stocked
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in PAIR))
+    monkeypatch.setattr(shelf, "IDS", frozenset(PAIR))
+    shelf.queue_missing(cfg, now=NOW)
+    process_queue(cfg, now=NOW)
+    view = shelf.view(cfg)
+    row = next(r for r in view["rows"] if r["id"] == "lib-buy-hold-sp500")
+    assert row["verdict"] in ("held_up", "within_noise", "fell_short") and not row["yardstick"] and "Your plan's mix" in row["line"]
+    assert view["counts"]["yardstick"] == 0
+
+
 def test_every_fund_in_a_built_in_mix_is_known_to_the_lab():
     from desk.engine.lab.data import LISTED_FUNDS
     from desk.engine.market import BENCHMARKS
