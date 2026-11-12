@@ -332,6 +332,38 @@ def test_nightly_job_without_alpaca_keys_still_loads_sec_data(cfg, monkeypatch):
     assert "insider" in engine_main.JOBS and ("20 23 * * *", "python -m desk.engine insider") in JOBS
 
 
+class DownSec(FakeSec):
+    def __init__(self, fail):
+        super().__init__()
+        self.fail = fail
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        if url.endswith("_form345.zip"):
+            if self.fail == "timeout":
+                raise insider.requests.ConnectTimeout("SEC did not answer")
+            return Res(429)
+        if "alpaca" in url:
+            symbols = params["symbols"].split(",")
+            return BadRes(200, {"bars": {s: [{"t": "2024-03-01T05:00:00Z", "o": 5, "h": 5, "l": 5, "c": 5.0, "v": 100, "vw": 5}] for s in symbols}})
+        return super().get(url, headers=headers, params=params, timeout=timeout)
+
+
+@pytest.mark.parametrize(("fail", "word"), [("timeout", "did not answer"), ("limit", "rate limit")])
+def test_a_bad_night_at_the_sec_does_not_stop_the_price_history(cfg, monkeypatch, fail, word):
+    monkeypatch.setenv("DESK_SEC_USER_AGENT", "Vektor Desk test")
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "paper-id")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "paper-secret")
+    monkeypatch.setattr(insider, "FIRST_QUARTER", (2024, 1))
+    conn = desk(cfg)
+    with conn:
+        buy(conn, "a1", 1, "SMOL", "2024-03-04")
+    out = insider.run(conn, DownSec(fail), now=datetime(2024, 7, 2, tzinfo=UTC), sleep=lambda _: None)
+    assert out["ok"] is False and out["error"].startswith("bulk: ") and word in out["error"] and word in out["bulk"]["error"]
+    assert out["history"]["symbols"] >= 1 and "SMOL" in {r[0] for r in conn.execute("SELECT symbol FROM alpaca_history")}
+    assert out["frames"] > 0 and out["buys"] == 1 and "months" in out
+    conn.close()
+
+
 # ---- Survivorship ----
 
 

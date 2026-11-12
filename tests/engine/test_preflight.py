@@ -131,6 +131,17 @@ def test_margin_funded_buy_is_blocked_with_the_cost(cfg, mirror, monkeypatch):
     assert m["margin.debit"]["before"] == 0 and m["margin.debit"]["after"] == 200.0 and m["margin.cost_month"]["after"] == 2.0
 
 
+def test_margin_funded_buy_without_a_rate_names_no_setting(cfg, mirror, monkeypatch):
+    from desk.engine import preflight
+
+    monkeypatch.setattr(preflight, "margin_rate", lambda cfg: (None, "none"))
+    seed(mirror)
+    run_holdings(cfg)
+    r = check_trade(cfg, {"kind": "buy", "symbol": "ACME", "amount_usd": 500, "funding": "cash"}, now=NOW)
+    detail = lights(r)["funding"]["detail"]
+    assert "the other $200 goes on margin" in detail and "DESK_" not in detail and "could not be read from your profile" in detail
+
+
 def test_new_single_stock_is_blocked(cfg, mirror):
     seed(mirror)
     run_holdings(cfg)

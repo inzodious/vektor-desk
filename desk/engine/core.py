@@ -42,6 +42,11 @@ MARKET_KEYS = (
 )
 FUND_WORDS = {"ETF", "ETFS", "FUND", "FUNDS", "ISHARES", "SPDR", "PROSHARES", "INDEX"}
 PROFILE_ERRORS = (sqlite3.Error, TypeError, KeyError, ValueError, OSError, AttributeError)
+KEPT_ON_FAIL = ("stale", "insufficient_history")
+NO_MARGIN_RATE = (
+    "There is a margin debit but the margin rate could not be read from your profile, so its interest cost is unknown. "
+    "Fix: open Settings and check the profile loads."
+)
 REFERENCE_NOTE = (
     "No plan of your own is loaded, so drift and the benchmark are measured against the built-in safe mix. "
     "It is a yardstick, not a target, and the drift rule is not judged against it."
@@ -627,7 +632,7 @@ def _margin_metrics(out: Out, rows, total, cfg: Config | None = None):
                 drop = 1 - a["debit"] / ((1 - maint / 100) * a["value"])
                 out.m("margin.call_drop", max(0.0, drop) * 100, "pct", scope="account", scope_id=acct, quality="modelled")
         if rate is None:
-            out.h("margin_rate", "warn", f"There is a margin debit but no rate, so its interest cost is unknown. Fix: {env_fix(['DESK_MARGIN_RATE_PCT'])}")
+            out.h("margin_rate", "warn", NO_MARGIN_RATE)
         elif rate_source == "default":
             out.h("margin_rate", "ok", f"Margin interest is estimated at a typical {rate:g}% a year until you set your own rate in Settings.")
     else:
@@ -1086,7 +1091,7 @@ def _health(out: Out, cfg: Config, mirror, desk, holdings, now: datetime):
 
 def store(desk: sqlite3.Connection, out: Out) -> dict:
     if any(h[2] == "fail" for h in out.health):
-        out.metrics = [m[:8] + (("stale" if m[8] == "ok" else m[8]),) + m[9:] for m in out.metrics]
+        out.metrics = [m[:8] + ((m[8] if m[8] in KEPT_ON_FAIL else "stale"),) + m[9:] for m in out.metrics]
     with desk:
         desk.execute("DELETE FROM metric_values WHERE as_of=?", (out.as_of,))
         desk.executemany("INSERT INTO metric_values VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", out.metrics)
