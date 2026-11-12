@@ -1,7 +1,7 @@
 import json
 import os
 import sqlite3
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from statistics import NormalDist
 
 from desk.config import Config
@@ -13,6 +13,9 @@ from desk.engine.lab.runner import PBO_BAR
 from desk.engine.lab.simcache import queue_dir
 
 FAMILY = "library"
+HINDSIGHT_FAMILY = "library-hindsight"
+HINDSIGHT_LINE = "Hindsight, not a test: you hold these knowing how they did, and the last two years are held back."
+HINDSIGHT_NOTE = "The row for what you hold today is hindsight, not a test, and is never counted as held up."
 KINDS = (("classic", "Old and tested"), ("practical", "Practical"), ("novel", "Novel and creative"))
 SPY, PLAN, MARKET, SMALL = "S&P 500 (SPY)", "Your plan's mix", "US stock market (French)", "Small caps (IWM)"
 NOTE = (
@@ -22,6 +25,7 @@ NOTE = (
 N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
 REFRESH_AFTER = timedelta(days=30)
+HINDSIGHT_REFRESH = timedelta(days=7)
 REV = 2
 MIX_REV = 3
 OUTDATED = "were measured before the lab's latest fix and are being run again; until then their numbers lean a little."
@@ -29,6 +33,7 @@ LEVEL_PTS = 0.2
 YARDSTICK = "lib-buy-hold-sp500"
 PLAIN = (
     (("no plan mix",), "No plan of your own is loaded on the desk yet, so there is no plan mix to test. The Safe mix row is the built-in stand-in."),
+    (("no held mix",), "The desk has not sent the lab what you hold yet. This runs the night after the next lab export."),
     (("small-cap history",), "Small-company price history is still loading. This runs once that finishes."),
     (("is not in the lab yet",), "Its data file has not reached the lab yet. This runs the night after the file arrives."),
     (("no price history", "too little price history"), "Most of its funds have no price history in the lab yet."),
@@ -301,6 +306,16 @@ LIBRARY: tuple[dict, ...] = (
         rev=MIX_REV,
     ),
     _exp(
+        "lib-as-held",
+        "practical",
+        "Allocation",
+        "What you hold today",
+        "Today's holdings at today's weights, set back to those weights every quarter. Cash and anything without a market price are left out.",
+        SPY,
+        {"universe": {"type": "fund_list", "set": "held_mix"}, "rebalance": "quarterly", "benchmark": "SPY"},
+    )
+    | {"hindsight": True},
+    _exp(
         "lib-safe-mix",
         "practical",
         "Allocation",
@@ -518,7 +533,7 @@ def request(entry: dict, written_at: str) -> dict:
     spec = {
         "id": entry["id"],
         "version": 1,
-        "parent_id": FAMILY,
+        "parent_id": HINDSIGHT_FAMILY if entry.get("hindsight") else FAMILY,
         "title": entry["title"],
         "hypothesis": entry["description"],
         "constraints": {"long_only": True, "margin": False, "max_position_pct": 100},
@@ -586,7 +601,7 @@ def _due(entry: dict, seen: dict, now: datetime, done: set[str]) -> bool:
             build = None
         return build != lab_build() or now - made >= RETRY_AFTER
     if not _outdated(entry, seen):
-        return now - made >= REFRESH_AFTER
+        return now - made >= (HINDSIGHT_REFRESH if entry.get("hindsight") else REFRESH_AFTER)
     tried = _tried(entry["id"], done)
     return tried is None or tried <= made.astimezone(UTC) or now - tried >= RETRY_AFTER
 
@@ -669,6 +684,24 @@ def _experiment(entry: dict, body: dict, trials: int, alone: bool = False) -> di
     }
 
 
+def _month(day: str) -> str:
+    return f"{date.fromisoformat(day[:10]):%b %Y}"
+
+
+def _hindsight(entry: dict, body: dict) -> dict:
+    wf = body.get("walk_forward") or {}
+    if not wf.get("days") or wf.get("excess_pts") is None:
+        return {"verdict": None, "line": f"No record to show for today's mix yet. {HINDSIGHT_LINE}"}
+    x, bench = wf["excess_pts"], entry["benchmark"]
+    span = f"From {_month(wf['start'])} to {_month(wf['end'])}" if wf.get("start") and wf.get("end") else "Over the test period"
+    how = f"level with {bench}" if not round(x, 1) else f"{abs(x):.1f} points a year {'ahead of' if x > 0 else 'behind'} {bench}"
+    return {
+        "verdict": None,
+        "line": f"{span}, today's mix would have run {how}. {HINDSIGHT_LINE}",
+        "out_of_sample": {key: wf.get(key) for key in ("start", "end", "ann_return_pct", "excess_pts", "sharpe", "mdd_pct")},
+    }
+
+
 def _yardstick(wf: dict) -> dict:
     return {
         "verdict": None,
@@ -748,7 +781,7 @@ def view(cfg: Config) -> dict:
     for entry in LIBRARY:
         row = {k: entry[k] for k in ("id", "title", "kind", "family", "description", "benchmark", "type")}
         row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
-        row |= {"yardstick": False, "gap_pts": None, "outdated": False}
+        row |= {"yardstick": False, "gap_pts": None, "outdated": False, "hindsight": bool(entry.get("hindsight"))}
         row |= {
             "research_only": (entry.get("spec") or {}).get("universe", {}).get("type") == "french",
             "caveats": [],
@@ -764,7 +797,10 @@ def view(cfg: Config) -> dict:
                 row |= {"status": "not_run", "reason": plain(body.get("problems") or [])}
             else:
                 row |= {"status": "tested", "reason": None, "caveats": body.get("caveats") or [], "outdated": _outdated(entry, seen)}
-                row |= _rule_row(entry, body) if seen["kind"] == "rule" else _experiment(entry, body, trials, alone)
+                if seen["kind"] == "rule":
+                    row |= _rule_row(entry, body)
+                else:
+                    row |= _hindsight(entry, body) if row["hindsight"] else _experiment(entry, body, trials, alone)
         rows.append(row)
     kinds = [k for k, _ in KINDS]
     rows.sort(
@@ -772,6 +808,7 @@ def view(cfg: Config) -> dict:
             kinds.index(r["kind"]),
             r["status"] != "tested",
             not r["yardstick"],
+            not r["hindsight"],
             ORDER.get(r["verdict"], 4),
             -((r["out_of_sample"] or {}).get("excess_pts") or -1e9),
         )
@@ -780,11 +817,13 @@ def view(cfg: Config) -> dict:
     counts |= {v: sum(r["verdict"] == v for r in rows) for v in ("held_up", "within_noise", "fell_short", "inconclusive")}
     counts |= {s: sum(r["status"] == s for r in rows) for s in ("waiting", "not_run")}
     counts["yardstick"] = sum(r["yardstick"] for r in rows)
+    counts["hindsight"] = hind = sum(r["hindsight"] and r["status"] == "tested" for r in rows)
     counts["outdated"] = old = sum(r["outdated"] for r in rows)
     several = "All of these" if old == counts["tested"] else "Some of these"
     gap = next((r["gap_pts"] for r in rows if r["yardstick"] and not r["outdated"] and r["gap_pts"] is not None), None)
     level = gap is None or abs(gap) < LEVEL_PTS
-    note = f"{NOTE} {several} {OUTDATED}" if old else NOTE
+    note = f"{NOTE} {HINDSIGHT_NOTE}" if hind else NOTE
+    note = f"{note} {several} {OUTDATED}" if old else note
     if not level:
         note += (
             f" The S&P 500 row is measured against itself and should read level, but it is off by {abs(gap):.1f} points a year, "
