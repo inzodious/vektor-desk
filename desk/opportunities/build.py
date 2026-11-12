@@ -9,6 +9,7 @@ from desk.engine import discounts, planfacts
 from desk.engine.market import ET
 from desk.engine.source import closes as mirror_closes
 from desk.engine.source import open_mirror
+from desk.opportunities import cases as own_cases
 from desk.opportunities import sizing
 from desk.opportunities.sizing import day_words, usd
 
@@ -28,7 +29,14 @@ ORDER = {"buy": 0, "watch": 1, "screen": 1}
 METHOD = "Ranked by how unusual the discount is for that name, lifted by a written buy case or a Scout idea. It is a sort, not a forecast."
 NO_ENGINE = "No list yet: the engine has not run. It fills in after the next engine run."
 NOTHING = "Nothing is on sale tonight: every name the desk tracks is within a normal swing of its high."
-SOURCE_WORDS = {"scanner": "Discount scanner", "case": "written case", "scout": "Scout idea", "standing": "On sale by the numbers", "near": "Not on sale yet"}
+SOURCE_WORDS = {
+    "scanner": "Discount scanner",
+    "case": "written case",
+    "scout": "Scout idea",
+    "research": "research note",
+    "standing": "On sale by the numbers",
+    "near": "Not on sale yet",
+}
 BUY_WORDS = {"cash": "Worth buying now", "deposit": "Worth buying with the next deposit", "wait": "Worth buying once cash is free"}
 SPLIT = "The latest price down to one monthly swing lower. Split the buy in two."
 BELOW = "One to two monthly swings under the latest price."
@@ -37,7 +45,8 @@ OLDER = "The desk has no newer price for it than {day}: live quotes cover what y
 FUNDING_REASONS = ("A margin debit", "It needs $")
 HOLD_REASONS = ("A standing note says to hold off",)
 WINDOW_WORDS = "wash-sale window"
-ANALYSIS_WORDS = {"case": "The written case is", "scout": "Scout's idea is", "scanner": "The scanner hit is"}
+ANALYSIS_WORDS = {"case": "The written case is", "scout": "Scout's idea is", "scanner": "The scanner hit is", "research": "Your research note is"}
+NUMBER_KEYS = ("price", "day_move_pct", "drop_from_high_pct", "high_52w", "ret_1y_pct", "sigma_month_pct", "vs_sma_200_pct")
 
 
 # ---- Inputs ----
@@ -159,7 +168,16 @@ def _last_ok(cfg: Config, desk: str) -> str | None:
     return None
 
 
-def _research(cfg: Config) -> dict[str, str]:
+def _unknown(note: dict) -> bool:
+    try:
+        from desk.agents.portfolio import unknown
+
+        return bool(unknown(note))
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _research(cfg: Config) -> dict[str, dict]:
     try:
         from desk.agents import store
 
@@ -169,11 +187,19 @@ def _research(cfg: Config) -> dict[str, str]:
     out = {}
     for row in rows:
         try:
-            verdict = json.loads(row["dossier"]).get("verdict")
+            note = json.loads(row["dossier"])
+            verdict = note.get("verdict")
         except (TypeError, ValueError, AttributeError):
             continue
-        if isinstance(verdict, str) and verdict.strip():
-            out[str(row["symbol"]).upper()] = verdict.strip().lower()
+        if not isinstance(verdict, str) or not verdict.strip() or _unknown(note):
+            continue
+        risks = note.get("risks")
+        out[str(row["symbol"]).upper()] = {
+            "verdict": verdict.strip().lower(),
+            "line": str(note.get("verdict_line") or note.get("thesis") or "").strip(),
+            "bear": str(note.get("bear_case") or (risks[0] if isinstance(risks, list) and risks else "") or "").strip(),
+            "written_at": row.get("created_at"),
+        }
     return out
 
 
@@ -207,6 +233,16 @@ def measure(conn: sqlite3.Connection, mirror_series: dict, symbol: str, marks: d
     return out
 
 
+def numbers(m: dict) -> dict:
+    val = m.get("valuation") or {}
+    out = {k: round(m[k], 4) for k in NUMBER_KEYS if isinstance(m.get(k), int | float)}
+    if m.get("swings") is not None:
+        out["swings_under_high"] = round(m["swings"], 2)
+    if val.get("value") is not None:
+        out |= {"valuation_metric": val.get("metric"), "valuation_value": val["value"], "valuation_pctile": val.get("pctile_own")}
+    return out
+
+
 def on_sale(m: dict) -> bool:
     drop, swings, val = m.get("drop_from_high_pct"), m.get("swings"), m.get("valuation") or {}
     if drop is None or swings is None:
@@ -234,6 +270,8 @@ def score(m: dict, c: dict) -> int:
         pts += 20 * (idea.get("confidence") or 0.6)
         if ((idea.get("skeptic") or {}).get("verdict")) == "flag":
             pts -= 15
+    if not case and not idea and (c.get("research") or {}).get("verdict") == "add":
+        pts += 15
     if c["size"].get("blocked"):
         pts -= 25
     soon = c.get("next_earnings")
@@ -293,6 +331,9 @@ def why_now(m: dict, c: dict) -> str:
         return _clip(case["case"])
     if idea:
         return _clip("Scout: " + str(idea.get("thesis") or idea.get("title") or "an idea inside your focus."))
+    note = c.get("research")
+    if note and note["line"]:
+        return _clip("Research: " + note["line"])
     drop, swings, trend = m.get("drop_from_high_pct"), m.get("swings"), m.get("vs_sma_200_pct")
     if c["tier"] == "near":
         zone = c["entry"]
@@ -319,6 +360,8 @@ def wrong_if(m: dict, c: dict) -> tuple[str, float | None]:
             lead = _clip("Skeptic: " + skeptic["counter_case"], 240)
         else:
             lead = _clip(idea.get("bear_case") or idea.get("invalidation") or "Scout wrote no bear case.", 240)
+    elif (c.get("research") or {}).get("bear"):
+        lead = _clip("Research: " + c["research"]["bear"], 240)
     elif c["tier"] == "near":
         lead = "It is not cheap yet, so buying now pays a normal price."
     else:
@@ -350,9 +393,14 @@ def analysis_day(m: dict, c: dict) -> tuple[str | None, str]:
     case, idea, hit = c.get("case"), c.get("scout"), c.get("hit")
     if hit and (case or not idea):
         return str(hit["as_of"])[:10], "case" if case else "scanner"
+    if case and case.get("as_of"):
+        return str(case["as_of"])[:10], "case"
     if idea:
         seen = str(idea.get("as_of") or "")
         return (seen if len(seen) == 10 else _et_day(idea.get("created_at"))), "scout"
+    note = c.get("research")
+    if note and note.get("written_at"):
+        return _et_day(note["written_at"]), "research"
     return m.get("price_as_of"), "numbers"
 
 
@@ -427,12 +475,21 @@ def stance(c: dict) -> tuple[str, str]:
         return "watch", "Watch: no room under your cap" if limit and limit != "plan rules" else "Watch: your rules block it"
     if c.get("research_verdict") in SELL_VERDICTS:
         return "watch", f"Watch: your research note says {c['research_verdict']}"
+    note = c.get("research")
     if case:
-        return ("buy", BUY_WORDS[c["size"]["funding"]]) if case["verdict"] == "buy" else ("watch", "Watch: the written case says wait")
+        if case["verdict"] != "buy":
+            return "watch", "Watch: the written case says wait"
+        if note and note["verdict"] != "add":
+            return "watch", f"Watch: the case says buy, but your research note says {note['verdict']}"
+        return "buy", BUY_WORDS[c["size"]["funding"]]
     if idea:
         if (idea.get("skeptic") or {}).get("verdict") == "flag":
             return "watch", "Watch: Skeptic disagreed"
         return "buy", BUY_WORDS[c["size"]["funding"]]
+    if note:
+        if note["verdict"] == "add":
+            return "buy", BUY_WORDS[c["size"]["funding"]]
+        return "watch", f"You already hold this; the analysis says {note['verdict']}, not add"
     if c["tier"] == "near":
         return "watch", "Watch: not on sale yet"
     return "screen", "Cheap by the numbers, no written case yet"
@@ -493,7 +550,7 @@ def _empty(now: datetime, note: str, profile: dict, cash: dict, freshness: dict,
         "advice_only": True,
         "freshness": freshness,
         "headline": headline([], note),
-        "counts": dict.fromkeys(("total", "buy", "watch", "screen", "held", "outside", "with_case"), 0),
+        "counts": dict.fromkeys(("total", "buy", "watch", "screen", "held", "outside", "with_case", "written"), 0),
         "note": note,
         "profile": profile,
         "cash": cash,
@@ -556,21 +613,23 @@ def _build(cfg: Config, conn: sqlite3.Connection, mirror: sqlite3.Connection | N
     kinds = planfacts.kinds_of(mirror, conn, set(symbols))
     titles = planfacts.names(conn)
     book = sizing.load(cfg, mirror, conn, kinds, now=now, numbers=desk_view.get("numbers"))
-    verdicts = _research(cfg)
+    notes = _research(cfg)
+    written = own_cases.fresh(cfg, today)
     picked, near, passed = [], [], []
     for sym in symbols:
         m = measures.get(sym) or {}
         hit, idea = signals.get(sym), ideas.get(sym)
-        case = (hit or {}).get("case")
+        case = (hit or {}).get("case") or written.get(sym)
+        note = notes.get(sym) if sym in held else None
         name = titles.get(sym) or (hit or {}).get("name")
         if case and case["verdict"] == "avoid" and not idea:
             passed.append({"symbol": sym, "name": name, "reason": _clip("Written case says avoid: " + case["case"], 200)})
             continue
         sale = bool(m) and on_sale(m)
-        tier = "live" if (hit or idea or sale) else "near"
-        if tier == "near" and not ((m.get("swings") or 0) >= NEAR_SWINGS and lists.get(sym) in ("held", "quality")):
+        tier = "live" if (hit or idea or sale or case or (note or {}).get("verdict") == "add") else "near"
+        if tier == "near" and (note or not ((m.get("swings") or 0) >= NEAR_SWINGS and lists.get(sym) in ("held", "quality"))):
             continue
-        sources = [s for s, on in (("scanner", hit), ("case", case), ("scout", idea), ("standing", sale and not hit and not idea)) if on]
+        sources = [s for s, on in (("scanner", hit), ("case", case), ("scout", idea), ("research", note), ("standing", sale and not hit and not idea)) if on]
         c = {
             "symbol": sym,
             "name": name,
@@ -583,7 +642,8 @@ def _build(cfg: Config, conn: sqlite3.Connection, mirror: sqlite3.Connection | N
             "case": case,
             "scout": idea,
             "next_earnings": _earnings(conn, sym, m.get("price_as_of") or book_day),
-            "research_verdict": verdicts.get(sym) if sym in held else None,
+            "research": note,
+            "research_verdict": note["verdict"] if note else None,
         }
         c["entry"] = entry(m, tier)
         c["size"] = sizing.size(book, sym, c["kind"], m.get("price"))
@@ -603,6 +663,7 @@ def _build(cfg: Config, conn: sqlite3.Connection, mirror: sqlite3.Connection | N
         "held": sum(r["held"] for r in rows),
         "outside": sum(not r["held"] for r in rows),
         "with_case": sum(r["case"] is not None for r in rows),
+        "written": sum(r["case"] is not None or r["decision_id"] is not None or r["research"] is not None for r in rows),
     }
     note = None if rows else NOTHING
     fresh = _freshness(cfg, conn, view)
@@ -654,6 +715,8 @@ def _row(c: dict, book_day: str, book: sizing.Book | None) -> dict:
         "queued": bool(idea) and not idea.get("turned_back"),
         "not_queued": not_queued(c, label, book),
         "research_verdict": c["research_verdict"],
+        "research": {"verdict": c["research"]["verdict"], "written_at": c["research"]["written_at"]} if c["research"] else None,
+        "numbers": numbers(m),
         "next_earnings": c["next_earnings"],
         "as_of": when["price_as_of"],
         **when,

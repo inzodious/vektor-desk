@@ -7,6 +7,7 @@ import pytest
 from desk.agents import store
 from desk.db import apply_schemas, connect
 from desk.opportunities import build as ob
+from desk.opportunities import cases as own_cases
 from desk.opportunities import ready, sizing
 
 NOW = datetime(2026, 11, 7, 3, 0, tzinfo=UTC)
@@ -213,6 +214,126 @@ def test_a_research_note_that_says_trim_keeps_a_holding_off_the_buy_tier(cfg, ru
     store.save_dossier(cfg, "ACME", run_id, json.dumps({"symbol": "ACME", "verdict": "Trim"}))
     r = row(ob.build(cfg, now=NOW), "ACME")
     assert r["stance"] == "watch" and r["stance_label"] == "Watch: your research note says trim" and r["research_verdict"] == "trim"
+
+
+def note(cfg, symbol, verdict, **more):
+    run_id = store.start_run(cfg, "research", trigger="schedule", model="opus", effort="xhigh", status="ok")
+    body = {
+        "symbol": symbol,
+        "verdict": verdict,
+        "verdict_line": f"{verdict.capitalize()}: the story is intact but the price is fair.",
+        "bear_case": "Margins may slip.",
+    }
+    store.save_dossier(cfg, symbol, run_id, json.dumps(body | more), "2026-11-06T07:10:00+00:00")
+
+
+def test_a_held_row_on_sale_carries_its_research_note_and_hold_is_not_a_buy(cfg, rules):
+    seed(cfg)
+    note(cfg, "ACME", "hold")
+    out = ob.build(cfg, now=NOW)
+    r = row(out, "ACME")
+    assert r["stance"] == "watch" and r["stance_label"] == "You already hold this; the analysis says hold, not add"
+    assert r["why_now"] == "Research: Hold: the story is intact but the price is fair." and r["wrong_if"].startswith("Research: Margins may slip.")
+    assert "research" in r["sources"] and r["source_label"] == "research note + On sale by the numbers"
+    assert r["research"] == {"verdict": "hold", "written_at": "2026-11-06T07:10:00+00:00"} and r["analysis_as_of"] == AS_OF
+    assert "Your research note is from the same day." in r["as_of_words"]
+    assert out["counts"]["written"] == 1 and out["counts"]["with_case"] == 0
+
+
+def test_a_research_note_that_says_add_is_a_buy_even_when_the_name_is_not_on_sale(cfg, rules):
+    seed(cfg)
+    assert row(ob.build(cfg, now=NOW), "IVV") is None
+    note(cfg, "IVV", "add")
+    r = row(ob.build(cfg, now=NOW), "IVV")
+    assert r["stance"] == "buy" and r["stance_label"] == "Worth buying now" and r["size"]["usd"] > 0 and r["not_queued"] is None
+
+
+def test_a_held_name_that_says_hold_and_is_not_on_sale_stays_off_the_list(cfg, rules):
+    seed(cfg)
+    note(cfg, "IVV", "hold")
+    note(cfg, "ACME", "watch", what_it_is="Unclear.", identified=False)
+    out = ob.build(cfg, now=NOW)
+    assert row(out, "IVV") is None
+    assert row(out, "ACME")["research"] is None and row(out, "ACME")["stance"] == "screen"
+
+
+def test_a_buy_case_on_a_holding_the_research_note_says_hold_is_a_watch(cfg, rules):
+    conn = seed(cfg)
+    signal(conn, "ACME", case="buy")
+    note(cfg, "ACME", "hold")
+    r = row(ob.build(cfg, now=NOW), "ACME")
+    assert r["stance"] == "watch" and r["stance_label"] == "Watch: the case says buy, but your research note says hold"
+    assert r["why_now"] == "ACME fell with the market, not on its own news."
+
+
+# ---- Cases for rows the scanner did not flag ----
+
+
+def test_only_rows_with_no_written_analysis_ask_for_a_case_and_the_hit_is_in_the_scanner_s_shape(cfg, rules):
+    seed(cfg)
+    note(cfg, "ACME", "hold")
+    hits = own_cases.wanted(ob.build(cfg, now=NOW))
+    assert [h["symbol"] for h in hits] == ["QUAL", "WTCH"]
+    h = hits[1]
+    assert h["signal_id"] == f"list-{AS_OF}-WTCH" and h["as_of"] == AS_OF and h["list"] == "on sale, not held" and h["name"] == "Watch Co"
+    assert h["price"] == 10.0 and h["drop_from_high_pct"] == h["numbers"]["drop_from_high_pct"] < -20
+    assert {"price", "drop_from_high_pct", "high_52w", "sigma_month_pct", "swings_under_high"} <= set(h["numbers"])
+
+
+def test_a_case_written_for_the_list_rates_the_row_and_a_bad_one_is_refused(cfg, rules):
+    seed(cfg)
+    hits = [h for h in own_cases.wanted(ob.build(cfg, now=NOW)) if h["symbol"] == "WTCH"]
+    source = own_cases.ListSource(hits)
+    assert source.pending(cfg, 6) == hits and source.pending(cfg, 0) == []
+    good = {"verdict": "avoid", "case": "The product line is being shut.", "risks": "A buyer may appear.", "confidence": 0.7, "horizon_days": 120}
+    good |= {"numbers_cited": ["price"], "model": "opus", "written_at": "2026-11-07T06:00:00+00:00", "run_id": 4}
+    with pytest.raises(ValueError, match="verdict must be buy, wait or avoid"):
+        source.record(cfg, hits[0]["signal_id"], good | {"verdict": "strong buy"})
+    with pytest.raises(ValueError, match="numbers_cited"):
+        source.record(cfg, hits[0]["signal_id"], good | {"numbers_cited": ["made_up"]})
+    with pytest.raises(ValueError, match="no row"):
+        source.record(cfg, "list-2026-11-06-NOPE", good)
+    assert own_cases.load(cfg) == {}
+    assert source.record(cfg, hits[0]["signal_id"], good) is True
+    out = ob.build(cfg, now=NOW)
+    assert row(out, "WTCH") is None and out["passed"] == [
+        {"symbol": "WTCH", "name": "Watch Co", "reason": "Written case says avoid: The product line is being shut."}
+    ]
+    assert own_cases.fresh(cfg, "2026-11-20") == {}
+
+
+def test_the_real_cases_desk_writes_into_the_list_through_its_own_source_parameter(cfg, rules):
+    from desk.agents.adapter import FakeAdapter
+    from desk.agents.discounts import run_discount_desk
+    from tests.agents.agent_fakes import FakeDecisions
+    from tests.agents.test_advisor import FakeAdvisor
+
+    seed(cfg)
+    store.set_guard(cfg, False)
+    hits = own_cases.wanted(ob.build(cfg, now=NOW))[:2]
+    answer = {"verdict": "buy", "case": "It fell with its sector on no news of its own.", "risks": "The sector may keep sliding.", "confidence": 0.58}
+    answer |= {"horizon_days": 120, "numbers_cited": ["drop_from_high_pct", "made_up"]}
+    fake = FakeAdapter({"discounts": answer})
+    profile = {"agents": {"enabled": True, "desks": {"discounts": True}}}
+    report = run_discount_desk(
+        cfg,
+        discounts=own_cases.ListSource(hits),
+        decisions=FakeDecisions(profile_data=profile),
+        adapter=fake,
+        advice=FakeAdvisor(),
+        trigger="schedule",
+        limit=2,
+    )
+    assert report.status == "ok" and report.written == [h["signal_id"] for h in hits] and report.dropped_numbers == 2
+    sent = json.loads(fake.calls[0]["prompt"].split("\n\n", 1)[1])["hit"]
+    assert sent["symbol"] == "QUAL" and sent["list"] == "on sale, not held" and sent["numbers"]["drop_from_high_pct"] < -10
+    saved = own_cases.load(cfg)["QUAL"]
+    assert saved["numbers_cited"] == ["drop_from_high_pct"] and saved["as_of"] == AS_OF and saved["run_id"]
+    out = ob.build(cfg, now=NOW)
+    r = row(out, "QUAL")
+    assert r["stance"] == "buy" and r["stance_label"] == "Worth buying now" and r["case"]["confidence"] == 0.58
+    assert r["wrong_if"].startswith("The sector may keep sliding.") and out["counts"]["with_case"] == 2
+    assert own_cases.written_tonight(cfg, datetime.now(UTC)) == 2 and [h["symbol"] for h in own_cases.wanted(out)] == ["WTCH"]
 
 
 # ---- Sizes respect the caps ----
@@ -442,6 +563,7 @@ def test_the_endpoint_returns_the_list(cfg, rules, app_client):
     assert body["rows"][0]["symbol"] == "QUAL" and body["counts"]["total"] == len(body["rows"])
     top = {"as_of", "asof", "prices", "built_at", "advice_only", "freshness", "headline", "counts", "note", "profile", "cash", "method", "rows", "passed"}
     assert set(body) == top
+    assert {"research", "numbers"} <= set(body["rows"][0]) and "written" in body["counts"]
     timing = {"price_as_of", "price_source", "price_at", "price_behind", "analysis_as_of", "since_analysis_pct", "as_of_words", "queued", "not_queued"}
     assert timing <= set(body["rows"][0])
     assert set(body["asof"]) == {"day", "words", "status", "provisional", "expected_day", "behind"}

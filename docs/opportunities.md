@@ -9,6 +9,7 @@ One ranked list of things worth buying or watching, in his holdings and outside 
 | Package | `desk/opportunities/` (list, sizes, night job, route, job) and `tests/opportunities/` |
 | Route prefix | `/api/opportunities` |
 | Tables | None. The list is built on each read from the engine's and the desks' tables |
+| Files | `data/run/opportunities/night.json` (last night's record) and `cases.json` (cases written for rows the scanner did not flag) |
 | Model calls | None of its own. The night job runs the existing Discount cases and Scout desks through `desk.agents`, so every call still goes through `claude -p` and the desks' switches, guard and weekly caps |
 
 ## Where a row comes from
@@ -16,7 +17,8 @@ One ranked list of things worth buying or watching, in his holdings and outside 
 | Source | Meaning | Written by |
 |---|---|---|
 | `scanner` | A discount scanner hit in the last 5 days | `python -m desk.engine discounts` |
-| `case` | That hit has a written case: buy, wait or avoid | Discount cases desk |
+| `case` | A written case: buy, wait or avoid. For a scanner hit it lives in the engine's `discount_cases`; for a row on sale with no hit it lives in `cases.json` and counts for 7 days | Discount cases desk |
+| `research` | A held name's latest research note. It is the row's written analysis when there is no case or Scout idea | Research desk, the nightly holdings pass |
 | `scout` | A Scout buy idea from the last 45 days: open in the queue, or turned back for cash, the margin debit, a hold-off note or a no-buy window | Scout, checked by the Skeptic |
 | `standing` | On sale by the numbers with no fresh hit: at least 10% under the 52-week high and 1.5 of its usual monthly swings, or in the cheapest fifth of its own 5 years on earnings and 5% under the high | Built on read |
 | `near` | Not on sale. Shown only to fill the list to 3 rows, with the zone where it would get interesting | Built on read |
@@ -31,9 +33,20 @@ Names come from the scanner's universe (held, watchlist, quality list) plus anyt
 | Entry zone | The latest price down to one monthly swing lower (63-session volatility × √21, the same swing Stock plans use). For `near` rows, one to two swings under that price |
 | Size | A starter slice: 1% of the portfolio for a single stock, 2.5% for a fund. Never more than the room under the caps, never more than free cash, never on margin |
 | What would make it wrong | The case's risks, or the Skeptic's counter-case, or Scout's bear case. Plus a price: two monthly swings under the latest price. Plus earnings inside 14 days |
-| Stance | `buy`: a written case or Scout says buy and nothing blocks it. `watch`: the case says wait, the Skeptic flagged it, a cap, rule or no-buy window blocks it, the holding's research note says trim or avoid, or it is not on sale. `screen`: cheap by the numbers, no written case yet |
+| Stance | `buy`: a written case or Scout says buy, or a holding's research note says add, and nothing blocks it. `watch`: the case says wait, the Skeptic flagged it, a cap, rule or no-buy window blocks it, the holding's research note says anything but add, or it is not on sale. `screen`: cheap by the numbers, no written case yet |
 
 A written case that says avoid drops the name from the rows and lists it under `passed` with the reason.
+
+## Holdings and their research note
+
+| Note says | Row |
+|---|---|
+| `add` | A buy, on the list even when the name is not on sale |
+| `hold` or `watch`, name on sale | A watch: "You already hold this; the analysis says hold, not add". Why now is the note's verdict line, what would make it wrong is its bear case |
+| `hold` or `watch`, name not on sale | Not on the list |
+| `trim` or `avoid` | A watch: "your research note says trim" |
+| Anything but `add`, and a written case says buy | A watch: "the case says buy, but your research note says hold" |
+| The desk could not tell what the holding is | The note is ignored |
 
 ## Which price, which day
 
@@ -83,8 +96,11 @@ Buys first, then by score. The score is a sort key from 0 to 100: depth of the d
 | Step | Does | Skips when |
 |---|---|---|
 | Scan | Runs the discount scan | The scan is already current to the latest close |
-| Cases | Runs the Discount cases desk on pending hits | Nothing is pending, or the desk is off, guarded or over its cap |
+| Cases | Runs the Discount cases desk on pending scanner hits | Nothing is pending, or the desk is off, guarded or over its cap |
+| List cases | Asks the same desk for a case on each `screen` row (on sale, no written case, note or idea), best rank first | Every such row has one; six cases were already written tonight, scanner cases included; the desk stopped in the step before; it is between 05:30 and 09:00 ET |
 | Scout | Runs Scout once | It had a good run in the last 35 days, or any counted run in the last 7 |
+
+List cases goes through `run_discount_desk(discounts=ListSource(...), trigger="schedule", limit=n)`: the desk's own prompt, schema, switch, guard, lock and weekly allowance, with the hit built from the row's `numbers` in the scanner's shape. The cap is six cases a night across both steps (18 hours back). A row with a case is no longer a `screen`, so a second run pays for nothing.
 
 Safe to start twice. It records the night in `data/run/opportunities/night.json` and ends with one JSON line for the morning alert: `{"ready": "6 buying opportunities, 2 rated a buy"}` or `{"skipped": "why"}`. `desk.opportunities.ready(cfg)` returns the same line at any time.
 
@@ -100,7 +116,7 @@ The list never waits for the night job. Rows without a case show as `screen` and
 | `asof` | `day`, `words`, `status`, `provisional`, `expected_day`, `behind`, straight from `desk.engine.asof` |
 | `prices` | `day` (newest price on the list), `words`, `older[]` (`symbol`, `price_as_of`, `held`) |
 | `freshness` | `scanner_as_of`, `last_case_at`, `last_scout_at`, `night_run_at`, `night_status` (`ok`, `partial`, `waiting`), `note` |
-| `headline`, `counts`, `note` | One line for the door; totals by stance, held and outside; the reason when the list is empty |
+| `headline`, `counts`, `note` | One line for the door; totals by stance, held and outside, `with_case` and `written` (rows with a case, a Scout idea or a research note); the reason when the list is empty |
 | `profile`, `cash`, `method` | The band sizes use; free cash, margin debit and next deposit; how rows are ranked |
-| `rows[]` | `rank`, `symbol`, `name`, `kind`, `held`, `weight_pct`, `sources`, `source_label`, `stance`, `stance_label`, `why_now`, `facts`, `entry`, `size`, `wrong_if`, `invalid_below`, `case`, `decision_id`, `queued`, `not_queued`, `research_verdict`, `next_earnings`, `as_of`, `price_as_of`, `price_source`, `price_at`, `price_behind`, `analysis_as_of`, `since_analysis_pct`, `as_of_words`, `score` |
+| `rows[]` | `rank`, `symbol`, `name`, `kind`, `held`, `weight_pct`, `sources`, `source_label`, `stance`, `stance_label`, `why_now`, `facts`, `entry`, `size`, `wrong_if`, `invalid_below`, `case`, `decision_id`, `queued`, `not_queued`, `research_verdict`, `research`, `numbers`, `next_earnings`, `as_of`, `price_as_of`, `price_source`, `price_at`, `price_behind`, `analysis_as_of`, `since_analysis_pct`, `as_of_words`, `score` |
 | `passed[]` | `symbol`, `name`, `reason` |
