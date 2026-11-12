@@ -34,8 +34,8 @@ def sync(cfg: Config) -> dict:
 
 
 def night(cfg: Config) -> dict:
-    moved = tidy_now(cfg)
-    gone = moved["expired"] + moved["replaced"] + moved["notes"]
+    moved = tidy_now(cfg, checks=True)
+    gone = moved["expired"] + moved["replaced"] + moved["notes"] + moved["cleared"]
     waiting = moved["waiting"]
     if not gone and not waiting:
         return {"skipped": "Nothing is waiting on a decision."}

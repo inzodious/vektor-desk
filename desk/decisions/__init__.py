@@ -5,6 +5,7 @@ import importlib
 _EXPORTS = {
     "add_event": "plan",
     "calendar_events": "plan",
+    "cleared": "records",
     "delete_event": "plan",
     "deposits_landed": "plan",
     "upcoming_deposits": "plan",
