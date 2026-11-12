@@ -39,6 +39,19 @@ Escape Vektor's `priceCloses` only refresh when Joshua opens it, so they can lag
 
 A held symbol is fetched from Tiingo unless the mirror already has a close for the last trading day. Weekends and holidays resolve to the last trading day.
 
+**Price backfill** (`desk.engine.backfill`, job `backfill`, hourly 01:10 to 12:10 ET; `ASK_HOURS` and `ASK_WORDS` hold the window and a test ties them to the schedule). Tiingo publishes most closes by 17:30 ET and mutual fund prices after midnight, sometimes later, so the desk keeps asking through the morning.
+
+| Piece | Rule |
+|---|---|
+| Who is asked | Held, benchmark, plan and watched names and the scanner's quality list while their newest bar is older than the last trading day; never-fetched names once; the rest every 90 days |
+| Order | By role (held first), never-fetched first inside a role, so a history backlog never delays a held name |
+| Nothing behind | The run makes no call and says so |
+| An error | Asked again next run; a rate limit or no answer also ends the run. A name is parked only when Tiingo says "no prices" and has never had a bar for it: 7 days, or 20 hours for a held name |
+| Result | `fetched`, `advanced` (a new bar landed), `behind` (answered with nothing new for `target`), `unpriced`, `errors`, `left`, and `detail`, one sentence the jobs page keeps |
+| Lock | `engine-backfill` only, never `engine-daily`; each name is its own short write, the request itself holds nothing |
+
+**`GET /api/engine/backfill`.** `{target, asks, limits, used, last_run, symbols}`. Each symbol: `symbol, role, priority, daily, first_bar, last_bar, fetched_at, error, parked_until, behind, due`. `last_run` is the newest run's `finished_at, ok, detail` and name lists. Read-only; no account data.
+
 **Gaps, stated plainly.**
 
 - **401(k) at Empower** has no feed. Until it is connected in SimpleFIN, the desk models it from the plan's contribution schedule and the funds' proxy tickers, flagged `modelled`. It never mixes a modelled number into a broker-reconciled total without saying so.
@@ -102,7 +115,7 @@ Before metrics are published for a day, the engine checks:
 | History | Shows the Fidelity history's dates, rows and accounts, and how many Escape Vektor rows it replaced. Warns when Escape Vektor rows inside those dates have no broker match, or a broker account has no Escape Vektor account with the same last 4 digits |
 | Cash | Change in cash equals flows plus trades plus income, within $0.01 |
 | Freshness | Mirror pull under 14 hours old |
-| Closes | Every held symbol has a close for the last trading day, or is a code nothing prices |
+| Closes | Every held symbol has a close for the last trading day, or is a code nothing prices. A name one session behind warns with when the desk asks again (`backfill.ASK_WORDS`) and nothing to do; more than one session behind points to Backfill in Settings, Box. A held name whose last ask failed or found no prices says so, with when it is asked again |
 | Flows | Lists any snapshot-day change that prices and recorded activity don't explain. The engine counts it as money in or out, not return (unlogged deposits, payroll contributions, a margin buy without a debit row). Always `ok`; it's there to explain the number |
 | Market keys | Tiingo, Finnhub, FRED, the SEC contact and the Alpaca paper keys are all set; any missing one warns in plain words ("the Tiingo key") and its fix points to Settings, Data, Keys. No health line names a setting variable, a shell command or a file path: fixes point to Settings (Keys and Inbox under Data, job buttons under Box). The words live in `desk.engine.KEY_WORDS` and `key_fix` |
 | Symbol kinds | Every holding is known as a fund or a stock: Escape Vektor's profiles, then SEC's fund list, the benchmark ETFs, ticker shape (5 letters ending in X, plan codes with digits) and SEC titles |
@@ -673,7 +686,7 @@ Limits: leftover swings are drawn month by month and holding by holding, so a fu
 
 ## Discount-day scanner
 
-Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run. The `backfill` job (hourly 01:10 to 06:10 ET) scans again whenever it fetched prices, so a name priced from Tiingo is scored on its newest close before the morning.
+Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run. The `backfill` job (hourly 01:10 to 12:10 ET) scans again whenever a fetch brought a new bar, so a name priced from Tiingo is scored on its newest close before the morning.
 
 | Piece | Rule |
 |---|---|
