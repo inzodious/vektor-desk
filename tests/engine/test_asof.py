@@ -143,7 +143,7 @@ def test_the_evening_run_closes_today_from_the_closing_quotes(cfg, mirror, monke
     evening = book(cfg, et(WED, 17, 50))
     assert evening["day"] == WED and evening["provisional"] and evening["status"] == "provisional"
     assert evening["previous_day"] == TUE and evening["behind"] is None and evening["live"] is None
-    assert evening["prices"] == {"official": 0, "quoted": 1, "carried": ["FXAIX"]}
+    assert evening["prices"] == {"official": 0, "quoted": 1, "carried": ["FXAIX"], "waiting": ["FXAIX"]}
     assert evening["numbers"]["value"] == 10 * 23.1 + 5 * 202.0 + 300.0
     assert evening["numbers"]["day_change"] == pytest.approx(21.0)
     assert evening["numbers"]["cash_ready"] == 300.0 and evening["numbers"]["margin_debit"] == 0.0
@@ -177,7 +177,7 @@ def test_official_closes_restate_the_day_overnight_and_only_once(cfg, mirror, mo
     assert done["ok"] and "official closes landed" in done["why"] and done["daily"]["closes"]["restated"] == 2
     final = book(cfg, et(THU, 6, 30))
     assert final["day"] == WED and not final["provisional"] and final["status"] == "final" and final["words"] == "Wed Nov 11, at the close."
-    assert final["prices"] == {"official": 2, "quoted": 0, "carried": []}
+    assert final["prices"] == {"official": 2, "quoted": 0, "carried": [], "waiting": []}
     assert final["numbers"]["value"] == 10 * 23.0 + 5 * 204.0 + 300.0
     assert final["live"] is None and final["behind"] is None
     at(monkeypatch, et(THU, 2, 25))
@@ -487,3 +487,67 @@ def test_preflight_pays_from_the_account_that_holds_the_ready_cash(cfg, mirror, 
     ready = conn.execute("SELECT value FROM metric_values WHERE metric_id='cash.ready' AND scope='portfolio' ORDER BY as_of DESC LIMIT 1").fetchone()[0]
     conn.close()
     assert ready == 120.0
+
+
+# ---- Not final while a fund's close is still on the way ----
+
+
+def evening_book(cfg, mirror, monkeypatch):
+    seed(mirror)
+    mirror.put("positions", 9, position(9, 1, IND, "PLAN1", 4, 100.0, 90.0))
+    mirror.put("snapshots", 1, snapshot(1, f"{MON}T08:00", 1600.0, 4))
+    mirror.pull(f"{WED}T12:30:00+00:00")
+    monkeypatch.setenv("FINNHUB_API_KEY", "k")
+    at(monkeypatch, et(WED, 8, 20))
+    run_daily(cfg)
+    at(monkeypatch, et(WED, 16, 5))
+    run_quotes(cfg, closing())
+    at(monkeypatch, et(WED, 17, 20))
+    run_daily(cfg)
+    run_review(cfg)
+
+
+def day_pack(cfg, day):
+    conn = connect(cfg.desk_db, readonly=True)
+    row = conn.execute("SELECT pack FROM period_reviews WHERE kind='day' AND \"end\"=?", (day,)).fetchone()
+    conn.close()
+    return json.loads(row[0])
+
+
+def test_a_day_is_not_final_while_a_fund_still_carries_its_last_close(cfg, mirror, monkeypatch):
+    evening_book(cfg, mirror, monkeypatch)
+    bars(cfg, [("ACME", WED, 23.0), ("SPY", WED, 611.0)])
+    at(monkeypatch, et(THU, 1, 12))
+    assert run_restate(cfg)["ok"]
+    early = book(cfg, et(THU, 6, 16))
+    assert early["day"] == WED and early["provisional"] and early["status"] == "provisional"
+    assert early["prices"] == {"official": 1, "quoted": 0, "carried": ["FXAIX", "PLAN1"], "waiting": ["FXAIX"]}
+    assert early["words"] == "Wed Nov 11, at the close. Waiting on the official close for FXAIX; the day is restated when it lands."
+    note = day_pack(cfg, WED)["provisional"]
+    assert note["carried"] == ["FXAIX"] and "still waits on the official close for FXAIX" in note["note"]
+    at(monkeypatch, et(THU, 6, 17))
+    assert "skipped" in run_restate(cfg)
+
+
+def test_a_late_fund_close_reruns_the_day_once_and_then_it_is_final(cfg, mirror, monkeypatch):
+    evening_book(cfg, mirror, monkeypatch)
+    bars(cfg, [("ACME", WED, 23.0), ("SPY", WED, 611.0)])
+    at(monkeypatch, et(THU, 1, 12))
+    run_restate(cfg)
+    before = book(cfg, et(THU, 6, 16))["numbers"]["value"]
+    jobrun.take_requests(cfg)
+    bars(cfg, [("FXAIX", WED, 204.0)])
+    at(monkeypatch, et(THU, 6, 22))
+    late = run_restate(cfg)
+    assert late["ok"] and "late official closes landed for FXAIX" in late["why"] and late["debrief"] == "asked"
+    final = book(cfg, et(THU, 6, 30))
+    assert not final["provisional"] and final["status"] == "final" and final["words"] == "Wed Nov 11, at the close."
+    assert final["prices"] == {"official": 2, "quoted": 0, "carried": ["PLAN1"], "waiting": []}
+    assert final["numbers"]["value"] == pytest.approx(before + 5 * 2.0)
+    assert "provisional" not in day_pack(cfg, WED)
+    assert "skipped" in run_restate(cfg)
+
+
+def test_names_keeps_a_long_list_short():
+    assert asof.names(["A"]) == "A" and asof.names(["A", "B"]) == "A and B"
+    assert asof.names(["A", "B", "C", "D", "E"]) == "A, B, C and 2 more"
