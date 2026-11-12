@@ -1,10 +1,11 @@
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from desk.agents import store, switches
+from desk.agents import portfolio, store, switches
 from desk.agents.desks import DESKS, Desk
+from desk.agents.pipeline import ONCE_A_DAY
 from desk.agents.runner import FIRST_RUN, UNGUARDED
-from desk.agents.sources import Decisions, NotReady, RealDecisions
+from desk.agents.sources import Decisions, NotReady, PlanFacts, RealDecisions, RealPlanFacts
 from desk.config import Config
 from desk.runlock import running
 from desk.scheduler import parse
@@ -39,7 +40,28 @@ def _profile(cfg: Config, decisions: Decisions | None) -> dict:
         return {}
 
 
-def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None = None) -> dict:
+def _held(cfg: Config, facts: PlanFacts | None) -> int | None:
+    try:
+        return len(portfolio.held_rows((facts or RealPlanFacts()).facts(cfg)))
+    except NotReady:
+        return None
+
+
+def week_of(cfg: Config, desk: Desk, now: datetime, facts: PlanFacts | None = None) -> dict:
+    week = store.week_usage(cfg, desk.name, now) | {"cap": desk.weekly_runs, "line": None, "parts": []}
+    if desk.name == portfolio.NAME:
+        nightly, asked = store.week_usage(cfg, desk.name, now, lane="pass")["runs"], store.week_usage(cfg, desk.name, now, lane="desk")["runs"]
+        held = _held(cfg, facts)
+        room = portfolio.desk_for(held).weekly_runs if held else max(nightly, 1)
+        week["cap"] = desk.weekly_runs + room
+        week["parts"] = [{"name": "Holdings pass", "runs": nightly, "cap": room}, {"name": "On request", "runs": asked, "cap": desk.weekly_runs}]
+        week["line"] = f"Holdings pass {nightly} of {room} this week, one per holding. On request {asked} of {desk.weekly_runs}."
+    elif desk.name in ONCE_A_DAY and week["runs"] >= desk.weekly_runs:
+        week["line"] = "Over this week's allowance, so extra runs wait. The daily check still runs once a day."
+    return week
+
+
+def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None = None, facts: PlanFacts | None = None) -> dict:
     now = now or datetime.now(UTC)
     zone = ZoneInfo(cfg.timezone)
     profile = _profile(cfg, decisions)
@@ -53,7 +75,7 @@ def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None =
         switch = switches.resolve(cfg, d.name, profile)
         enabled = switch["enabled"]
         guarded = guard and d.name not in UNGUARDED
-        week = store.week_usage(cfg, d.name, now)
+        week = week_of(cfg, d, now, facts)
         desks.append(
             {
                 "desk": d.name,
@@ -68,7 +90,7 @@ def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None =
                 "guarded": guarded,
                 "last_run": _last(store.last_run(cfg, d.name)),
                 "next_run": next_run(d, now, zone) if d.live and enabled and on and not guarded else None,
-                "week": week | {"cap": d.weekly_runs},
+                "week": week,
             }
         )
     return {

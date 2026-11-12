@@ -47,7 +47,7 @@ def fresh(cfg: Config, today: str) -> dict[str, dict]:
 # ---- Tonight's count ----
 
 
-def _stamp(text: object) -> datetime | None:
+def parse(text: object) -> datetime | None:
     try:
         t = datetime.fromisoformat(str(text).replace("Z", "+00:00"))
     except ValueError:
@@ -57,7 +57,7 @@ def _stamp(text: object) -> datetime | None:
 
 def written_tonight(cfg: Config, now: datetime) -> int:
     cut = now - timedelta(hours=NIGHT_HOURS)
-    n = sum(1 for c in load(cfg).values() if (t := _stamp(c.get("written_at"))) is not None and t >= cut)
+    n = sum(1 for c in load(cfg).values() if (t := parse(c.get("written_at"))) is not None and t >= cut)
     if not cfg.desk_db.exists():
         return n
     conn = connect(cfg.desk_db, readonly=True)
@@ -67,7 +67,7 @@ def written_tonight(cfg: Config, now: datetime) -> int:
         stamps = []
     finally:
         conn.close()
-    return n + sum(1 for s in stamps if (t := _stamp(s)) is not None and t >= cut)
+    return n + sum(1 for s in stamps if (t := parse(s)) is not None and t >= cut)
 
 
 # ---- Rows that need a case ----
