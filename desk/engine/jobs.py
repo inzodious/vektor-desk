@@ -10,6 +10,7 @@ JOBS = [
     {"schedule": "* 1-5 * * *", "command": "python -m desk.engine lab-offer", "heavy": False, "title": "Lab work to the worker"},
     {"schedule": "30 0 * * *", "command": "python -m desk.engine french", "overnight": 100},
     ("30 19 * * 1-5", "python -m desk.engine universe"),
+    {"schedule": "30 10,14 * * *", "command": "python -m desk.engine public", "heavy": False, "title": "Public stock list"},
     ("35 3 * * *", "python -m desk.engine filings"),
     ("20 23 * * *", "python -m desk.engine insider"),
     ("50 23 * * *", "python -m desk.engine earnings"),

@@ -29,6 +29,7 @@ from desk.engine import (
     insider,
     lane,
     paper_exec,
+    public,
     review,
     schema,
     triggers,
@@ -337,6 +338,10 @@ def _universe(desk, http) -> dict:
     return result
 
 
+def run_public(cfg: Config, http=None) -> dict:
+    return _with_desk(cfg, "public", lambda desk: public.run(desk, http or http_session(), now=datetime.now(UTC)))
+
+
 def run_insider(cfg: Config, http=None) -> dict:
     return _with_desk(cfg, "insider", lambda desk: insider.run(desk, http or http_session(), now=datetime.now(UTC)))
 
@@ -401,6 +406,7 @@ JOBS = {
     "lab-offer": run_lab_offer,
     "french": run_french,
     "research": run_research,
+    "public": run_public,
 }
 
 

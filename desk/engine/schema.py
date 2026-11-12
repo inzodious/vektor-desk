@@ -183,6 +183,21 @@ CREATE TABLE IF NOT EXISTS sec_shares (
   fetched_at TEXT NOT NULL,
   PRIMARY KEY (cik, end)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS public_stocks (
+  rank INTEGER PRIMARY KEY,
+  cik INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  float_usd REAL NOT NULL,
+  float_at TEXT NOT NULL,
+  accn TEXT,
+  symbol TEXT,
+  source TEXT,
+  first_bar TEXT,
+  last_bar TEXT,
+  state TEXT NOT NULL,
+  trading INTEGER NOT NULL DEFAULT 0,
+  fetched_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS universe_daily (
   date TEXT NOT NULL,
   symbol TEXT NOT NULL,
