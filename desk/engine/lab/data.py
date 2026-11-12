@@ -24,7 +24,6 @@ CREATE TABLE bars (
 ) WITHOUT ROWID;
 CREATE TABLE symbols (symbol TEXT PRIMARY KEY, kind TEXT NOT NULL, role TEXT, first TEXT, last TEXT) WITHOUT ROWID;
 CREATE TABLE macro (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
-CREATE TABLE plan_mix (symbol TEXT PRIMARY KEY, weight REAL NOT NULL) WITHOUT ROWID;
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
 CREATE TABLE factors (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
 CREATE TABLE french (set_name TEXT NOT NULL, name TEXT NOT NULL, date TEXT NOT NULL, ret REAL NOT NULL, PRIMARY KEY (set_name, name, date)) WITHOUT ROWID;
@@ -33,7 +32,8 @@ CREATE TABLE smallcap (symbol TEXT NOT NULL, month TEXT NOT NULL, PRIMARY KEY (s
 CREATE TABLE earnings (symbol TEXT NOT NULL, known TEXT NOT NULL, surprise REAL NOT NULL);
 """
 HELD_FILE = "held.json"
-WORKER_ROLES = {"held": "universe", "watch": "universe", "past": None}
+PLAN_FILE = "plan.json"
+WORKER_ROLES = dict.fromkeys(("held", "watch", "past", "plan"), "universe")
 SMALLCAP_KIND = "stock"
 SMALL_CAPS = "small_caps"
 SMALLCAP_ROLE = "small_cap"
@@ -59,6 +59,10 @@ def data_path(cfg: Config) -> Path:
 
 def held_path(cfg: Config) -> Path:
     return data_path(cfg).with_name(HELD_FILE)
+
+
+def plan_path(cfg: Config) -> Path:
+    return data_path(cfg).with_name(PLAN_FILE)
 
 
 def ledger_path(cfg: Config) -> Path:
@@ -96,14 +100,13 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
                     add, (tuple(r) for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM alpaca_bars WHERE symbol=?", (sym,)))
                 )
         bars = out.execute("SELECT count(*) FROM bars").fetchone()[0]
+        kinds = _public_kinds(desk, kinds, targets)
         roles = {r["symbol"]: WORKER_ROLES.get(r["role"], r["role"]) for r in desk.execute("SELECT symbol, role FROM market_symbols")}
         roles |= {sym: roles.get(sym) or SMALLCAP_ROLE for sym in small}
         spans = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, min(date), max(date) FROM bars GROUP BY symbol")}
         rows = []
         for sym, (first, last) in spans.items():
-            kind = kinds.get(sym) or (
-                "fund" if sym in BENCHMARKS or sym in targets or sym == SMALLCAP_BENCHMARK else SMALLCAP_KIND if sym in small else "unknown"
-            )
+            kind = kinds.get(sym) or ("fund" if sym in BENCHMARKS or sym == SMALLCAP_BENCHMARK else SMALLCAP_KIND if sym in small else "unknown")
             rows.append((sym, kind, roles.get(sym), first, last))
         out.executemany("INSERT INTO symbols VALUES (?, ?, ?, ?, ?)", rows)
         french_rows = 0
@@ -113,7 +116,6 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
             french_rows = out.execute("SELECT count(*) FROM french").fetchone()[0]
         if desk.execute("SELECT 1 FROM sqlite_master WHERE name='macro_daily'").fetchone():
             out.executemany("INSERT INTO macro VALUES (?, ?, ?)", (tuple(r) for r in desk.execute("SELECT series, date, value FROM macro_daily")))
-        out.executemany("INSERT INTO plan_mix VALUES (?, ?)", list(targets.items()))
         rate = desk.execute(
             "SELECT value FROM metric_values WHERE metric_id='tax.marginal_rate' AND scope='portfolio' AND value IS NOT NULL ORDER BY as_of DESC LIMIT 1"
         ).fetchone()
@@ -133,16 +135,17 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
     finally:
         out.close()
     os.replace(tmp, final)
-    _write_held(final.with_name(HELD_FILE), held, covered, held_day)
+    _write_box(final.with_name(HELD_FILE), {"as_of": held_day, "covered": covered, "weights": held})
+    _write_box(final.with_name(PLAN_FILE), {"weights": {s: w for s, w in targets.items() if w > 0}})
     return {"ok": True, "path": str(final), "symbols": len(spans), "bars": bars, "french_rows": french_rows, "small_caps": len(small), "held_mix": len(held)}
 
 
-def _write_held(path: Path, weights: dict[str, float], covered: float | None, day: str | None) -> None:
-    if not weights:
+def _write_box(path: Path, body: dict) -> None:
+    if not body["weights"]:
         path.unlink(missing_ok=True)
         return
     tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_text(json.dumps({"as_of": day, "covered": covered, "weights": weights}, sort_keys=True))
+    tmp.write_text(json.dumps(body, sort_keys=True))
     os.replace(tmp, path)
 
 
@@ -153,6 +156,19 @@ def read_held(path: Path) -> dict:
     except (OSError, ValueError, TypeError, AttributeError):
         return {}
     return {"as_of": body.get("as_of"), "covered": body.get("covered"), "weights": weights} if weights else {}
+
+
+def read_plan(path: Path) -> dict[str, float]:
+    return read_held(path).get("weights") or {}
+
+
+def _public_kinds(desk: sqlite3.Connection, kinds: dict[str, str], symbols) -> dict[str, str]:
+    from desk.engine.core import guess_kind
+
+    funds = {r[0] for r in desk.execute("SELECT symbol FROM sec_funds")} if _has(desk, "sec_funds") else set()
+    titles = {r[0]: r[1] or "" for r in desk.execute("SELECT symbol, title FROM sec_tickers")} if _has(desk, "sec_tickers") else {}
+    guessed = {s: guess_kind(s, funds, titles) for s in symbols if kinds.get(s, "unknown") == "unknown"}
+    return kinds | {s: "fund" if kind == "unknown" else kind for s, kind in guessed.items()}
 
 
 def _held_mix(desk: sqlite3.Connection, priced) -> tuple[dict[str, float], float | None, str | None]:
@@ -375,7 +391,6 @@ def load(path: Path) -> LabData:
             d, v = macro.setdefault(r[0], ([], []))
             d.append(r[1])
             v.append(r[2])
-        plan = {r[0]: r[1] for r in conn.execute("SELECT symbol, weight FROM plan_mix")}
         settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings")}
         factors: dict[str, dict[str, float]] = {}
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factors'").fetchone():
@@ -416,7 +431,7 @@ def load(path: Path) -> LabData:
         roles,
         last,
         macro,
-        plan,
+        read_plan(path.with_name(PLAN_FILE)),
         settings,
         list(series[ref].dates),
         factors,

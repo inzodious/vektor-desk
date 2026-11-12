@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from desk.config import Config
 from desk.db import connect
 from desk.engine.lab import runner, simcache
-from desk.engine.lab.data import data_path, ledger_path
+from desk.engine.lab.data import data_path, ledger_path, plan_path, read_plan
 from desk.engine.lab.spec import local_only
 from desk.worker import Kind, offer, online
 
@@ -64,8 +64,9 @@ def offer_queue(cfg: Config, *, now: datetime | None = None) -> dict:
         before = simcache.read_offers(cfg)
         kept = before["files"] if before.get("snapshot") == snapshot else {}
         files, fresh = {}, 0
+        plan = bool(read_plan(plan_path(cfg)))
         for name, request in waiting(cfg):
-            if local_only(request.get("spec")):
+            if local_only(request.get("spec"), plan):
                 continue
             key = simcache.job_key(snapshot, request)
             old = kept.get(name)
