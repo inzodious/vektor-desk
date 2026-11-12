@@ -198,13 +198,13 @@ The API never runs a command. `POST /api/jobs/{name}/run` drops a request file i
 
 | Call | Answer |
 |---|---|
-| `GET /api/jobs` | `{now, scheduler_alive, cooldown_seconds: 300, pickup_seconds: 5, stages: ["mirror", "engine", "review", "desks", "paper"], low_memory: {on, why}, jobs: [...]}` |
-| One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `waiting`, `waiting_since` (its turn hasn't come in low-memory mode), `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes), `stage` (its step in today's run, or `null`) |
+| `GET /api/jobs` | `{now, scheduler_alive, cooldown_seconds: 300, pickup_seconds: 5, stages: ["mirror", "engine", "review", "desks", "paper", "overnight"], low_memory: {on, why}, jobs: [...]}` |
+| One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `waiting`, `waiting_since` (its turn hasn't come: heavy jobs run one at a time in low-memory mode and during the overnight run), `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes), `stage` (its step in today's run, or `null`) |
 | `last_run` | `null`, or `{trigger: schedule\|request\|start, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, detail, note, error, oom: cap\|box\|null}`. `result` is `null` while it runs; `trigger` is also `memory` for the alert job after a kill |
 | `POST /api/jobs/{name}/run` | `202 {ok: true, job, request_id, requested_at, message}` |
 | Refusals | `{ok: false, error, message, ...}`: `404 unknown_job`; `409 running` (`since`); `409 queued` (`since`); `409 waiting` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 scheduler_down` |
 
-**Today's run.** The Bridge strip walks `stages` in order and shows the jobs whose `stage` matches: `mirror`, `engine-daily`, `engine-review`, the Plan keeper, debrief and plan desks, and `engine-paper`. A package can set both fields itself with a dict entry in its `jobs.py`: `{"schedule", "command", "refreshes": ["debrief"], "stage": "desks"}`; otherwise the tables in `desk/jobrun.py` apply.
+**Today's run.** The Bridge strip walks `stages` in order and shows the jobs whose `stage` matches: `mirror`, `engine-daily`, `engine-review`, the Plan keeper, debrief and plan desks, and `engine-paper`. A package can set both fields itself with a dict entry in its `jobs.py`: `{"schedule", "command", "refreshes": ["debrief"], "stage": "desks"}`; otherwise the tables in `desk/jobrun.py` apply. A job with `"overnight"` (below) shows under the `overnight` stage.
 
 **Reviews in health.** `/api/status` has `reviews: {state, due, last_ok, job, kinds, missing}`. `state` is `empty` before the first run, `ok` when `engine-review` finished (or the day pack in `period_reviews` was computed) since the last weekday 17:35 Eastern run that is at least 30 minutes old, `stale` when it didn't, and `failing` when the last run failed. `stale` and `failing` send one `desk-ops` alert a day.
 
@@ -237,6 +237,28 @@ One tap runs everything a new or stale desk needs, in order. `POST /api/start` d
 - `needs_start` is true until a chain has finished with no failed step, or the desk already has accounts, numbers and a review. The UI shows the Start banner while it is true.
 
 **What a job said.** The scheduler now reads each job's output, passes it on to the container log, and keeps the last line. `last_run` gains `note` (the `skipped` text of a job that exited 0) and `error` (the `error` text, or the last line, of one that failed). Long token-like strings are masked and both are cut at 300 characters.
+
+## The overnight run
+
+Every night the scheduler runs the night's work in order, one heavy job at a time, with no tap. Code: `desk/overnight.py`. State: `data/run/overnight/chain.json` (tonight's steps) and `build.json` (when the live version came up).
+
+| Point | Rule |
+|---|---|
+| Window | Starts 23:30 Eastern, ends 06:30. A scheduler that comes up inside the window carries on where it was |
+| One at a time | While it runs, heavy jobs take turns, whatever low-memory mode says. A job is light only if its `jobs.py` entry says `"heavy": False` or it is in `LIGHT` in `desk/scheduler.py` |
+| First: the evening run again | `mirror`, `engine-daily`, `engine-review`, `engine-discounts`, the Plan keeper, the debrief. Only when a new version went live after 16:00, and then only the jobs that haven't run well on it. So a fix merged in the evening is on every page by morning, and a quiet night repeats nothing |
+| Then: the night jobs | Every job whose `jobs.py` entry has `"overnight": N`, lowest first (Statistics 100 to 199, Agents 200 to 299, Concept 300 to 399). Keep `"schedule"` as the fallback: that line is skipped on a night when the run has done the job or is about to |
+| A restart mid-step | The step runs again, up to three times in all. Steps already done stay done |
+| A new version | Before 03:00 the night starts again from the top, so the fix is used. After 03:00 it only carries on, and adds any new night job |
+| Room for a deploy | After each step the run waits for the host's next check-in (`data/run/box/host.alive`, every 5 minutes; 10 minutes at most), so a waiting deploy takes the gap instead of stopping a job |
+| 06:30 | Steps that haven't started are closed as "The night ran out before its turn." A running one finishes |
+| 06:45 | `notify-morning` sends one alert on `desk-research`: what is ready, then what didn't finish. It opens the Bridge |
+
+A night job must be safe to start twice in a night and must skip what it already did. Its last printed line, as JSON, may say `{"ready": "14 holdings analysed"}` (shown on the step and in the alert) or `{"skipped": "why"}`. Work that isn't a cron job (the lab container, a worker) is not a step; `ready(cfg)` in `desk.engine.lab.shelf` or `desk.opportunities`, when present, adds its line to the alert.
+
+| Call | Answers |
+|---|---|
+| `GET /api/overnight` | `{night, state: idle\|running\|done, started_at, finished_at, build, restarts, starts: "23:30", ends: "06:30", summary, steps: [{id, job, title, state: waiting\|running\|ok\|skipped\|failed, detail, ready, started_at, finished_at}], ready: [...]}`. Before 23:30 it shows tonight's order as `idle`; through the day it shows last night's result |
 
 ## Readiness
 
@@ -370,7 +392,7 @@ Each package under `desk/` plugs in through five optional modules, found on thei
 | `desk/<pkg>/kinds.py` | `KINDS`, a list of `desk.worker.Kind` | `desk.worker.registry`, on the NAS and inside the worker's child process |
 | `desk/<pkg>/readiness.py` | `sections(cfg)`, returning `{key: {state, why, action, next_auto, next_auto_text}}` for the readiness keys it wants to answer itself | `desk.readiness`, which lays those fields over its own answer |
 
-Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/start`, `/api/readiness`, `/api/memory/...`, `/api/workers`, `/api/worker/...`, `/api/build/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
+Helpers: `desk.db.desk_conn(cfg, readonly=False)` opens `desk.db` with `mirror.db` attached read-only as `mirror`. `desk.api.deps` has `get_cfg`, `get_desk_db` and `get_desk_db_readonly` for route dependencies. `desk.notify.publish` sends a phone alert (see Phone alerts). Infrastructure's routes are `/api/health`, `/api/status`, `/api/positions`, `/api/jobs/...`, `/api/start`, `/api/overnight`, `/api/readiness`, `/api/memory/...`, `/api/workers`, `/api/worker/...`, `/api/build/...`, `/api/box/...` (including `/api/box/keys`), `/api/inbox/...` and `/api/notify/...`. Test fixtures in `tests/conftest.py` are `cfg`, `desk_db`, `client` and `app_client(packages=[...])`. Package tests go in `tests/<pkg>/`, and need no `__init__.py`.
 
 ## Web app
 

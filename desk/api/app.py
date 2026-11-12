@@ -17,6 +17,7 @@ from desk.db import apply_schemas, connect
 from desk.inbox_upload import router as inbox_router
 from desk.jobrun import router as jobs_router
 from desk.memory import router as memory_router
+from desk.overnight import router as overnight_router
 from desk.packages import seams
 from desk.readiness import router as readiness_router
 from desk.startrun import router as start_router
@@ -110,6 +111,7 @@ def create_app(cfg: Config | None = None, *, packages: list[str] | None = None, 
     app.include_router(jobs_router)
     app.include_router(start_router)
     app.include_router(memory_router)
+    app.include_router(overnight_router)
     app.include_router(readiness_router)
     app.include_router(keys_router)
     app.include_router(box_router)
