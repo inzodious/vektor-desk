@@ -1,0 +1,92 @@
+{
+ "as_of": "2026-11-06",
+ "status": "ok",
+ "checks": [
+  {
+   "check_name": "closes",
+   "status": "warn",
+   "detail": "Two fund prices for Monday are not out yet. The desk checks every hour.",
+   "kind": "fixes_itself",
+   "job": "engine-backfill",
+   "heal": {
+    "job": "engine-backfill",
+    "asked_at": "2026-11-09T16:35:00+00:00",
+    "attempts": 1,
+    "stuck": false
+   },
+   "diagnosis": "Closes for FXAIX, BND stop at 2026-11-06. A fund’s price for a day can arrive hours after the others. Fix: nothing to do yet.",
+   "counts": false
+  },
+  {
+   "check_name": "freshness",
+   "status": "ok",
+   "detail": "Mirror pulled 2.7 hours ago (limit 14).",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "Mirror pulled 2.7 hours ago (limit 14)."
+  },
+  {
+   "check_name": "lookthrough",
+   "status": "ok",
+   "detail": "Look-through covers 100% of invested value.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "Look-through covers 100% of invested value."
+  },
+  {
+   "check_name": "marginal_rate",
+   "status": "ok",
+   "detail": "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once; the desk reads the rate from there.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once; the desk reads the rate from there."
+  },
+  {
+   "check_name": "research",
+   "status": "ok",
+   "detail": "SEC company facts for 2 stocks.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "SEC company facts for 2 stocks."
+  },
+  {
+   "check_name": "shares",
+   "status": "ok",
+   "detail": "No lot export yet; tax lots and wash-sale checks need one.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "No lot export yet; tax lots and wash-sale checks need one."
+  },
+  {
+   "check_name": "value",
+   "status": "ok",
+   "detail": "Values match the broker on 2026-11-06.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "Values match the broker on 2026-11-06."
+  }
+ ],
+ "last_run": {
+  "job": "holdings",
+  "started_at": "2026-11-07T15:24:57+00:00",
+  "finished_at": "2026-11-07T15:24:57+00:00",
+  "ok": 1
+ },
+ "kinds": {
+  "fixes_itself": 1,
+  "needs_you": 0,
+  "blocks": 0
+ }
+}

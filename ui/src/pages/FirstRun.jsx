@@ -71,7 +71,7 @@ export default function FirstRun() {
   const board = useApi('/api/engine/lab/leaderboard');
   const risk = useApi('/api/decisions/risk');
   const [run, setRun] = useState({});
-  const { reloadSetup } = useStart();
+  const { reloadSetup, needs } = useStart();
   const ctl = useRef(null);
   useEffect(() => {
     ctl.current = new AbortController();
@@ -133,6 +133,19 @@ export default function FirstRun() {
       />
       <StartPanel always />
       <MemoryStrip />
+      {needs.length ? (
+        <section className="card" data-testid="needs-you">
+          <div className="card-head">
+            <span className="tag coral">Needs you</span>
+            <span className="chip">{needs.length === 1 ? 'One thing only you can do' : `${needs.length} things only you can do`}</span>
+          </div>
+          <ul className="needs-list">
+            {needs.map((n) => (
+              <li key={n.key}>{n.text}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
       <section className="card fr" data-testid="first-run" data-done={score.done} data-total={score.total}>
         <div className="card-head">
           <span className="tag mint">Launch sequence</span>

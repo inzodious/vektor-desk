@@ -21,11 +21,6 @@ function fixtureApi() {
   const serve = (req, res, next) => {
     const url = new URL(req.url, 'http://desk');
     if (!url.pathname.startsWith('/api/')) return next();
-    if (req.method === 'POST' && /^\/api\/jobs\/[^/]+\/run$/.test(url.pathname)) {
-      res.statusCode = 202;
-      res.setHeader('Content-Type', 'application/json');
-      return res.end(JSON.stringify({ ok: true, job: url.pathname.split('/')[3], request_id: null, message: 'Starts within a few seconds.' }));
-    }
     const scenario = req.headers['x-desk-scenario'] || url.searchParams.get('scenario') || '';
     const symbol = (url.searchParams.get('symbol') || '').toUpperCase();
     const scopeId = url.searchParams.get('scope_id') || '';

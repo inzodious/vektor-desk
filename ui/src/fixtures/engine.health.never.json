@@ -2,5 +2,10 @@
  "as_of": null,
  "status": "fail",
  "checks": [],
- "last_run": null
+ "last_run": null,
+ "kinds": {
+  "fixes_itself": 0,
+  "needs_you": 0,
+  "blocks": 0
+ }
 }

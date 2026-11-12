@@ -93,5 +93,8 @@ describe('readiness', () => {
     expect(setupChip(score)).toMatchObject({ text: 'Setup · 2 left', short: '2 left' });
     expect(setupChip(firstRunScore([{ state: 'done' }]))).toBeNull();
     expect(setupChip(null)).toBeNull();
+    expect(setupChip(score, [{ key: 'shares', text: 'x' }])).toMatchObject({ text: 'Setup · 2 left' });
+    expect(setupChip(firstRunScore([{ state: 'done' }]), [{ key: 'shares', text: 'x' }])).toMatchObject({ text: '1 needs you', left: 0 });
+    expect(setupChip(null, [{ key: 'a' }, { key: 'b' }])).toMatchObject({ text: '2 need you', label: '2 things need you. Open the list.' });
   });
 });

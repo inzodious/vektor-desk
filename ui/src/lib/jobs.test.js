@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from './api.js';
-import { AUTO_EVERY_MS, autoPlan, cronWords, jobState, jobWord, plainLine, refreshPlan, refusalText, runAndWait, scheduleWords, splitJobs, stepTitle } from './jobs.js';
+import { cronWords, jobState, jobWord, plainLine, refreshPlan, refusalText, runAndWait, scheduleWords, splitJobs, stepTitle } from './jobs.js';
 
 describe('job words', () => {
   it('names jobs plainly', () => {
@@ -96,23 +96,6 @@ describe('job state', () => {
     expect(refreshPlan({ checks: [{ check_name: 'marginal_rate', status: 'warn' }] }, jobs)).toEqual([]);
     expect(refreshPlan({ checks: [{ check_name: 'value', status: 'ok' }, { check_name: 'shares', status: 'warn' }] }, jobs)).toEqual(['engine-lots']);
     expect(refreshPlan({ checks: [{ check_name: 'value', status: 'fail' }, { check_name: 'shares', status: 'warn' }] }, jobs)).toEqual(['mirror', 'engine-daily']);
-  });
-
-  it('refreshes by itself only what is free to run and was not asked for lately', () => {
-    const jobs = [
-      { name: 'engine-daily', refreshes: ['holdings', 'value', 'closes'], can_run: true },
-      { name: 'mirror', refreshes: ['freshness', 'holdings', 'value'], can_run: false, cooldown_until: '2026-11-09T16:45:00Z' },
-      { name: 'engine-lots', refreshes: ['shares'], can_run: true },
-      { name: 'engine-backfill', refreshes: ['closes'], can_run: true, running: true },
-    ];
-    const now = Date.parse('2026-11-09T16:42:00Z');
-    const fail = { checks: [{ check_name: 'value', status: 'fail' }, { check_name: 'closes', status: 'fail' }] };
-    expect(autoPlan(fail, jobs, {}, now)).toEqual(['engine-daily']);
-    expect(autoPlan(fail, jobs, { 'engine-daily': now - 60000 }, now)).toEqual([]);
-    expect(autoPlan(fail, jobs, { 'engine-daily': now - AUTO_EVERY_MS }, now)).toEqual(['engine-daily']);
-    expect(autoPlan({ checks: [{ check_name: 'shares', status: 'warn' }] }, jobs, { 'engine-lots': 'junk' }, now)).toEqual(['engine-lots']);
-    expect(autoPlan({ checks: [{ check_name: 'marginal_rate', status: 'warn' }] }, jobs, {}, now)).toEqual([]);
-    expect(autoPlan(null, jobs, {}, now)).toEqual([]);
   });
 
   it('turns refusals into friendly words', () => {
