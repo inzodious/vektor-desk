@@ -135,13 +135,18 @@ test('Strategies leads with the overnight table, grouped by kind, with honest wo
   await expect(page.getByTestId('stages').locator('[data-stage="paper"] b')).toHaveText('6');
   await expect(page.getByTestId('stages').locator('[data-stage="eligible"] b')).toHaveText('1');
   const lib = page.getByTestId('library');
-  await expect(lib).toContainText('Every result is out of sample.');
+  await expect(lib.getByTestId('lib-note')).toContainText('Held up means ahead of its benchmark by more than luck allows');
+  await expect(lib.getByTestId('lib-note')).toContainText('The last two years of data are held back');
+  await expect(lib.getByTestId('lib-legend')).toHaveCount(0);
   await expect(lib.locator('.lib-group')).toHaveCount(3);
   await expect(lib.locator('.lib-group h3')).toHaveText(['Old and tested', 'Practical', 'Novel and creative']);
   const classic = lib.locator('.lib-group[data-kind="classic"]');
   await expect(classic.locator('.lib-row')).toHaveCount(5);
   await expect(classic.locator('.lib-row').first()).toContainText('12-1 momentum');
   await expect(classic.locator('.lib-row').first()).toContainText('Held up');
+  await expect(classic.locator('.lib-row').first().getByTestId('lib-bench')).toHaveText('Measured against the S&P 500 (SPY)');
+  await expect(classic.locator('.lib-row', { hasText: 'Profitability and quality tilt' }).getByTestId('lib-bench')).toHaveText('Measured against the US stock market');
+  await expect(lib.locator('.lib-row:visible').getByTestId('lib-bench')).toHaveCount(await lib.locator('.lib-row:visible').count());
   await expect(classic.locator('.lib-row').first()).toContainText('+3.1 pts a year');
   await expect(classic.locator('.lib-row').first()).toContainText('Ahead by 3.1 points a year out of sample, more than luck explains across 212 tries.');
   await expect(classic.locator('.lib-row').first()).toHaveAttribute('href', '/strategies/momentum-12-1');
@@ -478,4 +483,41 @@ test('the next links chain from the Bridge through the desk and back', async ({ 
   await expect(page.getByTestId('guide')).toContainText('A ranked list of what is worth buying or watching');
   await page.getByTestId('guide-next').click();
   await expect(page).toHaveURL(/\/decisions$/);
+});
+
+test('an older desk note gets the Held up legend above it, once', async ({ page }) => {
+  const LIB = JSON.parse(readFileSync(new URL('../src/fixtures/lab.library.json', import.meta.url), 'utf8'));
+  await page.route('**/api/lab/library*', (route) => route.fulfill({ json: { ...LIB, note: 'Every result is out of sample.' } }));
+  await page.goto('/strategies');
+  const lib = page.getByTestId('library');
+  await expect(lib.getByTestId('lib-legend')).toHaveText('Held up means it beat its benchmark on years it was never tuned on, by more than luck allows across everything tried. The last two years are held back.');
+  await expect(lib.getByTestId('lib-note')).toHaveText('Every result is out of sample.');
+  await expect(lib.getByText(/Held up means/)).toHaveCount(1);
+});
+
+test('a library of 60 stays short: three rows a kind with counts, the rest behind Show all', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/strategies?scenario=big');
+  const lib = page.getByTestId('library');
+  await expect(lib.locator('.card-head .chip')).toContainText('59 of 61 tested');
+  await expect(lib.locator('.lib-group')).toHaveCount(3);
+  for (const kind of ['classic', 'practical', 'novel']) await expect(lib.locator(`.lib-group[data-kind="${kind}"] .lib-row`)).toHaveCount(3);
+  await expect(lib.locator('.lib-group[data-kind="classic"] .lib-head')).toContainText('24 tested · 4 held up');
+  await expect(lib.locator('.lib-row').getByTestId('lib-bench')).toHaveCount(9);
+  await expect(lib.locator('.lib-group[data-kind="novel"] .lib-row').first().getByTestId('lib-bench')).toHaveText('Measured against small caps (IWM)');
+  const short = await lib.boundingBox();
+  const view = page.viewportSize();
+  expect(short.height / view.height).toBeLessThanOrEqual(view.width < 600 ? 2.4 : 1.6);
+  await lib.locator('.lib-group[data-kind="classic"]').getByRole('button', { name: 'Show all 24' }).click();
+  await expect(lib.locator('.lib-group[data-kind="classic"] .lib-row')).toHaveCount(24);
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+
+  await page.goto('/?scenario=big');
+  const door = page.getByTestId('morning').locator('[data-door="strategies"]');
+  await expect(door).toContainText('59 of 61');
+  await expect(door).toContainText('10 held up out of sample');
+  const b = await overflow(page);
+  expect(b.scroll).toBeLessThanOrEqual(b.view);
+  expect(errors).toEqual([]);
 });

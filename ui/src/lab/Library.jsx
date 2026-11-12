@@ -1,21 +1,24 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
-import { excessWords, libraryChip, libraryGroups, whenWords } from '../lib/morning.js';
-
-const TOP = 5;
+import { benchmarkWords, excessWords, libraryChip, libraryGroups, libraryLegend, libraryTop, whenWords } from '../lib/morning.js';
 
 function Row({ r }) {
   const chip = libraryChip(r);
   const excess = excessWords(r);
+  const bench = benchmarkWords(r.benchmark);
   const body = (
     <>
       <span className="l">
         <span style={{ minWidth: 0 }}>
           <b>{r.title}</b>
+          {bench ? (
+            <small className="lib-bench" data-testid="lib-bench">
+              {bench}
+            </small>
+          ) : null}
           <small>
             {r.family}
-            {r.benchmark ? ` · against ${r.benchmark}` : ''}
             {r.research_only ? ' · research data, not a fund you can buy' : ''}
           </small>
           <small className="lib-desc">{r.description}</small>
@@ -44,9 +47,9 @@ function Row({ r }) {
   );
 }
 
-function Group({ g }) {
+function Group({ g, top }) {
   const [all, setAll] = useState(false);
-  const shown = all ? g.rows : g.rows.slice(0, TOP);
+  const shown = all ? g.rows : g.rows.slice(0, top);
   return (
     <div className="lib-group" data-kind={g.key}>
       <div className="lib-head">
@@ -58,7 +61,7 @@ function Group({ g }) {
           <Row r={r} key={r.id} />
         ))}
       </div>
-      {g.rows.length > TOP ? (
+      {g.rows.length > top ? (
         <button type="button" className="link lib-more" onClick={() => setAll((v) => !v)} aria-expanded={all}>
           {all ? 'Show fewer' : `Show all ${g.rows.length}`}
         </button>
@@ -86,6 +89,8 @@ export function Library({ api }) {
   const groups = libraryGroups(d);
   const fresh = whenWords(d.as_of);
   const c = d.counts || {};
+  const legend = libraryLegend(d);
+  const top = libraryTop(d);
   return (
     <section className="card library" data-testid="library">
       <div className="card-head">
@@ -94,8 +99,17 @@ export function Library({ api }) {
           <span className="chip">{c.tested ? `${c.tested} of ${c.total} tested${fresh ? ` · ${fresh} ET` : ''}` : `${c.total || 0} waiting for their first run`}</span>
         </span>
       </div>
-      {d.note ? <p className="muted lib-note">{d.note}</p> : null}
-      {groups.length ? groups.map((g) => <Group g={g} key={g.key} />) : <p className="empty-hint">The library is empty. It fills in with the next desk update.</p>}
+      {legend ? (
+        <p className="lib-note" data-testid="lib-legend">
+          {legend}
+        </p>
+      ) : null}
+      {d.note ? (
+        <p className={legend ? 'muted lib-note' : 'lib-note'} data-testid="lib-note">
+          {d.note}
+        </p>
+      ) : null}
+      {groups.length ? groups.map((g) => <Group g={g} top={top} key={g.key} />) : <p className="empty-hint">The library is empty. It fills in with the next desk update.</p>}
     </section>
   );
 }

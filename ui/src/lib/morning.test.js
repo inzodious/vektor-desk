@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { excessWords, holdingsDoor, libraryChip, libraryGroups, nightSteps, opportunitiesDoor, passWords, strategiesDoor, whenWords } from './morning.js';
+import { LIB_LEGEND, benchmarkWords, excessWords, holdingsDoor, libraryChip, libraryGroups, libraryLegend, libraryTop, nightSteps, opportunitiesDoor, passWords, strategiesDoor, whenWords } from './morning.js';
 import { guideFor } from './guide.js';
 import { earningsLine, entryLine, heldLine, inQueue, opportunityGroups, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
 import { holdingChip } from './research.js';
@@ -51,6 +51,31 @@ describe('this morning', () => {
     expect(holdingsDoor(ok({ held: 5, analysed: 0, line: 'The first pass runs tonight.' }), NOW)).toMatchObject({ state: 'waiting', count: '0 of 5', fresh: null, tone: '' });
     expect(opportunitiesDoor(ok({ counts: { total: 1 }, headline: '1 worth buying now.', freshness: { night_run_at: null }, built_at: '2026-11-12T10:05:00Z' }), NOW)).toEqual({ state: 'ready', count: '1', unit: 'idea', line: '1 worth buying now.', fresh: 'Today, 5:05 AM' });
     expect(opportunitiesDoor(ok({ counts: { total: 0 }, headline: 'No list yet.', note: 'No list yet: the engine has not run.', rows: [] }), NOW)).toEqual({ state: 'waiting', count: '0', unit: 'ideas', line: 'No list yet: the engine has not run.', fresh: null });
+  });
+
+  it('says what a row was measured against in plain words', () => {
+    expect(benchmarkWords('S&P 500 (SPY)')).toBe('Measured against the S&P 500 (SPY)');
+    expect(benchmarkWords('SPY')).toBe('Measured against the S&P 500 (SPY)');
+    expect(benchmarkWords('US stock market (French)')).toBe('Measured against the US stock market');
+    expect(benchmarkWords('Small caps (IWM)')).toBe('Measured against small caps (IWM)');
+    expect(benchmarkWords('The same deposits, invested plainly')).toBe('Measured against the same deposits, invested plainly');
+    expect(benchmarkWords('Investing it all on day one')).toBe('Measured against investing it all on day one');
+    expect(benchmarkWords('Your plan’s mix')).toBe('Measured against your plan’s mix');
+    expect(benchmarkWords('QQQ')).toBe('Measured against QQQ');
+    expect(benchmarkWords('')).toBeNull();
+    expect(benchmarkWords(null)).toBeNull();
+  });
+
+  it('adds the Held up legend only when the desk note does not carry it, and shortens a long library', () => {
+    const tested = [{ status: 'tested' }];
+    expect(libraryLegend({ rows: tested, note: 'Every result is out of sample.' })).toBe(LIB_LEGEND);
+    expect(libraryLegend({ rows: tested, note: null })).toBe(LIB_LEGEND);
+    expect(libraryLegend({ rows: tested, note: 'The last two years are held back. Held up means ahead of its benchmark by more than luck allows.' })).toBeNull();
+    expect(libraryLegend({ rows: [{ status: 'waiting' }], note: 'Nothing has run yet.' })).toBeNull();
+    expect(libraryLegend(null)).toBeNull();
+    expect(libraryTop({ rows: Array(30).fill({}) })).toBe(5);
+    expect(libraryTop({ rows: Array(31).fill({}) })).toBe(3);
+    expect(libraryTop(null)).toBe(5);
   });
 
   it('groups the library by kind and words each result', () => {

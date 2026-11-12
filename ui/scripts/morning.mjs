@@ -16,7 +16,12 @@ const KINDS = [
   { key: 'novel', title: 'Novel and creative' },
 ];
 const SPY = 'S&P 500 (SPY)';
-const MIX = 'Safe mix';
+const MIX = 'Your plan’s mix';
+const MARKET = 'US stock market (French)';
+const SMALL = 'Small caps (IWM)';
+const PLAIN = 'The same deposits, invested plainly';
+const LUMP = 'Investing it all on day one';
+const LIB_NOTE = 'Every number here is out of sample: from periods the strategy was not tuned on. The last two years of data are held back and untouched. Held up means ahead of its benchmark by more than luck allows across every variant tried in the library.';
 const LIB = [
   ['buy-hold-total', 'Buy and hold the total market', 'classic', 'Buy and hold', 'Buy the whole market and never touch it.', SPY, 'within_noise', 0.1],
   ['sixty-forty', '60/40 stocks and bonds', 'classic', 'Allocation', 'Sixty percent stocks, forty percent bonds, rebalanced once a year.', SPY, 'fell_short', -2.4],
@@ -24,23 +29,23 @@ const LIB = [
   ['momentum-12-1', '12-1 momentum', 'classic', 'Momentum', 'Each month buy what rose most over the past year, skipping the last month.', SPY, 'held_up', 3.1],
   ['dual-momentum', 'Dual momentum', 'classic', 'Momentum', 'Own the stronger of US and international stocks, or bonds when both lag cash.', SPY, 'within_noise', 1.2],
   ['low-vol', 'Low volatility', 'classic', 'Low volatility', 'Own the calmest fifth of large companies.', SPY, 'within_noise', 0.4],
-  ['value-tilt', 'Value tilt', 'classic', 'Factor tilt', 'Lean toward cheap companies using the French value series.', SPY, 'fell_short', -1.1],
-  ['size-tilt', 'Small company tilt', 'classic', 'Factor tilt', 'Lean toward small companies.', SPY, 'fell_short', -1.8],
-  ['quality-tilt', 'Profitability and quality tilt', 'classic', 'Factor tilt', 'Lean toward profitable companies that invest carefully.', SPY, 'held_up', 2.2],
+  ['value-tilt', 'Value tilt', 'classic', 'Factor tilt', 'Lean toward cheap companies using the French value series.', MARKET, 'fell_short', -1.1],
+  ['size-tilt', 'Small company tilt', 'classic', 'Factor tilt', 'Lean toward small companies.', MARKET, 'fell_short', -1.8],
+  ['quality-tilt', 'Profitability and quality tilt', 'classic', 'Factor tilt', 'Lean toward profitable companies that invest carefully.', MARKET, 'held_up', 2.2],
   ['sector-rotation', 'Sector rotation', 'classic', 'Momentum', 'Hold the three strongest sectors and rotate monthly.', SPY, 'inconclusive', null],
   ['risk-parity', 'Risk parity', 'classic', 'Allocation', 'Size stocks and bonds so each carries the same risk.', MIX, 'within_noise', 0.3],
   ['vol-target', 'Volatility targeting', 'classic', 'Allocation', 'Hold less when markets are jumpy, more when they are calm.', SPY, 'within_noise', 0.8],
   ['dip-5', 'Buy the 5% dip', 'practical', 'Dip buying', 'Hold cash back and put it in after a 5% drop from the high.', SPY, 'fell_short', -0.9],
   ['dip-10', 'Buy the 10% dip', 'practical', 'Dip buying', 'Hold cash back and put it in after a 10% drop from the high.', SPY, 'fell_short', -1.6],
-  ['deposit-monthly', 'Monthly deposit versus lump sum', 'practical', 'Deposits', 'Spread a year of deposits monthly, or invest it all on day one.', SPY, 'rule', null],
+  ['deposit-monthly', 'Monthly deposit versus lump sum', 'practical', 'Deposits', 'Spread a year of deposits monthly, or invest it all on day one.', LUMP, 'rule', null],
   ['rebalance-band-5', 'Rebalance at a 5-point band', 'practical', 'Rebalancing', 'Leave the mix alone until a fund drifts 5 points, then bring it back.', MIX, 'held_up', 0.9],
   ['rebalance-yearly', 'Rebalance once a year', 'practical', 'Rebalancing', 'Bring every fund back to target each January.', MIX, 'within_noise', 0.2],
   ['as-held', 'Your book as held', 'practical', 'Buy and hold', 'What you own today, held with no changes.', SPY, 'within_noise', 0.5],
   ['safe-mix', 'The safe mix', 'practical', 'Allocation', 'The plan’s four-fund mix at its targets.', SPY, 'fell_short', -0.7],
   ['tech-tilt', 'Aggressive tech tilt', 'practical', 'Factor tilt', 'The safe mix with a quarter moved into technology.', SPY, 'within_noise', 1.9],
   ['trend-dip', 'Trend-filtered dip buying', 'novel', 'Dip buying', 'Buy the dip only while the market is still above its 200-day average.', SPY, 'held_up', 1.7],
-  ['insider-momentum', 'Insider clusters with momentum', 'novel', 'Insiders', 'Buy when three insiders buy within a month and the stock is already rising.', SPY, 'within_noise', 2.6],
-  ['drawdown-boost', 'Deposit boost in drawdowns', 'novel', 'Deposits', 'Double the monthly deposit while the market is 15% off its high.', SPY, 'rule', null],
+  ['insider-momentum', 'Insider clusters with momentum', 'novel', 'Insiders', 'Buy when three insiders buy within a month and the stock is already rising.', SMALL, 'within_noise', 2.6],
+  ['drawdown-boost', 'Deposit boost in drawdowns', 'novel', 'Deposits', 'Double the monthly deposit while the market is 15% off its high.', PLAIN, 'rule', null],
   ['breakout-vol-cap', '52-week-high breakout with a volatility cap', 'novel', 'Breakout', 'Buy new 52-week highs, but only in stocks calmer than the market.', SPY, 'fell_short', -0.4],
   ['pead-insiders', 'Earnings drift where insiders also bought', 'novel', 'Earnings', 'Hold for 60 days after a strong earnings surprise when insiders bought too.', SPY, 'waiting', null],
   ['discount-entries', 'Discount-day entries', 'novel', 'Dip buying', 'Buy names the discount scan flags, sized by the caps, and hold a year.', SPY, 'not_run', null],
@@ -72,7 +77,7 @@ function libraryRow([id, title, kind, family, description, benchmark, outcome, e
     out_of_sample: tested && !rule && excess != null ? { start: '2019-01-02', end: '2026-11-06', ann_return_pct: 11.2 + excess, excess_pts: excess, sharpe: 0.71 + excess / 20, mdd_pct: -24.5 } : null,
     noise: tested && !rule && excess != null ? { trials: 212, excess_total_pts: excess * 7.8, band_total_pts: 12.4, luck: Math.abs(excess * 7.8) < 12.4 } : null,
     rule: rule && tested ? { horizon_years: 10, starts: 100, p5_pts: -3.2, p50_pts: id === 'deposit-monthly' ? -1.4 : 0.8, p95_pts: 4.1, share_better: id === 'deposit-monthly' ? 0.32 : 0.81 } : null,
-    research_only: family === 'Insiders' || family === 'Earnings',
+    research_only: benchmark === MARKET,
     yardstick: false,
     outdated: tested && id === 'dual-momentum',
     caveats: family === 'Insiders' ? ['Insider filings arrive up to two days late.'] : [],
@@ -85,14 +90,43 @@ function library(rows) {
   return {
     as_of: rows.some((r) => r.status === 'tested') ? at('08:12:00') : null,
     trials: 212,
-    note: rows.some((r) => r.status === 'tested') ? 'Every result is out of sample. The bar for “held up” rises with every strategy tried: 212 so far.' : 'Nothing has run yet. The lab works through the list tonight, from 1 AM.',
+    note: rows.some((r) => r.status === 'tested') ? LIB_NOTE : 'Nothing has run yet. The lab works through the list tonight, from 1 AM.',
     counts: { outdated: n((r) => r.outdated), total: rows.length, tested: n((r) => r.status === 'tested'), held_up: n((r) => r.verdict === 'held_up'), within_noise: n((r) => r.verdict === 'within_noise'), fell_short: n((r) => r.verdict === 'fell_short'), inconclusive: n((r) => r.verdict === 'inconclusive'), waiting: n((r) => r.status === 'waiting'), not_run: n((r) => r.status === 'not_run') },
     kinds: KINDS,
     rows,
   };
 }
 
+// ---------- a long library: about 60 entries ----------
+const MORE = [
+  ['classic', 'Momentum', 'Sector momentum', 'Hold the three sectors that rose most over the past {n} months.', SPY, [3, 6, 9]],
+  ['classic', 'Trend', 'Moving-average trend filter', 'Hold stocks above their {n}-day average, bonds below it.', SPY, [50, 100, 150]],
+  ['classic', 'Low volatility', 'Calmest sectors', 'Own the three sectors that moved least over {n} days.', SPY, [63, 126, 252]],
+  ['classic', 'Factor tilt', 'Value and momentum blend', 'Mix cheap and rising companies, rebalanced every {n} months.', MARKET, [1, 3, 12]],
+  ['practical', 'Dip buying', 'Buy the drop', 'Hold cash back and put it in after a {n}% drop from the high.', PLAIN, [3, 7, 15]],
+  ['practical', 'Rebalancing', 'Rebalance at a band', 'Leave the mix alone until a fund drifts {n} points, then bring it back.', MIX, [3, 8, 10]],
+  ['practical', 'Deposits', 'Split the deposit', 'Put each deposit in over {n} weeks instead of at once.', LUMP, [2, 4, 8]],
+  ['practical', 'Allocation', 'Bond cushion', 'Hold {n}% in bonds and the rest in the total market.', SPY, [10, 20, 30]],
+  ['novel', 'Insiders', 'Insider clusters', 'Buy small companies when {n} insiders buy within a month.', SMALL, [2, 4, 5]],
+  ['novel', 'Breakout', 'Breakout with a trend filter', 'Buy new {n}-week highs while the market is above its 200-day average.', SPY, [13, 26, 52]],
+  ['novel', 'Dip buying', 'Sector dip rotation', 'Each month buy the three sectors furthest below their {n}-day high.', SPY, [63, 126, 252]],
+  ['novel', 'Momentum', 'Small-company momentum', 'Buy the small companies that rose most over {n} months.', SMALL, [3, 6]],
+];
+const SPREAD = ['within_noise', 'fell_short', 'held_up', 'within_noise', 'fell_short', 'within_noise', 'inconclusive', 'fell_short'];
+const BIG = [
+  ...LIB,
+  ...MORE.flatMap(([kind, family, title, description, benchmark, ns], i) =>
+    ns.map((n, j) => {
+      const outcome = SPREAD[(i * 3 + j) % SPREAD.length];
+      const excess = outcome === 'held_up' ? 1.4 + j * 0.5 : outcome === 'within_noise' ? 0.2 + j * 0.3 : outcome === 'fell_short' ? -0.6 - j * 0.4 : null;
+      return [`${title.toLowerCase().replace(/[^a-z]+/g, '-')}-${n}`, `${title}, ${n}`, kind, family, description.replace('{n}', n), benchmark, outcome, excess];
+    }),
+  ),
+];
+
 const ORDER = ['held_up', 'within_noise', 'inconclusive', 'fell_short', null];
+const libraryOrder = (a, b) => KINDS.findIndex((k) => k.key === a.kind) - KINDS.findIndex((k) => k.key === b.kind) || ORDER.indexOf(a.verdict) - ORDER.indexOf(b.verdict) || (b.out_of_sample?.excess_pts ?? -99) - (a.out_of_sample?.excess_pts ?? -99);
+const big = BIG.map(libraryRow).sort(libraryOrder);
 const tested = LIB.map(libraryRow).sort((a, b) => KINDS.findIndex((k) => k.key === a.kind) - KINDS.findIndex((k) => k.key === b.kind) || ORDER.indexOf(a.verdict) - ORDER.indexOf(b.verdict) || (b.out_of_sample?.excess_pts ?? -99) - (a.out_of_sample?.excess_pts ?? -99));
 const waiting = LIB.map((r) => libraryRow([...r.slice(0, 6), 'waiting', null])).map((r) => ({ ...r, reason: 'In tonight’s queue. The lab starts at 1 AM.' }));
 
@@ -376,7 +410,7 @@ const overnight = {
 const overnightIdle = { ...overnight, night: '2026-11-09', state: 'idle', started_at: null, finished_at: null, build: null, summary: 'Tonight’s run starts at 23:30.', steps: overnight.steps.map((s) => step(s.id, s.title, 'waiting')), ready: [] };
 
 export function morningFixtures() {
-  return { 'lab.library': library(tested), 'lab.library.fresh': library(waiting), 'lab.library.never': library(waiting), 'agents.holdings': holdings, 'agents.holdings.fresh': holdingsFresh, 'agents.holdings.never': holdingsFresh, opportunities, 'opportunities.evening': opportunitiesDebit, 'opportunities.fresh': opportunitiesFresh, 'opportunities.never': opportunitiesFresh, overnight, 'overnight.fresh': overnightIdle, 'overnight.never': overnightIdle, 'decisions.cleared': cleared, 'decisions.cleared.fresh': clearedNone, 'decisions.cleared.never': clearedNone, 'decisions.cleared.empty': clearedNone, 'decisions.notes': notes, 'decisions.notes.fresh': { count: 0, days: 7, items: [] }, 'decisions.notes.never': { count: 0, days: 7, items: [] }, 'decisions.notes.empty': { count: 0, days: 7, items: [] }, ...dossierFixtures() };
+  return { 'lab.library': library(tested), 'lab.library.big': library(big), 'lab.library.fresh': library(waiting), 'lab.library.never': library(waiting), 'agents.holdings': holdings, 'agents.holdings.fresh': holdingsFresh, 'agents.holdings.never': holdingsFresh, opportunities, 'opportunities.evening': opportunitiesDebit, 'opportunities.fresh': opportunitiesFresh, 'opportunities.never': opportunitiesFresh, overnight, 'overnight.fresh': overnightIdle, 'overnight.never': overnightIdle, 'decisions.cleared': cleared, 'decisions.cleared.fresh': clearedNone, 'decisions.cleared.never': clearedNone, 'decisions.cleared.empty': clearedNone, 'decisions.notes': notes, 'decisions.notes.fresh': { count: 0, days: 7, items: [] }, 'decisions.notes.never': { count: 0, days: 7, items: [] }, 'decisions.notes.empty': { count: 0, days: 7, items: [] }, ...dossierFixtures() };
 }
 
 // ---------- write ----------
