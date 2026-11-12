@@ -97,10 +97,11 @@ def test_check_lines_name_the_fix_and_walk_the_stages(cfg):
         "  review: Engine review not yet",
         "  desks: Agents run recap failed 17:52",
         "  paper: no job yet",
+        "  overnight: no job yet",
     ]
     entries = jobrun.catalogue(jobs)
     assert entries["agents-run-recap"].refreshes == ["debrief"] and entries["engine-review"].refreshes == ["reviews"]
-    assert entries["engine-quotes"].stage is None and jobrun.describe(cfg, jobs)["stages"] == ["mirror", "engine", "review", "desks", "paper"]
+    assert entries["engine-quotes"].stage is None and jobrun.describe(cfg, jobs)["stages"] == ["mirror", "engine", "review", "desks", "paper", "overnight"]
 
 
 def test_ops_alert_goes_out_once_a_day_while_reviews_are_behind(cfg):
