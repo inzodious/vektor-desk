@@ -1,16 +1,18 @@
 import argparse
 import json
 import os
+import secrets
 import shutil
 import sqlite3
 import sys
 import tempfile
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import requests
 
+from desk import jobrun
 from desk.config import Config
 from desk.db import connect
 from desk.engine import ENGINE_VERSION, asof, broker, core, discounts, earnings, filings, french, insider, lane, paper_exec, review, schema, triggers, universe
@@ -29,6 +31,9 @@ from desk.runlock import BUSY, Busy, job_lock
 
 DRY_RUN = "DESK_ENGINE_DRY_RUN"
 DRY_JOBS = ("holdings", "core", "daily", "history")
+RESTATE_RETRY = timedelta(hours=1)
+RESTATE_WAIT = 900
+DEBRIEF_JOB = "agents-run-debrief"
 
 
 def now_iso() -> str:
@@ -95,22 +100,65 @@ def run_closes(cfg: Config) -> dict:
         desk.close()
 
 
-def run_restate(cfg: Config) -> dict:
+def _restate_check(cfg: Config) -> tuple[dict, dict | None]:
     desk = connect(cfg.desk_db)
     try:
         schema.apply(desk)
         check = asof.pending(desk)
-        last = desk.execute("SELECT detail FROM engine_runs WHERE job='restate' AND ok=1 ORDER BY id DESC LIMIT 1").fetchone()
+        last = desk.execute("SELECT ok, finished_at, detail FROM engine_runs WHERE job='restate' ORDER BY id DESC LIMIT 1").fetchone()
+        return check, dict(last) if last else None
     finally:
         desk.close()
+
+
+def _restate_skip(check: dict, last: dict | None) -> str | None:
     if not check["due"]:
-        return {"ok": True, "skipped": check["why"]}
-    if last and json.loads(last["detail"] or "{}").get("signature") == check["signature"]:
-        return {"ok": True, "skipped": "Already restated on these closes and quotes."}
-    started = now_iso()
-    daily = run_daily(cfg)
+        return check["why"]
+    if not last or json.loads(last["detail"] or "{}").get("signature") != check["signature"]:
+        return None
+    if last["ok"]:
+        return "Already restated on these closes and quotes."
+    try:
+        age = datetime.now(UTC) - datetime.fromisoformat(last["finished_at"])
+    except (TypeError, ValueError):
+        return None
+    return "The last try on these closes failed; trying again an hour after it." if age < RESTATE_RETRY else None
+
+
+def _ask_for(cfg: Config, job: str) -> str:
+    folder = jobrun.requests_dir(cfg)
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        fd = os.open(folder / f"{job}.json", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
+    except FileExistsError:
+        return "already asked"
+    except OSError as e:
+        return f"not asked: {e!r}"
+    with os.fdopen(fd, "w") as f:
+        json.dump({"id": secrets.token_hex(6), "requested_at": jobrun.stamp(jobrun.now_utc()), "client": "restate"}, f)
+    return "asked"
+
+
+def run_restate(cfg: Config) -> dict:
+    check, last = _restate_check(cfg)
+    skip = _restate_skip(check, last)
+    if skip:
+        return {"ok": True, "skipped": skip}
+    try:
+        with job_lock("engine-daily", wait=RESTATE_WAIT, cfg=cfg):
+            check, last = _restate_check(cfg)
+            skip = _restate_skip(check, last)
+            if skip:
+                return {"ok": True, "skipped": skip}
+            started = now_iso()
+            daily = run_daily(cfg)
+    except Busy:
+        return {"ok": True, "skipped": "The daily pass is still running; the next check looks again."}
     reviewed = run_review(cfg) if daily.get("ok") else {"ok": False, "skipped": "the daily pass failed"}
-    result = {"ok": bool(daily.get("ok") and reviewed.get("ok")), "why": check["why"], "signature": check["signature"], "daily": daily, "review": reviewed}
+    ok = bool(daily.get("ok") and reviewed.get("ok"))
+    after = _restate_check(cfg)[0]
+    result = {"ok": ok, "why": check["why"], "signature": check["signature"], "from": check["day"], "to": after.get("day")}
+    result |= {"daily": daily, "review": reviewed, "debrief": _ask_for(cfg, DEBRIEF_JOB) if ok and os.environ.get(DRY_RUN) != "1" else "not asked"}
     desk = connect(cfg.desk_db)
     try:
         with desk:

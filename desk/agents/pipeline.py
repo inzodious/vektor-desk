@@ -285,7 +285,7 @@ def run_proposal_desk(
     summary = wording.tidy(str(answer.get("summary") or ""))
     answer = answer | {"summary": summary}
     proposals = [p for p in answer.get("proposals") or () if isinstance(p, dict)]
-    store.save_brief(cfg, outcome.run_id, name, slice_.get("as_of"), digest, version, summary, json.dumps(answer, sort_keys=True))
+    store.save_brief(cfg, outcome.run_id, name, slice_.get("data_as_of") or slice_.get("as_of"), digest, version, summary, json.dumps(answer, sort_keys=True))
     if name == "research" and isinstance(answer.get("dossier"), dict):
         dossier = {k: wording.tidy_all(v) for k, v in answer["dossier"].items()}
         dossier_symbol = dossier.get("symbol") or symbol

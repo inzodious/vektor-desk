@@ -452,7 +452,7 @@ Code: `desk.engine.preflight.check_trade(cfg, trade, ticket_id=None)`; the trade
 | Concentration | A buy opens a new single stock, takes one past its band (default: the satellite cap), or takes all single stocks past `opportunity.satellite_cap_pct` | A sale leaves one past its band; a buy of a symbol whose kind is unknown |
 | Conviction hold | A buy of the symbol that ends above `band_max_pct`, or any margin-funded buy of it (also breaks the hold in Plan rules). The symbol is left out of the single-stock band and the satellite total | Nothing; inside or under the band is ok |
 | Drift after | | Largest drift grows past the drift limit |
-| Funding | A buy is margin-funded or cash runs short, with the monthly interest in dollars and the drop to a call | |
+| Funding | A buy is margin-funded or cash runs short, with the monthly interest in dollars and the drop to a call. Cash and debit come from the same `desk.engine.cash.picture` as `cash.ready` and `margin.debit`, so "Cash covers" is the account's ready cash. A cash buy with no account named is checked against the account holding the most ready cash | |
 | Wash sales | A buy within 30 days of a loss sale of that symbol; a loss sale within 30 days of a buy of it in any account | A scheduled deposit or dividend reinvest would buy it back; a possibly identical fund |
 | Lots and tax | | No lot export; lots cover fewer shares than the sale; a harvest that realizes a gain |
 | Plan rules | A buy breaks a rule that held before | A sale breaks one; a rule already off before and no worse |
@@ -699,7 +699,9 @@ Module `desk.engine.asof`. Every page reads one day and one time from `GET /api/
 | Provisional | A day is provisional while any of its prices come from `closes_provisional`. A symbol with no quote (mutual funds) carries its last close and is listed in `prices.carried` |
 | Restated | Mirror closes and Tiingo bars always win over a provisional close. `restate` reruns the day when they land and the provisional rows are dropped; rows older than 7 days are dropped anyway |
 | Quotes | Held symbols, SPY and every live catalog mix symbol, so the yardsticks move on the provisional day too. One extra fetch right after the close settles the closing price |
-| Catch-up | A book older than the last finished session moves by itself on the next daily or `restate` run, from stored quotes or bars |
+| Catch-up | `restate` checks every 5 minutes, at any hour (`2-57/5 * * * *`). A book older than the last finished session moves on that check, from stored closing quotes or bars, so the book is on today within minutes of the close. It takes the daily pass's lock and looks again once it has it, so it never runs on top of a daily pass; as a heavy job it waits its turn in low-memory mode and during the overnight run. A try that failed waits an hour before the same closes are tried again |
+| After a catch-up | The review runs in the same job, and the Debrief desk is asked for through the job request folder (`agents-run-debrief`); it writes only when the pack changed |
+| Dates | Every date a page shows is the desk's day in Eastern time (`market.et_day`, `market.session_day`), never the UTC date. The Race to live `as_of` is capped at the last session; a mix that enters tomorrow reads today. A brief is stored under the data day it was built from, not the run's timestamp |
 
 **`GET /api/asof`.** `{day, at, provisional, status (final, provisional, empty), words, previous_day, expected_day, behind (null or {sessions, reason}), prices {official, quoted, carried}, numbers {value, day_change, day_change_pct, cash_ready, cash_pending, cash_pending_days, margin_debit, margin_cost_month}, live, market {state, day}, review {day, computed_at}, debrief {day, written_at, stale}}`. `numbers` are the metric values at `day`. `live` is `{day, state, at, value, day_change, day_change_pct, words}` only while quotes belong to a later session than `day`; null means the book already covers it, so pages show `numbers`.
 
@@ -1050,7 +1052,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Nightly 23:50 ET | `earnings`: EPS facts and release times for 300 companies, then every surprise event |
 | Weekdays 08:45 and 16:45 ET | `paper`: lanes and catalog mixes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
-| Nightly 01:25 to 06:25 ET, hourly | `restate`: exits at once unless official closes landed for a provisional day or the book is behind the last finished session; then the daily pass and the review run again. Never twice on the same closes |
+| Every 5 minutes, any hour | `restate` ("Catch the book up"): exits at once unless official closes landed for a provisional day or the book is behind the last finished session; then the daily pass and the review run again and the debrief is asked for. Never twice on the same closes |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
 | Nightly 00:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 

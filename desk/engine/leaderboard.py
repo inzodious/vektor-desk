@@ -1,13 +1,14 @@
 import json
 import math
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 
 from desk.config import Config
 from desk.db import connect
 from desk.engine.gate import LUCK_BAR, PAPER_DAYS, STEP_DAYS
 from desk.engine.lab.data import ledger_path
 from desk.engine.lane import BENCHMARK
+from desk.engine.market import session_day
 
 EMPTY_NOTE = "No strategies are paper trading yet. The filings lane starts the morning after the first filing is scored."
 STATUS_RANK = {"eligible": 0, "paper": 1, "retired": 2}
@@ -143,7 +144,7 @@ def _order(row: dict) -> tuple:
     return (STATUS_RANK.get(row["status"], 3), row["young"], score is None, -(score or 0), -row["days_live"], row["id"])
 
 
-def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict] | None = None) -> dict:
+def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict] | None = None, *, now: datetime | None = None) -> dict:
     base = {
         "as_of": None,
         "benchmark": BENCHMARK,
@@ -159,6 +160,7 @@ def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict
         return base
     trades, opens, accounts = _counts(conn, "paper_trades"), _counts(conn, "paper_positions"), _accounts(conn, sleeve)
     ledgers, tested = _ledgers(conn), tested or {}
+    today = session_day(now)
     rows = []
     for r in conn.execute("SELECT * FROM paper_portfolios"):
         key = (r["strategy_id"], r["version"])
@@ -181,7 +183,7 @@ def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict
                 "benchmark": summary.get("benchmark") or BENCHMARK,
                 "status": r["status"],
                 "started": r["started"],
-                "as_of": r["as_of"],
+                "as_of": min(r["as_of"], today) if r["as_of"] else r["as_of"],
                 "days_live": days,
                 "young": days < YOUNG_DAYS,
                 "checkpoint_day": upcoming.get("day"),
@@ -213,5 +215,5 @@ def build(conn: sqlite3.Connection | None, sleeve: float, tested: dict[str, dict
             groups.append({"benchmark": x["benchmark"], "rows": 0, "racing": 0})
         groups[-1]["rows"] += 1
         groups[-1]["racing"] += x["status"] != "retired"
-    as_of = max((x["as_of"] for x in rows), default=None)
+    as_of = max((x["as_of"] for x in rows if x["as_of"]), default=None)
     return base | {"as_of": as_of, "groups": groups, "rows": rows, "note": None if rows else EMPTY_NOTE}
