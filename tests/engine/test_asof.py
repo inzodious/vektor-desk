@@ -157,6 +157,10 @@ def test_the_evening_run_closes_today_from_the_closing_quotes(cfg, mirror, monke
     packs = [r[0] for r in conn.execute('SELECT "end" FROM period_reviews WHERE kind=\'day\' ORDER BY "end"')]
     conn.close()
     assert "priced from the closing quotes" in health["closes"] and "FXAIX" in health["closes"]
+    assert (
+        "until official closes land, usually the same evening; fund prices can follow the next morning. The day is restated as they land." in health["closes"]
+    )
+    assert "overnight" not in health["closes"]
     assert packs[-1] == WED
 
 
