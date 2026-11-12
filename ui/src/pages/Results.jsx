@@ -126,11 +126,21 @@ export default function Results() {
                 {state.t}
               </span>
             ) : null}
+            {pack.provisional ? (
+              <span className="chip lilac" title={pack.provisional.note || undefined} data-testid="rs-provisional">
+                Provisional
+              </span>
+            ) : null}
             {pack.quality && QUALITY[pack.quality] ? <span className="chip lilac">{QUALITY[pack.quality]}</span> : null}
           </>
         }
       />
       {end ? null : <GapNote k={`results.${kind}`} onFilled={api.reload} />}
+      {pack.provisional?.note ? (
+        <p className="note rs-cover" role="note" data-testid="rs-provisional-note">
+          {pack.provisional.note}
+        </p>
+      ) : null}
       {kind === 'day' && !end && clock && d.end < clock.day ? (
         <p className="note rs-cover" role="note" data-testid="rs-behind">
           This is the review for {dayWords(d.end)}. The one for {clock.dayWords} is not in yet; it follows the next numbers run.

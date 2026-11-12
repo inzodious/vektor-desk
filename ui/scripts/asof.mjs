@@ -85,6 +85,7 @@ const eveningReview = JSON.parse(JSON.stringify(review));
 Object.assign(eveningReview, { start: MONDAY, end: MONDAY, as_of: MONDAY, closed: true, final: false, computed_at: `${MONDAY}T22:35:12+00:00` });
 Object.assign(eveningReview.pack, { start: MONDAY, end: MONDAY, as_of: MONDAY, label: 'Mon Nov 9, 2026' });
 eveningReview.pack.value = { start: 16393.49, end: EVENING.value, change_usd: EVENING.day_change, change_pct: EVENING.day_change_pct, net_flows: 0, gain_usd: EVENING.day_change };
+eveningReview.pack.provisional = { day: MONDAY, carried: ['FXAIX'], note: 'Mon Nov 9 uses closing quotes until the official closes land overnight. FXAIX carries its last price.' };
 if (eveningReview.debrief) Object.assign(eveningReview.debrief, { headline: 'Up $87 on Monday, in step with the S&P 500.', written_at: `${MONDAY}T22:50:03+00:00`, stale: false });
 write('engine.reviews.evening.day', eveningReview);
 

@@ -53,6 +53,8 @@ test('Bridge, Results, Portfolio, Decisions and Research agree on the day, its c
   await expect(page.getByTestId('rs-change')).toHaveText(seen[0].change);
   await expect(page.getByTestId('rs-written')).toContainText('About Mon Nov 9 · written Nov 9');
   await expect(page.getByTestId('rs-behind')).toHaveCount(0);
+  await expect(page.getByTestId('rs-provisional')).toHaveText('Provisional');
+  await expect(page.getByTestId('rs-provisional-note')).toHaveText('Mon Nov 9 uses closing quotes until the official closes land overnight. FXAIX carries its last price.');
   expect(errors).toEqual([]);
 });
 
@@ -71,6 +73,7 @@ test('with the market open the Bridge headline is live and says so; every page s
   await page.goto('/results/day');
   await expect(page.getByTestId('rs-change')).toHaveText(seen[0].change);
   await expect(page.getByTestId('results')).toHaveAttribute('data-end', seen[0].day);
+  await expect(page.getByTestId('rs-provisional')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

@@ -221,7 +221,14 @@
    "progress_end_pct": 1.677,
    "change_pts": 0.005
   },
-  "events": []
+  "events": [],
+  "provisional": {
+   "day": "2026-11-09",
+   "carried": [
+    "FXAIX"
+   ],
+   "note": "Mon Nov 9 uses closing quotes until the official closes land overnight. FXAIX carries its last price."
+  }
  },
  "debrief": {
   "headline": "Up $87 on Monday, in step with the S&P 500.",
