@@ -67,7 +67,24 @@ def meminfo(path: Path | None = None, arc: Path | None = None) -> dict | None:
         "available_mb": rows["MemAvailable"] // 1024,
         "swap_mb": rows.get("SwapTotal", 0) // 1024,
         "cache_mb": _arc(arc),
+        "apps_mb": rows["AnonPages"] // 1024 if "AnonPages" in rows else None,
     }
+
+
+def claude_processes(root: Path | None = None, binary: str | None = None) -> int | None:
+    name = Path(binary or os.environ.get("DESK_CLAUDE_BIN", "claude")).name
+    try:
+        entries = [p for p in (root or PROC.parent).iterdir() if p.name.isdigit()]
+    except OSError:
+        return None
+    count = 0
+    for entry in entries:
+        try:
+            args = (entry / "cmdline").read_bytes().split(b"\0")[:2]
+        except OSError:
+            continue
+        count += any(Path(arg.decode("utf-8", "replace")).name == name for arg in args if arg)
+    return count
 
 
 def _number(path: Path) -> int | None:
@@ -352,21 +369,20 @@ def history(cfg: Config, now: datetime | None = None) -> list[dict]:
     return kept[-SAMPLE_MAX:]
 
 
-def sample(
-    cfg: Config, now: datetime | None = None, low: bool = False, running: list[str] | None = None, info: dict | None = None, group: dict | None = None
-) -> dict | None:
+def sample(cfg: Config, now: datetime | None = None, low: bool = False, running: list[str] | None = None, reading: dict | None = None) -> dict | None:
     now = now or jobrun.now_utc()
     rows = history(cfg, now)
     last = jobrun.parse_stamp(rows[-1]["at"]) if rows else None
     if last is not None and now - last < SAMPLE_EVERY - SAMPLE_SLACK:
         return None
-    info = info if info is not None else meminfo() or {}
-    group = group if group is not None else cgroup()
+    seen = reading if reading is not None else (meminfo() or {}) | {"scheduler_mb": cgroup().get("used_mb"), "claude_processes": claude_processes()}
     row = {
         "at": jobrun.stamp(now),
-        "free_mb": info.get("available_mb"),
-        "cache_mb": info.get("cache_mb"),
-        "scheduler_mb": group.get("used_mb"),
+        "free_mb": seen.get("available_mb"),
+        "cache_mb": seen.get("cache_mb"),
+        "apps_mb": seen.get("apps_mb"),
+        "scheduler_mb": seen.get("scheduler_mb"),
+        "claude_processes": seen.get("claude_processes"),
         "low": bool(low),
         "running": [str(name) for name in (running or [])[:SAMPLE_JOBS]],
     }

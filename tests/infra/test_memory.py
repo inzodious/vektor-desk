@@ -48,9 +48,28 @@ def test_reads_free_memory_swap_and_the_zfs_cache(tmp_path):
     (tmp_path / "arc").write_text(
         "13 1 0x01 147 39984 1 2\nname                            type data\nhits            4    123\nsize            4    6442450944\n"
     )
-    assert memory.meminfo(tmp_path / "meminfo", tmp_path / "arc") == {"total_mb": 15360, "available_mb": 512, "swap_mb": 0, "cache_mb": 6144}
+    assert memory.meminfo(tmp_path / "meminfo", tmp_path / "arc") == {"total_mb": 15360, "available_mb": 512, "swap_mb": 0, "cache_mb": 6144, "apps_mb": None}
+    (tmp_path / "meminfo").write_text((tmp_path / "meminfo").read_text() + "AnonPages:       9216000 kB\n")
+    assert memory.meminfo(tmp_path / "meminfo", tmp_path / "arc")["apps_mb"] == 9000
     assert memory.meminfo(tmp_path / "missing") is None
     assert memory.meminfo(tmp_path / "meminfo", tmp_path / "missing")["cache_mb"] is None
+
+
+def test_live_model_sessions_are_counted_by_their_command(tmp_path):
+    lines = {
+        "1": b"python\0-m\0desk.scheduler\0",
+        "40": b"node\0/usr/local/bin/claude\0-p\0--model\0x\0",
+        "41": b"/usr/local/bin/claude\0-p\0",
+        "42": b"python\0-m\0desk.agents\0queue\0--claude\0claude\0",
+        "43": b"",
+    }
+    for pid, line in lines.items():
+        (tmp_path / pid).mkdir()
+        (tmp_path / pid / "cmdline").write_bytes(line)
+    (tmp_path / "44").mkdir()
+    (tmp_path / "self").mkdir()
+    assert memory.claude_processes(tmp_path) == 2 and memory.claude_processes(tmp_path, "/opt/bin/other") == 0
+    assert memory.claude_processes(tmp_path / "missing") is None and isinstance(memory.claude_processes(), int)
 
 
 def test_a_kill_is_the_services_cap_or_the_whole_box(tmp_path):
@@ -69,25 +88,36 @@ def test_a_kill_is_the_services_cap_or_the_whole_box(tmp_path):
 
 # ---- The last two days ----
 
+SAMPLE = {"at", "free_mb", "cache_mb", "apps_mb", "scheduler_mb", "claude_processes", "low", "running"}
+
 
 def test_a_memory_sample_is_kept_every_five_minutes_for_two_days_and_no_longer(cfg):
     start = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
-    info, group = {"available_mb": 553, "cache_mb": 3100}, {"used_mb": 212}
-    first = memory.sample(cfg, start, low=True, running=["engine-lookthrough"], info=info, group=group)
-    assert first == {"at": "2026-11-10T12:00:00Z", "free_mb": 553, "cache_mb": 3100, "scheduler_mb": 212, "low": True, "running": ["engine-lookthrough"]}
-    assert memory.sample(cfg, start + timedelta(minutes=4), info=info, group=group) is None
-    assert memory.sample(cfg, start + timedelta(minutes=4, seconds=45), info=info, group=group)["running"] == []
+    seen = {"available_mb": 553, "cache_mb": 3100, "apps_mb": 9000, "scheduler_mb": 212, "claude_processes": 2}
+    first = memory.sample(cfg, start, low=True, running=["engine-lookthrough"], reading=seen)
+    assert first == {
+        "at": "2026-11-10T12:00:00Z",
+        "free_mb": 553,
+        "cache_mb": 3100,
+        "apps_mb": 9000,
+        "scheduler_mb": 212,
+        "claude_processes": 2,
+        "low": True,
+        "running": ["engine-lookthrough"],
+    }
+    assert memory.sample(cfg, start + timedelta(minutes=4), reading=seen) is None
+    assert memory.sample(cfg, start + timedelta(minutes=4, seconds=45), reading=seen)["running"] == []
     for n in range(2, 700):
-        assert memory.sample(cfg, start + timedelta(minutes=5 * n), info={"available_mb": n}, group={}, running=[f"job-{i}" for i in range(20)])
+        assert memory.sample(cfg, start + timedelta(minutes=5 * n), reading={"available_mb": n}, running=[f"job-{i}" for i in range(20)])
     end = start + timedelta(minutes=5 * 699)
     rows = memory.history(cfg, end)
     assert len(rows) == 576 and rows[-1]["free_mb"] == 699 and rows[-1]["scheduler_mb"] is None and len(rows[-1]["running"]) == 12
     assert jobrun.parse_stamp(rows[0]["at"]) > end - timedelta(hours=48) and memory.history_file(cfg).stat().st_size < 200_000
     assert memory.history(cfg, end + timedelta(hours=47, minutes=59)) == rows[-1:] and memory.history(cfg, end + timedelta(hours=49)) == []
-    assert memory.history(cfg, start) == [] and memory.sample(cfg, end + timedelta(days=3), info=info, group=group)["free_mb"] == 553
+    assert memory.history(cfg, start) == [] and memory.sample(cfg, end + timedelta(days=3), reading=seen)["free_mb"] == 553
     assert [r["free_mb"] for r in memory.history(cfg, end + timedelta(days=3))] == [553]
     memory.history_file(cfg).write_text("not json")
-    assert memory.history(cfg, end) == [] and memory.sample(cfg, end, info=info, group=group)["at"] == jobrun.stamp(end)
+    assert memory.history(cfg, end) == [] and memory.sample(cfg, end, reading=seen)["at"] == jobrun.stamp(end)
     memory.history_file(cfg).write_text(json.dumps({"samples": ["x", {"at": "never"}, {"free_mb": 1}]}))
     assert memory.history(cfg, end) == []
 
@@ -100,7 +130,7 @@ def test_the_scheduler_notes_memory_and_what_is_running_without_doing_it_twice(c
         monkeypatch.setitem(scheduler._LOW, "on", True)
         scheduler.remember([a, b], cfg)
         (row,) = memory.history(cfg)
-        assert row["running"] == ["engine-daily"] and row["low"] is True and set(row) == {"at", "free_mb", "cache_mb", "scheduler_mb", "low", "running"}
+        assert row["running"] == ["engine-daily"] and row["low"] is True and set(row) == SAMPLE
         due = scheduler._LOW["sample_due"]
         scheduler.remember([a, b], cfg)
         assert len(memory.history(cfg)) == 1 and scheduler._LOW["sample_due"] == due
@@ -119,8 +149,8 @@ def test_the_scheduler_notes_memory_and_what_is_running_without_doing_it_twice(c
 def test_the_memory_route_shows_the_record_only_when_asked(app_client, cfg):
     client = app_client(packages=[])
     now = jobrun.now_utc()
-    memory.sample(cfg, now - timedelta(minutes=10), running=["mirror"], info={"available_mb": 900, "cache_mb": None}, group={"used_mb": 100})
-    memory.sample(cfg, now - timedelta(minutes=5), info={"available_mb": 2400, "cache_mb": 5000}, group={"used_mb": 80})
+    memory.sample(cfg, now - timedelta(minutes=10), running=["mirror"], reading={"available_mb": 900, "scheduler_mb": 100})
+    memory.sample(cfg, now - timedelta(minutes=5), reading={"available_mb": 2400, "cache_mb": 5000, "scheduler_mb": 80})
     assert "history" not in client.get("/api/memory").json() and "history" not in client.get("/api/status").json()["memory"]
     body = client.get("/api/memory?history=1").json()
     assert body["history"]["every_minutes"] == 5 and body["history"]["keeps_hours"] == 48 and body["state"] in ("ok", "tight", "unknown")
