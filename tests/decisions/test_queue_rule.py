@@ -3,8 +3,9 @@ from datetime import timedelta
 
 import pytest
 
-from desk.decisions import create_proposal, desk_history, draft, get, journal, notes, queue, snooze, summary
-from desk.decisions.__main__ import main, night
+from desk.decisions import cleared, create_proposal, desk_history, draft, get, journal, notes, queue, snooze, summary
+from desk.decisions.__main__ import main, night, sync
+from desk.decisions.plans import save_plan
 from desk.decisions.records import subject_of
 from desk.decisions.schema import SCHEMA
 from desk.decisions.store import session
@@ -240,3 +241,70 @@ def test_an_older_database_gains_the_new_columns(cfg):
     with session(cfg) as conn:
         assert {"subject", "as_of", "valid", "replaced_by"} <= {r[1] for r in conn.execute("PRAGMA table_info(decisions)")}
     assert get(cfg, "d_old")["as_of"] == "2026-11-01T00:00:00+00:00"
+
+
+# ---- Items that pull against his plan ----
+
+PLAN = {
+    "role": "conviction",
+    "thesis": "Made-up thesis for a test.",
+    "steps": [
+        {"id": "harvest", "kind": "harvest", "due": "2026-12-07", "until": "2026-12-15", "shares": 40, "lots": "highest_cost", "account": "Brokerage"},
+        {"id": "repay", "kind": "repay", "due": "2026-11-18"},
+    ],
+}
+
+
+def test_the_night_job_clears_items_that_pull_against_his_plan(cfg, preflight, now, proposal, monkeypatch, app_client):
+    save_plan(cfg, "ABCD", PLAN, approve=True, now=now)
+    margin = {"kind": "hold_off", "symbol": None, "subject": "margin", "thesis": "Made-up.", "expires": "2099-01-01"}
+    keeper = create_proposal(cfg, proposal(**margin, title="Hold off on new buys until the margin debit is paid"), "plan_keeper", run_id="r1", now=now)
+    trim = create_proposal(
+        cfg, proposal(kind="trim", title="Trim ABCD to clear the margin debit", shares=10, amount_usd=None, expires="2099-01-01"), "risk", run_id="k1", now=now
+    )
+    second = create_proposal(cfg, proposal(**margin, title="No new buys while margin is open"), "risk", run_id="k1", now=now)
+    other = create_proposal(cfg, proposal(kind="hold_off", symbol="EFGH", title="Hold off on EFGH", expires="2099-01-01"), "risk", run_id="k1", now=now)
+    mine = draft(cfg, {"kind": "trim", "symbol": "ABCD", "shares": 5, "thesis": "Mine: trim to pay the margin down", "expires": "2099-01-01"}, now=now)
+    assert queue(cfg, now=now)["count"] == 5
+    monkeypatch.setattr("desk.decisions.records._now", lambda _=None: now)
+    assert night(cfg) == {"ready": "3 decisions waiting; 2 out-of-date items moved to the journal with the reason"}
+    assert {d["id"] for d in queue(cfg, now=now)["items"]} == {keeper["id"], other["id"], mine["id"]}
+    assert reason(cfg, trim) == "Your plan already times this sale for Dec 7 to 15."
+    assert reason(cfg, second) == "Already covered by a standing note: Hold off on new buys until the margin debit is paid."
+    last = get(cfg, trim["id"])["events"][-1]
+    assert last["event"] == "cleared" and last["detail"] == {"check": "plan"}
+    seen = cleared(cfg, now=now)
+    assert {d["id"]: d["check"] for d in seen["items"]} == {trim["id"]: "plan", second["id"]: "plan"}
+    assert all(d["cleared_at"] and d["status_reason"] for d in seen["items"])
+    assert night(cfg) == {"ready": "3 decisions waiting, all current"}
+    body = app_client(packages=["decisions"]).get("/api/decisions/cleared?days=30").json()
+    assert set(body) == {"count", "days", "items"} and body["days"] == 30
+
+
+def test_a_plain_read_does_not_run_the_plan_check_and_a_broken_check_clears_nothing(cfg, preflight, now, proposal, monkeypatch):
+    save_plan(cfg, "ABCD", PLAN, approve=True, now=now)
+    trim = create_proposal(cfg, proposal(kind="trim", shares=10, amount_usd=None, expires="2099-01-01"), "risk", run_id="k1", now=now)
+    stale = create_proposal(cfg, proposal(symbol="WXYZ", expires="2026-11-10"), "tax", run_id="t1", now=now)
+    assert [d["id"] for d in queue(cfg, now=now + timedelta(days=2))["items"]] == [trim["id"]]
+    assert {d["id"]: d["check"] for d in cleared(cfg, now=now + timedelta(days=2))["items"]} == {stale["id"]: "window"}
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("desk.decisions.records._desk_check", lambda: broken)
+    monkeypatch.setattr("desk.decisions.records._now", lambda _=None: now + timedelta(days=2))
+    assert night(cfg) == {"ready": "1 decision waiting, all current"}
+    monkeypatch.setattr("desk.decisions.records._desk_check", lambda: None)
+    assert night(cfg) == {"ready": "1 decision waiting, all current"}
+
+
+def test_the_sync_job_runs_the_plan_check_too(cfg, preflight, now, proposal, monkeypatch):
+    save_plan(cfg, "ABCD", PLAN, approve=True, now=now)
+    trim = create_proposal(cfg, proposal(kind="trim", shares=10, amount_usd=None, expires="2099-01-01"), "risk", run_id="k1", now=now)
+    keep = create_proposal(cfg, proposal(symbol="WXYZ", funding="deposit", expires="2099-01-01"), "scout", run_id="s1", now=now)
+    monkeypatch.setattr("desk.decisions.records._now", lambda _=None: now)
+    result = sync(cfg)
+    assert result["cleared"] == 1 and result["expired"] == 0
+    assert reason(cfg, trim) == "Your plan already times this sale for Dec 7 to 15."
+    assert [d["id"] for d in queue(cfg, now=now)["items"]] == [keep["id"]]
+    assert sync(cfg)["cleared"] == 0

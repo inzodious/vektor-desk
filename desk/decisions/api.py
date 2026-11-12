@@ -325,6 +325,11 @@ def get_notes(cfg: Cfg, days: Annotated[int, Query(ge=1, le=90)] = records.NOTE_
     return act(records.notes, cfg, days=days)
 
 
+@router.get("/cleared")
+def get_cleared(cfg: Cfg, days: Annotated[int, Query(ge=1, le=90)] = records.CLEARED_DAYS) -> JSONResponse:
+    return act(records.cleared, cfg, days=days)
+
+
 @router.get("/summary")
 def get_summary(cfg: Cfg) -> JSONResponse:
     return act(records.summary, cfg)

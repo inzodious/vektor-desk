@@ -11,7 +11,7 @@ from desk.decisions.store import session
 
 def sync(cfg: Config) -> dict:
     profile = active_profile(cfg)
-    moved = tidy_now(cfg)
+    moved = tidy_now(cfg, checks=True)
     with session(cfg) as conn:
         pending = [
             r["id"] for r in conn.execute("SELECT id FROM decisions WHERE status IN ('proposed', 'snoozed') AND preflight_status IN ('pending', 'error')")
@@ -27,6 +27,7 @@ def sync(cfg: Config) -> dict:
         "expired": moved["expired"],
         "replaced": moved["replaced"],
         "notes": moved["notes"],
+        "cleared": moved["cleared"],
         "preflight_rerun": checked,
         "filled": len(filled),
         "alerts": len(alerts),
@@ -34,8 +35,8 @@ def sync(cfg: Config) -> dict:
 
 
 def night(cfg: Config) -> dict:
-    moved = tidy_now(cfg)
-    gone = moved["expired"] + moved["replaced"] + moved["notes"]
+    moved = tidy_now(cfg, checks=True)
+    gone = moved["expired"] + moved["replaced"] + moved["notes"] + moved["cleared"]
     waiting = moved["waiting"]
     if not gone and not waiting:
         return {"skipped": "Nothing is waiting on a decision."}
