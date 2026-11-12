@@ -131,6 +131,27 @@ export function libraryChip(row) {
   return LIB_STATUS[row.status] || { t: 'Waiting to run', tone: 'info' };
 }
 
+const BENCH = { 'S&P 500 (SPY)': 'the S&P 500 (SPY)', 'US stock market (French)': 'the US stock market', 'Small caps (IWM)': 'small caps (IWM)', SPY: 'the S&P 500 (SPY)' };
+
+export function benchmarkWords(benchmark) {
+  if (typeof benchmark !== 'string' || !benchmark.trim()) return null;
+  const b = benchmark.trim();
+  const plain = BENCH[b] || (/^[A-Z][a-z]/.test(b) ? `${b[0].toLowerCase()}${b.slice(1)}` : b);
+  return `Measured against ${plain}`;
+}
+
+export const LIB_LEGEND = 'Held up means it beat its benchmark on years it was never tuned on, by more than luck allows across everything tried. The last two years are held back.';
+export const LIB_LONG = 30;
+
+export function libraryLegend(d) {
+  if (!d || !Array.isArray(d.rows) || !d.rows.some((r) => r.status === 'tested')) return null;
+  return /held up means/i.test(d.note || '') ? null : LIB_LEGEND;
+}
+
+export function libraryTop(d) {
+  return Array.isArray(d?.rows) && d.rows.length > LIB_LONG ? 3 : 5;
+}
+
 export function excessWords(row) {
   const v = row.out_of_sample?.excess_pts;
   if (row.status !== 'tested' || v == null || Number.isNaN(v)) return null;
