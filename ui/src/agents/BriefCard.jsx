@@ -9,6 +9,7 @@ export function BriefCard({ brief, i = 6, tag = "Today's brief", span = 'c4', em
   const now = useNow(60000);
   const b = brief.data;
   const lines = briefLines(b?.summary);
+  const asOf = dayLabel(b?.as_of);
   return (
     <div className={`card ${span} brief`} style={{ '--i': i }} data-testid="brief">
       <div className="card-head">
@@ -34,7 +35,7 @@ export function BriefCard({ brief, i = 6, tag = "Today's brief", span = 'c4', em
         )
       )}
       {children}
-      {b?.as_of ? <span className="muted brief-foot">Built from engine numbers as of {dayLabel(b.as_of)}</span> : null}
+      {asOf ? <span className="muted brief-foot" data-testid="brief-foot">Built from engine numbers as of {asOf}</span> : null}
     </div>
   );
 }

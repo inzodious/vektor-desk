@@ -21,6 +21,10 @@ describe('charts', () => {
       { i: 4, label: 'Feb' },
     ]);
     expect(dayLabel('2026-11-06', true)).toBe('Nov 6, 2026');
+    expect(dayLabel('2026-11-11T01:20:00Z')).toBe('Nov 10');
+    expect(dayLabel('2026-11-10T22:20:00+00:00', true)).toBe('Nov 10, 2026');
+    expect(dayLabel(undefined)).toBe('');
+    expect(dayLabel('soon')).toBe('');
   });
 
   it('turns a period into a start date', () => {
