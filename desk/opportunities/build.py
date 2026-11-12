@@ -25,8 +25,12 @@ EARNINGS_SOON = 14
 TEXT_MAX = 320
 OPEN_DECISIONS = ("open", "approved")
 SELL_VERDICTS = ("trim", "avoid", "sell", "reduce")
-ORDER = {"buy": 0, "watch": 1, "screen": 1}
-METHOD = "Ranked by how unusual the discount is for that name, lifted by a written buy case or a Scout idea. It is a sort, not a forecast."
+ORDER = {"buy": 0, "could": 1, "not_now": 2}
+GROUP_WORDS = {"buy": "Worth buying", "could": "Could become a buy", "not_now": "Not now"}
+METHOD = (
+    "Buys first, then names that could become one, then names that are not for now. Inside each group, ranked by how unusual the discount is "
+    "for that name, lifted by a written buy case or a Scout idea. It is a sort, not a forecast."
+)
 NO_ENGINE = "No list yet: the engine has not run. It fills in after the next engine run."
 NOTHING = "Nothing is on sale tonight: every name the desk tracks is within a normal swing of its high."
 SOURCE_WORDS = {
@@ -304,11 +308,27 @@ def hit_line(hit: dict) -> str:
     return f"An unusually big down day on {when}"
 
 
+def drop_then(m: dict, c: dict) -> float | None:
+    case, hit = c.get("case"), c.get("hit")
+    if not case:
+        return None
+    day, _ = analysis_day(m, c)
+    if not day or day >= str(m.get("price_as_of") or ""):
+        return None
+    then = (hit or {}).get("drop_from_high_pct") if hit else case.get("drop_from_high_pct")
+    if then is None and m.get("high_52w"):
+        base = next((p for d, p in reversed(m.get("closes") or ()) if d <= day), None)
+        then = (base / m["high_52w"] - 1) * 100 if base else None
+    return float(then) if isinstance(then, int | float) else None
+
+
 def facts(m: dict, c: dict) -> list[str]:
     out = []
     drop = m.get("drop_from_high_pct")
     if drop is not None and drop < -0.05:
-        out.append(f"{abs(drop):.1f}% under its 52-week high")
+        then = drop_then(m, c)
+        was = f" at the latest price ({abs(then):.1f}% when the case was written)" if then is not None and abs(then - drop) >= 0.05 else ""
+        out.append(f"{abs(drop):.1f}% under its 52-week high{was}")
     if c.get("hit"):
         out.append(hit_line(c["hit"]))
     val = m.get("valuation") or {}
@@ -497,6 +517,15 @@ def stance(c: dict) -> tuple[str, str]:
     return "screen", "Cheap by the numbers, no written case yet"
 
 
+def group(c: dict, label: str) -> str:
+    if label == "buy":
+        return "buy"
+    note, back = c.get("research"), (c.get("scout") or {}).get("turned_back")
+    if c["size"].get("blocked") or c["tier"] == "near" or (back and back["kind"] != "funding") or (note and note["verdict"] != "add"):
+        return "not_now"
+    return "could"
+
+
 def source_label(sources: list[str]) -> str:
     words = [SOURCE_WORDS[s] for s in sources if s in SOURCE_WORDS]
     return " + ".join(words) if words else "Desk screen"
@@ -506,15 +535,18 @@ def headline(rows: list[dict], note: str | None, debit: bool = False) -> str:
     if not rows:
         return note or NOTHING
     top = rows[0]
-    drop = next((f for f in top["facts"] if "under its 52-week high" in f), None)
-    lead = f"Top: {top['symbol']}" + (f", {drop.replace(' its 52-week high', ' its high')}." if drop else ".")
-    buy = sum(r["stance"] == "buy" for r in rows)
-    rest = len(rows) - buy
+    drop = (top.get("numbers") or {}).get("drop_from_high_pct")
+    lead = f"Top: {top['symbol']}" + (f", {abs(drop):.1f}% under its high." if drop is not None and drop < -0.05 else ".")
+    buy, could, rest = (sum(r["group"] == g for r in rows) for g in ("buy", "could", "not_now"))
+    later = f"{rest} not for now" if rest else ""
     if buy:
         funded = any(r["stance"] == "buy" and r["size"]["funding"] == "cash" for r in rows)
         words = f"{buy} worth buying now" if funded else f"{buy} worth buying once {'the margin debit is paid' if debit else 'cash is free'}"
-        return f"{words}, {rest} to watch. {lead}" if rest else f"{words}. {lead}"
-    return f"Nothing rated a buy yet. {len(rows)} to watch. {lead}"
+        tail = ", ".join(x for x in (f"{could} to watch" if could else "", later) if x)
+        return f"{words}, {tail}. {lead}" if tail else f"{words}. {lead}"
+    if could:
+        return f"Nothing rated a buy yet. {could} could become one" + (f", {later}. {lead}" if later else f". {lead}")
+    return f"Nothing rated a buy yet, and nothing is close: {later}. {lead}"
 
 
 # ---- The list ----
@@ -552,7 +584,7 @@ def _empty(now: datetime, note: str, profile: dict, cash: dict, freshness: dict,
         "advice_only": True,
         "freshness": freshness,
         "headline": headline([], note),
-        "counts": dict.fromkeys(("total", "buy", "watch", "screen", "held", "outside", "with_case", "written"), 0),
+        "counts": dict.fromkeys(("total", "buy", "watch", "screen", "could", "not_now", "held", "outside", "with_case", "written"), 0),
         "note": note,
         "profile": profile,
         "cash": cash,
@@ -657,13 +689,14 @@ def _build(cfg: Config, conn: sqlite3.Connection, mirror: sqlite3.Connection | N
     near.sort(key=lambda c: (-c["score"], c["symbol"]))
     picked += near[: max(0, MIN_ROWS - len(picked))]
     rows = [_row(c, book_day, book) for c in picked]
-    rows.sort(key=lambda r: (ORDER[r["stance"]], -r["score"], r["symbol"]))
+    rows.sort(key=lambda r: (ORDER[r["group"]], -r["score"], r["symbol"]))
     rows = rows[:MAX_ROWS]
     for i, r in enumerate(rows, 1):
         r["rank"] = i
     counts = {
         "total": len(rows),
         **{k: sum(r["stance"] == k for r in rows) for k in ("buy", "watch", "screen")},
+        **{k: sum(r["group"] == k for r in rows) for k in ("could", "not_now")},
         "held": sum(r["held"] for r in rows),
         "outside": sum(not r["held"] for r in rows),
         "with_case": sum(r["case"] is not None for r in rows),
@@ -708,6 +741,8 @@ def _row(c: dict, book_day: str, book: sizing.Book | None) -> dict:
         "source_label": source_label(c["sources"]),
         "stance": label,
         "stance_label": words,
+        "group": group(c, label),
+        "group_label": GROUP_WORDS[group(c, label)],
         "why_now": why_now(m, c),
         "facts": facts(m, c),
         "entry": c["entry"],

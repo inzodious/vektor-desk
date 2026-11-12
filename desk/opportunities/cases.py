@@ -141,6 +141,7 @@ class ListSource:
             "signal_id": signal_id,
             "symbol": hit["symbol"],
             "as_of": hit["as_of"],
+            "drop_from_high_pct": hit.get("drop_from_high_pct"),
             "verdict": case["verdict"],
             "case": case["case"].strip(),
             "risks": case["risks"].strip(),
