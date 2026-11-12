@@ -10,6 +10,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine import discounts, lab, lane, leaderboard, paper_exec, planfacts, review, schema, watchlist
 from desk.engine.compare import CompareError, compare
+from desk.engine.lab import shelf
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
 from desk.engine.preflight import PreflightError, check_trade
@@ -438,6 +439,11 @@ def lab_strategy(request: Request, strategy_id: str) -> JSONResponse:
         finally:
             conn.close()
     return _json(view | {"paper_trades": trades})
+
+
+@router.get("/api/lab/library")
+def lab_library(request: Request) -> JSONResponse:
+    return _json(shelf.view(get_cfg(request)))
 
 
 @router.get("/api/engine/watchlist")
