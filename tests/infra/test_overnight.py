@@ -300,6 +300,45 @@ def test_a_job_can_say_what_is_ready_on_its_last_line(cfg):
     job.proc.wait()
     reap([job], cfg)
     assert jobrun.last_run(cfg, "engine-x")["ready"] == "31 strategies tested, 9 held up out of sample"
+    assert jobrun.last_run(cfg, "engine-x")["did"] is None and overnight.outcome(jobrun.last_run(cfg, "engine-x"))[1] is None
+
+
+def test_a_step_that_worked_can_say_what_it_did(cfg):
+    said = """echo '{"ready": "6 buying opportunities", "detail": "Screened 40. Priced 12. Wrote 6 cases."}'"""
+    job = make_job("a", "0 0 1 1 *", ["sh", "-c", said], name="opportunities-night")
+    start(job, cfg, "overnight", "abc")
+    job.proc.wait()
+    reap([job], cfg)
+    run = jobrun.last_run(cfg, "opportunities-night")
+    assert (run["detail"], run["did"]) == (None, "Screened 40. Priced 12. Wrote 6 cases.")
+    assert overnight.outcome(run) == ("ok", "Screened 40. Priced 12. Wrote 6 cases.", "6 buying opportunities")
+    failed = make_job("b", "0 0 1 1 *", ["sh", "-c", """echo '{"detail": "half done"}'; exit 3"""], name="engine-y")
+    start(failed, cfg, "overnight", "abd")
+    failed.proc.wait()
+    reap([failed], cfg)
+    assert jobrun.last_run(cfg, "engine-y")["did"] is None
+
+
+def test_every_run_keeps_its_last_line_and_a_plain_one_shows_on_the_step(cfg):
+    refused = "Plan keeper: over_budget, 0 proposals, 0 rejected. Weekly cap of 10 runs reached."
+    job = make_job("a", "0 0 1 1 *", ["sh", "-c", f"echo working; echo '{refused}'"], name="agents-run-plan_keeper")
+    start(job, cfg, "overnight", "abc")
+    job.proc.wait()
+    reap([job], cfg)
+    run = jobrun.last_run(cfg, "agents-run-plan_keeper")
+    assert (run["result"], run["did"], run["said"], run["error"]) == ("ok", refused, refused, None)
+    assert overnight.outcome(run) == ("ok", refused, None)
+    counted = make_job("b", "0 0 1 1 *", ["sh", "-c", """echo '{"ok": true, "asked": 3}'"""], name="engine-backfill")
+    start(counted, cfg, "schedule")
+    counted.proc.wait()
+    reap([counted], cfg)
+    run = jobrun.last_run(cfg, "engine-backfill")
+    assert (run["did"], run["said"]) == (None, '{"ok": true, "asked": 3}') and overnight.outcome(run) == ("ok", None, None)
+    quiet = make_job("c", "0 0 1 1 *", ["true"], name="mirror")
+    start(quiet, cfg, "schedule")
+    quiet.proc.wait()
+    reap([quiet], cfg)
+    assert jobrun.last_run(cfg, "mirror")["said"] is None
 
 
 # ---- What the app and the phone see ----
@@ -343,3 +382,24 @@ def test_the_morning_alert_says_what_is_ready_and_what_did_not_finish(cfg, tmp_p
     assert out["body"] == "14 holdings analysed. 34 strategies tested, 3 held up out of sample. Not done: Opportunities night."
     (topic, title, body), kw = sent[0]
     assert topic == "research" and kw["click"] == "/" and kw["key"] == "overnight-2026-11-11" and json.dumps(out)
+
+
+def test_the_ready_list_keeps_one_line_per_step_the_fuller_one(cfg, tmp_path, monkeypatch):
+    went_live(cfg, datetime(2026, 11, 11, 14, 0, tzinfo=ET), monkeypatch=monkeypatch)
+    short = "12 buying opportunities to watch, none rated a buy yet"
+    scripts = {"opportunities-night": f"""echo '{{"ready": "{short}; 3 cases written overnight"}}'"""}
+    chain = drive(cfg, jobs_for(tmp_path, scripts), NIGHT)
+    said = {"line": short}
+
+    class Opportunities:
+        @staticmethod
+        def ready(cfg):
+            return said["line"]
+
+    monkeypatch.setattr(
+        overnight.importlib, "import_module", lambda path: Opportunities if path == "desk.opportunities" else (_ for _ in ()).throw(ImportError(path))
+    )
+    assert overnight.ready_lines(cfg, chain) == [f"{short}; 3 cases written overnight"]
+    said["line"] = f"{short}; 3 cases written overnight; 2 more this morning"
+    assert overnight.ready_lines(cfg, chain) == [said["line"]]
+    assert overnight.ready_lines(cfg, None) == [said["line"]]

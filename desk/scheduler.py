@@ -212,6 +212,8 @@ def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = N
         "error": None,
         "oom": None,
         "ready": None,
+        "did": None,
+        "said": None,
     }
     _record(cfg, job)
 
@@ -241,7 +243,7 @@ def reap(jobs: list[Job], cfg: Config | None = None) -> None:
             detail = None if rc == 0 else "another run held the lock" if rc == BUSY else f"exit {rc}; see docker logs vektor-desk-cron"
             job.run.update(finished=jobrun.stamp(jobrun.now_utc()), result=result, exit_code=rc, detail=detail)
             job.run.update(note=said.get("skipped") if rc == 0 else None, error=said.get("error") if result == "failed" else None)
-            job.run.update(ready=said.get("ready") if rc == 0 else None)
+            job.run.update(ready=said.get("ready") if rc == 0 else None, did=said.get("detail") if rc == 0 else None, said=said.get("said"))
             stopped = _stopped_for_memory(job, rc, cfg)
             if stopped is not None:
                 scope, group = stopped
@@ -347,8 +349,11 @@ def _in_tonights_run(cfg: Config, job: Job) -> bool:
 def tick(jobs: list[Job], t: datetime, cfg: Config | None = None) -> list[Job]:
     reap(jobs, cfg)
     started = []
-    for job in jobs:
-        if not job.due(t):
+    due = [job for job in jobs if job.due(t)]
+    fuller = {job.lock for job in due if job.lock and not job.timing.startswith("* ")}
+    for job in due:
+        if job.timing.startswith("* ") and job.lock in fuller:
+            log(f"{job.line} skipped: a fuller run with the same lock is due this minute")
             continue
         if _busy(jobs, job.name):
             log(f"{job.line} skipped: still running from last time")

@@ -85,9 +85,19 @@ Turned-back Scout buys are read from the decision journal (`status=rejected`, `o
 | Everything else | The size is run through Preflight, the same checker the Decisions queue uses. A red Concentration, Plan rules or Wash sales lamp sets the size to 0 and shows the lamp's words |
 | Cash | Ready cash and the margin debit are the desk's own figures (`cash.ready`, `margin.debit`, the ones the Bridge shows). An open debit comes first: nothing is sized from cash. Then ready cash, then the next expected deposit after it clears the debit. With neither, size 0 and the room the caps would allow. A size the buying account cannot settle is 0 too |
 
-## Order
+## Order and groups
 
-Buys first, then by score. The score is a sort key from 0 to 100: depth of the discount in monthly swings (up to 40), cheapness against its own history (±15), above or below the 200-day average (±8), a fresh hit (+10), a buy case (+25 × confidence), a wait case (−5), a Scout idea (+20 × confidence, −15 if flagged), a blocked size (−25), earnings inside 5 days (−5). It is not a forecast and has not been through the lab's gate; the payload's `method` says so.
+Every row has a `group`, and the list is sorted by it so the page leads with what could be bought.
+
+| `group` | `group_label` | Rows |
+|---|---|---|
+| `buy` | Worth buying | Stance `buy` |
+| `could` | Could become a buy | On sale and nothing rules it out: the case says wait, the Skeptic disagreed, or no case is written yet |
+| `not_now` | Not now | A holding whose research note does not say add; a row a cap, rule, hold-off note or no-buy window blocks; a name that is not on sale and only fills the list |
+
+Inside a group rows are sorted by score. The score is a sort key from 0 to 100: depth of the discount in monthly swings (up to 40), cheapness against its own history (±15), above or below the 200-day average (±8), a fresh hit (+10), a buy case (+25 × confidence), a wait case (−5), a Scout idea (+20 × confidence, −15 if flagged), a research note that says add (+15), a blocked size (−25), earnings inside 5 days (−5). It is not a forecast and has not been through the lab's gate; the payload's `method` says so.
+
+The headline counts the groups: "Nothing rated a buy yet. 2 could become one, 9 not for now. Top: VGT, 12.4% under its high." The drop in the headline is the top row's `numbers.drop_from_high_pct`, the same figure as its first fact. When a written case is older than the row's price, the fact says both: "31.3% under its 52-week high at the latest price (31.9% when the case was written)", because the case's own sentence quotes the scanner's number from its day.
 
 ## The night job
 
@@ -102,7 +112,7 @@ Buys first, then by score. The score is a sort key from 0 to 100: depth of the d
 
 List cases goes through `run_discount_desk(discounts=ListSource(...), trigger="schedule", limit=n)`: the desk's own prompt, schema, switch, guard, lock and weekly allowance, with the hit built from the row's `numbers` in the scanner's shape. The cap is six cases a night across both steps (18 hours back). A row with a case is no longer a `screen`, so a second run pays for nothing.
 
-Safe to start twice. It records the night in `data/run/opportunities/night.json` and ends with one JSON line for the morning alert: `{"ready": "6 buying opportunities, 2 rated a buy; 3 cases written overnight", "detail": "<every step's line>"}` or `{"skipped": "why"}`. `desk.opportunities.ready(cfg)` returns the same `ready` line at any time. The steps' own lines are also in the payload under `freshness.night_summary` and `freshness.night_steps`, because the overnight page only shows `ready` for a step that ended ok.
+Safe to start twice. It records the night in `data/run/opportunities/night.json` and ends with one JSON line for the morning alert: `{"ready": "6 buying opportunities, 2 rated a buy; 3 cases written overnight", "detail": "<the night's summary>"}` or `{"skipped": "why"}`. The count in `ready` is `buy` plus `could`; rows that are not for now are not called opportunities. The line is saved in `night.json`, and `desk.opportunities.ready(cfg)` returns that saved line for 18 hours, so the overnight page never lists two versions of it. Cases written overnight are counted once (both kinds, 18 hours back): `ready`, `night.json` `cases_written` and the summary's one sentence all use that count; a step's own note says "This run wrote N of M". The steps' own lines are also in the payload under `freshness.night_summary` and `freshness.night_steps`, because the overnight page only shows `ready` for a step that ended ok.
 
 The list never waits for the night job. Rows without a case show as `screen` and `freshness.note` says how many.
 
@@ -116,7 +126,7 @@ The list never waits for the night job. Rows without a case show as `screen` and
 | `asof` | `day`, `words`, `status`, `provisional`, `expected_day`, `behind`, straight from `desk.engine.asof` |
 | `prices` | `day` (newest price on the list), `words`, `older[]` (`symbol`, `price_as_of`, `held`) |
 | `freshness` | `scanner_as_of`, `last_case_at` (newest case of either kind), `last_scout_at`, `night_run_at`, `night_status` (`ok`, `partial`, `waiting`), `night_summary`, `night_steps[]` (`step`, `status`, `note`), `note` |
-| `headline`, `counts`, `note` | One line for the door; totals by stance, held and outside, `with_case` and `written` (rows with a case, a Scout idea or a research note); the reason when the list is empty |
+| `headline`, `counts`, `note` | One line for the door; totals by stance and by group (`could`, `not_now`), held and outside, `with_case` and `written` (rows with a case, a Scout idea or a research note); the reason when the list is empty |
 | `profile`, `cash`, `method` | The band sizes use; free cash, margin debit and next deposit; how rows are ranked |
-| `rows[]` | `rank`, `symbol`, `name`, `kind`, `held`, `weight_pct`, `sources`, `source_label`, `stance`, `stance_label`, `why_now`, `facts`, `entry`, `size`, `wrong_if`, `invalid_below`, `case`, `decision_id`, `queued`, `not_queued`, `research_verdict`, `research`, `numbers`, `next_earnings`, `as_of`, `price_as_of`, `price_source`, `price_at`, `price_behind`, `analysis_as_of`, `since_analysis_pct`, `as_of_words`, `score` |
+| `rows[]` | `rank`, `symbol`, `name`, `kind`, `held`, `weight_pct`, `sources`, `source_label`, `stance`, `stance_label`, `group`, `group_label`, `why_now`, `facts`, `entry`, `size`, `wrong_if`, `invalid_below`, `case`, `decision_id`, `queued`, `not_queued`, `research_verdict`, `research`, `numbers`, `next_earnings`, `as_of`, `price_as_of`, `price_source`, `price_at`, `price_behind`, `analysis_as_of`, `since_analysis_pct`, `as_of_words`, `score` |
 | `passed[]` | `symbol`, `name`, `reason` |
