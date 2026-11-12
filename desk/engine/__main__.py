@@ -25,6 +25,7 @@ from desk.engine import (
     earnings,
     filings,
     french,
+    heal,
     insider,
     lane,
     paper_exec,
@@ -157,6 +158,18 @@ def _ask_for(cfg: Config, job: str) -> str:
 
 
 def run_restate(cfg: Config) -> dict:
+    result = _restate(cfg)
+    if os.environ.get(DRY_RUN) != "1":
+        try:
+            healed = heal.run(cfg)
+        except (OSError, sqlite3.Error, ValueError) as e:
+            healed = {"error": repr(e)}
+        if healed.get("asked") or healed.get("error"):
+            result["heal"] = healed
+    return result
+
+
+def _restate(cfg: Config) -> dict:
     check, last = _restate_check(cfg)
     skip = _restate_skip(check, last)
     if skip:
@@ -424,10 +437,8 @@ def dry_run(cfg: Config, job: str) -> dict:
             conn = connect(copy.desk_db, readonly=True)
             try:
                 health = [
-                    {"check": r["check_name"], "status": r["status"], "detail": r["detail"]}
-                    for r in conn.execute(
-                        "SELECT check_name, status, detail FROM data_health WHERE as_of=(SELECT max(as_of) FROM data_health) ORDER BY check_name"
-                    )
+                    {"check": r["check_name"], "status": r["status"], "detail": r["detail"]} | {k: dict(r).get(k) for k in ("say", "kind", "job")}
+                    for r in conn.execute("SELECT * FROM data_health WHERE as_of=(SELECT max(as_of) FROM data_health) ORDER BY check_name")
                 ]
             except sqlite3.Error:
                 health = []

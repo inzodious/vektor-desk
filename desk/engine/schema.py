@@ -505,6 +505,9 @@ CREATE TABLE IF NOT EXISTS data_health (
   check_name TEXT NOT NULL,
   status TEXT NOT NULL CHECK (status IN ('ok', 'warn', 'fail')),
   detail TEXT,
+  say TEXT,
+  kind TEXT,
+  job TEXT,
   PRIMARY KEY (as_of, check_name)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS preflight (
@@ -723,9 +726,20 @@ CREATE TABLE IF NOT EXISTS french_returns (
 QUOTES_LIVE = re.search(r"CREATE TABLE IF NOT EXISTS quotes_live \(.*?\);", SCHEMA, re.S).group(0)
 
 
+HEALTH_COLUMNS = ("say", "kind", "job")
+
+
 def apply(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     rebuild_quotes(conn)
+    add_health_columns(conn)
+
+
+def add_health_columns(conn: sqlite3.Connection) -> None:
+    have = {r[1] for r in conn.execute("PRAGMA table_info(data_health)")}
+    for name in HEALTH_COLUMNS:
+        if name not in have:
+            conn.execute(f"ALTER TABLE data_health ADD COLUMN {name} TEXT")
 
 
 def rebuild_quotes(conn: sqlite3.Connection) -> bool:

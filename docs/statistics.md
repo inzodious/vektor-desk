@@ -120,7 +120,40 @@ Before metrics are published for a day, the engine checks:
 | Market keys | Tiingo, Finnhub, FRED, the SEC contact and the Alpaca paper keys are all set; any missing one warns in plain words ("the Tiingo key") and its fix points to Settings, Data, Keys. No health line names a setting variable, a shell command or a file path: fixes point to Settings (Keys and Inbox under Data, job buttons under Box). The words live in `desk.engine.KEY_WORDS` and `key_fix` |
 | Symbol kinds | Every holding is known as a fund or a stock: Escape Vektor's profiles, then SEC's fund list, the benchmark ETFs, ticker shape (5 letters ending in X, plan codes with digits) and SEC titles |
 
-Every non-ok detail ends with `Fix:` and the one step that clears it.
+Every non-ok detail ends with `Fix:` and the one step that clears it. That detail is the long form, kept for diagnosis; it is not what he reads.
+
+**What he reads, and who fixes it.** Each check also stores a plain sentence, a kind and, where a job can fix it, that job (`data_health.say`, `kind`, `job`). `GET /api/engine/health` serves the plain sentence as `detail` and the long form as `diagnosis`.
+
+| Kind | Means | Counts toward `status` | Examples |
+|---|---|---|---|
+| `fixes_itself` | The desk is already on it; the sentence says when | No | A fund price not out yet; broker totals from an older price; fund breakdowns not fetched yet |
+| `needs_you` | Only a file or a setting of his can clear it | Yes, as `warn` | A fresh Fidelity history; a lot export; a missing key; the tax rate |
+| `blocks` | Numbers cannot be trusted until it clears (every `fail`) | Yes, as `fail` | Accounts not read for over 14 hours; positions that do not add up; no holdings |
+
+| Sentence rule | |
+|---|---|
+| One or two short sentences a person would say | "Two fund prices for Monday are not out yet. The desk checks every hour." |
+| No method, table, column, job or variable names, and no ISO dates | Days read "Monday" inside a week, else "Nov 3" |
+| A name where the desk knows one, else the ticker; a count when there are several | `heal.names`, `heal.count` |
+| Funds nothing prices (plan codes) are valued at the broker's price and are never a problem | They appear in `diagnosis` only. A fund that files no holdings no longer warns in the look-through check either |
+
+**The desk heals itself** (`desk/engine/heal.py`). After every 5-minute catch-up (`restate`), `heal.run` reads the latest checks and asks for the job of each one that is not ok, through the same request folder the Run buttons use (`jobrun.request_run`, client `desk`). App open or not; a dry run asks for nothing.
+
+| Check | Job asked for | Cool-down |
+|---|---|---|
+| Freshness, no holdings, positions that do not add up | Accounts (`mirror`) | 1 hour |
+| A price never fetched, or more than a day behind | Price backfill (`engine-backfill`) | 1 hour |
+| Symbol kinds, company facts | Research (`engine-research`) | 12 hours |
+| Fund breakdowns missing or over 150 days old | Look-through (`engine-lookthrough`) | 24 hours |
+| Checks written by an older build; or Accounts, Research or Look-through finished after being asked | Daily numbers (`engine-daily`), once, so the checks are read again | 30 minutes |
+
+| Rule | |
+|---|---|
+| Never asked | While that job is queued, running or waiting its turn, inside its cool-down, or when the scheduler is not running |
+| A price one session late | No job: the hourly backfill already asks |
+| After 3 tries | The cool-down is 6 times longer. For prices, and for any `fail`, the sentence adds "The desk has tried 3 times and it has not cleared. Settings, Box shows why." and a `fixes_itself` price check becomes `needs_you` |
+| State | `run/heal.json`: per job, when it was asked, how many tries, which checks. A job whose checks are ok again is forgotten |
+| Payload | Each check: `check_name, status, detail, kind, counts, job, heal {job, asked_at, attempts, stuck}, diagnosis`. Top level: `status` (fail if any fail, warn if any `needs_you`, else ok) and `kinds` (count per kind) |
 
 **Implied flows.** On each snapshot day, per account: residual = snapshot value − the prior day's holdings repriced at today's closes − recorded deposits and withdrawals − dividends and interest. A residual over $1 or 0.05% is added to that day's flows for the account and the portfolio, so TWR, MWR, day change, shadows and risk see price moves only.
 
@@ -132,7 +165,7 @@ Every non-ok detail ends with `Fix:` and the one step that clears it.
 
 **Dry run.** `python -m desk.engine daily --dry-run` (also `holdings`, `core`, `history`) runs on a throwaway copy of the data, sends no alerts, and prints the result plus `health_detail` for every check. Nothing in `/data` changes.
 
-A failed check marks the day `stale`, keeps the last good values on screen with their date, and writes the reason to `data_health`. Stale wins over every other flag except `insufficient_history`: a `modelled` or `pro_forma` number from a failed run is stored as `stale`, so nothing acts on it. Agents read `data_health` first and stop if it is not green. The Phase 1 exit test ("numbers match Fidelity to the cent on a test day") is this table passing.
+A failed check marks the day `stale`, keeps the last good values on screen with their date, and writes the reason to `data_health`. The daily job's own `health` result uses the same counting as the endpoint. Stale wins over every other flag except `insufficient_history`: a `modelled` or `pro_forma` number from a failed run is stored as `stale`, so nothing acts on it. Agents read `data_health` first and stop if it is not green. The Phase 1 exit test ("numbers match Fidelity to the cent on a test day") is this table passing.
 
 ## Fidelity history
 
@@ -1167,7 +1200,7 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Where it runs | On the box in the night lab pass only; `lab-offer` skips it and a worker refuses it |
 | Not run | No held mix exported yet, or the holdings have not all traded long enough before the holdout (see "A fund that had not started trading") |
 
-**Stock screens lean on hindsight.** The screen universe is the stocks the desk has bars for: a few large quality names plus names he holds, watches or has held. So every screen spec carries the caveat `spec.SCREEN_HINDSIGHT`, and the six screen rows have `leans_on_hindsight: true`, that caveat first, and a `line` that ends "Leans on hindsight: the stock list is small and includes names you hold or held." The view adds both to a result stored before the caveat existed. A public stock universe is the fix, not yet built.
+**Stock screens lean on hindsight.** The screen universe is the stocks the desk has bars for: a few large quality names plus names he holds, watches or has held. So every screen spec carries the caveat `spec.SCREEN_HINDSIGHT`, and the six screen rows have `leans_on_hindsight: true`, that caveat first, and a `line` that ends "Leans on hindsight: the stock list is small and includes names you hold or held." The view adds both to a result stored before the caveat existed. A screen row that would read held up is shown as within noise instead ("Ahead, but it leans on hindsight: ...") and is not in `counts.held_up`. A public stock universe is the fix, not yet built.
 
 **Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the five stock screens (see "What a worker can read").
 

@@ -366,7 +366,7 @@ def test_roll_forward_uses_broker_shares(cfg, mirror):
     conn.close()
     assert rokt == 20
     out = computed(cfg)
-    checks = {c: (s, d) for _, c, s, d in out.health}
+    checks = {c: (s, d) for _, c, s, d, *_ in out.health}
     assert checks["history"][0] == "ok" and "1 Escape Vektor rows replaced" in checks["history"][1]
     assert checks["shares"][0] == "ok" and "FIFO for stocks and ETFs" in checks["shares"][1]
     paid = {m[3]: m[5] for m in out.metrics if m[0] == "margin.interest_paid"}
@@ -381,7 +381,7 @@ def test_without_history_nothing_changes(cfg, mirror):
     seed(mirror)
     run_holdings(cfg)
     out = computed(cfg)
-    checks = {c: (s, d) for _, c, s, d in out.health}
+    checks = {c: (s, d) for _, c, s, d, *_ in out.health}
     assert checks["history"][0] == "ok" and checks["shares"][0] == "warn" and out.book is None
     assert not [m for m in out.metrics if m[0] == "margin.interest_paid"]
 

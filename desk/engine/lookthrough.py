@@ -6,11 +6,12 @@ import time
 from datetime import UTC, date, datetime, timedelta
 from xml.parsers import expat
 
-from desk.engine import JOBS_AT, key_fix, research
+from desk.engine import JOBS_AT, heal, key_fix, research
 from desk.engine.market import ProviderError, finnhub_key
 from desk.engine.research import SEC_ARCHIVE, SEC_SUBMISSIONS, _fresh, _get, _log, _stamp, sec_agent, sec_ciks
 
 SEC_FUNDS = "https://www.sec.gov/files/company_tickers_mf.json"
+LISTED = re.compile(r"^[A-Z]{1,5}$")
 FINNHUB_PROFILE = "https://finnhub.io/api/v1/stock/profile2"
 
 NPORT_FORMS = ("NPORT-P", "NPORT-P/A")
@@ -426,17 +427,43 @@ def metrics(out, desk: sqlite3.Connection, kinds: dict[str, str], profiles: dict
         for e in view["rows"]
     ]
     missing = sorted(f for f, v in view["funds"].items() if not v["holdings"] and f not in SECTOR_FUNDS)
-    if missing:
-        fix = "the weekly look-through job fills them" if os.environ.get("DESK_SEC_USER_AGENT") else key_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
-        out.h("lookthrough", "warn", f"No N-PORT holdings yet for {', '.join(missing)}. Fix: {fix}.")
+    listed = [f for f in missing if LISTED.match(f)]
+    if listed:
+        sec = bool(os.environ.get("DESK_SEC_USER_AGENT"))
+        fix = "the weekly look-through job fills them" if sec else key_fix(["DESK_SEC_USER_AGENT"]).rstrip(".")
+        out.h(
+            "lookthrough",
+            "warn",
+            f"No N-PORT holdings yet for {', '.join(missing)}. Fix: {fix}.",
+            f"What {heal.listed(listed)} {'holds' if len(listed) == 1 else 'hold'} inside is not in yet. "
+            + ("The desk fetches it by itself, within a week at most." if sec else f"To fetch it, {fix}."),
+            heal.FIXES if sec else heal.NEEDS,
+            heal.LOOKTHROUGH if sec else None,
+        )
+    elif missing and not stale:
+        out.h(
+            "lookthrough",
+            "ok",
+            f"Look-through covers {view['coverage']:.0f}% of invested value. {', '.join(missing)} have no public filing, so each counts as one holding.",
+            f"The desk can see inside funds making up {view['coverage']:.0f}% of what you have invested. "
+            "Funds that publish no holdings, such as retirement-plan funds, count as one holding each.",
+        )
     elif stale:
         out.h(
             "lookthrough",
             "warn",
             f"N-PORT holdings for {', '.join(stale)} are over 150 days old. Fix: in {JOBS_AT}, run Fund breakdowns.",
+            f"What {heal.listed(stale)} {'holds' if len(stale) == 1 else 'hold'} inside is more than five months old. The desk is refreshing it.",
+            heal.FIXES,
+            heal.LOOKTHROUGH,
         )
     else:
-        out.h("lookthrough", "ok", f"Look-through covers {view['coverage']:.0f}% of invested value.")
+        out.h(
+            "lookthrough",
+            "ok",
+            f"Look-through covers {view['coverage']:.0f}% of invested value.",
+            f"The desk can see inside funds making up {view['coverage']:.0f}% of what you have invested.",
+        )
 
 
 def overlap(conn: sqlite3.Connection, a: str, b: str) -> float | None:
