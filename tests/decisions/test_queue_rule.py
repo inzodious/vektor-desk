@@ -161,9 +161,14 @@ def test_ready_cash_gone_expires_a_cash_funded_buy(cfg, preflight, now, desk_db,
     explicit = create_proposal(cfg, proposal(symbol="EFGH", funding=None, needs_cash_usd=800, expires="2099-01-01"), "scout", run_id="s1", now=now)
     fresh = create_proposal(cfg, proposal(symbol="IJKL", as_of="2026-11-10", expires="2099-01-01"), "research", run_id="a1", now=now)
     assert queue(cfg, now=now)["count"] == 4
-    cash(desk_db, "2026-11-10", 120.4, "mismatch")
-    assert queue(cfg, now=now + timedelta(days=1))["count"] == 4
-    cash(desk_db, "2026-11-10", -250.0, "modelled")
+    for unsure in ("mismatch", "stale", "insufficient_history"):
+        cash(desk_db, "2026-11-10", 120.4, unsure)
+        assert queue(cfg, now=now + timedelta(days=1))["count"] == 4
+    desk_db.execute(
+        "INSERT INTO metric_values (metric_id, scope, scope_id, window, as_of, value, unit, n_obs, quality, engine_version) "
+        "VALUES ('cash.ready', 'account', 'Brokerage', 'now', '2026-11-11', 0, 'usd', 1, 'ok', '1')"
+    )
+    cash(desk_db, "2026-11-10", 0.0, "pro_forma")
     later = now + timedelta(days=1)
     assert {d["id"] for d in queue(cfg, now=later)["items"]} == {route["id"], fresh["id"]}
     assert reason(cfg, buy) == "Ready cash is $0 as of Nov 10 (estimated), less than the $500 this needs."
