@@ -328,3 +328,20 @@ def test_a_default_margin_rate_prices_the_debit_as_modelled_without_a_warning(cf
     assert tuple(cost)[0] == 3.0 and cost["quality"] in ("modelled", "stale")
     assert health["status"] == "ok" and "typical 12%" in health["detail"]
     assert book(cfg, et(WED, 8, 30))["numbers"]["margin_cost_month"] == 3.0
+
+
+def test_an_overnight_restate_never_rings_the_phone(cfg, mirror, monkeypatch):
+    from desk.engine import triggers
+
+    sent = []
+    monkeypatch.setattr(triggers, "publish", lambda topic, title, body, priority, **kw: sent.append((title, priority)))
+    seed(mirror, margin=True)
+    at(monkeypatch, et(WED, 8, 20))
+    run_daily(cfg)
+    conn = connect(cfg.desk_db)
+    found = [(TUE, "margin_debit", "portfolio", {"debit": 300.0}), (TUE, "daily_move", "ACME", {"ret_pct": 9.0, "dial_pct": 5.0})]
+    conn.execute("DELETE FROM triggers")
+    triggers.record(cfg, conn, found[:1], now=et(WED, 17, 20))
+    triggers.record(cfg, conn, found[1:], now=et(THU, 1, 25))
+    conn.close()
+    assert ("Margin debit on the desk", "high") in sent and ("Big move today", "low") in sent

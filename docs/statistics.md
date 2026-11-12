@@ -990,7 +990,7 @@ paper_portfolios, paper_positions, paper_trades   (Strategy lab; the trial ledge
 
 Every slice also carries `triggers` for its day. A proposal's `numbers_used[].field` is the key `metric_id:scope_id:window` (for example `plan.drift:FXAIX:now`), so Preflight can match it to the brief exactly.
 
-**Triggers.** After each core run the engine writes `triggers(as_of, kind, scope_id, detail)` for the agents' scheduler (`desk.engine.triggers.today(cfg)`); each fires at most once a day. The first day a condition appears, it also sends a phone alert on `alerts` (no dollar amounts). Live quotes failing during market hours sends one `ops` alert a day.
+**Triggers.** After each core run the engine writes `triggers(as_of, kind, scope_id, detail)` for the agents' scheduler (`desk.engine.triggers.today(cfg)`); each fires at most once a day. Between 22:00 and 07:00 local time an alert goes out at low priority, so a day restated overnight never rings the phone. The first day a condition appears, it also sends a phone alert on `alerts` (no dollar amounts). Live quotes failing during market hours sends one `ops` alert a day.
 
 | Kind | Fires when | Scope |
 |---|---|---|

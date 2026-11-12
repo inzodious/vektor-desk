@@ -13,6 +13,7 @@ from desk.notify import publish
 MOVE_BY_RISK = {1: 1.0, 2: 1.5, 3: 2.0, 4: 3.0, 5: 4.0}
 HOLDING_MOVE_X = 2.5
 MAX_GAP_DAYS = 5
+QUIET_FROM, QUIET_UNTIL = 22, 7
 DETECTED = {"margin_debit", "daily_move", "concentration", "rule_breach", "earnings", "deposit_landed"}
 ALERTS = {
     "margin_debit": ("Margin debit on the desk", "high"),
@@ -127,9 +128,12 @@ def record(cfg: Config, conn: sqlite3.Connection, found: list[tuple[str, str, st
                 prev = conn.execute("SELECT max(as_of) FROM metric_values WHERE as_of < ?", (as_of,)).fetchone()[0]
                 held = prev is not None and conn.execute("SELECT 1 FROM triggers WHERE kind=? AND scope_id=? AND as_of=?", (kind, scope_id, prev)).fetchone()
                 new.append({"as_of": as_of, "kind": kind, "scope_id": scope_id, "detail": detail, "crossed": not held})
+    hour = _now(now).astimezone(ZoneInfo(cfg.timezone)).hour
+    asleep = not QUIET_FROM > hour >= QUIET_UNTIL
     for t in new:
         if t["kind"] in ALERTS and t["crossed"]:
             title, priority = ALERTS[t["kind"]]
+            priority = "low" if asleep else priority
             tags = ["rotating_light"] if priority == "high" else []
             publish("alerts", title, _words(t), priority, tags=tags, click="/", key=f"trigger-{t['kind']}-{t['scope_id']}-{t['as_of']}", cfg=cfg)
     return new
