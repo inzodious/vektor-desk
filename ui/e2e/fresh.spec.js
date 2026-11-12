@@ -44,7 +44,7 @@ test('a broken desk.yaml shows a heads-up and the warnings', async ({ page }) =>
 test('a first-day desk reads calmly on every page', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/?scenario=fresh');
-  await expect(page.getByTestId('health-banner')).toHaveAttribute('data-level', 'warn');
+  await expect(page.getByTestId('health-banner')).toHaveCount(0);
   await expect(page.getByTestId('steps-due')).toBeVisible();
   await page.getByTestId('open-holdings').click();
   await expect(page.locator('.board-row[data-sym="0999999"] .flap')).toBeVisible();
