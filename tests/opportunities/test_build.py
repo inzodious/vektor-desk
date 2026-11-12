@@ -266,6 +266,50 @@ def test_a_buy_case_on_a_holding_the_research_note_says_hold_is_a_watch(cfg, rul
     assert r["why_now"] == "ACME fell with the market, not on its own news."
 
 
+# ---- The page leads with rows that could become a buy ----
+
+
+def test_rows_are_grouped_buy_then_could_then_not_now_and_the_headline_counts_them(cfg, rules):
+    conn = seed(cfg)
+    note(cfg, "ACME", "hold")
+    out = ob.build(cfg, now=NOW)
+    assert [(r["symbol"], r["group"]) for r in out["rows"]] == [("QUAL", "could"), ("WTCH", "could"), ("ACME", "not_now")]
+    assert row(out, "ACME")["group_label"] == "Not now" and row(out, "QUAL")["group_label"] == "Could become a buy"
+    assert out["counts"]["could"] == 2 and out["counts"]["not_now"] == 1
+    assert out["headline"] == "Nothing rated a buy yet. 2 could become one, 1 not for now. Top: QUAL, 16.7% under its high."
+    signal(conn, "WTCH", case="buy")
+    out = ob.build(cfg, now=NOW)
+    assert [(r["symbol"], r["group"]) for r in out["rows"]] == [("WTCH", "buy"), ("QUAL", "could"), ("ACME", "not_now")]
+    assert out["headline"].startswith("1 worth buying now, 1 to watch, 1 not for now. Top: WTCH, 27.4% under its high.")
+    assert ready(cfg, now=NOW).startswith("2 buying opportunities, 1 rated a buy")
+
+
+def test_a_row_the_caps_block_is_not_for_now_and_nothing_close_says_so(cfg, monkeypatch):
+    monkeypatch.setattr("desk.engine.preflight.rules_in_force", lambda cfg, plan: ([RULES[1]], "profile"))
+    conn = seed(cfg)
+    signal(conn, "ACME", case="buy")
+    with conn:
+        conn.execute("DELETE FROM price_bars WHERE symbol IN ('QUAL', 'WTCH')")
+        conn.execute("DELETE FROM market_symbols")
+    out = ob.build(cfg, now=NOW)
+    assert row(out, "ACME")["group"] == "not_now" and row(out, "IVV")["stance_label"] == "Watch: not on sale yet"
+    assert {r["group"] for r in out["rows"]} == {"not_now"} and out["rows"][0]["symbol"] == "ACME"
+    assert out["headline"] == "Nothing rated a buy yet, and nothing is close: 3 not for now. Top: ACME, 32.2% under its high."
+    assert ready(cfg, now=NOW) == "No buying opportunities today: 3 looked at, none for now; 1 case written overnight"
+
+
+def test_the_drop_is_one_figure_and_says_so_when_the_case_was_written_at_another_price(cfg, rules):
+    conn = seed(cfg)
+    signal(conn, "QUAL", case="wait")
+    with conn:
+        conn.execute("INSERT INTO closes_provisional VALUES ('QUAL', ?, 171.0, 180.0, '2026-11-09T21:00:00+00:00', '2026-11-09T21:02:00+00:00')", (NEXT,))
+    out = ob.build(cfg, now=LATER)
+    r = row(out, "QUAL")
+    assert r["facts"][0] == "20.9% under its 52-week high at the latest price (14.0% when the case was written)"
+    assert r["numbers"]["drop_from_high_pct"] == pytest.approx(-20.9, abs=0.05)
+    assert "Top: QUAL, 20.9% under its high." in out["headline"]
+
+
 # ---- Cases for rows the scanner did not flag ----
 
 
