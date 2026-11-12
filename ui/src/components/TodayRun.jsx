@@ -21,7 +21,7 @@ export function TodayRun({ i = 7 }) {
           </Link>
         </span>
       </div>
-      <ol className="run-stages">
+      <ol className="run-stages" style={{ '--n': run.stages.length }}>
         {run.stages.map((s) => (
           <li key={s.id} className="run-stage" data-stage={s.id} data-state={s.state} title={s.blurb}>
             <span className="run-dot" aria-hidden="true">

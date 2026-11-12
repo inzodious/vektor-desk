@@ -119,3 +119,14 @@ write('asof.lagging', { ...evening, provisional: false, status: 'final', words: 
 
 // ---------- behind: Monday's prices have not landed ----------
 write('asof.behind', { ...base, at: `${MONDAY}T22:21:40+00:00`, expected_day: MONDAY, behind: { sessions: 1, reason: 'No closing quotes or official closes for Mon Nov 9 yet. The next engine run picks them up.' }, live: null, market: { state: 'closed', day: MONDAY } });
+
+// ---------- afterclose: the closing run has not landed, the quotes have ----------
+write('live.afterclose', { ...closed, state: 'after', day: MONDAY, as_of: `${MONDAY}T23:40:00+00:00`, holdings_date: FRIDAY, value: 16513.99, day_change: 120.5, day_change_pct: 0.74 });
+write('asof.afterclose', {
+  ...base,
+  at: `${MONDAY}T22:21:40+00:00`,
+  expected_day: MONDAY,
+  behind: { sessions: 1, reason: 'Closing quotes are in for Mon Nov 9, and the book stops at Fri Nov 6. The next engine run moves it; nothing to tap.' },
+  live: { day: MONDAY, state: 'after', at: `${MONDAY}T23:40:00+00:00`, value: 16513.99, day_change: 120.5, day_change_pct: 0.74, words: 'Mon Nov 9, last quotes 6:40 PM ET' },
+  market: { state: 'after', day: MONDAY },
+});

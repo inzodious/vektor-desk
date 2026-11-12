@@ -7,6 +7,7 @@ import { Spark } from '../components/Spark.jsx';
 import { BriefCard } from '../agents/BriefCard.jsx';
 import { TodayRun } from '../components/TodayRun.jsx';
 import { StepsDue } from './BridgeSteps.jsx';
+import { Morning } from './BridgeMorning.jsx';
 import { CashDrawer, DiscountsDrawer, ExcessDrawer, HoldingsDrawer, MixDrawer, ValueDrawer } from './BridgeDrawers.jsx';
 import { LIVE_STATES, useLive, useSymbol } from '../live/context.js';
 import { useApi } from '../lib/api.js';
@@ -167,6 +168,7 @@ export default function Bridge() {
           </>
         }
       />
+      <Morning />
       <section className="kpis kpis-4" data-testid="bridge-kpis">
         <Kpi i={1} label="Market value" metric="value.market" value={usd(head.value)} line={showMove ? `${usd(head.change, { sign: true })} ${head.when}` : 'At the last close'} asOf={asOf} quality={live.quality} spark={sparkVals.length > 1 ? <Spark values={sparkVals} label="Last 30 days" /> : null} onOpen={() => setDrill('value')} />
         <Kpi i={2} label="Vs the safe mix" metric="bm.excess" value={exV == null ? '—' : usd(exV, { sign: true })} tone={exV == null ? undefined : exV >= 0 ? 'ok' : 'watch'} line={exS == null ? 'Year to date' : `YTD · S&P ${usd(exS, { sign: true })}`} quality={ex?.quality} asOf={engineAsOf} onOpen={() => setDrill('excess')} />

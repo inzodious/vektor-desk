@@ -58,10 +58,13 @@ test('Bridge, Results, Portfolio, Decisions and Research agree on the day, its c
   expect(errors).toEqual([]);
 });
 
-test('with the market open the Bridge headline is live and says so; every page still shows the closed book', async ({ page }) => {
+test('with the market open every page leads with the live day and its change, never the day before', async ({ page }) => {
   const errors = watchErrors(page);
   const seen = await walk(page, '');
-  seen.forEach((c) => expect(c).toEqual({ day: '2026-11-06', words: 'As of Fri Nov 6, at the close', change: '+$53', cash: '$142', margin: 'none' }));
+  seen.forEach((c) => expect(c).toEqual({ day: '2026-11-09', words: 'As of Mon Nov 9, 11:40 AM ET', change: '−$86', cash: '$142', margin: 'none' }));
+  await expect(page.getByTestId('asof')).toContainText('Live');
+  await expect(page.getByTestId('asof-book')).toHaveText('Book as of Fri Nov 6, at the close');
+  await expect(page.getByTestId('asof')).not.toContainText('+$53');
 
   await page.goto('/');
   await expect(page.locator('.ph-kick')).toHaveText('Bridge · Live, Mon Nov 9, 11:40 AM ET');
@@ -71,9 +74,24 @@ test('with the market open the Bridge headline is live and says so; every page s
   await expect(page.getByTestId('bridge-kpis').locator('[data-kpi="margin.debit"] .v')).toHaveText('$0');
 
   await page.goto('/results/day');
-  await expect(page.getByTestId('rs-change')).toHaveText(seen[0].change);
-  await expect(page.getByTestId('results')).toHaveAttribute('data-end', seen[0].day);
+  await expect(page.getByTestId('rs-change')).toHaveText('+$53');
+  await expect(page.getByTestId('results')).toHaveAttribute('data-end', '2026-11-06');
   await expect(page.getByTestId('rs-provisional')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('after the close, with the closing run still to come, every page shows the newest quotes and no Behind flag', async ({ page }) => {
+  const errors = watchErrors(page);
+  const seen = await walk(page, 'afterclose');
+  seen.forEach((c) => expect(c).toEqual({ day: '2026-11-09', words: 'As of Mon Nov 9, last quotes 6:40 PM ET', change: '+$121', cash: '$142', margin: 'none' }));
+  const line = page.getByTestId('asof');
+  await expect(line).not.toContainText('Behind');
+  await expect(line).not.toContainText('+$53');
+  await expect(page.getByTestId('asof-book')).toHaveText('Book as of Fri Nov 6, at the close');
+  await expect(line).toHaveAttribute('title', /Closing quotes are in for Mon Nov 9/);
+
+  await page.goto('/?scenario=afterclose');
+  await expect(page.getByTestId('bridge-change')).toHaveText('+$121 · +0.74% today');
   expect(errors).toEqual([]);
 });
 

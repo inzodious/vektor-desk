@@ -1,0 +1,115 @@
+{
+ "state": "after",
+ "day": "2026-11-09",
+ "opens_at": null,
+ "closes_at": null,
+ "as_of": "2026-11-09T23:40:00+00:00",
+ "holdings_date": "2026-11-06",
+ "value": 16513.99,
+ "day_change": 120.5,
+ "day_change_pct": 0.74,
+ "quality": "ok",
+ "rows": [
+  {
+   "account": "individual-0001",
+   "symbol": "FXAIX",
+   "shares": 38.704486,
+   "price": 207.72,
+   "prev_close": 207.72,
+   "value": 8039.7,
+   "day_change": 0,
+   "source": "holdings"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "FTEC",
+   "shares": 11.551172,
+   "price": 250.53,
+   "prev_close": 250.53,
+   "value": 2893.92,
+   "day_change": 0,
+   "source": "holdings"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "VXUS",
+   "shares": 29.684112,
+   "price": 62.95,
+   "prev_close": 62.95,
+   "value": 1868.61,
+   "day_change": 0,
+   "source": "holdings"
+  },
+  {
+   "account": "hsa-0002",
+   "symbol": "FXAIX",
+   "shares": 7.740911,
+   "price": 207.72,
+   "prev_close": 207.72,
+   "value": 1607.94,
+   "day_change": 0,
+   "source": "holdings"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "BND",
+   "shares": 8.725014,
+   "price": 77.35,
+   "prev_close": 77.35,
+   "value": 674.88,
+   "day_change": 0,
+   "source": "holdings"
+  },
+  {
+   "account": "hsa-0002",
+   "symbol": "FTEC",
+   "shares": 2.310224,
+   "price": 250.53,
+   "prev_close": 250.53,
+   "value": 578.78,
+   "day_change": 0,
+   "source": "holdings"
+  },
+  {
+   "account": "hsa-0002",
+   "symbol": "VXUS",
+   "shares": 5.936828,
+   "price": 62.95,
+   "prev_close": 62.95,
+   "value": 373.72,
+   "day_change": 0,
+   "source": "holdings"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "SPAXX",
+   "shares": 142,
+   "price": 1,
+   "prev_close": 1,
+   "value": 142,
+   "day_change": 0,
+   "source": "cash"
+  },
+  {
+   "account": "hsa-0002",
+   "symbol": "BND",
+   "shares": 1.745133,
+   "price": 77.35,
+   "prev_close": 77.35,
+   "value": 134.99,
+   "day_change": 0,
+   "source": "holdings"
+  },
+  {
+   "account": "individual-0001",
+   "symbol": "ACME",
+   "shares": 26.055237,
+   "price": 3.03,
+   "prev_close": 3.03,
+   "value": 78.95,
+   "day_change": 0,
+   "source": "holdings"
+  }
+ ],
+ "benchmarks": {}
+}

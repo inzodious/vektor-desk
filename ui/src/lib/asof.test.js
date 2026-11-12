@@ -44,11 +44,22 @@ describe('one clock', () => {
     expect(v.title).toContain('Provisional until official closes land overnight.');
   });
 
-  it('puts live figures in the headline only, with the day they belong to', () => {
+  it('leads with the live day and its change when quotes are newer than the book', () => {
     const v = asOfView({ ...FINAL, live: LIVE }, NOW);
     expect(v.headline).toEqual({ value: 41010.77, change: -251.41, pct: -0.6093, when: 'today', live: true });
     expect(v.liveWords).toBe('Live, Thu Nov 12, 2:15 PM ET');
-    expect(v.figures.change).toBe('+$524');
+    expect(v.text).toBe('As of Thu Nov 12, 2:15 PM ET');
+    expect(v.ticking).toBe(true);
+    expect(v.shown).toBe('2026-11-12');
+    expect(v.day).toBe('2026-11-11');
+    expect(v.books).toBe('Book as of Wed Nov 11, at the close');
+    expect(v.figures).toEqual({ change: '−$251', pct: '−0.61%', tone: 'dn', cash: '$603', pending: '$250', margin: '$1,500' });
+    const late = asOfView({ ...FINAL, behind: { sessions: 1, reason: 'Closing quotes are in for Thu Nov 12.' }, live: { ...LIVE, state: 'after', words: 'Thu Nov 12, last quotes 7:40 PM ET' } }, NOW);
+    expect(late.text).toBe('As of Thu Nov 12, last quotes 7:40 PM ET');
+    expect(late.ticking).toBe(false);
+    expect(late.behind).toBeNull();
+    expect(late.tone).toBe('');
+    expect(late.title).toContain('Closing quotes are in for Thu Nov 12.');
     expect(asOfView({ ...FINAL, live: LIVE }, new Date('2026-11-13T15:00:00Z')).headline.when).toBe('on Thu Nov 12');
   });
 

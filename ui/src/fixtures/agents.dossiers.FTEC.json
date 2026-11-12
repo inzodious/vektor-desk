@@ -36,6 +36,15 @@
    "now": 32
   },
   "verdict": "hold",
-  "what_would_change": "Top three weights pass 50%.\nForward P/E above 35x.\nThe plan drops the tech tilt."
+  "what_would_change": "Top three weights pass 50%.\nForward P/E above 35x.\nThe plan drops the tech tilt.",
+  "as_of": "2026-11-05",
+  "what_it_is": "A fund that owns US technology companies.",
+  "valuation_note": "Rich against its own history, held up by fast earnings growth.",
+  "risks": [
+   "Two companies make up over a third of the fund.",
+   "Technology falls further than the market in a sell-off."
+  ],
+  "fit": "It is at the top of its band, so new money goes elsewhere. The tilt is a choice, not the plan’s core.",
+  "verdict_line": "Hold. It sits at the top of its band, so new money goes elsewhere."
  }
 }

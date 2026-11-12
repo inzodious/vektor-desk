@@ -1,0 +1,36 @@
+{
+ "symbol": "FXAIX",
+ "run_id": 412,
+ "created_at": "2026-11-09T08:41:09+00:00",
+ "dossier": {
+  "symbol": "FXAIX",
+  "as_of": "2026-11-09",
+  "what_it_is": "A fund that owns the 500 largest US companies in proportion to their size. It makes money when US business as a whole does.",
+  "thesis": "It is the cheapest way to own US large companies and it is the core the plan is built around.",
+  "changes_since_last": null,
+  "valuation_range": {
+   "low": 17,
+   "high": 24,
+   "now": 22,
+   "unit": "multiple",
+   "basis": "Price against next year’s earnings"
+  },
+  "valuation_note": "Fair to slightly rich. Earnings growth is carrying the price, not hope.",
+  "risks": [
+   "A third of the fund sits in ten companies.",
+   "A US recession hits every holding at once."
+  ],
+  "bear_case": "It is concentrated in a handful of very large technology companies, and it has not been cheap for years.",
+  "fit": "It is 59% of the book against a 60% target, so the next deposit still goes here. It suits a moderate risk level.",
+  "verdict": "add",
+  "verdict_line": "Add on schedule. It is the core of the book and still under its band.",
+  "what_would_change": "It drifts more than 5 points over its target.\nThe plan changes its core fund.",
+  "sources": [
+   {
+    "title": "Fund fact sheet (synthetic)",
+    "url": "https://example.com/synthetic/fund-facts",
+    "date": "2026-10-31"
+   }
+  ]
+ }
+}

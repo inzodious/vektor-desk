@@ -2,7 +2,8 @@ import { parseDay } from './charts.js';
 import { pct, usd } from './format.js';
 
 export const RESEARCH_TABS = [
-  { to: '/research', label: 'Dossiers', end: true },
+  { to: '/research', label: 'Holdings', end: true },
+  { to: '/research/opportunities', label: 'Opportunities' },
   { to: '/research/sources', label: 'Sources' },
   { to: '/research/watchlist', label: 'Watchlist' },
   { to: '/research/calendar', label: 'Calendar' },
@@ -37,6 +38,18 @@ export const SOURCE_WORD = { primary: { t: 'Primary', tone: 'ok' }, web: { t: 'W
 
 export function isLink(s) {
   return /^https?:\/\//i.test(s?.url || '');
+}
+
+const HOLD_STATUS = {
+  running: { t: 'Running now', tone: 'info' },
+  waiting: { t: 'In tonight’s pass', tone: 'info' },
+  failed: { t: 'Last try failed', tone: 'watch' },
+  none: { t: 'Not analysed yet', tone: '' },
+};
+
+export function holdingChip(h) {
+  if (h?.verdict && VERDICT[h.verdict]) return VERDICT[h.verdict];
+  return HOLD_STATUS[h?.status] || { t: 'Analysed', tone: '' };
 }
 
 export function verdictOf(d) {
@@ -86,15 +99,44 @@ export function rangeGeo(range) {
   return { left: at(range.low), width: at(range.high) - at(range.low), now: now == null ? null : at(now), mid: at(mid), where };
 }
 
-export function isPriceBasis(basis) {
-  return /\bprice\b|\$|per share/i.test(basis || '');
+const MULTIPLE = /p\/e|\bpe\b|multiple|ev\/|p\/s|p\/b|price[- ]to[- ]|times (earnings|sales|book)/i;
+
+function basisLead(basis) {
+  return String(basis || '').split(/[.(;:]/)[0];
 }
 
-export function fmtBasis(v, basis) {
+export function isMultipleBasis(basis) {
+  const lead = basisLead(basis);
+  if (/per share/i.test(lead)) return false;
+  if (MULTIPLE.test(lead)) return true;
+  return !/\bprice\b|\$/i.test(lead) && MULTIPLE.test(String(basis || ''));
+}
+
+export function basisKind(basis, unit) {
+  if (unit !== undefined) return ['price', 'multiple', 'percent'].includes(unit) ? unit : 'plain';
+  if (isMultipleBasis(basis)) return 'multiple';
+  if (/\bprice\b|\$|per share/i.test(basis || '')) return 'price';
+  return /yield|%|percent/i.test(basis || '') ? 'percent' : 'plain';
+}
+
+export function isPriceBasis(basis, unit) {
+  return basisKind(basis, unit) === 'price';
+}
+
+export function basisParts(basis) {
+  const text = String(basis || '').trim();
+  if (!text) return { label: null, note: null };
+  if (text.length <= 48) return { label: text.replace(/\.$/, ''), note: null };
+  const lead = basisLead(text).trim();
+  return lead && lead.length <= 48 ? { label: lead, note: text } : { label: null, note: text };
+}
+
+export function fmtBasis(v, basis, unit) {
   if (v == null) return '—';
-  if (isPriceBasis(basis)) return `$${v.toFixed(v >= 100 ? 0 : 2)}`;
-  if (/p\/e|multiple|ev\/|p\/s|p\/b/i.test(basis || '')) return `${Number(v.toFixed(1))}x`;
-  if (/yield|%|percent/i.test(basis || '')) return `${Number(v.toFixed(2))}%`;
+  const kind = basisKind(basis, unit);
+  if (kind === 'price') return `$${v.toFixed(v >= 100 ? 0 : 2)}`;
+  if (kind === 'multiple') return `${Number(v.toFixed(1))}x`;
+  if (kind === 'percent') return `${Number(v.toFixed(2))}%`;
   return String(Number(v.toFixed(2)));
 }
 
@@ -102,9 +144,9 @@ export function rangeLine(range, nowValue) {
   const now = range?.now ?? nowValue ?? null;
   const g = rangeGeo({ ...range, now });
   if (!g) return 'No range written yet.';
-  if (now == null) return `Fair range ${fmtBasis(range.low, range.basis)} to ${fmtBasis(range.high, range.basis)}. Today's value isn't tracked for this basis.`;
+  if (now == null) return `Fair range ${fmtBasis(range.low, range.basis, range.unit)} to ${fmtBasis(range.high, range.basis, range.unit)}. Today's value isn't tracked for this basis.`;
   const word = { below: 'below the range', above: 'above the range', upper: 'inside the range, upper half', lower: 'inside the range, lower half' }[g.where];
-  return `Now ${fmtBasis(now, range.basis)}: ${word}.`;
+  return `Now ${fmtBasis(now, range.basis, range.unit)}: ${word}.`;
 }
 
 export function rebase(a, b) {

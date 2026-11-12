@@ -71,7 +71,7 @@ export function Board({ rows, names = {}, intraday = {}, label = 'Live holdings'
               {usd(r.value)}
             </span>
             <span role="cell" className="sp">
-              {series && series.length > 1 ? <Spark values={series} base={r.prev_close} color={up ? '#7fe3c2' : '#ffd677'} /> : <span className="nm">{r.source !== 'holdings' ? 'No ticks yet' : nav ? 'Prices at 4 PM' : 'Last close'}</span>}
+              {series && series.length > 1 ? <Spark values={series} base={r.prev_close} color={up ? '#7fe3c2' : '#ffd677'} /> : <span className="nm">{r.source !== 'holdings' ? (nav ? 'No ticks yet' : 'Closing quote') : nav ? 'Prices at 4 PM' : 'Last close'}</span>}
             </span>
           </div>
         );

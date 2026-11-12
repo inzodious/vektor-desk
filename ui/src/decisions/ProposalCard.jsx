@@ -2,13 +2,15 @@ import { Icon } from '../components/Icon.jsx';
 import { DESK_ICO } from '../components/icons.js';
 import { Conf, Lights } from './Lights.jsx';
 import { DESK_KEY, FUNDING, expiresLabel, oneLine, kindName, lampsOf, needsReason, originName, preflightMetric } from '../lib/decisions.js';
-import { usd } from '../lib/format.js';
+import { dayWords } from '../lib/charts.js';
+import { etStamp, usd } from '../lib/format.js';
 
 export function ProposalCard({ d, on = false, onPick, actions, busy }) {
   const lamps = lampsOf(d);
   const key = DESK_KEY[d.origin] || 'plan';
   const reason = needsReason(d);
   const cost = d.funding === 'margin' ? preflightMetric(d, 'margin.cost_month')?.after : null;
+  const asOf = dayWords(d.as_of || d.created_at);
   const pick = () => onPick?.(d);
   return (
     <div
@@ -43,6 +45,11 @@ export function ProposalCard({ d, on = false, onPick, actions, busy }) {
           {d.skeptic?.verdict === 'flag' ? <span className="chip lilac">Skeptic: flag</span> : null}
           {d.status === 'snoozed' ? <span className="chip">Back from snooze</span> : null}
           {d.expires_at ? <span className="chip">{expiresLabel(d.expires_at)}</span> : null}
+          {asOf ? (
+            <span className="chip" title={d.created_at ? `Written ${etStamp(d.created_at)}` : undefined} data-testid="prop-asof">
+              As of {asOf}
+            </span>
+          ) : null}
         </span>
       </span>
       <span className="prop-side">

@@ -39,12 +39,13 @@ function signedPct(v) {
   return `${zero ? '' : v < 0 ? '−' : '+'}${s}%`;
 }
 
-function figures(n) {
+function figures(n, live) {
   if (!n) return null;
+  const day = live || n;
   return {
-    change: usd(n.day_change, { sign: true }),
-    pct: signedPct(n.day_change_pct),
-    tone: n.day_change > 0 ? 'up' : n.day_change < 0 ? 'dn' : '',
+    change: usd(day.day_change, { sign: true }),
+    pct: signedPct(day.day_change_pct),
+    tone: day.day_change > 0 ? 'up' : day.day_change < 0 ? 'dn' : '',
     cash: usd(n.cash_ready),
     pending: n.cash_pending ? usd(n.cash_pending) : null,
     margin: n.margin_debit ? usd(n.margin_debit) : 'none',
@@ -57,18 +58,24 @@ export function asOfView(d, now = new Date()) {
   const live = d.live && d.live.value != null ? d.live : null;
   const numbers = d.numbers && d.numbers.value != null ? d.numbers : null;
   const behind = d.behind?.reason || null;
-  const label = firstSentence(d.words) || dayWords(d.day);
+  const book = firstSentence(d.words) || dayWords(d.day);
+  const quoted = live ? firstSentence(live.words) || dayWords(live.day) : null;
+  const label = quoted ? quoted.replace(/^Live,\s*/, '') : book;
+  const older = Boolean(live && live.day && live.day > d.day);
   const head = live ? { value: live.value, change: live.day_change, pct: live.day_change_pct, when: dayWord(live.day, now), live: true } : numbers ? { value: numbers.value, change: numbers.day_change, pct: numbers.day_change_pct, when: dayWord(d.day, now), live: false } : null;
   return {
     day: d.day,
     dayWords: dayWords(d.day),
+    shown: live?.day || d.day,
     text: `As of ${label}`,
-    provisional: Boolean(d.provisional),
-    behind,
-    title: [d.words, behind].filter(Boolean).join(' ') || null,
-    tone: behind ? 'watch' : '',
+    ticking: Boolean(live && /^Live\b/.test(quoted)),
+    provisional: Boolean(d.provisional) && !older,
+    behind: live ? null : behind,
+    books: older ? `Book as of ${book}` : null,
+    title: [live ? `Prices: ${quoted}. Cash, margin and the review come from the closed book, ${book}.` : d.words, behind].filter(Boolean).join(' ') || null,
+    tone: behind && !live ? 'watch' : '',
     numbers,
-    figures: figures(numbers),
+    figures: figures(numbers, live),
     live,
     liveWords: live?.words || null,
     headline: head,

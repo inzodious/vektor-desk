@@ -31,6 +31,15 @@
    "now": null
   },
   "verdict": "avoid",
-  "what_would_change": "Two clean launches in a row.\nShare count stops growing.\nThe plan makes room for a satellite sleeve."
+  "what_would_change": "Two clean launches in a row.\nShare count stops growing.\nThe plan makes room for a satellite sleeve.",
+  "as_of": "2026-11-04",
+  "what_it_is": "A small company that builds launch vehicles and sells rides to orbit.",
+  "valuation_note": "Priced for a launch schedule it has not yet kept.",
+  "risks": [
+   "A failed launch grounds the fleet for months.",
+   "It needs to raise cash again within a year."
+  ],
+  "fit": "It is a single stock outside the plan, half a percent of the book and inside the single-stock band.",
+  "verdict_line": "Stay out of more. One scrubbed launch resets the timeline and the price."
  }
 }

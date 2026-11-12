@@ -32,6 +32,26 @@ test('in the evening the strip shows what ran and what is running', async ({ pag
   await expect(card.locator('[data-stage="paper"]')).toContainText('Ran 4:46 PM');
 });
 
+test('a sixth stage sits on the same row as the others on a desktop', async ({ page }) => {
+  await page.route('**/api/jobs*', async (route) => {
+    const res = await route.fetch();
+    const json = await res.json();
+    await route.fulfill({ json: { ...json, stages: ['mirror', 'engine', 'review', 'desks', 'paper', 'overnight'] } });
+  });
+  await page.goto('/');
+  const stages = page.getByTestId('today-run').locator('.run-stage');
+  await expect(stages).toHaveCount(6);
+  await expect(stages.last()).toContainText('Overnight');
+  if (page.viewportSize().width >= 761) {
+    const first = await stages.first().boundingBox();
+    const last = await stages.last().boundingBox();
+    expect(last.y).toBe(first.y);
+    expect(last.x).toBeGreaterThan(first.x);
+  }
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+});
+
 test('a stopped scheduler is called out and All jobs opens Settings at the jobs card', async ({ page }) => {
   await page.goto('/?scenario=down');
   const card = page.getByTestId('today-run');

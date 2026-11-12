@@ -1,0 +1,109 @@
+{
+ "as_of": "2026-11-09",
+ "held": 5,
+ "analysed": 4,
+ "today": 2,
+ "failed": 1,
+ "waiting": 0,
+ "running": null,
+ "fresh_at": "2026-11-09T08:44:30+00:00",
+ "line": "4 of 5 holdings analysed, 2 of them today. 1 failed last night.",
+ "pass": {
+  "status": "ok",
+  "at": "2026-11-09T08:55:30+00:00",
+  "note": "Analysed FXAIX and VXUS. BND failed: the model call timed out.",
+  "next": "Tonight from 11:05 PM"
+ },
+ "rows": [
+  {
+   "symbol": "FXAIX",
+   "name": "Synthetic 500 Index Fund",
+   "kind": "fund",
+   "weight_pct": 59.2,
+   "status": "today",
+   "status_line": "Analysed today",
+   "verdict": "add",
+   "verdict_line": "Add on schedule. It is the core of the book and still under its band.",
+   "analysed_at": "2026-11-09T08:41:09+00:00",
+   "analysed_day": "2026-11-09",
+   "run_id": 412,
+   "attempt": {
+    "status": "ok",
+    "at": "2026-11-09T08:41:09+00:00",
+    "note": null
+   }
+  },
+  {
+   "symbol": "FTEC",
+   "name": "Synthetic Technology Index ETF",
+   "kind": "fund",
+   "weight_pct": 20.8,
+   "status": "older",
+   "status_line": "Analysed Thu Nov 5. It is in tonight’s pass.",
+   "verdict": "hold",
+   "verdict_line": "Hold. It sits at the top of its band, so new money goes elsewhere.",
+   "analysed_at": "2026-11-05T06:12:00+00:00",
+   "analysed_day": "2026-11-05",
+   "run_id": 4,
+   "attempt": {
+    "status": "ok",
+    "at": "2026-11-05T06:12:00+00:00",
+    "note": null
+   }
+  },
+  {
+   "symbol": "VXUS",
+   "name": "Synthetic International Index ETF",
+   "kind": "fund",
+   "weight_pct": 13.7,
+   "status": "today",
+   "status_line": "Analysed today",
+   "verdict": "add",
+   "verdict_line": "Add. It is the furthest under its target.",
+   "analysed_at": "2026-11-09T08:44:30+00:00",
+   "analysed_day": "2026-11-09",
+   "run_id": 413,
+   "attempt": {
+    "status": "ok",
+    "at": "2026-11-09T08:44:30+00:00",
+    "note": null
+   }
+  },
+  {
+   "symbol": "BND",
+   "name": "Synthetic Total Bond ETF",
+   "kind": "fund",
+   "weight_pct": 4.9,
+   "status": "failed",
+   "status_line": "Last try failed at 3:12 AM: the model call timed out. No earlier analysis.",
+   "verdict": null,
+   "verdict_line": null,
+   "analysed_at": null,
+   "analysed_day": null,
+   "run_id": null,
+   "attempt": {
+    "status": "timeout",
+    "at": "2026-11-09T08:12:00+00:00",
+    "note": "The model call timed out."
+   }
+  },
+  {
+   "symbol": "ACME",
+   "name": "Acme Launch Corp",
+   "kind": "stock",
+   "weight_pct": 0.5,
+   "status": "older",
+   "status_line": "Analysed Wed Nov 4. It is in tonight’s pass.",
+   "verdict": "avoid",
+   "verdict_line": "Stay out of more. One scrubbed launch resets the timeline and the price.",
+   "analysed_at": "2026-11-04T06:07:00+00:00",
+   "analysed_day": "2026-11-04",
+   "run_id": 3,
+   "attempt": {
+    "status": "ok",
+    "at": "2026-11-04T06:07:00+00:00",
+    "note": null
+   }
+  }
+ ]
+}

@@ -5,9 +5,9 @@ import { useConsole } from './consoleContext.js';
 import { useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { useMetrics } from '../lib/metrics.js';
-import { dayLabel, parseDay, periodStart } from '../lib/charts.js';
+import { dayLabel, dayWords, parseDay, periodStart } from '../lib/charts.js';
 import { etStamp, plural } from '../lib/format.js';
-import { SOURCE_WORD, coreFund, eventsOf, fmtBasis, freshness, isLink, isPriceBasis, keyNumbers, rangeGeo, rangeLine, rebase, sourceKind, triggersOf, verdictOf } from '../lib/research.js';
+import { SOURCE_WORD, basisParts, coreFund, eventsOf, fmtBasis, freshness, isLink, isPriceBasis, keyNumbers, rangeGeo, rangeLine, rebase, sourceKind, triggersOf, verdictOf } from '../lib/research.js';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SHOW_EVENTS = 6;
@@ -27,21 +27,29 @@ export function RangeStrip({ range, nowValue }) {
   const now = range?.now ?? nowValue ?? null;
   const g = rangeGeo({ ...range, now });
   if (!g) return <p className="empty-hint">No valuation range written yet.</p>;
+  const basis = basisParts(range.basis);
   return (
     <div>
-      <span className="kicker">Valuation range · {range.basis}</span>
-      <div className="range" role="img" aria-label={`Range ${fmtBasis(range.low, range.basis)} to ${fmtBasis(range.high, range.basis)}. ${rangeLine(range, nowValue)}`}>
+      <span className="kicker" data-testid="range-label">
+        Valuation range{basis.label ? ` · ${basis.label}` : ''}
+      </span>
+      {basis.note ? (
+        <p className="range-basis" data-testid="range-basis">
+          {basis.note}
+        </p>
+      ) : null}
+      <div className="range" role="img" aria-label={`Range ${fmtBasis(range.low, range.basis, range.unit)} to ${fmtBasis(range.high, range.basis, range.unit)}. ${rangeLine(range, nowValue)}`}>
         <span className="lab" style={{ left: `${g.left}%` }}>
-          {fmtBasis(range.low, range.basis)}
+          {fmtBasis(range.low, range.basis, range.unit)}
         </span>
         <span className="lab mid" style={{ left: `${g.mid}%` }}>
           fair
         </span>
         <span className="lab" style={{ left: `${g.left + g.width}%` }}>
-          {fmtBasis(range.high, range.basis)}
+          {fmtBasis(range.high, range.basis, range.unit)}
         </span>
         <span className="bar" style={{ left: `${g.left}%`, width: `${g.width}%` }} />
-        {g.now != null ? <span className={`now ${g.where}`} style={{ left: `${g.now}%` }} title={`Now ${fmtBasis(now, range.basis)}`} /> : null}
+        {g.now != null ? <span className={`now ${g.where}`} style={{ left: `${g.now}%` }} title={`Now ${fmtBasis(now, range.basis, range.unit)}`} /> : null}
       </div>
       <p className="empty-hint">{rangeLine(range, nowValue)}</p>
     </div>
@@ -178,7 +186,7 @@ export function Dossier({ entry, today }) {
   const verdict = verdictOf(entry);
   const fresh = freshness(entry.created_at);
   const row = live.symbols.find((s) => s.symbol === sym);
-  const nowPrice = isPriceBasis(d.valuation_range?.basis) ? (row?.price ?? null) : null;
+  const nowPrice = isPriceBasis(d.valuation_range?.basis, d.valuation_range?.unit) ? (row?.price ?? null) : null;
   const core = coreFund(plan.rows);
   const triggers = triggersOf(d.what_would_change);
   const start = periodStart('1Y', today);
@@ -190,7 +198,8 @@ export function Dossier({ entry, today }) {
         <div className="card-head">
           <span style={{ display: 'grid', gap: 2, minWidth: 0 }}>
             <span className="kicker">
-              Research desk · {etStamp(entry.created_at) || 'never'} · {plural((d.sources || []).length, 'source')}
+              Research desk · {etStamp(entry.created_at) || 'never'}
+              {dayWords(d.as_of) ? ` · numbers as of ${dayWords(d.as_of)}` : ''} · {plural((d.sources || []).length, 'source')}
             </span>
             <h2 className="dossier-title">
               <button type="button" className="sym sym-btn" data-sym={sym}>
@@ -209,9 +218,20 @@ export function Dossier({ entry, today }) {
             </button>
           </span>
         </div>
+        {d.verdict_line || d.what_it_is ? (
+          <div className="dossier-lead" data-testid="dossier-lead">
+            {d.verdict_line ? <p className="dossier-call">{d.verdict_line}</p> : null}
+            {d.what_it_is ? (
+              <p className="muted">
+                <b>What it is.</b> {d.what_it_is}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="split">
           <div>
             <RangeStrip range={d.valuation_range} nowValue={nowPrice} />
+            {d.valuation_note ? <p className="empty-hint" data-testid="valuation-note">{d.valuation_note}</p> : null}
             {d.changes_since_last ? (
               <div className="note" style={{ marginTop: 10 }}>
                 <Icon name="swap" />
@@ -262,6 +282,30 @@ export function Dossier({ entry, today }) {
           )}
         </div>
       </div>
+      {d.risks?.length || d.fit ? (
+        <div className="grid inner">
+          {d.risks?.length ? (
+            <div className={`card ${d.fit ? 'c7' : 'c12'}`} data-testid="dossier-risks">
+              <div className="card-head">
+                <span className="tag coral">Risks</span>
+              </div>
+              <ul className="dossier-risks">
+                {d.risks.map((x) => (
+                  <li key={x}>{x}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {d.fit ? (
+            <div className={`card ${d.risks?.length ? 'c5' : 'c12'}`} data-testid="dossier-fit">
+              <div className="card-head">
+                <span className="tag mint">Fit with your plan</span>
+              </div>
+              <p className="dossier-fit">{d.fit}</p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <KeyNumbers symbol={sym} />
       <div className="grid inner">
         <Events symbol={sym} today={today} />

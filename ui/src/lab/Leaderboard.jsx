@@ -77,8 +77,9 @@ function Row({ r }) {
   );
 }
 
-export function Leaderboard() {
-  const api = useApi('/api/engine/lab/leaderboard');
+export function Leaderboard({ api: given }) {
+  const own = useApi(given ? null : '/api/engine/lab/leaderboard');
+  const api = given || own;
   const d = api.data;
   const groups = boardGroups(d);
   const head = boardHead(d);

@@ -5,10 +5,16 @@ export function AsOfLine() {
   if (!a) return null;
   const f = a.figures;
   return (
-    <p className={`ph-asof ${a.tone}`} title={a.title || undefined} data-testid="asof" data-day={a.day}>
+    <p className={`ph-asof ${a.tone}`} title={a.title || undefined} data-testid="asof" data-day={a.shown || a.day} data-book={a.day}>
       <b data-testid="asof-day">{a.text}</b>
+      {a.ticking ? <span className="chip mint">Live</span> : null}
       {a.provisional ? <span className="chip lilac">Provisional</span> : null}
       {a.behind ? <span className="chip watch">Behind</span> : null}
+      {a.books ? (
+        <span className="chip" data-testid="asof-book">
+          {a.books}
+        </span>
+      ) : null}
       {f ? (
         <>
           <span>
