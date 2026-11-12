@@ -26,7 +26,23 @@ HEADER = "# Vektor Desk profile, drafted from the mirror"
 
 
 class StarterError(Exception):
-    pass
+    def __init__(self, message: str, code: str = "invalid"):
+        super().__init__(message)
+        self.code = code
+
+
+INIT = {"method": "POST", "path": "/api/decisions/profile/init", "label": "Set up my profile from my data"}
+PLAIN = {
+    "exists": "You already have a profile. Open Settings to change it.",
+    "no_mirror": (
+        "Your accounts haven't been copied to the desk yet, so there is nothing to build a profile from. "
+        "That copy runs every morning and evening. Try again after it, or start it from Settings → Box."
+    ),
+}
+
+
+def plain(error: StarterError) -> str:
+    return PLAIN.get(error.code) or str(error)
 
 
 def _local_today(cfg: Config) -> date:
@@ -192,7 +208,7 @@ def themes_from_plan(plan: dict) -> list[dict]:
 
 def draft(cfg: Config, *, today: date | None = None) -> tuple[dict, list[str]]:
     if not cfg.mirror_db.exists():
-        raise StarterError(f"No mirror at {cfg.mirror_db}. Run the mirror first (deploy.sh mirror).")
+        raise StarterError(f"No mirror at {cfg.mirror_db}. Run the mirror first (deploy.sh mirror).", "no_mirror")
     today = today or _local_today(cfg)
     conn = connect(cfg.mirror_db, readonly=True)
     try:
@@ -244,7 +260,7 @@ def render(data: dict, notes: list[str], today: date) -> str:
 def init(cfg: Config, path: Path | None = None, *, today: date | None = None, dry_run: bool = False) -> tuple[Path, str]:
     path = path or profile_path(cfg)
     if path.exists() and not dry_run:
-        raise StarterError(f"{path} already exists. The starter never overwrites it; edit it, or move it aside and run init again.")
+        raise StarterError(f"{path} already exists. The starter never overwrites it; edit it, or move it aside and run init again.", "exists")
     today = today or _local_today(cfg)
     data, notes = draft(cfg, today=today)
     text = render(data, notes, today)
@@ -401,5 +417,6 @@ def status(cfg: Config) -> dict:
         "rules": len(profile.get("rules", default=[]) or []),
         "notices": _notices(cfg),
         "margin": margin_rate(profile.data),
+        "init": None if path.exists() else INIT,
         "starter": None if path.exists() else "docker exec vektor-desk-cron python -m desk.decisions.profile init",
     }

@@ -194,8 +194,8 @@ def post_profile_init(cfg: Cfg) -> JSONResponse:
     try:
         path, _ = starter.init(cfg)
     except starter.StarterError as e:
-        raise HTTPException(409 if "already exists" in str(e) else 422, str(e)) from e
-    message = f"Wrote {path}. The next page load picks it up as a new profile version."
+        raise HTTPException(409 if e.code == "exists" else 422, starter.plain(e)) from e
+    message = "Your profile is set up from your data."
     return fresh({"changed": True, "path": str(path), "message": message, "status": starter.status(cfg)})
 
 
