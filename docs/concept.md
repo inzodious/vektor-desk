@@ -79,8 +79,8 @@ This is the heart of the desk.
 
   | Rule | What happens |
   |---|---|
-  | Subject and "as of" | Every proposal has a `subject` (stable across runs, scoped to its desk; derived when missing: `buy:SYM`, `sell:SYM`, `hold_off:SYM`, or `hold_off:general` with no symbol) and an `as_of` (the day of its facts; the creation time when missing) |
-  | Replace | A newer desk proposal on the same subject from a later run expires the older one (`replaced_by` points to it). A snooze carries over. One run never replaces its own proposals; his drafts are never replaced |
+  | Subject and "as of" | Every proposal has a `subject` (stable across runs, scoped to its desk; derived when missing: `buy:SYM`, `sell:SYM`, `hold_off:SYM`, `hold_off:general` with no symbol, `next-deposit` for a deposit route) and an `as_of` (the day of its facts; the creation time when missing) |
+  | Replace | A newer desk proposal on the same subject from a later run expires the older one (`replaced_by` points to it), including an older one filed without a subject that it stands for. A snooze carries over. One run never replaces its own proposals; his drafts are never replaced |
   | Window passed | `expires` is behind us |
   | Price outside its zone | Latest price is outside `price_min` to `price_max`. With no zone, a desk trade expires once the price is more than 10% from the price it was written at |
   | Cash gone | A ready-cash figure newer than the proposal is below `needs_cash_usd` (a cash-funded buy uses its amount) |

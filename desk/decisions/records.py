@@ -124,17 +124,20 @@ def _subject(value) -> str | None:
     return text[:SUBJECT_MAX] or None
 
 
-def subject_of(d: dict) -> str:
-    given = _subject(d.get("subject"))
-    if given:
-        return given
+def derived_subject(d: dict) -> str:
     kind, symbol = d["kind"], d.get("symbol")
+    if kind == "deposit_route":
+        return "next-deposit"
     head = "buy" if kind in BUY_KINDS else "sell" if kind in SELL_KINDS else "note" if kind in NOTE_KINDS else kind
     if symbol:
         return f"{head}:{str(symbol).upper()}"
     if head != "note":
         return f"{head}:general"
     return f"note:{_slug(d.get('rule_served')) or _slug(d.get('title')) or 'general'}"[:SUBJECT_MAX]
+
+
+def subject_of(d: dict) -> str:
+    return _subject(d.get("subject")) or derived_subject(d)
 
 
 def _as_of(raw) -> str | None:
@@ -419,9 +422,9 @@ def _insert(cfg: Config, conn: sqlite3.Connection, c: dict, *, origin: str, run_
 
 def _replace(conn: sqlite3.Connection, new: dict, at: str, tz: str) -> int:
     rows = conn.execute(
-        "SELECT id, status, snoozed_until FROM decisions WHERE status IN ('proposed', 'snoozed') AND origin=? AND subject=? AND id != ? "
+        "SELECT id, status, snoozed_until FROM decisions WHERE status IN ('proposed', 'snoozed') AND origin=? AND subject IN (?, ?) AND id != ? "
         "AND (run_id IS NULL OR run_id != ?)",
-        (new["origin"], new["subject"], new["id"], new["run_id"]),
+        (new["origin"], new["subject"], derived_subject(new), new["id"], new["run_id"]),
     ).fetchall()
     reason = REPLACED.format(day=day_words(new["created_at"], tz))
     held = None
@@ -733,7 +736,7 @@ def tidy(cfg: Config, conn: sqlite3.Connection, at: str) -> dict:
                 out["notes"] += _close(conn, d["id"], at, "logged", NOTE_REASON, status="logged", expires_at=None)
                 d["status"] = "logged"
             elif d["origin"] != "you":
-                newest[(d["origin"], d["subject"])] = d
+                newest[(d["origin"], d["subject"])] = newest[(d["origin"], derived_subject(d))] = d
         for d in rows:
             if d["status"] not in OPEN:
                 continue

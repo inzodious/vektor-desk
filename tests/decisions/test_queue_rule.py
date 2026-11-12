@@ -45,7 +45,8 @@ def test_subject_and_as_of_are_stored_or_derived(cfg, preflight, now, proposal):
     assert given["subject"] == "next deposit" and given["as_of"] == "2026-11-06"
     derived = create_proposal(cfg, proposal(kind="trim", symbol="wxyz"), "risk", run_id="r1", now=now)
     assert derived["subject"] == "sell:WXYZ" and derived["as_of"] == derived["created_at"]
-    assert subject_of({"kind": "deposit_route", "symbol": "abcd"}) == "buy:ABCD"
+    assert subject_of({"kind": "deposit_route", "symbol": "abcd"}) == "next-deposit"
+    assert subject_of({"kind": "buy", "symbol": "abcd"}) == "buy:ABCD"
     assert subject_of({"kind": "hold_off", "symbol": None, "rule_served": "Margin stays at 0"}) == "hold_off:general"
     assert subject_of({"kind": "alert", "symbol": None, "rule_served": "Margin stays at 0"}) == "note:margin-stays-at"
     assert subject_of({"kind": "alert", "symbol": None, "title": "Tech is 3 points over"}) == "note:tech-is-points-over"
@@ -80,6 +81,14 @@ def test_one_run_never_replaces_its_own_proposals(cfg, preflight, now, proposal)
     a = create_proposal(cfg, proposal(kind="hold_off", symbol=None, subject="margin"), "plan_keeper", run_id="r1", now=now)
     b = create_proposal(cfg, proposal(kind="hold_off", symbol=None, subject="margin"), "plan_keeper", run_id="r1", now=now)
     assert {d["id"] for d in queue(cfg, now=now)["items"]} == {a["id"], b["id"]}
+
+
+def test_a_named_subject_also_replaces_the_unnamed_one_it_stands_for(cfg, preflight, now, proposal):
+    unnamed = create_proposal(cfg, proposal(kind="hold_off", symbol=None), "plan_keeper", run_id="r1", now=now)
+    other = create_proposal(cfg, proposal(kind="hold_off", symbol=None, subject="earnings-week"), "plan_keeper", run_id="r1", now=now)
+    named = create_proposal(cfg, proposal(kind="hold_off", symbol=None, subject="margin"), "plan_keeper", run_id="r2", now=now + timedelta(days=1))
+    assert unnamed["subject"] == "hold_off:general" and get(cfg, unnamed["id"])["replaced_by"] == named["id"]
+    assert {d["id"] for d in queue(cfg, now=now + timedelta(days=1))["items"]} == {other["id"], named["id"]}
 
 
 def test_a_snooze_carries_over_to_the_replacement(cfg, preflight, now, proposal):
