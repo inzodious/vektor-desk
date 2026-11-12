@@ -212,7 +212,7 @@ One current analysis per holding, written overnight and shown in Research. It ru
 | Which holdings | Never analysed, then a new discount signal, a new filing signal, earnings today or tomorrow, then older than 7 days. Biggest weight first within each. An analysis under 18 hours old is skipped, so starting twice in a night is safe |
 | One at a time | Each holding is one call behind the shared `agents` lock: Opus, `high`, web search, 30 turns. No new call starts between 06:00 and 08:00, so a slow night never runs into the morning jobs |
 | Prompt | `holding` (plan facts without lots), `current_plan`, `previous_analysis`, `no_buy`, `advisor`, `risk_numbers`, `reasons` |
-| Checks | Needs a verdict, the six text sections and one dated source, or it is refused. An `add` becomes `hold` when the holding is over its band or inside a no-buy window |
+| Checks | Needs a verdict and the six text sections, and a stock needs one dated source, or it is refused. `valuation_range.unit` is `price`, `multiple`, `percent` or null, `basis` is a short label (120 characters at most) and the method lives in `valuation_note`. A dossier written in the older format counts as never analysed. Text is rounded like every other desk's. An `add` becomes `hold` when the holding is over its band or inside a no-buy window |
 | Failures | A failed holding is tried once more that night, then left for the next. Three failures in a row or a usage limit stop the pass. Each try is kept in `agent_holding_tries`, and the page says why in plain words |
 | Last line | `{"ready": "All 14 holdings analysed"}` or `{"skipped": "..."}` for the morning alert |
 | App | `GET /api/agents/holdings`: counts, `fresh_at`, one `line`, and a row per holding with `status` (`today`, `older`, `running`, `waiting`, `failed`, `none`), `status_line`, `verdict`, `verdict_line`. One holding: `GET /api/agents/dossiers/{symbol}` |
@@ -297,9 +297,10 @@ Decisions Joshua makes are stored against the proposal: `approved`, `dismissed`,
 
 | Rule | Where |
 |---|---|
-| Prose is rounded before it is saved: percentages, points and ratios to one or two decimals, dollars over $1,000 to whole dollars. `numbers_used` and `numbers_cited` are never touched | `wording.tidy`, applied to proposal titles and text, the Brief summary, debrief text and plan summaries |
+| Prose is rounded before it is saved: percentages, points and ratios to one or two decimals, dollars over $1,000 to whole dollars, and a bare amount such as (-2182.12) becomes -$2,182. `numbers_used` and `numbers_cited` are never touched | `wording.tidy`, applied to proposal titles and text, the Brief summary, debrief text and plan summaries |
 | One cash figure, no machinery talk ("the rule's own count reads 0", "no margin rate is set"), nothing raised twice | `prompts/common.md` Writing, `debrief.md`, `plans.md` |
 | Every proposal a desk files carries `subject` and `as_of` | `wording.stamp`: `subject` is stable and has no numbers (`next-deposit`, `margin`, `buy:SYM`, `sell:SYM`, `rebalance:SYM`, `hold_off:SYM`, `rule:<slug>`); `as_of` is the engine day of the brief |
+| A buy needs money that is really there | `pipeline.funding_problem` throws away a buy or deposit route that needs more than `cash.ready` (the account's own figure when the proposal names one), any buy while `margin.debit` is open unless the named account's own cash covers it, and a deposit route larger than the pending deposit less the debit. `pipeline.held_off` throws away a buy that an open `hold_off` covers (same symbol, the margin note, or a "no new buys" note), whichever desk wrote it, including one in the same answer |
 | What the record does with them | `desk.decisions` replaces an open proposal from the same desk on the same subject, expires stale ones, and logs `alert` and `memo` as notes instead of queue items (see `docs/concept.md`) |
 
 ## Guardrails
