@@ -34,6 +34,15 @@ CREATE TABLE IF NOT EXISTS prices_daily (
   source TEXT NOT NULL,
   PRIMARY KEY (symbol, date)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS closes_provisional (
+  symbol TEXT NOT NULL,
+  date TEXT NOT NULL,
+  close REAL NOT NULL,
+  prev_close REAL,
+  quote_at TEXT NOT NULL,
+  stamped_at TEXT NOT NULL,
+  PRIMARY KEY (symbol, date)
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS holdings_daily (
   date TEXT NOT NULL,
   account TEXT NOT NULL,

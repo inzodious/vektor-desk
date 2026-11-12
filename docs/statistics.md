@@ -63,7 +63,7 @@ Long engine jobs wrap themselves in `desk.runlock.job_lock("<name>")` so a deplo
 | Layer | Where | Tables | Rule |
 |---|---|---|---|
 | **raw** | `mirror.db`, plus `desk.db` | Mirror: `rows`, `row_history`. Engine: `raw_lot_files`, `raw_api(source, key, body, fetched_at)` | Verbatim, append-only. Lets any later number be recomputed from what was known on the day |
-| **core** | `desk.db` | `accounts`, `engine_snapshots` (every snapshot the mirror ever saw, with the one per day used as the anchor), `holdings_daily(date, account, symbol, shares, close, value, cost, reported_value, is_cash, source, anchor, quality)`, `lots`, `cash_flows(date, account, amount, kind, external)`, `prices_daily(symbol, date, close, adj_close, source)`, `benchmarks`, `factors_daily`, `macro_daily`, `fund_holdings(fund, as_of, holding, name, cusip, weight, asset_cat, country, accession)`, `quotes_live(symbol, at, price)` | Normalized, deduplicated, one row per fact |
+| **core** | `desk.db` | `accounts`, `engine_snapshots` (every snapshot the mirror ever saw, with the one per day used as the anchor), `holdings_daily(date, account, symbol, shares, close, value, cost, reported_value, is_cash, source, anchor, quality)`, `lots`, `cash_flows(date, account, amount, kind, external)`, `prices_daily(symbol, date, close, adj_close, source)`, `benchmarks`, `factors_daily`, `macro_daily`, `fund_holdings(fund, as_of, holding, name, cusip, weight, asset_cat, country, accession)`, `quotes_live(symbol, at, price)`, `closes_provisional` | Normalized, deduplicated, one row per fact |
 | **derived** | `desk.db` | `metric_values`, `series_daily`, `signals`, `proposals_scored`, `data_health` | Written by the engine run, tagged with `engine_version` |
 
 **Keep every pull.** Escape Vektor collapses synced snapshots to one per week. `row_history` keeps every version of every snapshot and position the mirror saw (`positions.json.snapshotId` joins to `snapshots.json.id`), so the engine rebuilds `holdings_daily` for every pull and, from the first day the mirror runs, has a daily history Escape Vektor does not. Earlier history is rebuilt the way Escape Vektor's `market.js` does it: the earliest snapshot's quantities rolled forward by activity rows, priced with daily closes, flagged `pro_forma` where no snapshot confirms it. Days before the earliest snapshot come from the Fidelity history (see History before the first snapshot).
@@ -181,7 +181,7 @@ Each metric has an id, a formula, a minimum sample, and scopes (portfolio, accou
 | `value.gain` | Investment gain | Change in value minus net contributions. The honest "how much did the market give me" |
 | `income.dividends` | Dividend and interest income | Trailing 12 months and by window |
 | `cash.share` | Cash share | Core fund and settled cash as a share of value |
-| `cash.ready` | Cash ready to invest | Settled core cash minus any margin debit |
+| `cash.ready` | Cash ready to invest | Cash you can invest without borrowing: each account's core cash net of its own debit, floored at zero, then summed. Never negative; the debt lives only in `margin.debit`. Also per account (`scope=account`). `modelled` when a cash row is. One helper, `desk.engine.cash.picture`, feeds `cash.ready`, `cash.share` and `margin.debit`, so ready cash minus margin debit is always net cash |
 | `cash.pending`, `cash.pending_days` | Next deposit and days until it | From the profile's deposit schedule, else the plan; `modelled` |
 | `flow.invest_rate` | Investing rate | External investment flows divided by take-home pay (from `paystubs`) |
 
@@ -236,7 +236,7 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 | Id | Metric | Notes |
 |---|---|---|
 | `margin.debit` | Margin debit | From the margin sub-account balance |
-| `margin.cost_day`, `margin.cost_month` | Interest cost in dollars | Daily accrual at `DESK_MARGIN_RATE_PCT`, assuming a 360-day year until the first margin statement confirms the broker's day count |
+| `margin.cost_day`, `margin.cost_month` | Interest cost in dollars | Daily accrual at one rate from `desk.engine.cash.margin_rate`: `DESK_MARGIN_RATE_PCT`, else the profile's `margin.rate_pct` (`modelled` while that is the built-in default). Assumes a 360-day year until the first margin statement confirms the broker's day count. Preflight and the scorecard use the same rate |
 | `margin.funded_share` | Margin-funded share of positions | |
 | `margin.call_drop` | Price drop to a maintenance call | `1 − debit / ((1 − m) × value)`, with `m` the maintenance requirement (per security where the export gives it, otherwise `DESK_MARGIN_MAINT_PCT`, default 30) |
 | `margin.call_price` | Call price for the largest single stock | The price at which that holding alone, with everything else flat, triggers a call |
@@ -253,7 +253,8 @@ Portfolio rows use your actual daily returns once there are enough of them. Befo
 | `plan.single_stock` | Single-stock share vs its band | |
 | `plan.next_deposit` | Where the next deposit goes | The split that closes the most drift without selling. Only when a deposit is expected from your activity (auto-detected series or a schedule); the plan's contributions never predict one |
 | `plan.adherence` | Plan adherence | Share of buy dollars (activity, core sweeps excluded) that went to plan funds; windows `MTD`, `QTD`, `YTD`, `1Y`, `ITD` |
-| `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points, conviction holds (pass while the symbol's weight sits inside `band_min_pct`–`band_max_pct`). A conviction symbol is exempt from the single-stock band and from no new single stocks. Each a pass or fail with the evidence |
+| `plan.rules` | Rule checks | Single-stock band, no new single stocks, no margin-funded buys, drift over 5 points, conviction holds (pass while the symbol's weight sits inside `band_min_pct`–`band_max_pct`). A conviction symbol is exempt from the single-stock band and from no new single stocks. Unit `flag`: 1 holds, 0 broken. It is not a count |
+| `plan.rule_breaks` | What breaks a rule | Per rule, how many things break it (margin-funded buys in 30 days, stocks outside a band, funds past the drift limit). 0 whenever `plan.rules` is 1. The plain sentences sit in the `rules` view and in the `rule_breach` trigger's `detail {breaks, what}` |
 
 **Reference mix.** `core.reference_mix(plan)` gives the weights these metrics are measured against: the Escape Vektor plan when the mirror has one, else the built-in safe mix (`catalog.SAFE_MIX`). `GET /api/engine/reference` returns `{as_of, source (plan or safe_mix), name, weights, judged, note}`.
 
@@ -687,6 +688,21 @@ Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the clo
 
 For the research desk: `discounts.pending(cfg, limit)` returns the last 5 days' hits with no case, biggest discount first, and raises `discounts.NotReady` before the first scan. `discounts.record(cfg, signal_id, case)` checks a case (verdict buy/wait/avoid, case ≤ 400, risks ≤ 240, confidence 0–1, horizon_days ≥ 1, numbers_cited from the hit's `numbers`, model, written_at), raises `ValueError` on bad values and returns False when a case already exists.
 
+## One as of
+
+Module `desk.engine.asof`. Every page reads one day and one time from `GET /api/asof`.
+
+| Piece | Rule |
+|---|---|
+| Book day | The newest day in `metric_values`. Holdings, metrics, the newest day pack and its debrief all sit on it |
+| Evening run | After the close the daily job copies each quoted symbol's last regular-session quote (trade time up to a minute past the close; later prints ignored) into `closes_provisional(symbol, date, close, prev_close, quote_at, stamped_at)`, then rebuilds. So by 17:45 ET the book day is today |
+| Provisional | A day is provisional while any of its prices come from `closes_provisional`. A symbol with no quote (mutual funds) carries its last close and is listed in `prices.carried` |
+| Restated | Mirror closes and Tiingo bars always win over a provisional close. `restate` reruns the day when they land and the provisional rows are dropped; rows older than 7 days are dropped anyway |
+| Quotes | Held symbols, SPY and every live catalog mix symbol, so the yardsticks move on the provisional day too. One extra fetch right after the close settles the closing price |
+| Catch-up | A book older than the last finished session moves by itself on the next daily or `restate` run, from stored quotes or bars |
+
+**`GET /api/asof`.** `{day, at, provisional, status (final, provisional, empty), words, previous_day, expected_day, behind (null or {sessions, reason}), prices {official, quoted, carried}, numbers {value, day_change, day_change_pct, cash_ready, cash_pending, cash_pending_days, margin_debit, margin_cost_month}, live, market {state, day}, review {day, computed_at}, debrief {day, written_at, stale}}`. `numbers` are the metric values at `day`. `live` is `{day, state, at, value, day_change, day_change_pct, words}` only while quotes belong to a later session than `day`; null means the book already covers it, so pages show `numbers`.
+
 ## Period reviews
 
 Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. One pack of facts per day, week, month and year; the debrief desk writes the words from it.
@@ -702,6 +718,7 @@ Module `desk.engine.review`, job `review` weekdays 08:35, 17:35 and 17:45 ET. On
 | Movers | Per holding: yesterday's shares × today's price change, summed over the period (splits handled). Top 5 up and down. A mover's `return_pct` is chained from the same daily holdings prices, so it always agrees in sign with its contribution. `other_usd` is the rest of the gain: dividends, interest, cash and same-day trades. A day's flow under 5 cents is rounding and counts as zero |
 | Risk | Max drawdown and best and worst day on the return index; volatility annualised from daily returns (5 or more days). `band` (your risk band and the as-held fit) only on the latest pack. `convictions` is each conviction hold's weight against its band |
 | Events | Discount days, scored filings and earnings dates for names held in the period |
+| Provisional | A pack whose last day is provisional carries `provisional {day, carried, note}`; the key is absent otherwise. It is rebuilt when the day is restated, and the debrief is written again |
 | Tables | `period_reviews(kind, start, end, as_of, closed, final, version, digest, pack, computed_at)`, `period_debriefs(kind, end, pack_digest, body, written_at, model, run_id)`, `review_runs` |
 
 **Pack.** `version, kind, start, end, as_of, label, quality, coverage {full, base, days, note}, value {start, end, change_usd, change_pct, net_flows, gain_usd}, vs [{id, name, kind, return_pct, excess_pts, value_end, diff_usd}], movers {up, down, other_usd, count}` (rows `{symbol, name, contribution_usd, contribution_pts, return_pct, weight_pct}`), `accounts [{account, start, end, change_usd, change_pct, net_flows}], income {dividends, interest, margin_interest}, flows [{date, account, amount, kind}], trades [{date, account, symbol, side, shares, price, amount}], trade_count, realized {short_term, long_term, total, sales}, risk {max_drawdown_pct, volatility_pct, best_day, worst_day, band, convictions}, decisions {made, matured}, paper [{id, name, kind, status, return_pct, value_end}], fi {fi_number, progress_start_pct, progress_end_pct, change_pts}, events [{date, type, symbol, detail}], numbers`. `numbers` is the flat list a debrief may cite (`change_usd`, `vs.spy.pts`, `contrib.<SYM>.usd`, `ret.<SYM>.pct`, `paper.<id>.pct`, `score.<id>.<horizon>.usd` …). `digest` is a hash of the pack.
@@ -867,6 +884,9 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 | `entry` | `{"top_n": 3 \| "param:top_n", "min_signal": 0}` or "top 3 by rank". `min_signal` applies to the first signal's raw value; slots it leaves empty stay in cash |
 | `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
 | `rebalance`, `sizing` | Weekly, monthly or quarterly; `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash |
+| `filters` | `[{"metric_id": "ma_gap", "window": "200d", "min": 0}]`: a name is eligible only while each raw value sits inside `min` and `max`; slots left empty stay in cash |
+| Fixed mixes | `"sizing": {"weights": {"SPY": 60, "AGG": 40}}` holds funds at fixed weights and needs no signal; `{"type": "fund_list", "set": "plan_mix"}` is the plan at its target weights. A fund with no history in the lab is dropped and the rest scaled up, with a caveat; under half the mix present is refused |
+| Named French portfolios | `{"type": "french", "set": "size_deciles", "members": ["lo"]}` keeps the portfolios whose name starts that way and needs no signal |
 | `params`, `grid` | `{"top_n": {"min": 1, "max": 4, "default": 3}}` or a list; grid values must sit inside. Over the trial budget (max 200), a seeded, deterministic subset runs |
 
 **A run.** Signals at the close, fills at the next open (`adjClose`-scaled), costs 5 bps for funds, 15 for stocks, 25 under $20M a day. FIFO lots, year-end tax on net realized gains at the exported marginal rate (else 24%) and 15% long-term, losses carried. Cash earns the 3-month bill. A symbol whose bars stop before the data ends is sold at its last price less 30%. The benchmark is `spec.benchmark`, else the plan mix, else the S&P 500, rebalanced monthly; the S&P 500 is always reported.
@@ -957,7 +977,7 @@ paper_portfolios, paper_positions, paper_trades   (Strategy lab; the trial ledge
 
 - `scope`: `portfolio`, `account`, `sleeve`, `holding`, `benchmark`, `shadow`, plus `pair`, `underlying`, `sector`, `scenario`, `macro`, `rule`, `tax`, `decision`, `group`, `desk`, `factor`.
 - `quality`: `ok`, `stale`, `pro_forma`, `modelled`, `insufficient_history`.
-- `unit`: `usd`, `pct`, `pts`, `ratio`, `days`, `date`.
+- `unit`: `usd`, `pct`, `pts`, `ratio`, `days`, `date`, `count`, `flag` (1 yes, 0 no).
 
 **Agent brief.** Agents never open the SQLite file. The brief builder ([agents.md](agents.md)) calls `desk.engine.brief.desk_slice(cfg, desk)` and writes the result as that run's `brief.json`: `{desk, as_of, data_as_of, data_health: [{check, status, detail}], sections}`. It raises `brief.NotReady` before the first engine run. Every metric value is `{metric_id, scope, scope_id, window, value, unit, as_of, quality}`; portfolio-level rows use `scope_id` `all`.
 
@@ -973,14 +993,14 @@ paper_portfolios, paper_positions, paper_trades   (Strategy lab; the trial ledge
 
 Every slice also carries `triggers` for its day. A proposal's `numbers_used[].field` is the key `metric_id:scope_id:window` (for example `plan.drift:FXAIX:now`), so Preflight can match it to the brief exactly.
 
-**Triggers.** After each core run the engine writes `triggers(as_of, kind, scope_id, detail)` for the agents' scheduler (`desk.engine.triggers.today(cfg)`); each fires at most once a day. The first day a condition appears, it also sends a phone alert on `alerts` (no dollar amounts). Live quotes failing during market hours sends one `ops` alert a day.
+**Triggers.** After each core run the engine writes `triggers(as_of, kind, scope_id, detail)` for the agents' scheduler (`desk.engine.triggers.today(cfg)`); each fires at most once a day. Between 22:00 and 07:00 local time an alert goes out at low priority, so a day restated overnight never rings the phone. The first day a condition appears, it also sends a phone alert on `alerts` (no dollar amounts). Live quotes failing during market hours sends one `ops` alert a day.
 
 | Kind | Fires when | Scope |
 |---|---|---|
 | `margin_debit` | `margin.debit` above zero | `portfolio` |
 | `daily_move` | Portfolio 1D TWR past the risk dial (1 to 4% for risk level 1 to 5), or a holding past 2.5 times it | `portfolio` or ticker |
 | `concentration` | A single stock, or all of them together, past `opportunity.satellite_cap_pct` | ticker or `satellite` |
-| `rule_breach` | A `plan.rules` check is 0 | rule id |
+| `rule_breach` | A `plan.rules` flag is 0; `detail` is `{breaks, what}` from `plan.rule_breaks` | rule id |
 | `lot_export` | A lot or realized export was imported | `lots` or `realized` |
 | `deposit_landed` | A scheduled deposit landed in the last 3 days | deposit id |
 | `earnings` | A holding reported (phase 6 fetchers) | ticker |
@@ -998,12 +1018,14 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | `GET /api/engine/lots?symbol=&account=` | Current tax lots (each with `method` and `quality`), recent lot files, and imported Fidelity history files (`history`) |
 | `GET /api/compare?ids=&window=` | Aligned, rebased series plus the comparison table; 400 on bad input |
 | `GET /api/engine/lookthrough?fund=&limit=` | Look-through exposure, sectors, funds covered, one fund's holdings |
-| `GET /api/live` | Latest quotes, live value, day change (market hours) |
+| `GET /api/asof` | The desk's one day and time (see [One as of](#one-as-of)) |
+| `GET /api/live` | Latest quotes, live value, day change (market hours). `quote_day` is the session the quotes belong to; a fund with no quote that day counts no change |
 | `GET /api/live/intraday` | Today's quote ticks `{SYM: [{t, price}]}` |
 | `POST /api/preflight` | The Preflight answer for a hypothetical trade (nothing stored); 400 on a bad trade |
 | `GET /api/engine/preflight?ticket_id=` | Stored before and after rows for a ticket |
 | `GET /api/engine/wash` | Open wash-sale windows `{symbol, kind, date, clears, account, amount}` |
 | `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status, feature catalog and grammar; one strategy's tear sheet, verdict and paper trades |
+| `GET /api/lab/library` | The strategy library: one row per built-in experiment with its kind, out-of-sample verdict, benchmark, trial count and luck band |
 | `GET /api/engine/scorecard?origin=` | Flight record: groups, desks, saves, off-plan gap, per-decision scores |
 | `GET /api/engine/patterns` | Patterns: market, holdings, drawdown tables, seasonality, correlation shifts, behavior |
 | `GET /api/engine/replay` | Rule replays: you, the index, and each rule's end value, by-symbol effect and weekly path |
@@ -1028,8 +1050,45 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Nightly 23:50 ET | `earnings`: EPS facts and release times for 300 companies, then every surprise event |
 | Weekdays 08:45 and 16:45 ET | `paper`: lanes and catalog mixes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
+| Nightly 01:25 to 06:25 ET, hourly | `restate`: exits at once unless official closes landed for a provisional day or the book is behind the last finished session; then the daily pass and the review run again. Never twice on the same closes |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
 | Nightly 03:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
+
+## Strategy library
+
+A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/shelf.py`. Each entry has an id, a kind, a family, a title, a one-line description, a benchmark label and either a strategy spec or a deposit rule.
+
+| Kind | Entries | Examples |
+|---|---|---|
+| Old and tested | 16 | Buy and hold, 60/40, risk parity, 200-day trend, volatility cap, dual momentum, 12-1 momentum (sectors, stocks, industries), sector rotation, low volatility, size and momentum tilts from the French portfolios |
+| Practical | 12 | The plan's mix, safe mix, aggressive tech tilt, dip-only, beaten-down sectors, deposits held back for a dip, margin dip-buy, lump sum spread over months, deposit steering, rebalance bands, tax-loss harvesting |
+| Novel and creative | 7 | Trend-filtered dip-buy, sector momentum in uptrends only, calm winners, 52-week-high breakout with a volatility cap, discount-day entries, insider cluster with a momentum filter, earnings drift where insiders also bought |
+
+Not on the shelf yet: value, profitability and quality tilts (their French files are not downloaded) and the as-held mix (the lab file carries the plan's weights, not position sizes; as-held runs in the paper race).
+
+| Step | When | What happens |
+|---|---|---|
+| Queue | End of `lab-export` (00:55), before the offer to a worker | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Experiments sort before rules. An entry the lab refused is queued again the next evening. A second run the same night queues nothing |
+| Run | Lab, with a worker first | Experiments are `lab.sims` jobs like any other; deposit rules run in the lab itself. The lab keeps waiting for an offered file while the worker has answered something in the last `DESK_LAB_WORKER_WAIT_MIN` minutes, then runs what is left |
+| Count | Ledger | Every shelf strategy has `parent_id: "library"`, so they are one family and each variant counts toward the trial count. `insider-` and `drift-` ids also count in those gate families |
+| Report | `GET /api/lab/library` | One row per entry, sorted by kind, verdict, then excess |
+
+`lab-export` is a light job (54 MB), so low-memory mode never makes it wait for its turn. Shelf results never queue a Strategy desk review, and they are never finalized by the shelf, so the two-year holdout stays untouched and nothing goes to paper.
+
+**New deposit rules.** `dip_reserve` (`hold_pct`, `dip_pct`): that share of each deposit waits in cash and is all invested when the mix is that far below its high. `spread` (`months`): the starting sum goes in over that many monthly parts; the baseline invests it on day one. Waiting cash earns the three-month Treasury rate.
+
+**Verdicts** use out-of-sample numbers only (the stitched walk-forward test windows; start-month distributions for rules):
+
+| Verdict | Experiment | Deposit rule |
+|---|---|---|
+| `held_up` | Ahead of the benchmark by at least the luck band, and overfitting probability under 0.2 | `helps`: 5th percentile above zero and the holdout not negative |
+| `within_noise` | Ahead, but inside the band, or the best settings look fitted | `no_clear_edge` |
+| `fell_short` | Behind the benchmark | `hurts`: 95th percentile below zero |
+| `inconclusive` | No out-of-sample record | No horizon with a start month |
+
+The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 / k)) * tracking_error / sqrt(years)`, with `k` the library's trial count. Each experiment result now also stores `noise` (`gate.measure` on the walk-forward record).
+
+**Row** (`rows[]`): `id`, `title`, `kind`, `family`, `description`, `benchmark`, `type` (`experiment` or `rule`), `status` (`tested`, `waiting`, `not_run`), `verdict`, `line` (one sentence with the numbers), `reason` (why it has not run), `tested_at`, `out_of_sample` (`start`, `end`, `ann_return_pct`, `excess_pts`, `sharpe`, `mdd_pct`), `noise` (`trials`, `band_pts`, `luck`), `rule` (`horizon_years`, `starts`, `p5_pts`, `p50_pts`, `p95_pts`, `share_better`), `deflated_sharpe`, `pbo`, `variants`, `research_only`, `caveats`, `detail`. The payload also has `as_of`, `trials`, `note`, `counts` and `kinds`. `shelf.ready(cfg)` gives the morning alert its line.
 
 ## Memory budget
 
@@ -1067,7 +1126,7 @@ On the synthetic database the heaviest experiment (French industries, 781 simula
 | Offer | NAS: end of `lab-export` (00:55), then `lab-offer` each minute from 01:00 to 05:59 | If a worker is online, every queued experiment the lab has not run becomes a `lab.sims` job keyed by `simcache.job_key`, with the current `lab.db` as its copy. `lab/queue/offers.sims` records each file's key and first offer time, and when a worker was last seen. A file is offered once per `lab.db`; later passes keep its time. No worker online: nothing is offered and nothing waits |
 | Run | Worker | `runner.sims` on its downloaded copy. An answer over 3 million simulated days is cut short and marked `partial`; the lab computes the rest |
 | Accept | NAS, `worker-apply` | `simcache.stage_file` copies the gzip into `lab/queue/` unread, so it costs no memory in the scheduler. It runs within seconds of the worker's post |
-| Use | Lab | An offered file, and everything queued after it, waits up to `DESK_LAB_WORKER_WAIT_MIN` (10) minutes from its offer for the answer; `waiting_for_worker` in the run's output names them. An experiment queued in the last 3 minutes also waits if a worker was seen in the last 6, so the offer can reach it first. When the answer arrives it is checked as above and used, good or bad. When it does not, the lab runs the queue itself. A wait still open at 06:00 is finished before the lab stops for the day |
+| Use | Lab | An offered file, and everything queued after it, waits up to `DESK_LAB_WORKER_WAIT_MIN` (10) minutes from its offer, or from the worker's latest answer if that is later, for the answer; `waiting_for_worker` in the run's output names them. An experiment queued in the last 3 minutes also waits if a worker was seen in the last 6, so the offer can reach it first. When the answer arrives it is checked as above and used, good or bad. When it does not, the lab runs the queue itself. A wait still open at 06:00 is finished before the lab stops for the day |
 
 **Rules for new jobs.** Iterate cursors, do not `fetchall` a bar table. Write downloads in batches inside the loop that fetches them. A second run of a job must be a no-op, not a double write.
 
