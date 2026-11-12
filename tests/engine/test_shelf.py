@@ -23,6 +23,9 @@ SMALLS = tuple(f"SML{i}" for i in range(6))
 FRENCH = (
     ("size_deciles", ("Lo 10", "Dec 2", "Hi 10")),
     ("momentum_deciles", ("Lo PRIOR", "PRIOR 2", "Hi PRIOR")),
+    ("value_deciles", ("Lo 10", "Dec 2", "Hi 10")),
+    ("profitability_deciles", ("Lo 10", "Dec 2", "Hi 10")),
+    ("investment_deciles", ("Lo 10", "Dec 2", "Hi 10")),
     ("industry_12", tuple(f"Ind{i}" for i in range(12))),
     ("industry_49", tuple(f"I{i}" for i in range(49))),
 )

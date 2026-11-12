@@ -17,6 +17,9 @@ PORTFOLIO_FILES = {
     "industry_49": "49_Industry_Portfolios_daily_CSV.zip",
     "size_deciles": "Portfolios_Formed_on_ME_daily_CSV.zip",
     "momentum_deciles": "10_Portfolios_Prior_12_2_Daily_CSV.zip",
+    "value_deciles": "Portfolios_Formed_on_BE-ME_Daily_CSV.zip",
+    "profitability_deciles": "Portfolios_Formed_on_OP_Daily_CSV.zip",
+    "investment_deciles": "Portfolios_Formed_on_INV_Daily_CSV.zip",
 }
 DECILES = ("Lo 10", "Dec 2", "Dec 3", "Dec 4", "Dec 5", "Dec 6", "Dec 7", "Dec 8", "Dec 9", "Hi 10")
 REFRESH_DAYS = 25
@@ -62,7 +65,7 @@ def unzip_csv(content: bytes) -> str:
 
 
 def pick_columns(set_name: str, header: list[str]) -> list[int]:
-    if set_name in ("size_deciles", "momentum_deciles"):
+    if set_name.endswith("_deciles"):
         named = [i for i, h in enumerate(header) if h in DECILES]
         return named if len(named) == 10 else list(range(max(0, len(header) - 10), len(header)))
     return list(range(len(header)))

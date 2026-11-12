@@ -905,12 +905,12 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 ### As built (phase 9b)
 
-**French data.** Engine job `french` (03:30 on the 2nd of each month, skips files fetched in the last 25 days) downloads the daily zips into `desk.db`:
+**French data.** Engine job `french` (00:30 nightly, before `lab-export`; skips files fetched in the last 25 days) downloads the daily zips into `desk.db`:
 
 | Table | From | Holds |
 |---|---|---|
 | `factors_daily(series, date, value)` | 5 factors (2x3) and momentum, daily; 3 factors monthly | `mkt_rf`, `smb`, `hml`, `rmw`, `cma`, `rf`, `mom`, and monthly `mkt_rf_m`, `rf_m` (dated the 1st), in percent |
-| `french_returns(set_name, name, date, ret)` | Value-weighted block only | `industry_12`, `industry_49`, `size_deciles`, `momentum_deciles` (deciles by name) |
+| `french_returns(set_name, name, date, ret)` | Value-weighted block only | `industry_12`, `industry_49`, and deciles by name: `size_deciles`, `momentum_deciles`, `value_deciles` (book-to-market), `profitability_deciles` (operating profitability), `investment_deciles` |
 
 The lab loads a French set only when a spec asks for it, sharing one calendar across the set, so 49 industries over 60 years cost about 40 MB per worker. `FF.MKT` (market plus bill) is built from the factors.
 
@@ -1052,7 +1052,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
 | Nightly 01:25 to 06:25 ET, hourly | `restate`: exits at once unless official closes landed for a provisional day or the book is behind the last finished session; then the daily pass and the review run again. Never twice on the same closes |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
-| Nightly 03:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
+| Nightly 00:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Strategy library
 
@@ -1060,11 +1060,11 @@ A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/sh
 
 | Kind | Entries | Examples |
 |---|---|---|
-| Old and tested | 16 | Buy and hold, 60/40, risk parity, 200-day trend, volatility cap, dual momentum, 12-1 momentum (sectors, stocks, industries), sector rotation, low volatility, size and momentum tilts from the French portfolios |
+| Old and tested | 19 | Buy and hold, 60/40, risk parity, 200-day trend, volatility cap, dual momentum, 12-1 momentum (sectors, stocks, industries), sector rotation, low volatility, and size, momentum, value, profitability and quality tilts from the French portfolios |
 | Practical | 12 | The plan's mix, safe mix, aggressive tech tilt, dip-only, beaten-down sectors, deposits held back for a dip, margin dip-buy, lump sum spread over months, deposit steering, rebalance bands, tax-loss harvesting |
 | Novel and creative | 7 | Trend-filtered dip-buy, sector momentum in uptrends only, calm winners, 52-week-high breakout with a volatility cap, discount-day entries, insider cluster with a momentum filter, earnings drift where insiders also bought |
 
-Not on the shelf yet: value, profitability and quality tilts (their French files are not downloaded) and the as-held mix (the lab file carries the plan's weights, not position sizes; as-held runs in the paper race).
+Not on the shelf: the as-held mix. A backtest of today's holdings is the hindsight leak the lab exists to avoid, so as-held runs forward in the paper race.
 
 | Step | When | What happens |
 |---|---|---|
