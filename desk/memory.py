@@ -18,9 +18,10 @@ from desk.runlock import run_dir
 PROC = Path("/proc/meminfo")
 ARC = Path("/proc/spl/kstat/zfs/arcstats")
 CGROUP = Path("/sys/fs/cgroup")
-LOW_MB = 1500
-ROOMY_MB = 4000
+LOW_MB = 1000
+ROOMY_MB = 1500
 TIGHT_MB = 1000
+KILL_HOLD = timedelta(minutes=30)
 MODES = ("auto", "on", "off")
 PAUSED: tuple[str, ...] = ()
 FRESH = timedelta(minutes=10)
@@ -134,18 +135,25 @@ def set_mode(cfg: Config, mode: str, client: str | None = None, now: datetime | 
     return low_memory(cfg, now, trust=False)
 
 
-def decide(mode: str, available_mb: int | None, was_on: bool) -> tuple[bool, str | None]:
+def decide(mode: str, available_mb: int | None, was_on: bool, stopped: bool = False) -> tuple[bool, str | None]:
     if mode == "on":
         return True, "You switched it on."
     if mode == "off":
         return False, None
+    if stopped:
+        return True, f"Something was stopped for memory in the last {int(KILL_HOLD.total_seconds() // 60)} minutes."
     if available_mb is None:
         return was_on, "The box's memory can't be read, so it stays on." if was_on else None
-    if was_on and available_mb < ROOMY_MB:
-        return True, f"The box has {gb(available_mb)} free. It switches itself off above {gb(ROOMY_MB)}."
     if available_mb < LOW_MB:
         return True, f"The box has {gb(available_mb)} free, under the {gb(LOW_MB)} floor."
+    if was_on and available_mb < ROOMY_MB:
+        return True, f"The box has {gb(available_mb)} free. It switches itself off at {gb(ROOMY_MB)}."
     return False, None
+
+
+def stopped_lately(cfg: Config, now: datetime) -> bool:
+    rows = killed(cfg, now, host_report(cfg, now))
+    return any(timedelta(0) <= now - jobrun.parse_stamp(e["at"]) <= KILL_HOLD for e in rows)
 
 
 def low_memory(cfg: Config, now: datetime | None = None, trust: bool = True, info: dict | None = None) -> dict:
@@ -156,7 +164,7 @@ def low_memory(cfg: Config, now: datetime | None = None, trust: bool = True, inf
     if trust and last.get("mode") == mode and seen is not None and timedelta(0) <= now - seen <= FRESH:
         return last
     info = info or meminfo() or {}
-    on, why = decide(mode, info.get("available_mb"), bool(last.get("on")))
+    on, why = decide(mode, info.get("available_mb"), bool(last.get("on")), mode == "auto" and stopped_lately(cfg, now))
     since = None if not on else last.get("since") if last.get("on") and last.get("since") else jobrun.stamp(now)
     return {"on": on, "mode": mode, "why": why, "since": since, "checked_at": jobrun.stamp(now), "paused": list(PAUSED) if on else []}
 

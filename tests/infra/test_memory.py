@@ -72,15 +72,16 @@ def test_a_kill_is_the_services_cap_or_the_whole_box(tmp_path):
 
 def test_auto_turns_on_under_the_floor_and_only_off_again_with_room(cfg, monkeypatch):
     monkeypatch.setenv("DESK_LOW_MEMORY", "auto")
-    assert memory.decide("auto", 1499, False)[0] is True and memory.decide("auto", 1500, False) == (False, None)
-    assert memory.decide("auto", 3999, True)[0] is True and memory.decide("auto", 4000, True) == (False, None)
+    assert memory.decide("auto", 999, False)[0] is True and memory.decide("auto", 1000, False) == (False, None)
+    assert memory.decide("auto", 1499, True)[0] is True and memory.decide("auto", 1500, True) == (False, None)
+    assert memory.decide("auto", 2400, True) == (False, None) and memory.decide("auto", 2400, False) == (False, None)
     assert memory.decide("auto", None, True)[0] is True and memory.decide("auto", None, False) == (False, None)
     state = memory.refresh(cfg, NOW, info=TIGHT, group={"limit_mb": 640, "used_mb": 300})
-    assert state["on"] is True and state["paused"] == [] and "512 MB free, under the 1.5 GB floor" in state["why"]
+    assert state["on"] is True and state["paused"] == [] and "512 MB free, under the 1,000 MB floor" in state["why"]
     assert state["scheduler"] == {"limit_mb": 640, "used_mb": 300}
     later = NOW + timedelta(minutes=30)
-    kept = memory.refresh(cfg, later, info=TIGHT | {"available_mb": 3000}, group={})
-    assert kept["on"] is True and kept["since"] == state["since"] and "switches itself off above 3.9 GB" in kept["why"]
+    kept = memory.refresh(cfg, later, info=TIGHT | {"available_mb": 1200}, group={})
+    assert kept["on"] is True and kept["since"] == state["since"] and "switches itself off at 1.5 GB" in kept["why"]
     assert memory.refresh(cfg, later, info=ROOMY, group={})["on"] is False
 
 
@@ -104,8 +105,8 @@ def test_the_switch_wins_over_auto_and_is_logged(app_client, cfg, monkeypatch):
         "why": None,
         "since": None,
         "paused": [],
-        "low_mb": 1500,
-        "roomy_mb": 4000,
+        "low_mb": 1000,
+        "roomy_mb": 1500,
     }
     assert client.put("/api/memory/low", json={"mode": "sometimes"}).status_code == 422
     log = [json.loads(line) for line in (cfg.data_dir / "run" / "job-requests.log").read_text().splitlines()]
