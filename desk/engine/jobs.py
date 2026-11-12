@@ -2,7 +2,7 @@ JOBS = [
     ("20 8,17 * * *", "python -m desk.engine daily"),
     ("*/15 * * * *", "python -m desk.engine lots"),
     ("*/5 4-20 * * 1-5", "python -m desk.engine quotes"),
-    ("10 1-6 * * *", "python -m desk.engine backfill"),
+    ("10 1-12 * * *", "python -m desk.engine backfill"),
     {"schedule": "2-57/5 * * * *", "command": "python -m desk.engine restate", "title": "Catch the book up"},
     ("40 0 * * *", "python -m desk.engine research"),
     ("10 2 * * 0", "python -m desk.engine lookthrough"),

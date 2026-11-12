@@ -10,8 +10,8 @@ from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
 from desk.engine import ENGINE_VERSION, INBOX_AT, JOBS_AT, KEY_WORDS, bands, broker, catalog, fi, key_fix, lookthrough, patterns, replay, risk, scoring
-from desk.engine.asof import day_words, provisional_symbols
-from desk.engine.backfill import NO_PRICES
+from desk.engine.asof import ET, day_words, provisional_symbols
+from desk.engine.backfill import ASK_WORDS, NO_PRICES, parked_until
 from desk.engine.cash import margin_rate
 from desk.engine.cash import picture as cash_picture
 from desk.engine.flows import classify, income
@@ -882,9 +882,10 @@ def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
         if desk.execute("SELECT 1 FROM sqlite_master WHERE name=?", (tbl,)).fetchone():
             for sym, d in desk.execute(f"SELECT symbol, max(date) FROM {tbl} GROUP BY symbol"):
                 newest[sym] = max(newest.get(sym, ""), d)
-    no_source = set()
+    no_source, asked = set(), {}
     if desk.execute("SELECT 1 FROM sqlite_master WHERE name='market_symbols'").fetchone():
-        no_source = {r[0] for r in desk.execute("SELECT symbol FROM market_symbols WHERE error LIKE ?", (NO_PRICES + "%",))}
+        asked = {r["symbol"]: r for r in desk.execute("SELECT symbol, priority, last_bar, fetched_at, error FROM market_symbols WHERE error IS NOT NULL")}
+        no_source = {s for s, r in asked.items() if r["error"].startswith(NO_PRICES)}
     snap = {h["symbol"] for h in rows if h["source"] == "snapshot"}
     quoted = provisional_symbols(desk, as_of)
     missing = [s for s in held if s not in newest and s not in no_source and s not in quoted]
@@ -892,19 +893,38 @@ def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
     stale = [s for s in held if s in newest and newest[s] < session and s not in snap and s not in quoted]
     broker = [s for s in held if s not in newest and s in no_source]
     notes = []
-    fix = "the overnight backfill fills them" if os.environ.get("TIINGO_API_KEY") else key_fix(["TIINGO_API_KEY"]).rstrip(".")
+    keyed = bool(os.environ.get("TIINGO_API_KEY"))
+    no_key = "Fix: " + key_fix(["TIINGO_API_KEY"])
     if missing:
-        notes.append(f"No close for {', '.join(missing)} on {as_of}. Fix: {fix}.")
+        notes.append(f"No close for {', '.join(missing)} on {as_of}. " + (f"The desk asks for them {ASK_WORDS}. Fix: nothing to do yet." if keyed else no_key))
     if quoted:
         notes.append(f"{day_words(as_of)} is priced from the closing quotes until official closes land overnight; the day is restated then.")
         if stale:
             notes.append(f"{', '.join(stale)} have no quote, so they carry their last close until then.")
     elif stale:
-        notes.append(f"Closes for {', '.join(stale)} stop at {min(newest[s] for s in stale)}. Fix: {fix}.")
+        oldest = min(newest[s] for s in stale)
+        head = f"Closes for {', '.join(stale)} stop at {oldest}."
+        if not keyed:
+            notes.append(f"{head} {no_key}")
+        elif oldest >= last_trading_day(date.fromisoformat(session) - timedelta(days=1)).isoformat():
+            notes.append(
+                f"{head} A fund's price for a day can arrive hours after the others. The desk asks for it {ASK_WORDS}, "
+                "and the day's numbers follow once it lands. Fix: nothing to do yet."
+            )
+        else:
+            notes.append(f"{head} That is more than a day behind. Fix: in {JOBS_AT}, run Backfill and read its result there.")
+    notes.extend(_ask_words(s, asked[s]) for s in stale if s in asked)
     if broker:
         notes.append(f"{', '.join(broker)} have no market price anywhere, so they're valued at the broker's snapshot price.")
     status = "warn" if missing or (stale and not quoted) else "ok"
     return "closes", status, " ".join(notes) or f"Every holding has a close on {as_of}."
+
+
+def _ask_words(symbol: str, row) -> str:
+    until = parked_until(row)
+    if until is None:
+        return f"The last ask for {symbol} failed ({row['error']}); it is asked again at the next run."
+    return f"Tiingo had no prices for {symbol} at the last ask; it is asked again on {day_words(until.astimezone(ET).date().isoformat())}."
 
 
 def _snapshot_age(rows, day: str, series) -> str | None:
