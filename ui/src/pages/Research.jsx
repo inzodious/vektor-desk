@@ -11,6 +11,7 @@ import { useLive } from '../live/context.js';
 import { dayLabel } from '../lib/charts.js';
 import { plural } from '../lib/format.js';
 import { todayEt } from '../lib/tax.js';
+import { passWords } from '../lib/morning.js';
 import { VERDICT, freshness, holdingChip, verdictOf } from '../lib/research.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 
@@ -59,7 +60,7 @@ function HoldingList({ data, cur, onPick }) {
           );
         })}
       </div>
-      {data.pass?.next ? <p className="empty-hint">Next pass: {data.pass.next}.</p> : null}
+      {passWords(data.pass?.next) ? <p className="empty-hint">Next pass: {passWords(data.pass.next)}.</p> : null}
     </div>
   );
 }
@@ -236,7 +237,7 @@ export default function Research() {
           {entry ? (
             <Dossier key={entry.symbol} entry={entry} today={today} />
           ) : wantRow ? (
-            <NotAnalysed row={wantRow} next={byHolding.pass?.next} onAsk={() => openConsole({ desk: 'research', symbol: wantRow.symbol, question: `Deep dive on ${wantRow.symbol}`, now: true })} />
+            <NotAnalysed row={wantRow} next={passWords(byHolding.pass?.next)} onAsk={() => openConsole({ desk: 'research', symbol: wantRow.symbol, question: `Deep dive on ${wantRow.symbol}`, now: true })} />
           ) : (
             <div className="card">
               <div className="queue-clear">

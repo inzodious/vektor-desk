@@ -12,7 +12,7 @@
   "status": "ok",
   "at": "2026-11-09T08:55:30+00:00",
   "note": "Analysed FXAIX and VXUS. BND failed: the model call timed out.",
-  "next": "Tonight from 11:05 PM"
+  "next": "2026-11-09T23:05:00-05:00"
  },
  "rows": [
   {

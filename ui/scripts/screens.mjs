@@ -130,6 +130,7 @@ const SHOTS = [
   { name: 'morning-research-fresh', path: '/research?scenario=fresh', fixtures: true, clock: MONDAY, full: true },
   { name: 'morning-opportunities', path: '/research/opportunities', fixtures: true, clock: MONDAY, full: true },
   { name: 'morning-opportunities-fresh', path: '/research/opportunities?scenario=fresh', fixtures: true, clock: MONDAY },
+  { name: 'morning-opportunities-debit', path: '/research/opportunities?scenario=evening', fixtures: true, clock: MONDAY, full: true },
   { name: 'morning-decisions', path: '/decisions', fixtures: true, clock: MONDAY },
   { name: 'builds-jobs-offer', path: '/settings/box', fixtures: true, clock: MONDAY, el: 'jobs', act: async (p) => p.getByTestId('jobs').getByText(/Agents and housekeeping/).click() },
   { name: 'stale-mixes', path: '/strategies/mixes?scenario=loose', fixtures: true, clock: MONDAY },

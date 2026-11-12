@@ -156,7 +156,7 @@ test('Research is organised by holding, each with a status', async ({ page }) =>
   await expect(list.locator('[data-holding="FTEC"]')).toContainText('Analysed Thu Nov 5. It is in tonight’s pass.');
   await expect(list.locator('[data-holding="BND"]')).toContainText('Last try failed at 3:12 AM: the model call timed out.');
   await expect(list.locator('[data-holding="BND"]')).toContainText('Last try failed');
-  await expect(list).toContainText('Next pass: Tonight from 11:05 PM.');
+  await expect(list).toContainText('Next pass: Today, 11:05 PM ET.');
 
   const d = page.getByTestId('dossier');
   await expect(d).toHaveAttribute('data-symbol', 'FXAIX');
@@ -200,7 +200,7 @@ test('a holding with no analysis says why and offers to run one', async ({ page 
   await expect(page).toHaveURL(/s=BND/);
   const none = page.getByTestId('not-analysed');
   await expect(none).toContainText('No analysis of BND yet');
-  await expect(none).toContainText('Last try failed at 3:12 AM: the model call timed out. No earlier analysis. Next pass: Tonight from 11:05 PM.');
+  await expect(none).toContainText('Last try failed at 3:12 AM: the model call timed out. No earlier analysis. Next pass: Today, 11:05 PM ET.');
   await none.getByRole('button', { name: 'Analyse BND now' }).click();
   await expect(page.getByRole('dialog', { name: 'Console' })).toBeVisible();
 });
@@ -230,6 +230,30 @@ test('buying opportunities lists each idea with why now, a zone, a size and what
   await acme.getByRole('link', { name: 'Open its research' }).click();
   await expect(page).toHaveURL(/\/research\?s=ACME$/);
   await expect(page.getByTestId('dossier')).toHaveAttribute('data-symbol', 'ACME');
+  expect(errors).toEqual([]);
+});
+
+test('each idea says which price it is worked out from, and why a buy is not in the queue', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/research/opportunities');
+  await expect(page.getByTestId('opp-top')).toContainText('Prices run to Mon Nov 9. NOVA is still at an earlier close');
+  const ideas = page.getByTestId('ideas');
+  await expect(ideas.locator('[data-idea="QUAL"]').getByTestId('idea-asof')).toHaveText('Priced at Mon Nov 9, 11:40 AM ET. The written case is from Fri Nov 6; the price is 1.8% lower since.');
+  await expect(ideas.locator('[data-idea="NOVA"]').getByTestId('idea-asof')).toContainText('The desk has no newer price for it than Fri Nov 6');
+  await expect(ideas.locator('[data-idea="NOVA"]')).not.toContainText('Numbers from');
+  await expect(ideas.locator('[data-idea="NOVA"]').getByTestId('idea-queue')).toHaveText('See it in Decisions');
+  await expect(ideas.getByTestId('idea-queue')).toHaveCount(1);
+  await expect(ideas.getByTestId('idea-not-queued')).toHaveCount(0);
+
+  await page.goto('/research/opportunities?scenario=evening');
+  await expect(page.getByTestId('opp-top')).toContainText('2 worth buying once the margin debit is paid');
+  const debit = page.getByTestId('ideas');
+  await expect(debit.locator('[data-idea="QUAL"]').getByTestId('idea-not-queued')).toHaveText('Pay the margin debit first: $1,500 is open, so no buy goes to the queue.');
+  await expect(debit.locator('[data-idea="NOVA"]').getByTestId('idea-not-queued')).toBeVisible();
+  await expect(debit.getByTestId('idea-queue')).toHaveCount(0);
+  await expect(debit.locator('[data-idea="ACME"]').getByTestId('idea-not-queued')).toHaveCount(0);
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
 });
 

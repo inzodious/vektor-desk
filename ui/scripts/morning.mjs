@@ -176,7 +176,7 @@ const holdings = {
   running: null,
   fresh_at: at('08:44:30'),
   line: '4 of 5 holdings analysed, 2 of them today. 1 failed last night.',
-  pass: { status: 'ok', at: at('08:55:30'), note: 'Analysed FXAIX and VXUS. BND failed: the model call timed out.', next: 'Tonight from 11:05 PM' },
+  pass: { status: 'ok', at: at('08:55:30'), note: 'Analysed FXAIX and VXUS. BND failed: the model call timed out.', next: '2026-11-09T23:05:00-05:00' },
   rows: HELD,
 };
 const holdingsFresh = {
@@ -189,7 +189,7 @@ const holdingsFresh = {
   running: null,
   fresh_at: null,
   line: 'No holding has been analysed yet. The first pass runs tonight from 11:05 PM.',
-  pass: { status: 'never', at: null, note: null, next: 'Tonight from 11:05 PM' },
+  pass: { status: 'never', at: null, note: null, next: '2026-11-09T23:05:00-05:00' },
   rows: HELD.map((h) => holding(h.symbol, h.name, h.kind, h.weight_pct, 'none', { status_line: 'Not analysed yet. It is in tonight’s pass.' })),
 };
 
@@ -210,6 +210,14 @@ const OPPS = [
     invalid_below: 162,
     case: { verdict: 'buy', confidence: 0.62, horizon_days: 120, written_at: at('07:12:00') },
     score: 78,
+    queued: false,
+    not_queued: null,
+    price_as_of: '2026-11-09',
+    price_source: 'quote',
+    price_behind: false,
+    analysis_as_of: '2026-11-06',
+    since_analysis_pct: -1.8,
+    as_of_words: 'Priced at Mon Nov 9, 11:40 AM ET. The written case is from Fri Nov 6; the price is 1.8% lower since.',
   }),
   opp(2, 'NOVA', 'Nova Semiconductor Corp', 'stock', {
     sources: ['scout'],
@@ -223,6 +231,15 @@ const OPPS = [
     wrong_if: 'Skeptic: one customer is 40% of sales, so the guidance cut may repeat. Off below $36.90.',
     invalid_below: 36.9,
     decision_id: 'd_20261109_0007',
+    queued: true,
+    not_queued: null,
+    as_of: '2026-11-06',
+    price_as_of: '2026-11-06',
+    price_source: 'close',
+    price_behind: true,
+    analysis_as_of: '2026-11-05',
+    since_analysis_pct: 2.3,
+    as_of_words: 'Priced at the Fri Nov 6 close. Scout’s idea is from Thu Nov 5; the price is 2.3% higher since. The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands overnight.',
     next_earnings: { date: '2026-11-18', days: 9 },
     score: 64,
   }),
@@ -241,6 +258,9 @@ const OPPS = [
     invalid_below: 19.3,
     case: { verdict: 'wait', confidence: 0.58, horizon_days: 60, written_at: at('07:20:00') },
     score: 51,
+    queued: false,
+    not_queued: null,
+    as_of_words: 'Priced at Mon Nov 9, 11:40 AM ET. The written case is from the same day.',
   }),
   opp(4, 'VXUS', 'Synthetic International Index ETF', 'fund', {
     held: true,
@@ -254,6 +274,9 @@ const OPPS = [
     wrong_if: 'No written case yet, so nobody has checked why it fell. Off below $55.10, two monthly swings under today.',
     invalid_below: 55.1,
     score: 44,
+    queued: false,
+    not_queued: null,
+    as_of_words: 'Priced at Mon Nov 9, 11:40 AM ET. The numbers here are worked out from that price.',
   }),
 ];
 const PROFILE = { source: 'default_moderate', label: 'Moderate', single_stock_max_pct: 5, speculative_max_pct: 5, note: 'No risk check on file yet, so sizes use the Moderate band: 5% a single stock, 5% for all single stocks together.' };
@@ -270,7 +293,16 @@ const opportunities = {
   cash: { free_usd: 142, account: 'individual', next_deposit_usd: 500, next_deposit_on: '2026-11-18', note: 'Sizes come from free cash first, then the next deposit. Never from margin.' },
   method: METHOD,
   rows: OPPS,
+  prices: { day: '2026-11-09', words: 'Prices run to Mon Nov 9. NOVA is still at an earlier close: live quotes cover what you hold, and other closes land overnight.', older: [{ symbol: 'NOVA', price_as_of: '2026-11-06', held: false }] },
   passed: [{ symbol: 'BND', name: 'Synthetic Total Bond ETF', reason: 'Written case says avoid: cheap for a reason that looks lasting.' }],
+};
+const DEBIT = 'Pay the margin debit first: $1,500 is open, so no buy goes to the queue.';
+const opportunitiesDebit = {
+  ...opportunities,
+  headline: '2 worth buying once the margin debit is paid, 2 to watch. Top: QUAL, 12% under its high.',
+  counts: { ...opportunities.counts, buy: 2, watch: 1 },
+  cash: { ...opportunities.cash, free_usd: 0, margin_debit_usd: 1500, note: 'A margin debit of $1,500 is open. It is paid before anything here is bought.' },
+  rows: OPPS.map((r) => (r.symbol === 'QUAL' || r.symbol === 'NOVA' ? { ...r, stance: 'buy', stance_label: 'Worth buying once cash is free', queued: false, not_queued: DEBIT, size: { ...r.size, usd: 0, shares: 0, funding: 'wait', note: 'Nothing to buy until the margin debit is paid.' } } : r)),
 };
 const opportunitiesFresh = {
   as_of: null,
@@ -322,7 +354,7 @@ const overnight = {
 const overnightIdle = { ...overnight, night: '2026-11-09', state: 'idle', started_at: null, finished_at: null, build: null, summary: 'Tonight’s run starts at 23:30.', steps: overnight.steps.map((s) => step(s.id, s.title, 'waiting')), ready: [] };
 
 export function morningFixtures() {
-  return { 'lab.library': library(tested), 'lab.library.fresh': library(waiting), 'lab.library.never': library(waiting), 'agents.holdings': holdings, 'agents.holdings.fresh': holdingsFresh, 'agents.holdings.never': holdingsFresh, opportunities, 'opportunities.fresh': opportunitiesFresh, 'opportunities.never': opportunitiesFresh, overnight, 'overnight.fresh': overnightIdle, 'overnight.never': overnightIdle, 'decisions.notes': notes, 'decisions.notes.fresh': { count: 0, days: 7, items: [] }, 'decisions.notes.never': { count: 0, days: 7, items: [] }, 'decisions.notes.empty': { count: 0, days: 7, items: [] }, ...dossierFixtures() };
+  return { 'lab.library': library(tested), 'lab.library.fresh': library(waiting), 'lab.library.never': library(waiting), 'agents.holdings': holdings, 'agents.holdings.fresh': holdingsFresh, 'agents.holdings.never': holdingsFresh, opportunities, 'opportunities.evening': opportunitiesDebit, 'opportunities.fresh': opportunitiesFresh, 'opportunities.never': opportunitiesFresh, overnight, 'overnight.fresh': overnightIdle, 'overnight.never': overnightIdle, 'decisions.notes': notes, 'decisions.notes.fresh': { count: 0, days: 7, items: [] }, 'decisions.notes.never': { count: 0, days: 7, items: [] }, 'decisions.notes.empty': { count: 0, days: 7, items: [] }, ...dossierFixtures() };
 }
 
 // ---------- write ----------
