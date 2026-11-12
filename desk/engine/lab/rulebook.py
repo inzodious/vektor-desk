@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 
 from desk.engine.lab import stats
-from desk.engine.lab.data import FUND_KINDS, LabData
+from desk.engine.lab.data import FUND_KINDS, LabData, lab_build
 from desk.engine.lab.sim import DEFAULT_RATE, FUND_BPS, _year_tax
 from desk.engine.shadows import deposit_split
 
@@ -31,6 +31,9 @@ MAINTENANCE = 0.30
 RESTORE = 0.35
 MAX_GRID = 12
 HOLDOUT_YEARS = 2
+STAND_IN = "No plan of your own is loaded"
+STAND_IN_YEARS = 8
+STAND_IN_SHARE = 0.5
 SHELTERED = ("hsa", "ira", "roth", "401k", "401(k)")
 
 
@@ -118,9 +121,13 @@ def parse(raw: dict, data: LabData) -> Rule:
     combos = [dict(zip(keys, c, strict=True)) for c in itertools.product(*(grid[k] for k in keys))] if keys else [{}]
     if len(combos) > MAX_GRID:
         problems.append(f"{len(combos)} variants is over the rule grid cap of {MAX_GRID}")
-    mix_raw = raw.get("mix") or data.plan_mix
+    stand_in = not raw.get("mix") and not data.plan_mix and bool(raw.get("mix_without_plan"))
+    mix_raw = raw.get("mix") or data.plan_mix or raw.get("mix_without_plan")
     mix = {str(s).upper(): float(w) for s, w in (mix_raw or {}).items() if float(w) > 0}
-    if not mix:
+    notes: list[str] = []
+    if stand_in:
+        mix, notes = _stand_in(data, mix, problems)
+    if not mix and not problems:
         problems.append("there is no plan mix in the lab data, so the request needs a mix of funds")
     for sym in mix:
         if sym not in data.series:
@@ -143,7 +150,7 @@ def parse(raw: dict, data: LabData) -> Rule:
     if problems:
         raise RuleError(problems)
     total = sum(mix.values())
-    caveats = [
+    caveats = notes + [
         "Dividends sit inside adjusted prices, so dividend tax is not charged, the same for both sides.",
         "Both sides are sold at the end and taxed, so a deferred gain is not counted as a win.",
     ]
@@ -154,6 +161,22 @@ def parse(raw: dict, data: LabData) -> Rule:
     if name == "margin":
         caveats.append("Margin interest is charged at the given rate on a 360-day year and not deducted; a margin call sells at 30% equity, back to 35%.")
     return Rule(rid, int(raw.get("version") or 1), name, combos, {s: w / total for s, w in mix.items()}, horizons, deposit, start_value, taxable, raw, caveats)
+
+
+def _stand_in(data: LabData, mix: dict[str, float], problems: list[str]) -> tuple[dict[str, float], list[str]]:
+    last = date.fromisoformat(data.calendar[-1]) if data.calendar else None
+    short = sorted(s for s in mix if s in data.series and last and (last - date.fromisoformat(data.series[s].dates[0])).days < STAND_IN_YEARS * 365)
+    missing = sorted(s for s in mix if s not in data.series)
+    kept = {s: w for s, w in mix.items() if s not in short and s not in missing}
+    if sum(kept.values()) < STAND_IN_SHARE * sum(mix.values()):
+        problems.append("most of the built-in safe mix has too little price history in the lab yet")
+        return {}, []
+    notes = [f"{STAND_IN}, so this ran on the desk's built-in safe mix."]
+    if missing:
+        notes.append(f"{', '.join(missing)} have no price history in the lab yet, so the rest of the mix was scaled up to cover them.")
+    if short:
+        notes.append(f"{', '.join(short)} have under {STAND_IN_YEARS} years of prices, so they are left out and the rest of the mix was scaled up.")
+    return kept, notes
 
 
 # ---- Simulation ----
@@ -522,7 +545,7 @@ def run(conn, data: LabData, request: dict, *, now: datetime) -> dict:
         rule = parse(raw, data)
         body = evaluate(data, rule, raw.get("date_range"))
     except RuleError as e:
-        body = {"strategy_id": rid, "version": version, "kind": "rejected", "result_at": stamp, "problems": e.problems}
+        body = {"strategy_id": rid, "version": version, "kind": "rejected", "result_at": stamp, "problems": e.problems, "lab_build": lab_build()}
         with conn:
             conn.execute("INSERT OR REPLACE INTO lab_results VALUES (?, ?, 'rejected', ?, ?)", (rid, version, stamp, json.dumps(body)))
         return body

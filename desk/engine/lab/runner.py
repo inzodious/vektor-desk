@@ -12,7 +12,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine import gate
 from desk.engine.lab import factors, rulebook, simcache, stats
-from desk.engine.lab.data import FRENCH_KIND, SMALL_CAPS, LabData, data_path, lab_dir, ledger_path, load
+from desk.engine.lab.data import FRENCH_KIND, SMALL_CAPS, LabData, data_path, lab_build, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
 from desk.engine.lab.simcache import Cache, Run
 from desk.engine.lab.spec import Spec, SpecError, Variant, parse, resolve, variants
@@ -119,7 +119,7 @@ def _record(conn, spec: Spec, kind: str, body: dict, now: datetime) -> dict:
 
 def _reject(conn, raw: dict, problems: list[str], now: datetime) -> dict:
     sid, version = str(raw.get("id") or raw.get("strategy_id") or "unknown"), int(raw.get("version") or 1)
-    body = {"strategy_id": sid, "version": version, "kind": "rejected", "result_at": _stamp(now), "problems": problems}
+    body = {"strategy_id": sid, "version": version, "kind": "rejected", "result_at": _stamp(now), "problems": problems, "lab_build": lab_build()}
     with conn:
         conn.execute("INSERT OR REPLACE INTO lab_results VALUES (?, ?, 'rejected', ?, ?)", (sid, version, body["result_at"], json.dumps(body)))
     return body

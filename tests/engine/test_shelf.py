@@ -233,10 +233,65 @@ def test_an_entry_the_lab_refused_is_explained_and_tried_again_the_next_evening(
     assert shelf.queue_missing(cfg, now=NOW)["queued"] == 1
     process_queue(cfg, now=NOW)
     (row,) = shelf.view(cfg)["rows"]
-    assert row["status"] == "not_run" and "small-cap history is not in the lab yet" in row["reason"] and row["verdict"] is None
+    assert row["status"] == "not_run" and row["verdict"] is None
+    assert row["reason"] == "Small-company price history is still loading. This runs once that finishes."
     assert shelf.queue_missing(cfg, now=NOW + timedelta(hours=11))["queued"] == 0
     assert shelf.queue_missing(cfg, now=NOW + timedelta(days=1))["queued"] == 1
     assert shelf.view(cfg)["rows"][0]["status"] == "waiting"
+
+
+BOX = ("lib-plan-mix", "lib-safe-mix", "lib-tech-tilt", "lib-rebalance-bands-plan")
+
+
+def test_built_in_mixes_run_without_a_plan_when_their_funds_are_unlabelled(stocked, monkeypatch):
+    cfg = stocked
+    conn = sqlite3.connect(data_path(cfg))
+    conn.execute("DELETE FROM plan_mix")
+    conn.execute("UPDATE symbols SET kind='unknown' WHERE symbol IN ('IVV', 'FTEC')")
+    conn.commit()
+    conn.close()
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in BOX))
+    monkeypatch.setattr(shelf, "IDS", frozenset(BOX))
+    runner.ledger_path(cfg).parent.mkdir(parents=True, exist_ok=True)
+    ledger = sqlite3.connect(runner.ledger_path(cfg))
+    ledger.executescript(runner.LEDGER)
+    for sid in BOX:
+        old = {"strategy_id": sid, "version": 1, "kind": "rejected", "result_at": NOW.isoformat(), "problems": ['entry needs a top N, like {"top_n": 3}']}
+        ledger.execute("INSERT INTO lab_results VALUES (?, 1, 'rejected', ?, ?)", (sid, old["result_at"], json.dumps(old)))
+    ledger.commit()
+    ledger.close()
+    before = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    assert all(r["status"] == "not_run" and "{" not in r["reason"] and "top_n" not in r["reason"] for r in before.values())
+    later = NOW + timedelta(minutes=5)
+    assert shelf.queue_missing(cfg, now=later) == {"queued": 4, "of": 4}
+    process_queue(cfg, now=later)
+    rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    assert rows["lib-safe-mix"]["status"] == "tested" and rows["lib-tech-tilt"]["status"] == "tested"
+    bands = rows["lib-rebalance-bands-plan"]
+    assert bands["status"] == "tested" and bands["line"].startswith("Run on the built-in safe mix, as no plan of your own is loaded.")
+    assert any("scaled up" in c for c in bands["caveats"])
+    plan = rows["lib-plan-mix"]
+    assert plan["status"] == "not_run" and plan["reason"].startswith("No plan of your own is loaded on the desk yet")
+    assert shelf.queue_missing(cfg, now=later + timedelta(minutes=1))["queued"] == 0
+    assert shelf.queue_missing(cfg, now=later + timedelta(hours=13))["queued"] == 1
+
+
+def test_every_fund_in_a_built_in_mix_is_known_to_the_lab():
+    from desk.engine.lab.data import LISTED_FUNDS
+    from desk.engine.market import BENCHMARKS
+
+    known = set(LISTED_FUNDS) | set(BENCHMARKS)
+    for entry in shelf.LIBRARY:
+        body = entry.get("body") or {}
+        weights = ((entry.get("spec") or {}).get("sizing") or {}).get("weights") if isinstance((entry.get("spec") or {}).get("sizing"), dict) else None
+        for mix in (weights, body.get("mix"), body.get("mix_without_plan")):
+            assert set(mix or {}) <= known, entry["id"]
+
+
+def test_reasons_never_show_request_syntax():
+    for problems in (["there is no plan mix in the lab data yet", 'entry needs a top N, for example {"top_n": 3}'], ["something new {x: 1}"], []):
+        text = shelf.plain(problems)
+        assert text and "{" not in text and "top_n" not in text
 
 
 def test_a_build_that_lands_after_the_export_still_queues_the_library_that_night(stocked, monkeypatch):

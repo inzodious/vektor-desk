@@ -1070,7 +1070,7 @@ Not on the shelf: the as-held mix. A backtest of today's holdings is the hindsig
 
 | Step | When | What happens |
 |---|---|---|
-| Queue | End of `lab-export` (00:55), before the offer to a worker; `lab-offer` repeats it each minute of the lab hours, so a build that lands after 00:55 still queues that night | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Experiments sort before rules. An entry the lab refused is queued again once 12 hours have passed. A second run the same night queues nothing |
+| Queue | End of `lab-export` (00:55), before the offer to a worker; `lab-offer` repeats it each minute of the lab hours, so a build that lands after 00:55 still queues that night | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Experiments sort before rules. An entry the lab refused is queued again once 12 hours have passed, or at once when the lab's code has changed since the refusal (each refusal records `lab_build`, a hash of the lab's source files). A second run the same night queues nothing |
 | Run | Lab, with a worker first | Experiments are `lab.sims` jobs like any other; deposit rules run in the lab itself. The lab keeps waiting for an offered file while the worker has answered something in the last `DESK_LAB_WORKER_WAIT_MIN` minutes, then runs what is left |
 | Count | Ledger | Every shelf strategy has `parent_id: "library"`, so they are one family and each variant counts toward the trial count. `insider-` and `drift-` ids also count in those gate families |
 | Report | `GET /api/lab/library` | One row per entry, sorted by kind, verdict, then excess |
@@ -1090,7 +1090,11 @@ Not on the shelf: the as-held mix. A backtest of today's holdings is the hindsig
 
 The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 / k)) * tracking_error / sqrt(years)`, with `k` the library's trial count. Each experiment result now also stores `noise` (`gate.measure` on the walk-forward record).
 
-**Row** (`rows[]`): `id`, `title`, `kind`, `family`, `description`, `benchmark`, `type` (`experiment` or `rule`), `status` (`tested`, `waiting`, `not_run`), `verdict`, `line` (one sentence with the numbers), `reason` (why it has not run), `tested_at`, `out_of_sample` (`start`, `end`, `ann_return_pct`, `excess_pts`, `sharpe`, `mdd_pct`), `noise` (`trials`, `band_pts`, `luck`), `rule` (`horizon_years`, `starts`, `p5_pts`, `p50_pts`, `p95_pts`, `share_better`), `deflated_sharpe`, `pbo`, `variants`, `research_only`, `caveats`, `detail`. The payload also has `as_of`, `trials`, `note`, `counts` and `kinds`. `shelf.ready(cfg)` gives the morning alert its line.
+**No plan loaded.** `lib-rebalance-bands-plan` carries `mix_without_plan` (the built-in safe mix). With no plan mix in the lab data the rule runs on it: funds with no prices, or under 8 years of them, are left out and the rest scaled up (at least half the weight must remain). The row's `line` starts "Run on the built-in safe mix" and `caveats` names what was left out. `lib-plan-mix` stays `not_run` with a plain reason, since the safe mix has its own row.
+
+**Known funds.** The lab data labels a symbol a fund only when the desk has seen it held or in a plan. `LISTED_FUNDS` in `lab/data.py` names the ETFs the built-in mixes use, so `load` treats them as funds whatever the label; a test keeps the list in step with the library.
+
+**Row** (`rows[]`): `id`, `title`, `kind`, `family`, `description`, `benchmark`, `type` (`experiment` or `rule`), `status` (`tested`, `waiting`, `not_run`), `verdict`, `line` (one sentence with the numbers), `reason` (why it has not run, as a plain sentence from `shelf.plain`; it never quotes request syntax), `tested_at`, `out_of_sample` (`start`, `end`, `ann_return_pct`, `excess_pts`, `sharpe`, `mdd_pct`), `noise` (`trials`, `band_pts`, `luck`), `rule` (`horizon_years`, `starts`, `p5_pts`, `p50_pts`, `p95_pts`, `share_better`), `deflated_sharpe`, `pbo`, `variants`, `research_only`, `caveats`, `detail`. The payload also has `as_of`, `trials`, `note`, `counts` and `kinds`. `shelf.ready(cfg)` gives the morning alert its line.
 
 ## Memory budget
 
