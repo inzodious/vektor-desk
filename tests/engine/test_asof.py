@@ -1,13 +1,19 @@
 import json
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
 import pytest
 
+from desk import jobrun
 from desk.db import connect
-from desk.engine import asof, brief
+from desk.engine import __main__ as main_module
+from desk.engine import asof, brief, leaderboard, market, preflight
 from desk.engine.__main__ import run_daily, run_quotes, run_restate, run_review
 from desk.engine.cash import picture
+from desk.engine.jobs import JOBS
+from desk.runlock import job_lock
+from desk.scheduler import package_jobs
 from tests.engine.helpers import closes_doc, position, snapshot
 
 IND = "individual-1111"
@@ -345,3 +351,139 @@ def test_an_overnight_restate_never_rings_the_phone(cfg, mirror, monkeypatch):
     triggers.record(cfg, conn, found[1:], now=et(THU, 1, 25))
     conn.close()
     assert ("Margin debit on the desk", "high") in sent and ("Big move today", "low") in sent
+
+
+# ---- Catching up within minutes, at any hour ----
+
+
+def behind_book(cfg, mirror, monkeypatch):
+    seed(mirror)
+    monkeypatch.setenv("FINNHUB_API_KEY", "k")
+    at(monkeypatch, et(WED, 8, 20))
+    run_daily(cfg)
+    at(monkeypatch, et(WED, 16, 5))
+    run_quotes(cfg, closing())
+    at(monkeypatch, et(WED, 21, 25))
+
+
+def test_the_catch_up_check_runs_every_five_minutes_at_any_hour_as_one_job():
+    entries = [e for e in JOBS if "restate" in (e["command"] if isinstance(e, dict) else e[1])]
+    assert len(entries) == 1 and entries[0]["schedule"] == "2-57/5 * * * *" and "heavy" not in entries[0]
+    job = next(j for j in package_jobs(["engine"]) if j.name == "engine-restate")
+    assert job.heavy and not job.timing.startswith("* ")
+    hits = [m for m in range(60) if job.due(datetime(2026, 11, 11, 21, m))]
+    assert hits == list(range(2, 60, 5)) and job.due(datetime(2026, 11, 14, 3, 7))
+
+
+def test_a_book_left_behind_in_the_evening_moves_within_one_check_and_asks_for_the_debrief(cfg, mirror, monkeypatch):
+    behind_book(cfg, mirror, monkeypatch)
+    assert book(cfg, et(WED, 21, 25))["day"] == TUE
+    caught = run_restate(cfg)
+    assert caught["ok"] and (caught["from"], caught["to"]) == (TUE, WED) and caught["debrief"] == "asked"
+    after = book(cfg, et(WED, 21, 30))
+    assert after["day"] == WED and after["behind"] is None and after["live"] is None and after["review"]["day"] == WED
+    asked = jobrun.requests_dir(cfg) / "agents-run-debrief.json"
+    assert json.loads(asked.read_text())["client"] == "restate"
+    assert [name for name, _ in jobrun.take_requests(cfg)] == ["agents-run-debrief"]
+    assert run_restate(cfg)["skipped"] and not asked.exists()
+
+
+def test_the_catch_up_never_runs_on_top_of_the_daily_pass(cfg, mirror, monkeypatch):
+    behind_book(cfg, mirror, monkeypatch)
+    monkeypatch.setattr("desk.engine.__main__.RESTATE_WAIT", 0)
+    with job_lock("engine-daily", cfg=cfg):
+        held = run_restate(cfg)
+    assert held == {"ok": True, "skipped": "The daily pass is still running; the next check looks again."}
+    assert book(cfg, et(WED, 21, 25))["day"] == TUE
+    assert run_restate(cfg)["to"] == WED
+
+
+def test_a_daily_pass_that_lands_while_the_check_waits_is_not_run_twice(cfg, mirror, monkeypatch):
+    behind_book(cfg, mirror, monkeypatch)
+    real, calls = main_module._restate_check, []
+
+    def check(c):
+        calls.append(1)
+        if len(calls) == 2:
+            run_daily(c)
+        return real(c)
+
+    monkeypatch.setattr("desk.engine.__main__._restate_check", check)
+    assert "skipped" in run_restate(cfg) and book(cfg, et(WED, 21, 30))["day"] == WED
+
+
+def test_a_failed_catch_up_waits_an_hour_before_it_tries_the_same_closes_again(cfg, mirror, monkeypatch):
+    behind_book(cfg, mirror, monkeypatch)
+    conn = connect(cfg.desk_db)
+    sig = asof.pending(conn)["signature"]
+    stamp_ = datetime.now(UTC).isoformat(timespec="seconds")
+    with conn:
+        conn.execute(
+            "INSERT INTO engine_runs (job, started_at, finished_at, ok, detail, engine_version) VALUES ('restate', ?, ?, 0, ?, 'x')",
+            (stamp_, stamp_, json.dumps({"signature": sig})),
+        )
+    assert "failed" in run_restate(cfg)["skipped"]
+    with conn:
+        conn.execute("UPDATE engine_runs SET finished_at='2026-01-01T00:00:00+00:00' WHERE job='restate'")
+    conn.close()
+    assert run_restate(cfg)["to"] == WED
+
+
+# ---- One day in Eastern time ----
+
+
+def test_the_session_day_is_eastern_at_nine_in_the_evening():
+    late = et(WED, 21, 25)
+    assert late.date().isoformat() == THU and market.et_day(late) == WED and market.session_day(late) == WED
+    assert market.session_day(et("2026-11-14", 12, 0)) == "2026-11-13"
+
+
+def test_the_race_never_shows_a_day_after_the_last_session(tmp_path):
+    conn = connect(tmp_path / "race.db")
+    conn.execute(
+        "CREATE TABLE paper_portfolios (strategy_id TEXT, version INTEGER, title TEXT, status TEXT, started TEXT, as_of TEXT, "
+        "days INTEGER, return_pct REAL, excess_pts REAL, summary TEXT)"
+    )
+    conn.execute("INSERT INTO paper_portfolios VALUES ('safe', 1, 'Safe mix', 'paper', ?, ?, 0, 0.0, NULL, ?)", (THU, THU, json.dumps({"kind": "mix"})))
+    conn.execute("INSERT INTO paper_portfolios VALUES ('held', 1, 'As held', 'paper', ?, ?, 2, 0.6, 0.9, ?)", (MON, WED, json.dumps({"kind": "mix"})))
+    board = leaderboard.build(conn, 1000.0, now=et(WED, 21, 25))
+    conn.close()
+    assert board["as_of"] == WED and {r["id"]: r["as_of"] for r in board["rows"]} == {"safe": WED, "held": WED}
+
+
+# ---- One ready cash, also before a trade ----
+
+
+def test_preflight_nets_cash_against_the_debit_in_the_same_account():
+    ctx = SimpleNamespace(kinds={}, targets={}, maint=30.0)
+    rows = [
+        {"account": IND, "symbol": "FXAIX", "shares": 5, "value": 1000.0, "is_cash": 0},
+        {"account": IND, "symbol": "SPAXX", "shares": 100, "value": 100.0, "is_cash": 1},
+        {"account": IND, "symbol": "MARGIN", "shares": -300, "value": -300.0, "is_cash": 1},
+        {"account": HSA, "symbol": "FDRXX", "shares": 120, "value": 120.0, "is_cash": 1},
+    ]
+    before = preflight.picture(rows, ctx)
+    money = picture(rows)
+    assert (before["debit"], before["cash_ready"]) == (money["debit"], money["ready"]) == (200.0, 120.0)
+    assert preflight.pick_account(None, rows, "SPY", "buy", "cash") == HSA
+    assert preflight.pick_account(None, rows, "SPY", "buy", "margin") == IND
+    trade = {"account": IND, "symbol": "SPY", "amount_usd": 150.0, "shares": 0.25, "side": "buy", "funding": "cash"}
+    after = preflight.picture(preflight.apply_trade(rows, trade), ctx)
+    assert after["debit"] - before["debit"] == pytest.approx(150.0) and after["cash_ready"] == 120.0
+
+
+def test_preflight_pays_from_the_account_that_holds_the_ready_cash(cfg, mirror, monkeypatch):
+    seed(mirror, margin=True)
+    at(monkeypatch, et(WED, 8, 20))
+    run_daily(cfg)
+    now = et(WED, 9, 0)
+    paid = preflight.check_trade(cfg, {"kind": "buy", "symbol": "SPY", "amount_usd": 100, "funding": "cash"}, now=now)
+    lamp = next(x for x in paid["lights"] if x["id"] == "funding")
+    assert paid["trade"]["account"] == HSA and lamp["status"] == "ok" and lamp["detail"] == "Paid from the $120 of ready cash in this account."
+    over = preflight.check_trade(cfg, {"kind": "buy", "symbol": "SPY", "amount_usd": 200, "funding": "cash"}, now=now)
+    lamp = next(x for x in over["lights"] if x["id"] == "funding")
+    assert lamp["status"] == "act" and lamp["detail"].startswith("Cash covers $120; the other $80 goes on margin")
+    conn = connect(cfg.desk_db, readonly=True)
+    ready = conn.execute("SELECT value FROM metric_values WHERE metric_id='cash.ready' AND scope='portfolio' ORDER BY as_of DESC LIMIT 1").fetchone()[0]
+    conn.close()
+    assert ready == 120.0

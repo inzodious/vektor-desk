@@ -59,6 +59,14 @@ def last_trading_day(d: date) -> date:
     return d
 
 
+def et_day(now: datetime | None = None) -> str:
+    return (now or datetime.now(UTC)).astimezone(ET).date().isoformat()
+
+
+def session_day(now: datetime | None = None) -> str:
+    return last_trading_day((now or datetime.now(UTC)).astimezone(ET).date()).isoformat()
+
+
 def session(now: datetime | None = None) -> Session:
     t = (now or datetime.now(UTC)).astimezone(ET)
     d = t.date()
