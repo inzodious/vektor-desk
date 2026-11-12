@@ -11,7 +11,7 @@ import { LIVE_STATES, useLive } from '../live/context.js';
 import { useApi } from '../lib/api.js';
 import { fundsFromMetrics, useMetrics, val } from '../lib/metrics.js';
 import { driftTone, driftWords, judgedRuleRows, planLimits, ruleState, useReference } from '../lib/plan.js';
-import { dayLabel } from '../lib/charts.js';
+import { dayStamp, useAsOf } from '../lib/asof.js';
 import { QUALITY } from '../lib/quality.js';
 import { plural, usd } from '../lib/format.js';
 import { emptyText, moneyIn, rhythmText, seenText } from '../lib/deposits.js';
@@ -208,6 +208,7 @@ function Deposits({ funds, deposits, mode, landed, deskValue, words }) {
 export default function Holdings() {
   const ctx = useLive();
   const m = useMetrics(HEAD_IDS);
+  const clock = useAsOf();
   const plan = useMetrics('plan.*', 'scope=holding');
   const profile = useApi('/api/decisions/profile');
   const rules = useApi('/api/decisions/rules');
@@ -219,7 +220,7 @@ export default function Holdings() {
   const values = useMemo(() => Object.fromEntries(ctx.symbols.map((s) => [s.symbol, s.value])), [ctx.symbols]);
   const p = profile.data?.profile || {};
   const ruleList = rules.data?.rules || p.rules || [];
-  const engineAsOf = m.asOf ? `engine ${dayLabel(m.asOf)}` : null;
+  const engineAsOf = dayStamp(m.asOf, clock);
   const tabs = <Subtabs label="Portfolio views" tabs={PORTFOLIO_TABS} />;
 
   if (m.loading || plan.loading) {

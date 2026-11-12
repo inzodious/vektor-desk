@@ -13,6 +13,7 @@ import { useApi } from '../lib/api.js';
 import { fundsFromMetrics, useMetrics, val } from '../lib/metrics.js';
 import { driftTone, usePlanLimits, useReference } from '../lib/plan.js';
 import { dayLabel } from '../lib/charts.js';
+import { dayStamp, useAsOf } from '../lib/asof.js';
 import { movers } from '../lib/bridge.js';
 import { QUALITY } from '../lib/quality.js';
 import { etTime, pct, usd } from '../lib/format.js';
@@ -40,6 +41,7 @@ function useAccounts(live) {
 // ---------- page ----------
 export default function Bridge() {
   const ctx = useLive();
+  const clock = useAsOf();
   const { openSymbol } = useSymbol();
   const live = ctx.live;
   const accounts = useAccounts(live);
@@ -88,11 +90,15 @@ export default function Bridge() {
     );
   }
 
-  const up = live.day_change >= 0;
   const trading = LIVE_STATES.includes(live.state);
-  const showMove = trading || ctx.symbols.some((r) => Math.abs(r.day_change) >= 0.5);
-  const asOf = live.as_of ? `${etTime(new Date(live.as_of))} ET` : live.holdings_date ? `close ${dayLabel(live.holdings_date)}` : null;
-  const engineAsOf = m.asOf ? `engine ${dayLabel(m.asOf)}` : null;
+  const head = clock?.headline || { value: live.value, change: live.day_change, pct: live.day_change_pct, when: 'today', live: true };
+  const up = head.change >= 0;
+  const showMove = clock?.headline ? head.change != null : trading || ctx.symbols.some((r) => Math.abs(r.day_change) >= 0.5);
+  const liveAt = live.as_of ? `${etTime(new Date(live.as_of))} ET` : live.holdings_date ? `close ${dayLabel(live.holdings_date)}` : null;
+  const asOf = clock ? null : liveAt;
+  const kick = clock?.liveWords || [STATE_WORD[live.state] || 'Market', asOf].filter(Boolean).join(' · ');
+  const engineAsOf = dayStamp(m.asOf, clock);
+  const n = clock?.numbers || null;
   const q = live.quality && live.quality !== 'ok' ? QUALITY[live.quality] : null;
   const closeDrill = (sym) => {
     setDrill(null);
@@ -103,28 +109,32 @@ export default function Bridge() {
   const exSpx = m.get('bm.excess', { scope: 'shadow', scopeId: 'sp500_shadow', window: 'YTD' });
   const worst = funds.filter((f) => f.drift != null).sort((a, b) => Math.abs(b.drift) - Math.abs(a.drift))[0];
   const debit = m.get('margin.debit');
-  const marginCost = val(m.get('margin.cost_month'));
+  const debitV = n ? n.margin_debit || 0 : (val(debit) ?? 0);
+  const marginCost = n ? n.margin_cost_month : val(m.get('margin.cost_month'));
   const cash = m.get('cash.ready');
   const pending = m.get('cash.pending');
+  const cashV = n ? n.cash_ready : (val(cash) ?? ctx.cash);
+  const pendingV = n ? n.cash_pending : val(pending);
+  const bookAsOf = n ? null : engineAsOf;
   const exV = val(ex);
   const exS = val(exSpx);
-  const moved = showMove ? movers(ctx.symbols) : [];
+  const moved = showMove && head.live ? movers(ctx.symbols) : [];
   const sale = discounts.data?.rows?.length || 0;
   const hasDiscounts = discounts.error?.status !== 404;
 
   return (
     <>
       <Hero
-        kicker={`Bridge · ${STATE_WORD[live.state] || 'Market'}${asOf ? ` · ${asOf}` : ''}`}
+        kicker={`Bridge · ${kick}`}
         title="Bridge"
         art="bridge"
         big={
           <>
-            <b>{usd(live.value)}</b>
+            <b data-testid="bridge-value">{usd(head.value)}</b>
             {showMove ? (
-              <span className={up ? 'up' : 'dn'}>
-                {usd(live.day_change, { sign: true })}
-                {live.day_change_pct != null ? ` · ${pct(live.day_change_pct / 100, 2, true)}` : ''} today
+              <span className={up ? 'up' : 'dn'} data-testid="bridge-change">
+                {usd(head.change, { sign: true })}
+                {head.pct != null ? ` · ${pct(head.pct / 100, 2, true)}` : ''} {head.when}
               </span>
             ) : (
               <span className="muted">at the last close</span>
@@ -158,10 +168,10 @@ export default function Bridge() {
         }
       />
       <section className="kpis kpis-4" data-testid="bridge-kpis">
-        <Kpi i={1} label="Market value" metric="value.market" value={usd(live.value)} line={showMove ? `${usd(live.day_change, { sign: true })} today` : 'At the last close'} asOf={asOf} quality={live.quality} spark={sparkVals.length > 1 ? <Spark values={sparkVals} label="Last 30 days" /> : null} onOpen={() => setDrill('value')} />
+        <Kpi i={1} label="Market value" metric="value.market" value={usd(head.value)} line={showMove ? `${usd(head.change, { sign: true })} ${head.when}` : 'At the last close'} asOf={asOf} quality={live.quality} spark={sparkVals.length > 1 ? <Spark values={sparkVals} label="Last 30 days" /> : null} onOpen={() => setDrill('value')} />
         <Kpi i={2} label="Vs the safe mix" metric="bm.excess" value={exV == null ? '—' : usd(exV, { sign: true })} tone={exV == null ? undefined : exV >= 0 ? 'ok' : 'watch'} line={exS == null ? 'Year to date' : `YTD · S&P ${usd(exS, { sign: true })}`} quality={ex?.quality} asOf={engineAsOf} onOpen={() => setDrill('excess')} />
-        <Kpi i={3} label="Cash ready" metric="cash.ready" value={usd(val(cash) ?? ctx.cash)} line={val(pending) ? `+${usd(val(pending))} on the way` : 'Nothing pending'} quality={pending?.quality === 'modelled' ? 'modelled' : cash?.quality} asOf={engineAsOf} onOpen={() => setDrill('cash')} />
-        <Kpi i={4} label="Margin" metric="margin.debit" value={usd(val(debit) ?? 0)} line={val(debit) ? `${usd(marginCost || 0)} a month` : 'Nothing borrowed'} quality={debit?.quality} asOf={engineAsOf} cream={!!val(debit)} onOpen={() => setDrill('cash')} />
+        <Kpi i={3} label="Cash ready" metric="cash.ready" value={usd(cashV)} line={pendingV ? `+${usd(pendingV)} on the way` : 'Nothing pending'} quality={pending?.quality === 'modelled' ? 'modelled' : cash?.quality} asOf={bookAsOf} onOpen={() => setDrill('cash')} />
+        <Kpi i={4} label="Margin" metric="margin.debit" value={usd(debitV)} line={debitV ? `${usd(marginCost || 0)} a month` : 'Nothing borrowed'} quality={debit?.quality} asOf={bookAsOf} cream={!!debitV} onOpen={() => setDrill('cash')} />
       </section>
       <section className="grid">
         <TodayRun i={5} />

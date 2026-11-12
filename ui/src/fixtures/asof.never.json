@@ -1,0 +1,23 @@
+{
+ "day": null,
+ "at": null,
+ "provisional": false,
+ "status": "empty",
+ "words": "The engine has not run yet.",
+ "previous_day": null,
+ "expected_day": null,
+ "behind": null,
+ "prices": {
+  "official": 0,
+  "quoted": 0,
+  "carried": []
+ },
+ "numbers": {},
+ "live": null,
+ "market": {
+  "state": "closed",
+  "day": "2026-11-09"
+ },
+ "review": null,
+ "debrief": null
+}

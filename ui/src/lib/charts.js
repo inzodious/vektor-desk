@@ -74,6 +74,14 @@ export function dayLabel(day, withYear = false) {
   return `${MON[d.getUTCMonth()]} ${d.getUTCDate()}${withYear ? `, ${d.getUTCFullYear()}` : ''}`;
 }
 
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+export function dayWords(day) {
+  const d = parseDay(day);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${DOW[d.getUTCDay()]} ${MON[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
 export function monthTicks(days, maxLabels = 8) {
   const out = [];
   let last = '';
