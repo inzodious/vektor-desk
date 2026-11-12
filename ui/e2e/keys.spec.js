@@ -14,6 +14,13 @@ test('keys list what is set without ever showing a value', async ({ page }) => {
   await expect(card.locator('[data-key="FINNHUB_API_KEY"]')).toHaveAttribute('data-state', 'pending');
   await expect(card.locator('[data-key="TIINGO_API_KEY"]')).toContainText('Saved 9:00 AM');
   await expect(card.locator('[data-key="TS_AUTHKEY"]')).toContainText('The box turned it down 8:10 AM: That value has a line break.');
+  const tiingo = card.locator('[data-key="TIINGO_API_KEY"]');
+  await expect(tiingo.getByTestId('key-word')).toHaveText('Tiingo prices key');
+  await expect(tiingo.locator('.key-name')).toHaveText('TIINGO_API_KEY');
+  const word = await tiingo.getByTestId('key-word').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  const variable = await tiingo.locator('.key-name').evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+  expect(variable).toBeLessThan(word);
+  await expect(card.getByTestId('key-word')).toHaveText(['Claude token', 'Claude token expiry date', 'Tiingo prices key', 'Finnhub quotes key', 'FRED rates key', 'SEC contact line', 'Alpaca paper key ID', 'Alpaca paper secret', 'Escape Vektor project', 'Escape Vektor user ID', 'Porkbun key', 'Porkbun secret', 'Tailscale sign-in key']);
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   expect(errors).toEqual([]);
@@ -27,7 +34,7 @@ test('setting a key seals it, clears the box and says it is on its way', async (
   });
   await page.goto('/settings/data');
   const row = page.getByTestId('keys').locator('[data-key="FRED_API_KEY"]');
-  await row.getByRole('button', { name: 'Replace FRED_API_KEY' }).click();
+  await row.getByRole('button', { name: 'Replace FRED rates key' }).click();
   const input = row.getByTestId('key-input');
   await expect(input).toHaveAttribute('type', 'password');
   await expect(input).toBeFocused();
@@ -46,7 +53,7 @@ test('a live Alpaca key never leaves the browser', async ({ page }) => {
   });
   await page.goto('/settings/data');
   const row = page.getByTestId('keys').locator('[data-key="ALPACA_API_KEY_ID"]');
-  await row.getByRole('button', { name: 'Replace ALPACA_API_KEY_ID' }).click();
+  await row.getByRole('button', { name: 'Replace Alpaca paper key ID' }).click();
   await row.getByTestId('key-input').fill('AKLIVE123');
   await row.getByRole('button', { name: 'Seal and send' }).click();
   await expect(row.getByRole('alert')).toHaveText('Paper key IDs start with PK. Live keys are never accepted.');
@@ -58,7 +65,7 @@ test('a refused key shows the box’s reason', async ({ page }) => {
   await page.route('**/api/box/keys/*', (route) => route.fulfill({ status: 400, json: { ok: false, error: 'refused', message: 'That URL isn’t the paper API.' } }));
   await page.goto('/settings/data');
   const row = page.getByTestId('keys').locator('[data-key="DESK_UID"]');
-  await row.getByRole('button', { name: 'Replace DESK_UID' }).click();
+  await row.getByRole('button', { name: 'Replace Escape Vektor user ID' }).click();
   await expect(row.getByTestId('key-input')).toHaveAttribute('type', 'text');
   await row.getByTestId('key-input').fill('synthetic-uid');
   await row.getByRole('button', { name: 'Seal and send' }).click();

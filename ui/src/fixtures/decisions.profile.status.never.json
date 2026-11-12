@@ -21,6 +21,7 @@
   "growth.horizon_years",
   "growth.tilt",
   "growth.fi_target_from_plan",
+  "margin.rate_pct",
   "fi.number_usd",
   "fi.yearly_spend_usd",
   "fi.multiple",
@@ -42,5 +43,9 @@
  "deposits": 0,
  "deposits_mode": "auto",
  "rules": 3,
+ "margin": {
+  "rate_pct": 12,
+  "source": "default"
+ },
  "starter": "docker exec vektor-desk-cron python -m desk.decisions.profile init"
 }

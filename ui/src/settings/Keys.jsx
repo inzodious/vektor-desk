@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/Icon.jsx';
 import { postJson, useApi } from '../lib/api.js';
-import { fileWord, keyCheck, keyCount, keyRefusal, keyState } from '../lib/keys.js';
+import { fileWord, keyCheck, keyCount, keyRefusal, keyState, keyWord } from '../lib/keys.js';
 
 function KeyRow({ k, ready, open, note, onOpen, onClose, onSave }) {
   const st = keyState(k);
+  const word = keyWord(k);
   const input = useRef(null);
   const [err, setErr] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -33,7 +34,10 @@ function KeyRow({ k, ready, open, note, onOpen, onClose, onSave }) {
     <div className="job-row key-row" data-key={k.name} data-state={st.state}>
       <span className={`job-dot ${st.state === 'set' ? 'ok' : st.state === 'pending' ? 'queued' : st.state === 'unset' ? 'never' : 'failed'}`} aria-hidden="true" />
       <span className="job-text">
-        <b className="key-name">{k.name}</b>
+        <span className="key-head">
+          <b data-testid="key-word">{word}</b>
+          <code className="key-name">{k.name}</code>
+        </span>
         <small>
           {k.what} · {fileWord(k.file)}
         </small>
@@ -46,7 +50,7 @@ function KeyRow({ k, ready, open, note, onOpen, onClose, onSave }) {
         {open ? (
           <form className="key-form" onSubmit={submit} autoComplete="off">
             <label className="sr-only" htmlFor={`key-${k.name}`}>
-              New value for {k.name}
+              New value for {word}
             </label>
             <input
               id={`key-${k.name}`}
@@ -82,7 +86,7 @@ function KeyRow({ k, ready, open, note, onOpen, onClose, onSave }) {
             Saving
           </span>
         ) : open ? null : (
-          <button className="btn ghost sm" type="button" disabled={!ready} title={ready ? undefined : 'The box hasn’t checked in with its lock yet'} aria-label={`${k.set ? 'Replace' : 'Set'} ${k.name}`} onClick={() => onOpen(k.name)}>
+          <button className="btn ghost sm" type="button" disabled={!ready} title={ready ? undefined : 'The box hasn’t checked in with its lock yet'} aria-label={`${k.set ? 'Replace' : 'Set'} ${word}`} onClick={() => onOpen(k.name)}>
             <Icon name={k.set ? 'swap' : 'plus'} />
             {k.set ? 'Replace' : 'Set'}
           </button>

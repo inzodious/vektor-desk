@@ -55,8 +55,18 @@ describe('profile editor', () => {
     const { changes, errors } = changesFrom(p, { ...formFrom(p), 'growth.horizon_years': 'soon', 'alerts.min_priority': 'high' }, ['growth']);
     expect(errors).toEqual({ 'growth.horizon_years': 'Needs a number.' });
     expect(changes).toEqual({});
-    expect(lockedGroups(['growth', 'tax'])).toEqual(['opportunity', 'industry_focus', 'alerts']);
+    expect(lockedGroups(['growth', 'tax'])).toEqual(['opportunity', 'margin', 'industry_focus', 'alerts']);
     expect(lockedGroups(null)).toEqual([]);
+  });
+
+  it('takes a margin rate between 0 and 40 and sends it as its own section', () => {
+    expect(formFrom(p)['margin.rate_pct']).toBe('12');
+    expect(formFrom({ ...p, margin: undefined })['margin.rate_pct']).toBe('');
+    expect(parseField(field('margin.rate_pct'), '12.075')).toEqual({ value: 12.075 });
+    expect(parseField(field('margin.rate_pct'), '41').error).toBe('40 or less.');
+    expect(parseField(field('margin.rate_pct'), '-1').error).toBe('0 or more.');
+    expect(changesFrom(p, { ...formFrom(p), 'margin.rate_pct': '12.075' }).changes).toEqual({ margin: { rate_pct: 12.075 } });
+    expect(changesFrom(p, { ...formFrom(p), 'margin.rate_pct': '12.075' }, ['growth']).changes).toEqual({});
   });
 
   it('words the save', () => {

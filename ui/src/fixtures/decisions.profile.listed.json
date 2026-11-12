@@ -82,6 +82,9 @@
   "usage": {
    "overnight_window": "01:00-05:00",
    "weekly_runs": {}
+  },
+  "margin": {
+   "rate_pct": 12
   }
  },
  "deposits_mode": "listed",
@@ -90,6 +93,7 @@
   "opportunity",
   "tax",
   "growth",
+  "margin",
   "usage",
   "agents",
   "deposits",

@@ -160,8 +160,13 @@ function Tile({ d, allOn, busy, onFlip, onFollow, now }) {
         <i style={{ width: `${usageShare(d.week) * 100}%`, background: over ? 'var(--mustard)' : undefined }} />
       </div>
       <small>
-        {d.week.runs} of {d.week.cap} runs this week{over ? ' · over, next run waits' : ''}
+        {d.week.runs} of {d.week.cap} runs this week{over && !d.week.line ? ' · over, next run waits' : ''}
       </small>
+      {d.week.line ? (
+        <small className="crew-week" data-testid="crew-week">
+          {d.week.line}
+        </small>
+      ) : null}
     </div>
   );
 }

@@ -205,7 +205,7 @@ const SHOTS = [
   { name: 'settings-box-off', path: '/settings/box?scenario=off', fixtures: true, clock: MONDAY },
   { name: 'settings-inbox', path: '/settings/data#inbox', fixtures: true, clock: MONDAY },
   { name: 'settings-keys', path: '/settings/data#keys', fixtures: true, clock: MONDAY },
-  { name: 'settings-keys-open', path: '/settings/data#keys', fixtures: true, clock: MONDAY, act: async (p) => p.getByRole('button', { name: 'Set FINNHUB_API_KEY' }).or(p.getByRole('button', { name: 'Replace FRED_API_KEY' })).first().click() },
+  { name: 'settings-keys-open', path: '/settings/data#keys', fixtures: true, clock: MONDAY, act: async (p) => p.getByRole('button', { name: 'Set Finnhub quotes key' }).or(p.getByRole('button', { name: 'Replace FRED rates key' })).first().click() },
   { name: 'risk', path: '/settings/risk', fixtures: true, clock: MONDAY },
   { name: 'risk-convictions', path: '/settings/risk', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('convictions').scrollIntoViewIfNeeded() },
   { name: 'risk-convictions-edit', path: '/settings/risk', fixtures: true, clock: MONDAY, act: async (p) => p.locator('[data-cv="ACME"]').getByTestId('cv-edit').click() },

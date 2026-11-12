@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileWord, keyCheck, keyCount, keyRefusal, keyState } from './keys.js';
+import { fileWord, keyCheck, keyCount, keyRefusal, keyState, keyWord } from './keys.js';
 import { composeView } from './box.js';
 
 const NOW = new Date('2026-11-09T16:42:00Z');
@@ -12,6 +12,15 @@ describe('keys', () => {
     expect(keyState({ set: false, last: { result: 'refused', message: 'live key', at: '2026-11-09T14:00:00Z' } }, NOW).line).toBe('The box turned it down 9:00 AM: live key');
     expect(keyCount({ keys: [{ set: true }, { set: false, pending: true }] })).toEqual({ set: 1, total: 2, pending: 1 });
     expect(fileWord('caddy.env')).toBe('Certificates');
+  });
+
+  it('leads with a plain name for each key, and makes one for a key it has not met', () => {
+    expect(keyWord({ name: 'CLAUDE_CODE_OAUTH_TOKEN' })).toBe('Claude token');
+    expect(keyWord({ name: 'ALPACA_API_KEY_ID' })).toBe('Alpaca paper key ID');
+    expect(keyWord({ name: 'TS_AUTHKEY' })).toBe('Tailscale sign-in key');
+    expect(keyWord({ name: 'DESK_NTFY_TOPIC' })).toBe('Ntfy topic');
+    expect(keyWord({ name: 'POLYGON_API_KEY' })).toBe('Polygon API key');
+    expect(keyWord(null)).toBe('');
   });
 
   it('checks a value before it leaves the browser', () => {

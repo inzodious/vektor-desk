@@ -9,6 +9,7 @@ const KEY_WORD = {
   'tax.lot_method': 'Lot method',
   'tax.year_end_start': 'Year-end start',
   'tax.wash_sale_accounts': 'Wash-sale accounts',
+  'margin.rate_pct': 'Margin rate',
   'growth.horizon_years': 'Horizon',
   'growth.tilt': 'Tilt',
   'growth.fi_target_from_plan': 'FI target from Escape Vektor',
@@ -38,4 +39,11 @@ export function defaultsText(p) {
   if (!list.length) return 'Everything is set in desk.yaml.';
   if (p?.set?.length === 0) return 'Every setting is still the default.';
   return null;
+}
+
+export function marginWords(margin) {
+  const rate = margin?.rate_pct;
+  if (typeof rate !== 'number' || Number.isNaN(rate)) return null;
+  const yours = margin.source === 'profile' || margin.source === 'env';
+  return { rate: `${Number(rate.toFixed(3))}%`, yours, line: yours ? 'Your rate, a year' : 'A typical rate until you set your own' };
 }
