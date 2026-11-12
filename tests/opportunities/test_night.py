@@ -5,8 +5,9 @@ from types import SimpleNamespace
 from desk.agents import store
 from desk.opportunities import __main__ as cli
 from desk.opportunities import build as ob
+from desk.opportunities import cases as own_cases
 from desk.opportunities import night
-from tests.opportunities.test_build import AS_OF, seed, signal
+from tests.opportunities.test_build import AS_OF, RULES, seed, signal
 
 NOW = datetime(2026, 11, 7, 7, 0, tzinfo=UTC)
 
@@ -20,7 +21,10 @@ def scout_report(status="ok", created=1, note=None):
 
 
 def fakes(calls, cases=None, scout=None):
-    def run_cases(cfg, *, trigger, wait):
+    def run_cases(cfg, *, trigger, wait, discounts=None, limit=None):
+        if discounts is not None:
+            calls.append(("list_cases", limit))
+            return cases_report(written=(), pending=limit, note="Switched off for the test.") if cases is None else cases
         calls.append(("cases", trigger))
         return cases or cases_report()
 
@@ -35,6 +39,10 @@ def fakes(calls, cases=None, scout=None):
     return {"cases": run_cases, "scout": run_scout, "scan": run_scan}
 
 
+def step(out, name):
+    return next(s for s in out["steps"] if s["step"] == name)
+
+
 def scout_run(cfg, status, days_ago, now=NOW):
     rid = store.start_run(cfg, "scout", trigger="schedule", model="opus", effort="xhigh", status=status)
     stamp = (now - timedelta(days=days_ago)).isoformat(timespec="seconds")
@@ -46,9 +54,9 @@ def test_the_night_scans_when_stale_writes_cases_and_runs_an_overdue_scout(cfg):
     seed(cfg)
     calls = []
     out = night.run_night(cfg, now=NOW, **fakes(calls))
-    assert calls == [("scan", None), ("cases", "schedule"), ("scout", "schedule")]
-    assert out["status"] == "ok" and [s["step"] for s in out["steps"]] == ["scan", "cases", "scout"]
-    assert out["summary"] == "Scanned 20 names, 2 hits. Wrote 2 of 2 discount cases. Scout wrote 1 idea."
+    assert calls == [("scan", None), ("cases", "schedule"), ("list_cases", 1), ("scout", "schedule")]
+    assert out["status"] == "ok" and [s["step"] for s in out["steps"]] == ["scan", "cases", "list_cases", "scout"]
+    assert out["summary"] == "Scanned 20 names, 2 hits. Wrote 2 of 2 discount cases. Switched off for the test. Scout wrote 1 idea."
     assert night.last_night(cfg)["status"] == "ok"
     fresh = ob.build(cfg, now=NOW)["freshness"]
     assert fresh["night_status"] == "ok" and fresh["night_run_at"] == "2026-11-07T07:00:00Z"
@@ -60,9 +68,9 @@ def test_a_current_scan_and_a_recent_scout_are_left_alone(cfg):
     scout_run(cfg, "ok", 10)
     calls = []
     out = night.run_night(cfg, now=NOW, **fakes(calls))
-    assert calls == [("cases", "schedule")]
-    assert out["steps"][0]["status"] == "current" and out["steps"][2]["status"] == "fresh"
-    assert "Scout last ran on Oct 28" in out["steps"][2]["note"] and out["status"] == "ok"
+    assert calls == [("cases", "schedule"), ("list_cases", 1)]
+    assert out["steps"][0]["status"] == "current" and step(out, "scout")["status"] == "fresh"
+    assert "Scout last ran on Oct 28" in step(out, "scout")["note"] and out["status"] == "ok"
 
 
 def test_scout_is_not_tried_twice_in_a_week_so_a_second_start_tonight_is_safe(cfg):
@@ -71,7 +79,7 @@ def test_scout_is_not_tried_twice_in_a_week_so_a_second_start_tonight_is_safe(cf
     calls = []
     out = night.run_night(cfg, now=NOW, **fakes(calls))
     assert ("scout", "schedule") not in calls
-    assert out["steps"][2] == {"step": "scout", "status": "over_budget", "note": "Scout already used this week's run."}
+    assert step(out, "scout") == {"step": "scout", "status": "over_budget", "note": "Scout already used this week's run."}
 
 
 def test_a_busy_or_deferred_desk_leaves_the_night_waiting_and_the_reason_in_plain_words(cfg):
@@ -80,7 +88,8 @@ def test_a_busy_or_deferred_desk_leaves_the_night_waiting_and_the_reason_in_plai
     deferred = cases_report("deferred", (), 3, "Usage limit reached; resets at 9 AM.")
     out = night.run_night(cfg, now=NOW, **fakes(calls, cases=deferred, scout=scout_report("disabled", 0, "Switched off in Settings.")))
     assert out["status"] == "waiting"
-    assert out["steps"][1]["note"] == "Usage limit reached; resets at 9 AM." and out["steps"][2]["note"] == "Switched off in Settings."
+    assert out["steps"][1]["note"] == "Usage limit reached; resets at 9 AM." and step(out, "scout")["note"] == "Switched off in Settings."
+    assert step(out, "list_cases") == {"step": "list_cases", "status": "deferred"} and all(c[0] != "list_cases" for c in calls)
 
 
 def test_a_desk_that_throws_does_not_stop_the_night(cfg):
@@ -91,7 +100,7 @@ def test_a_desk_that_throws_does_not_stop_the_night(cfg):
 
     out = night.run_night(cfg, now=NOW, scan=lambda cfg: {}, cases=boom, scout=lambda cfg, name, **kw: scout_report("ok", 0))
     assert out["status"] == "partial" and out["steps"][1]["status"] == "failed" and "no token" in out["steps"][1]["note"]
-    assert out["steps"][2]["note"] == "Scout looked and proposed nothing."
+    assert step(out, "scout")["note"] == "Scout looked and proposed nothing." and step(out, "list_cases")["status"] == "failed"
 
 
 def test_no_engine_yet_is_a_quiet_night(cfg):
@@ -102,6 +111,70 @@ def test_no_engine_yet_is_a_quiet_night(cfg):
         scout=lambda *a, **kw: scout_report("not_ready", 0, "Engine brief not ready."),
     )
     assert out["steps"][0] == {"step": "scan", "status": "not_ready", "note": "The engine has not run yet."} and out["status"] == "ok"
+
+
+# ---- Cases for rows the scanner did not flag ----
+
+
+def writer(calls, verdict="buy"):
+    def run_cases(cfg, *, trigger, wait, discounts=None, limit=None):
+        if discounts is None:
+            return cases_report(written=(), pending=0, note="No discount hits today.")
+        hits = discounts.pending(cfg, limit)
+        calls.append((trigger, wait, [h["symbol"] for h in hits]))
+        for h in hits:
+            case = {"verdict": verdict, "case": f"{h['symbol']} fell with its sector.", "risks": "The sector may keep falling.", "confidence": 0.6}
+            case |= {"horizon_days": 90, "numbers_cited": ["drop_from_high_pct"], "model": "opus", "written_at": NOW.isoformat(), "run_id": 3}
+            discounts.record(cfg, h["signal_id"], case)
+        return cases_report(written=[h["signal_id"] for h in hits], pending=len(hits))
+
+    return run_cases
+
+
+def quiet_scout(cfg, name, **kw):
+    return scout_report("ok", 0)
+
+
+def test_rows_on_sale_with_no_written_case_get_one_and_a_second_run_pays_for_nothing(cfg):
+    seed(cfg)
+    before = ob.build(cfg, now=NOW)
+    assert [r["symbol"] for r in before["rows"] if r["stance"] == "screen"] == ["QUAL"]
+    calls = []
+    out = night.run_night(cfg, now=NOW, scan=lambda cfg: {}, cases=writer(calls), scout=quiet_scout)
+    assert calls == [("schedule", night.CASES_WAIT, ["QUAL"])]
+    assert step(out, "list_cases") == {"step": "list_cases", "status": "ok", "note": "Wrote 1 of 1 cases for rows on sale.", "written": 1, "pending": 1}
+    r = next(r for r in ob.build(cfg, now=NOW)["rows"] if r["symbol"] == "QUAL")
+    assert r["stance"] == "buy" and r["case"]["verdict"] == "buy" and "case" in r["sources"] and r["why_now"] == "QUAL fell with its sector."
+    assert r["analysis_as_of"] == AS_OF and "The written case is from the same day." in r["as_of_words"]
+    again = night.run_night(cfg, now=NOW, scan=lambda cfg: {}, cases=writer(calls), scout=quiet_scout)
+    assert len(calls) == 1 and step(again, "list_cases")["status"] == "current"
+
+
+def test_the_six_a_night_cap_counts_scanner_cases_too(cfg, monkeypatch):
+    monkeypatch.setattr("desk.engine.preflight.rules_in_force", lambda cfg, plan: (RULES, "profile"))
+    conn = seed(cfg)
+    for i in range(5):
+        signal(conn, f"S{i}", case="wait")
+    with conn:
+        conn.execute("UPDATE discount_cases SET written_at=?", ((NOW - timedelta(hours=1)).isoformat(),))
+    assert [h["symbol"] for h in own_cases.wanted(ob.build(cfg, now=NOW))] == ["QUAL", "ACME", "WTCH"]
+    calls = []
+    out = night.run_night(cfg, now=NOW, scan=lambda cfg: {}, cases=writer(calls, "wait"), scout=quiet_scout)
+    assert calls == [("schedule", night.CASES_WAIT, ["QUAL"])] and step(out, "list_cases")["written"] == 1
+    out = night.run_night(cfg, now=NOW, scan=lambda cfg: {}, cases=writer(calls, "wait"), scout=quiet_scout)
+    assert len(calls) == 1 and step(out, "list_cases")["status"] == "over_budget"
+    assert step(out, "list_cases")["note"] == "Tonight's 6 cases are written; 2 rows wait for tomorrow night."
+    later = NOW + timedelta(hours=24)
+    out = night.run_night(cfg, now=later, scan=lambda cfg: {}, cases=writer(calls, "wait"), scout=quiet_scout)
+    assert calls[-1][2] == ["ACME", "WTCH"]
+
+
+def test_no_case_is_started_close_to_morning(cfg):
+    seed(cfg)
+    calls = []
+    late = datetime(2026, 11, 7, 10, 45, tzinfo=UTC)
+    out = night.run_night(cfg, now=late, scan=lambda cfg: {}, cases=writer(calls), scout=quiet_scout)
+    assert calls == [] and step(out, "list_cases")["status"] == "late" and out["status"] == "ok"
 
 
 def test_the_job_ends_with_the_line_the_morning_alert_reads(cfg, monkeypatch, capsys):

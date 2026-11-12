@@ -1,10 +1,11 @@
 import json
 import sqlite3
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 from desk.config import Config
 from desk.db import connect
+from desk.engine.market import ET
 from desk.opportunities.sizing import day_words
 from desk.runlock import run_dir
 
@@ -12,9 +13,12 @@ SCOUT = "scout"
 SCOUT_EVERY_DAYS = 35
 SCOUT_RETRY_DAYS = 7
 LOCK_WAIT = 600.0
+CASES_WAIT = 900.0
+LATE = (time(5, 30), time(9, 0))
 COUNTED = ("ok", "failed", "timeout", "running")
 WAITING = ("busy", "deferred")
-QUIET = ("ok", "fresh", "current", "disabled", "guarded", "over_budget", "not_ready", "unhealthy")
+STOPPED = ("disabled", "guarded", "over_budget", "busy", "deferred", "failed")
+QUIET = ("ok", "fresh", "current", "late", "disabled", "guarded", "over_budget", "not_ready", "unhealthy")
 
 
 # ---- Last night's record ----
@@ -83,6 +87,40 @@ def cases_step(cfg: Config, cases: Callable | None = None, wait: float = LOCK_WA
     return {"step": "cases", "status": report.status, "note": note, "written": written, "pending": report.pending}
 
 
+def list_cases_step(cfg: Config, cases: Callable | None = None, wait: float = LOCK_WAIT, now: datetime | None = None) -> dict:
+    from desk.opportunities import cases as own
+    from desk.opportunities.build import build
+
+    step = "list_cases"
+    now = now or datetime.now(UTC)
+    try:
+        listing = build(cfg, now=now)
+        if listing["as_of"] is None:
+            return {"step": step, "status": "not_ready"}
+        hits = own.wanted(listing)
+        room = max(0, own.CAP - own.written_tonight(cfg, now))
+    except Exception as e:  # noqa: BLE001
+        return {"step": step, "status": "failed", "note": f"Could not read the list for cases: {e}"}
+    if not hits:
+        return {"step": step, "status": "current", "note": "Every row on sale has a written case or note."}
+    if not room:
+        return {"step": step, "status": "over_budget", "note": f"Tonight's {own.CAP} cases are written; {len(hits)} rows wait for tomorrow night."}
+    if LATE[0] <= now.astimezone(ET).time() < LATE[1]:
+        return {"step": step, "status": "late", "note": f"Too close to morning to start cases; {len(hits)} rows wait for tomorrow night."}
+    hits = hits[:room]
+    if cases is None:
+        from desk.agents.discounts import run_discount_desk as cases
+    try:
+        report = cases(cfg, discounts=own.ListSource(hits), trigger="schedule", limit=len(hits), wait=max(wait, CASES_WAIT))
+    except Exception as e:  # noqa: BLE001
+        return {"step": step, "status": "failed", "note": f"Cases for the list did not finish: {e}"}
+    written, failed = len(report.written), len(report.failed)
+    note = f"Wrote {written} of {len(hits)} cases for rows on sale" + (f", {failed} failed." if failed else ".")
+    if report.note and not written:
+        note = report.note
+    return {"step": step, "status": report.status, "note": note, "written": written, "pending": len(hits)}
+
+
 def _scout_runs(cfg: Config) -> list[dict]:
     from desk.agents import store
 
@@ -126,7 +164,10 @@ def run_night(
     now: datetime | None = None,
 ) -> dict:
     started = now or datetime.now(UTC)
-    steps = [scan_step(cfg, scan), cases_step(cfg, cases, wait), scout_step(cfg, scout, wait, now)]
+    steps = [scan_step(cfg, scan), cases_step(cfg, cases, wait)]
+    stopped = steps[1]["status"] in STOPPED
+    steps.append({"step": "list_cases", "status": steps[1]["status"]} if stopped else list_cases_step(cfg, cases, wait, now))
+    steps.append(scout_step(cfg, scout, wait, now))
     states = [s["status"] for s in steps]
     status = "waiting" if any(s in WAITING for s in states) else "ok" if all(s in QUIET for s in states) else "partial"
     night = {
