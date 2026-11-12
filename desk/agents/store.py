@@ -213,7 +213,9 @@ def last_tries(cfg: Config) -> dict[str, dict]:
 def misses_since(cfg: Config, since: str) -> dict[str, int]:
     with db(cfg) as conn:
         rows = conn.execute(
-            "SELECT symbol, count(*) AS n FROM agent_holding_tries WHERE started_at>=? AND status NOT IN ('ok','running') GROUP BY symbol", (since,)
+            "SELECT symbol, count(*) AS n FROM agent_holding_tries t WHERE started_at>=? AND status NOT IN ('ok','running') "
+            "AND started_at > coalesce((SELECT max(o.started_at) FROM agent_holding_tries o WHERE o.symbol=t.symbol AND o.status='ok'), '') GROUP BY symbol",
+            (since,),
         ).fetchall()
     return {r["symbol"]: r["n"] for r in rows}
 

@@ -31,7 +31,21 @@ STOP = ("disabled", "guarded", "over_budget", "busy", "deferred")
 SKIP_KINDS = ("cash", "money_market")
 VERDICTS = ("add", "hold", "trim", "watch")
 ORDER = ("asked", "new", "discount", "filing", "earnings", "weekly")
-HOLDING_FIELDS = ("symbol", "name", "kind", "as_of", "price_as_of", "numbers", "zones", "discount", "next_earnings", "filing_signals", "valuation", "band")
+HOLDING_FIELDS = (
+    "symbol",
+    "name",
+    "kind",
+    "held_in",
+    "as_of",
+    "price_as_of",
+    "numbers",
+    "zones",
+    "discount",
+    "next_earnings",
+    "filing_signals",
+    "valuation",
+    "band",
+)
 PREVIOUS_FIELDS = ("as_of", "thesis", "bear_case", "valuation_range", "valuation_note", "risks", "fit", "verdict", "verdict_line", "what_would_change")
 TEXT = {"what_it_is": 500, "thesis": 1500, "bear_case": 1500, "valuation_note": 600, "fit": 800, "verdict_line": 240, "what_would_change": 800}
 NEEDED = ("what_it_is", "thesis", "bear_case", "fit", "verdict_line", "what_would_change")
@@ -41,6 +55,7 @@ RISKS_MAX = 6
 RISK_CHARS = 300
 SOURCES_MAX = 12
 NO_HOLDINGS = "No holdings to analyse yet: the engine has not run."
+UNKNOWN = "the desk could not tell what this holding is"
 MISSES = {
     "timeout": "the model call timed out",
     "deferred": "the subscription's usage limit was reached",
@@ -106,6 +121,8 @@ def desk_for(held: int) -> Desk:
 def schema() -> dict:
     dossier = deepcopy(briefs.DOSSIER)
     dossier["required"] = [*dossier["required"], "what_it_is", "risks", "fit", "verdict", "verdict_line"]
+    dossier["required"].append("identified")
+    dossier["properties"]["identified"] = {"type": "boolean"}
     dossier["properties"]["verdict"] = {"enum": list(VERDICTS)}
     span = dossier["properties"]["valuation_range"]
     span["required"] = [*span["required"], "unit"]
@@ -152,6 +169,14 @@ def _body(found: dict | None) -> dict | None:
     except (TypeError, ValueError):
         return None
     return body if isinstance(body, dict) else None
+
+
+def unknown(body: dict | None) -> bool:
+    if not body or not body.get("what_it_is"):
+        return False
+    if "identified" in body:
+        return body["identified"] is False
+    return not body.get("sources")
 
 
 def _latest(cfg: Config) -> dict[str, dict]:
@@ -204,6 +229,8 @@ def build_queue(cfg: Config, rows: list[dict], now: datetime, zone: ZoneInfo, sy
             continue
         found = latest.get(symbol)
         previous = _body(found)
+        if unknown(previous):
+            previous = None
         full = previous is not None and bool(previous.get("what_it_is"))
         why = ["asked"] if symbols else reasons(row, _at(found["created_at"]) if full else None, now, zone)
         if not why or (not symbols and misses.get(symbol, 0) >= TRIES_A_NIGHT):
@@ -261,7 +288,9 @@ def clean(answer: dict, item: Item, view: dict, today: str) -> tuple[dict | None
     raw = answer.get("dossier")
     if not isinstance(raw, dict):
         return None, "no analysis came back"
-    out: dict = {"symbol": item.symbol, "as_of": today}
+    if raw.get("identified") is False:
+        return None, UNKNOWN
+    out: dict = {"symbol": item.symbol, "as_of": today, "identified": True}
     for key, cap in TEXT.items():
         out[key] = _text(wording.tidy(raw.get(key)), cap)
     missing = [k for k in NEEDED if not out[k]]
@@ -315,7 +344,7 @@ def closed(now: datetime, zone: ZoneInfo, trigger: str) -> bool:
 def _tally(cfg: Config, report: PassReport, rows: list[dict], now: datetime) -> PassReport:
     latest = _latest(cfg)
     held = {r["symbol"] for r in rows}
-    ages = [now - t for s, r in latest.items() if s in held and (t := _at(r["created_at"])) is not None]
+    ages = [now - t for s, r in latest.items() if s in held and not unknown(_body(r)) and (t := _at(r["created_at"])) is not None]
     report.tonight = sum(1 for a in ages if a < timedelta(hours=FRESH_HOURS))
     report.current = sum(1 for a in ages if a < timedelta(days=REFRESH_DAYS))
     return report
@@ -462,6 +491,8 @@ def _date(day: date) -> str:
 
 
 def _row(row: dict, found: dict | None, last: dict | None, now: datetime, zone: ZoneInfo, active: bool, due: bool) -> dict:
+    if unknown(_body(found)):
+        found = None
     body = _body(found) or {}
     written = _at(found["created_at"]) if found else None
     day = written.astimezone(zone).date() if written else None

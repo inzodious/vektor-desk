@@ -26,7 +26,8 @@ def analysis(**over) -> dict:
         "valuation_range": {"low": 34.0, "high": 52.0, "now": 41.2, "unit": "price", "basis": "Price per share at 4 to 6 times next year's sales."},
         "valuation_note": "About fair: it trades near the middle of its range.",
         "risks": ["A bigger rival is cutting prices.", "One customer is a fifth of sales."],
-        "fit": "It sits inside its band and matches his plan to hold through earnings.",
+        "fit": "It sits inside its band and matches your plan to hold through earnings.",
+        "identified": True,
         "verdict": "hold",
         "verdict_line": "Hold. Results were in line and it sits inside its band.",
         "what_would_change": "Two quarters of falling revenue, or a close below 34.",
@@ -360,6 +361,119 @@ def test_a_plan_fund_known_only_by_its_id_still_gets_an_analysis(cfg):
     assert report.analysed == ["31617E745"] and report.rejected == ["TICKA"]
     assert saved(cfg, "31617E745")["sources"] == [] and saved(cfg, "31617E745")["verdict"] == "watch"
     assert "plan id" in fake.calls[0]["system"]
+
+
+# ---- Names from the book, holdings the desk could not identify ----
+
+PLACEHOLDER = {
+    "symbol": "PLAN01",
+    "what_it_is": "This is a placeholder: the fund behind this plan id could not be found.",
+    "thesis": "Placeholder.",
+    "bear_case": "Unknown.",
+    "fit": "Unknown.",
+    "verdict": "watch",
+    "verdict_line": "Watch. Check the fund's name in the plan.",
+    "what_would_change": "The fund's name.",
+    "sources": [],
+}
+
+
+def plan_fund(**over) -> dict:
+    return fact("PLAN01", kind="fund", held=False, numbers={"value": 2400.0, "weight_pct": 6.0}, band={"status": "inside", "weight_pct": 6.0}, **over)
+
+
+def test_book_names_come_from_the_latest_snapshot_without_account_numbers():
+    from desk.agents.sources import book_names
+
+    accounts = [{"key": "plan-0003", "kind": "401k", "name": "Synthetic Retirement Plan", "last4": "0003"}]
+    snaps = {1: {"id": 1, "asOf": "2026-11-01T16:00", "accounts": accounts}, 2: {"id": 2, "asOf": "2026-11-08T16:00", "accounts": accounts}}
+    positions = [
+        {"snapshotId": 2, "accountKey": "plan-0003", "symbol": "plan01", "description": "  Synthetic 500   Index Fund Inv ", "isCash": False},
+        {"snapshotId": 1, "accountKey": "plan-0003", "symbol": "PLAN01", "description": "Old Name", "isCash": False},
+        {"snapshotId": 1, "accountKey": "gone-0009", "symbol": "PLAN01", "description": "Old Name", "isCash": False},
+        {"snapshotId": 2, "accountKey": "plan-0003", "symbol": "CASHX", "description": "Synthetic Money Market", "isCash": True},
+        {"snapshotId": 2, "accountKey": "plan-0003", "symbol": "", "description": "No symbol"},
+    ]
+    got = book_names(snaps, positions)
+    assert got == {"PLAN01": {"name": "Synthetic 500 Index Fund Inv", "held_in": [{"name": "Synthetic Retirement Plan", "kind": "401k"}]}}
+    assert "0003" not in json.dumps(got)
+
+
+def test_real_plan_facts_fill_a_missing_name_from_the_book(demo_cfg, monkeypatch):
+    from desk.agents.sources import RealPlanFacts
+    from desk.engine import planfacts
+
+    rows = [{"symbol": "ACME", "name": None, "kind": "unknown"}, {"symbol": "FXAIX", "name": "Kept Name", "kind": "fund"}, {"symbol": "NOPE", "name": None}]
+    monkeypatch.setattr(planfacts, "facts", lambda cfg, symbol=None: rows)
+    got = {r["symbol"]: r for r in RealPlanFacts().facts(demo_cfg)}
+    assert got["ACME"]["name"] == "Acme Rockets Inc" and got["FXAIX"]["name"] == "Kept Name" and got["NOPE"]["name"] is None
+    assert got["ACME"]["held_in"] and all(set(a) <= {"name", "kind"} for a in got["ACME"]["held_in"]) and "held_in" not in got["NOPE"]
+    assert rows[0]["name"] is None
+
+
+def test_real_plan_facts_work_without_a_mirror(cfg, monkeypatch):
+    from desk.agents.sources import RealPlanFacts
+    from desk.engine import planfacts
+
+    monkeypatch.setattr(planfacts, "facts", lambda cfg, symbol=None: [{"symbol": "ACME", "name": None}])
+    assert RealPlanFacts().book(cfg) == {} and RealPlanFacts().facts(cfg) == [{"symbol": "ACME", "name": None}]
+
+
+def test_the_desk_gets_the_name_and_accounts_and_speaks_to_you(cfg):
+    held_in = [{"name": "Synthetic Retirement Plan", "kind": "401k"}]
+    report, fake = go(cfg, held=[plan_fund(name="Synthetic 500 Index Fund Inv", held_in=held_in)])
+    payload = json.loads(fake.calls[0]["prompt"].split("\n\n", 1)[1])
+    assert payload["holding"]["name"] == "Synthetic 500 Index Fund Inv" and payload["holding"]["held_in"] == held_in
+    system = fake.calls[0]["system"]
+    assert '"you" and "your"' in system and "`holding.name`" in system and "`identified`" in system
+    assert report.analysed == ["PLAN01"] and saved(cfg, "PLAN01")["identified"] is True
+    assert status(cfg, held=[plan_fund(name="Synthetic 500 Index Fund Inv")])["rows"][0]["name"] == "Synthetic 500 Index Fund Inv"
+    shape = portfolio.schema()["properties"]["dossier"]
+    assert "identified" in shape["required"] and shape["properties"]["identified"] == {"type": "boolean"}
+
+
+def test_an_analysis_that_could_not_identify_the_holding_is_not_kept(cfg):
+    held = [plan_fund(name=None)]
+    report, _ = go(cfg, analysis(identified=False, sources=[]), held=held)
+    assert report.rejected == ["PLAN01"] and not report.analysed and store.latest_dossier(cfg, "PLAN01") is None
+    assert report.lines == ["PLAN01: not analysed (the desk could not tell what this holding is)"]
+    board = status(cfg, held=held)
+    assert board["analysed"] == 0 and board["rows"][0]["status"] == "failed" and "could not tell what this holding is" in board["rows"][0]["status_line"]
+    again, fake = go(cfg, analysis(identified=False), held=held, now=NIGHT + timedelta(hours=2))
+    assert len(fake.calls) == 1 and again.rejected == ["PLAN01"]
+    third, fake = go(cfg, held=held, now=NIGHT + timedelta(hours=4))
+    assert not fake.calls
+
+
+def test_a_placeholder_from_an_earlier_night_is_redone_and_only_that_one(cfg):
+    held = [plan_fund(name="Synthetic 500 Index Fund Inv"), fact("TICKA", kind="stock", band={"status": "inside", "weight_pct": 5.0})]
+    first, _ = go(cfg, held=held)
+    assert sorted(first.analysed) == ["PLAN01", "TICKA"]
+    run_id = store.start_run(cfg, "research", trigger="schedule", model="opus", effort="high", status="ok")
+    wrote = NIGHT + timedelta(minutes=10)
+    store.save_dossier(cfg, "PLAN01", run_id, json.dumps(PLACEHOLDER), wrote.isoformat())
+    board = status(cfg, held=held, now=wrote + timedelta(minutes=5))
+    row = next(r for r in board["rows"] if r["symbol"] == "PLAN01")
+    assert (board["analysed"], board["pass"]["due"]) == (1, 1) and row["status"] == "none" and row["verdict"] is None and row["analysed_at"] is None
+    assert board["line"] == "1 of 2 holdings analysed today."
+    report, fake = go(cfg, held=held, now=NIGHT + timedelta(hours=2))
+    assert report.analysed == ["PLAN01"] and len(fake.calls) == 1 and report.ready == {"ready": "All 2 holdings analysed"}
+    payload = json.loads(fake.calls[0]["prompt"].split("\n\n", 1)[1])
+    assert payload["reasons"] == ["new"] and payload["previous_analysis"] is None
+    assert saved(cfg, "PLAN01")["identified"] is True and status(cfg, held=held, now=NIGHT + timedelta(hours=3))["analysed"] == 2
+
+
+def test_a_holding_that_worked_since_its_misses_starts_the_count_again(cfg):
+    held = [plan_fund(name=None)]
+    for minutes in (0, 20):
+        go(cfg, analysis(verdict="buy"), held=held, now=NIGHT + timedelta(minutes=minutes))
+    since = (NIGHT - timedelta(hours=1)).isoformat(timespec="seconds")
+    assert store.misses_since(cfg, since) == {"PLAN01": 2}
+    done = store.start_try(cfg, "PLAN01", (NIGHT + timedelta(minutes=40)).isoformat(timespec="seconds"))
+    store.finish_try(cfg, done, "ok", None, None, (NIGHT + timedelta(minutes=41)).isoformat(timespec="seconds"))
+    assert store.misses_since(cfg, since) == {}
+    go(cfg, analysis(verdict="buy"), held=held, now=NIGHT + timedelta(minutes=60))
+    assert store.misses_since(cfg, since) == {"PLAN01": 1}
 
 
 def test_another_desk_over_its_cap_does_not_stop_the_pass(cfg):
