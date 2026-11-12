@@ -257,6 +257,27 @@ test('each idea says which price it is worked out from, and why a buy is not in 
   expect(errors).toEqual([]);
 });
 
+test('a long stance label stays inside its card', async ({ page }) => {
+  const labels = ['You already hold this; the analysis says hold, not add', 'Watch: the case says buy, but your research note says hold'];
+  await page.route('**/api/opportunities*', async (route) => {
+    const res = await route.fetch();
+    const json = await res.json();
+    await route.fulfill({ json: { ...json, rows: json.rows.map((r, k) => ({ ...r, stance: 'watch', stance_label: labels[k % 2] })) } });
+  });
+  await page.goto('/research/opportunities');
+  await expect(page.getByTestId('ideas')).toContainText(labels[1]);
+  const gaps = await page.locator('.idea').evaluateAll((cards) =>
+    cards.map((card) => {
+      const pad = parseFloat(getComputedStyle(card).paddingRight);
+      const chip = card.querySelector('.card-head .chip').getBoundingClientRect();
+      return Math.round(card.getBoundingClientRect().right - chip.right - pad);
+    }),
+  );
+  gaps.forEach((gap) => expect(gap).toBeGreaterThanOrEqual(-1));
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+});
+
 test('an empty opportunities list gives its reason', async ({ page }) => {
   await page.goto('/research/opportunities?scenario=fresh');
   await expect(page.getByTestId('opp-count')).toHaveText('0');
