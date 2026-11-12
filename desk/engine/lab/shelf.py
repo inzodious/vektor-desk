@@ -23,6 +23,7 @@ N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
 REFRESH_AFTER = timedelta(days=30)
 REV = 2
+MIX_REV = 3
 OUTDATED = "were measured before the lab's latest fix and are being run again; until then their numbers lean a little."
 LEVEL_PTS = 0.2
 YARDSTICK = "lib-buy-hold-sp500"
@@ -31,7 +32,7 @@ PLAIN = (
     (("small-cap history",), "Small-company price history is still loading. This runs once that finishes."),
     (("is not in the lab yet",), "Its data file has not reached the lab yet. This runs the night after the file arrives."),
     (("no price history", "too little price history"), "Most of its funds have no price history in the lab yet."),
-    (("no common history", "too late for anything"), "Its funds do not share enough price history yet."),
+    (("no common history", "too late for anything", "needs 2.5 or more"), "Its funds have not all traded long enough to test before the two-year holdout."),
     (("not funds", "not a fund"), "The lab did not recognise one of its funds, so it was held back."),
 )
 PLAIN_DEFAULT = "The lab could not run this one. It is tried again on a later night."
@@ -96,6 +97,7 @@ LIBRARY: tuple[dict, ...] = (
         "70% US stocks, 30% international, rebalanced monthly.",
         SPY,
         _mix({"VTI": 70, "VXUS": 30}, benchmark="SPY"),
+        rev=MIX_REV,
     ),
     _exp(
         "lib-60-40",
@@ -120,6 +122,7 @@ LIBRARY: tuple[dict, ...] = (
             "sizing": "inverse_vol",
             "benchmark": "SPY",
         },
+        rev=MIX_REV,
     ),
     _exp(
         "lib-trend-200d",
@@ -295,6 +298,7 @@ LIBRARY: tuple[dict, ...] = (
         "Hold the funds in your plan at their target weights, rebalanced monthly.",
         SPY,
         {"universe": {"type": "fund_list", "set": "plan_mix"}, "benchmark": "SPY"},
+        rev=MIX_REV,
     ),
     _exp(
         "lib-safe-mix",
@@ -304,6 +308,7 @@ LIBRARY: tuple[dict, ...] = (
         "The broad index mix from your October plan, at fixed weights.",
         SPY,
         _mix(SAFE_MIX, benchmark="SPY"),
+        rev=MIX_REV,
     ),
     _exp(
         "lib-tech-tilt",
@@ -313,6 +318,7 @@ LIBRARY: tuple[dict, ...] = (
         "Half S&P 500, the rest leaning into technology and chips with a slice of international.",
         SPY,
         _mix(TECH_TILT, benchmark="SPY"),
+        rev=MIX_REV,
     ),
     _exp(
         "lib-dip-only",

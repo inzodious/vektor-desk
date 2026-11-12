@@ -426,6 +426,15 @@ def test_a_result_from_an_older_revision_is_flagged_and_run_again(stocked, monke
     assert shelf.view(cfg)["note"] == f"{shelf.NOTE} Some of these {shelf.OUTDATED}"
 
 
+def test_mixes_that_held_cash_for_a_fund_not_yet_trading_are_run_again():
+    again = {e["id"] for e in shelf.LIBRARY if e["rev"] == shelf.MIX_REV}
+    assert again == {"lib-buy-hold-total-world", "lib-risk-parity", "lib-plan-mix", "lib-safe-mix", "lib-tech-tilt"} and shelf.MIX_REV > shelf.REV
+    seen = {"kind": "experiment", "rev": shelf.REV, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
+    assert all(shelf._outdated(e, seen) == (e["id"] in again) for e in shelf.LIBRARY)
+    short = "the walk-forward range 2021-04-01 to 2022-12-30 is 1.7 years; it needs 2.5 or more before the two-year holdout"
+    assert shelf.plain([short]) == "Its funds have not all traded long enough to test before the two-year holdout."
+
+
 def test_an_outdated_row_whose_rerun_left_no_result_waits_before_another_try():
     entry = {"id": "lib-60-40", "rev": 2}
     seen = {"kind": "experiment", "rev": 1, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
