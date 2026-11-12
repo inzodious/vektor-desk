@@ -181,12 +181,25 @@ def test_margin_call_drop(cfg, mirror, monkeypatch):
     assert m[("plan.rules", "rule", "no-margin-buys", "now")]["value"] == 1
 
 
+def test_an_unreadable_margin_rate_is_explained_without_a_setting_name(cfg, mirror, monkeypatch):
+    monkeypatch.setattr(core, "margin_rate", lambda cfg: (None, "none"))
+    seed(mirror, debit=True)
+    result, m = computed(cfg)
+    desk = connect(cfg.desk_db, readonly=True)
+    detail = desk.execute("SELECT detail FROM data_health WHERE check_name='margin_rate'").fetchone()[0]
+    desk.close()
+    assert result["checks"]["margin_rate"] == "warn" and "DESK_" not in detail and "Settings" in detail
+    assert m[("margin.cost_month", "portfolio", "all", "now")]["value"] is None
+
+
 def test_a_failed_check_marks_metrics_stale(cfg, mirror):
     seed(mirror)
     result, m = computed(cfg, now=datetime(2026, 11, 9, 12, 0, tzinfo=UTC))
     assert result["checks"]["freshness"] == "fail" and result["health"] == "fail"
     assert m[("margin.debit", "portfolio", "all", "now")]["quality"] == "stale"
-    assert m[("ret.twr", "portfolio", "all", "ITD")]["quality"] == "pro_forma"
+    assert m[("ret.twr", "portfolio", "all", "ITD")]["quality"] == "stale"
+    assert m[("cash.ready", "portfolio", "all", "now")]["quality"] == "stale"
+    assert {r["quality"] for r in m.values()} <= {"stale", "insufficient_history"}
 
 
 def test_core_without_holdings(cfg, mirror):

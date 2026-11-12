@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -59,7 +60,7 @@ def test_without_a_plan_the_safe_mix_is_a_yardstick_not_a_target(cfg, mirror, ap
     client = app_client(packages=["engine"])
     assert client.get("/api/engine/reference").json() == {"as_of": None, "source": None, "name": None, "weights": {}, "judged": False, "note": None}
     seed(mirror)
-    out = computed(cfg)
+    out = computed(replace(cfg, stale_hours=48))
     ref = client.get("/api/engine/reference").json()
     assert ref["source"] == "safe_mix" and ref["name"] == "Safe mix" and ref["judged"] is False and ref["note"] == core.REFERENCE_NOTE
     assert ref["weights"] == {s: w * 100 for s, w in sorted(catalog.SAFE_MIX.items())} and ref["as_of"] == DAYS[-1]
