@@ -31,7 +31,7 @@ test('This morning has three doors, each with a count, a line and when it ran', 
   const ideas = morning.locator('[data-door="opportunities"]');
   await expect(ideas).toContainText('Buying opportunities');
   await expect(page.getByTestId('door-opportunities-count')).toHaveText('4 ideas');
-  await expect(ideas).toContainText('1 worth buying now, 3 to watch. Top: QUAL, 12% under its high.');
+  await expect(ideas).toContainText('1 worth buying now. 2 could become a buy, 1 not for now. Top: QUAL, 12% under its high.');
 
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
@@ -225,9 +225,10 @@ test('a holding with no analysis says why and offers to run one', async ({ page 
 test('buying opportunities lists each idea with why now, a zone, a size and what would make it wrong', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/research/opportunities');
-  await expect(page.getByTestId('opp-count')).toHaveText('4');
+  await expect(page.getByTestId('opp-count')).toHaveText('3');
+  await expect(page.locator('.ph-big')).toContainText('ideas to look at · 1 not for now');
   const top = page.getByTestId('opp-top');
-  await expect(top).toContainText('1 worth buying now, 3 to watch. Top: QUAL, 12% under its high.');
+  await expect(top).toContainText('1 worth buying now. 2 could become a buy, 1 not for now. Top: QUAL, 12% under its high.');
   await expect(top).toContainText('1 of these has no written case yet.');
   await expect(top).toContainText('No risk check on file yet, so sizes use the Moderate band');
   await expect(top).toContainText('It is a sort, not a forecast.');
@@ -244,10 +245,72 @@ test('buying opportunities lists each idea with why now, a zone, a size and what
   await expect(acme).not.toContainText('$0');
   await expect(page.getByTestId('ideas')).not.toContainText('score');
   await expect(page.getByTestId('opp-passed')).toContainText('BND');
+  await page.getByTestId('ideas').locator('summary').click();
   await acme.getByRole('link', { name: 'Open its research' }).click();
   await expect(page).toHaveURL(/\/research\?s=ACME$/);
   await expect(page.getByTestId('dossier')).toHaveAttribute('data-symbol', 'ACME');
   expect(errors).toEqual([]);
+});
+
+test('the page leads with what could be bought and folds the rest under Not now', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/research/opportunities');
+  const ideas = page.getByTestId('ideas');
+  await expect(ideas.locator('[data-group]')).toHaveCount(3);
+  await expect(ideas.locator('[data-group="buy"] h2')).toHaveText('Worth buying 1');
+  await expect(ideas.locator('[data-group="could"] h2')).toHaveText('Could become a buy 2');
+  await expect(ideas.locator('[data-group="buy"] .idea')).toHaveAttribute('data-idea', 'QUAL');
+  await expect(ideas.locator('[data-group="could"] .idea')).toHaveCount(2);
+  const fold = ideas.locator('[data-group="not_now"]');
+  await expect(fold.locator('summary')).toContainText('Not now');
+  await expect(fold.locator('summary .chip')).toHaveText('1');
+  await expect(fold.locator('.idea')).toBeHidden();
+  await fold.locator('summary').click();
+  await expect(fold.locator('[data-idea="ACME"]')).toBeVisible();
+  await fold.locator('summary').click();
+  await expect(fold.locator('.idea')).toBeHidden();
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  expect(errors).toEqual([]);
+});
+
+test('when nothing is a buy or close to one the Not now list is open, and an older desk keeps one flat list', async ({ page }) => {
+  const fact = '31.3% under its 52-week high at the latest price (31.9% when the case was written)';
+  let mode = 'not_now';
+  await page.route('**/api/opportunities*', async (route) => {
+    const res = await route.fetch();
+    const json = await res.json();
+    const rows = json.rows.map((r) => {
+      const rest = { ...r };
+      delete rest.group;
+      delete rest.group_label;
+      return mode === 'flat' ? rest : { ...rest, group: 'not_now', group_label: 'Not now', facts: [fact, ...r.facts.slice(1)] };
+    });
+    await route.fulfill({ json: { ...json, headline: 'Nothing rated a buy yet. 4 not for now.', rows } });
+  });
+  await page.goto('/research/opportunities');
+  const ideas = page.getByTestId('ideas');
+  await expect(page.getByTestId('opp-count')).toHaveText('0');
+  await expect(page.locator('.ph-big')).toContainText('ideas to look at · 4 not for now');
+  await expect(ideas.locator('[data-group="not_now"] .idea')).toHaveCount(4);
+  await expect(ideas.locator('[data-idea="QUAL"]')).toBeVisible();
+  await expect(ideas.locator('[data-idea="QUAL"] .idea-facts li').first()).toHaveText(fact);
+  const gaps = await page.locator('.idea').evaluateAll((cards) =>
+    cards.map((card) => {
+      const pad = parseFloat(getComputedStyle(card).paddingRight);
+      const li = card.querySelector('.idea-facts li').getBoundingClientRect();
+      return Math.round(card.getBoundingClientRect().right - li.right - pad);
+    }),
+  );
+  gaps.forEach((gap) => expect(gap).toBeGreaterThanOrEqual(-1));
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+
+  mode = 'flat';
+  await page.goto('/research/opportunities');
+  await expect(page.getByTestId('opp-count')).toHaveText('4');
+  await expect(page.getByTestId('ideas').locator('[data-group]')).toHaveCount(0);
+  await expect(page.getByTestId('ideas').locator('.idea')).toHaveCount(4);
 });
 
 test('each idea says which price it is worked out from, and why a buy is not in the queue', async ({ page }) => {

@@ -48,3 +48,18 @@ export function inQueue(row) {
   if (!row?.decision_id) return false;
   return row.queued === undefined ? true : row.queued === true;
 }
+
+const GROUPS = [
+  { key: 'buy', t: 'Worth buying' },
+  { key: 'could', t: 'Could become a buy' },
+  { key: 'not_now', t: 'Not now' },
+];
+
+export function opportunityGroups(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.some((r) => r.group)) return null;
+  return GROUPS.map((g) => {
+    const mine = list.filter((r) => (GROUPS.some((x) => x.key === r.group) ? r.group : 'not_now') === g.key);
+    return { key: g.key, title: mine[0]?.group_label || g.t, rows: mine, fold: g.key === 'not_now' };
+  }).filter((g) => g.rows.length);
+}

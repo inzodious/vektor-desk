@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { excessWords, holdingsDoor, libraryChip, libraryGroups, opportunitiesDoor, passWords, strategiesDoor, whenWords } from './morning.js';
 import { guideFor } from './guide.js';
-import { earningsLine, entryLine, heldLine, inQueue, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
+import { earningsLine, entryLine, heldLine, inQueue, opportunityGroups, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
 import { holdingChip } from './research.js';
 
 const NOW = new Date('2026-11-12T15:00:00Z');
@@ -113,6 +113,13 @@ describe('buying opportunities', () => {
     expect(inQueue({ decision_id: 'd_1', queued: false })).toBe(false);
     expect(inQueue({ decision_id: 'd_1' })).toBe(true);
     expect(inQueue({ decision_id: null, queued: true })).toBe(false);
+    expect(opportunityGroups([{ symbol: 'A' }, { symbol: 'B' }])).toBeNull();
+    const groups = opportunityGroups([{ symbol: 'A', group: 'buy', group_label: 'Worth buying' }, { symbol: 'B', group: 'not_now' }, { symbol: 'C', group: 'could' }, { symbol: 'D', group: 'odd' }]);
+    expect(groups.map((g) => [g.key, g.title, g.fold, g.rows.map((r) => r.symbol).join('')])).toEqual([
+      ['buy', 'Worth buying', false, 'A'],
+      ['could', 'Could become a buy', false, 'C'],
+      ['not_now', 'Not now', true, 'BD'],
+    ]);
     expect(passWords('2026-11-13T00:05:00-05:00', NOW)).toBe('Fri Nov 13, 12:05 AM ET');
     expect(passWords('2026-11-12T23:05:00-05:00', NOW)).toBe('Today, 11:05 PM ET');
     expect(passWords('Tonight from 11:05 PM', NOW)).toBe('Tonight from 11:05 PM');
