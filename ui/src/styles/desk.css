@@ -1710,4 +1710,5 @@ a.chip { text-decoration: none; }
 }
 
 /* ---------- valuation basis ---------- */
+.valuation-note { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--ink); max-width: 70ch; }
 .range-basis { margin: 4px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink-2); max-width: 70ch; }

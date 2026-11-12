@@ -230,8 +230,18 @@ export function Dossier({ entry, today }) {
         ) : null}
         <div className="split">
           <div>
-            <RangeStrip range={d.valuation_range} nowValue={nowPrice} />
-            {d.valuation_note ? <p className="empty-hint" data-testid="valuation-note">{d.valuation_note}</p> : null}
+            {rangeGeo(d.valuation_range) || !d.valuation_note ? (
+              <RangeStrip range={d.valuation_range} nowValue={nowPrice} />
+            ) : (
+              <span className="kicker" data-testid="range-label">
+                Valuation
+              </span>
+            )}
+            {d.valuation_note ? (
+              <p className="valuation-note" data-testid="valuation-note">
+                {d.valuation_note}
+              </p>
+            ) : null}
             {d.changes_since_last ? (
               <div className="note" style={{ marginTop: 10 }}>
                 <Icon name="swap" />

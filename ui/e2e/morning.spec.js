@@ -175,6 +175,23 @@ test('Research is organised by holding, each with a status', async ({ page }) =>
   expect(errors).toEqual([]);
 });
 
+test('a fund with no valuation range shows its reason as text and no strip', async ({ page }) => {
+  const note = 'A broad fund has no single fair price, so there is no range here. It is judged by its cost and how closely it tracks its index.';
+  await page.route('**/api/agents/dossiers', async (route) => {
+    const res = await route.fetch();
+    const rows = await res.json();
+    await route.fulfill({ json: rows.map((r) => (r.symbol === 'FTEC' ? { ...r, dossier: { ...r.dossier, valuation_range: { low: null, high: null, now: null, unit: null, basis: null }, valuation_note: note } } : r)) });
+  });
+  await page.goto('/research?s=FTEC');
+  const d = page.getByTestId('dossier');
+  await expect(d.getByTestId('valuation-note')).toHaveText(note);
+  await expect(d.getByTestId('range-label')).toHaveText('Valuation');
+  await expect(d.locator('.range')).toHaveCount(0);
+  await expect(d).not.toContainText('No valuation range written yet');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+});
+
 test('an older dossier with a long method note prints it as plain text and its multiples without a dollar sign', async ({ page }) => {
   const basis = 'Forward P/E on the listed shares (price ÷ next-year consensus EPS). Low 22x = the recent trough reading; high 33x = the five-year average. Now 24.57x at the close of $100.00.';
   await page.route('**/api/agents/dossiers', async (route) => {
