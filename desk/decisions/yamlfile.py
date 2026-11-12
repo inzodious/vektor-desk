@@ -77,7 +77,7 @@ def edit_profile(cfg: Config, changes) -> dict:
     changes = check_changes(changes)
     path = profile_path(cfg)
     if not path.exists():
-        raise EditError("There's no desk.yaml yet. Write one from the first-run checklist in Settings (POST /api/decisions/profile/init).", 409)
+        raise EditError("You have no profile yet. Set one up from your data first; the first-run checklist does it in one tap.", 409)
     text = path.read_text()
     try:
         parse(text)

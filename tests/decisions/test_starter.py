@@ -67,10 +67,11 @@ def test_init_from_demo_mirror_writes_a_valid_draft_once(demo_cfg):
 def test_status_lists_what_is_still_default(demo_cfg):
     before = status(demo_cfg)
     assert before["exists"] is False and before["source"] == "defaults" and "profile init" in before["starter"]
+    assert before["init"] == {"method": "POST", "path": "/api/decisions/profile/init", "label": "Set up my profile from my data"}
     assert "deposits" in before["defaults"] and "risk_level" in before["defaults"]
     init(demo_cfg, today=TODAY)
     after = status(demo_cfg)
-    assert after["exists"] is True and after["starter"] is None and after["error"] is None
+    assert after["exists"] is True and after["starter"] is None and after["init"] is None and after["error"] is None
     assert {"tax.wash_sale_accounts", "industry_focus.themes", "agents.desks"} <= set(after["set"]) and "deposits" in after["defaults"]
     assert {"risk_level", "agents.enabled", "tax.harvest_threshold_usd", "opportunity.satellite_cap_pct"} <= set(after["defaults"])
     assert after["agents_enabled"] is False and after["desks_on"] == [] and after["deposits_mode"] == "auto"
@@ -95,9 +96,15 @@ def test_payroll_transactions_when_no_paystubs(cfg):
     assert data["deposits"][0]["cadence"] == "weekly" and "amount_usd" not in data["deposits"][0]
 
 
-def test_empty_mirror_still_drafts_and_no_mirror_refuses(cfg):
+def test_empty_mirror_still_drafts_and_no_mirror_refuses(cfg, app_client):
     with pytest.raises(StarterError, match="No mirror"):
         init(cfg, today=TODAY)
+    client = app_client(packages=["decisions"])
+    refused = client.post("/api/decisions/profile/init")
+    assert refused.status_code == 422 and refused.json()["detail"].startswith("Your accounts haven't been copied to the desk yet")
+    assert str(cfg.data_dir) not in refused.json()["detail"] and "deploy.sh" not in refused.json()["detail"]
+    edit = client.patch("/api/decisions/profile", json={"changes": {"margin": {"rate_pct": 9}}})
+    assert edit.status_code == 409 and "desk.yaml" not in edit.text and "POST" not in edit.text
     _mirror(cfg, [])
     _, text = init(cfg, dry_run=True, today=TODAY)
     assert "Deposits: auto" in text and "rules stay at the defaults" in text

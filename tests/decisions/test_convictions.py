@@ -113,7 +113,7 @@ def test_edit_profile_refuses_bad_changes(cfg, yaml_file):
     assert yaml_file.read_text() == STARTER
     assert not (cfg.data_dir / "desk.yaml.bak").exists()
     yaml_file.unlink()
-    with pytest.raises(EditError, match="no desk.yaml") as e:
+    with pytest.raises(EditError, match="no profile yet") as e:
         edit_profile(cfg, {"alerts": {"min_priority": "high"}})
     assert e.value.status == 409
 
