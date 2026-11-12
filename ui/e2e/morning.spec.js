@@ -143,7 +143,8 @@ test('Strategies leads with the overnight table, grouped by kind, with honest wo
   await expect(legend.locator('details')).toHaveJSProperty('open', false);
   await legend.locator('summary').click();
   await expect(legend.locator('li')).toHaveCount(5);
-  await expect(legend.locator('li').first()).toContainText('Every US stock weighted by size');
+  await expect(legend.locator('li').first()).toContainText('The funds in your plan at their target weights.');
+  await expect(legend.locator('li', { hasText: 'US stock market (French)' })).toContainText('Every US stock weighted by size');
   await expect(lib.locator('.lib-group')).toHaveCount(3);
   await expect(lib.locator('.lib-group h3')).toHaveText(['Old and tested', 'Practical', 'Novel and creative']);
   const classic = lib.locator('.lib-group[data-kind="classic"]');

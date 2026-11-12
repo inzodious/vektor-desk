@@ -214,10 +214,23 @@ export function factorItems(loadings = {}) {
   return Object.entries(loadings || {}).map(([k, l]) => ({ label: FACTOR_WORD[k] || k, value: l?.beta ?? null, hint: l?.t != null ? `t ${l.t}` : undefined }));
 }
 
-const METRIC_WORD = { ret: 'return', ret_skip: 'return skipping the last month', vol: 'volatility', ma_gap: 'gap to its average', ma_cross: '50-day average against the long average', range_52w: 'place in its range', dd: 'drop from the high' };
+const METRIC_WORD = { ret: 'return', ret_skip: 'return skipping the last month', vol: 'volatility', ma_gap: 'gap to its average', ma_cross: '50-day average against the long average', range_52w: 'place in its range', dd: 'drop from the high', 'insider.buyers': 'insiders buying', 'earnings.surprise': 'earnings surprise' };
 const TRANSFORM_WORD = { raw: '', rank: 'ranked high to low', inverse_rank: 'ranked low to high', zscore: 'as a z-score', inverse: 'flipped' };
-const SET_WORD = { sector_etfs: 'US sector ETFs', core_etfs: 'core ETFs', benchmarks: 'benchmarks', plan_mix: 'the funds in your plan', held_mix: 'what you hold today' };
-const TYPE_WORD = { french: 'Ken French research portfolios', small_caps: 'US small companies' };
+const SET_WORD = {
+  sector_etfs: 'US sector ETFs',
+  core_etfs: 'core ETFs',
+  benchmarks: 'benchmarks',
+  plan_mix: 'the funds in your plan',
+  held_mix: 'what you hold today',
+  industry_12: '12 US industry portfolios',
+  industry_49: '49 US industry portfolios',
+  value_deciles: 'ten US portfolios sorted from cheap to expensive',
+  momentum_deciles: 'ten US portfolios sorted by the past year’s return',
+  size_deciles: 'ten US portfolios sorted from small to large',
+  profitability_deciles: 'ten US portfolios sorted by profitability',
+  investment_deciles: 'ten US portfolios sorted by how much companies invest',
+};
+const TYPE_WORD = { french: 'Ken French research portfolios', small_caps: 'US small companies', screen: 'a short list of stocks, which leans on hindsight' };
 
 function universeText(u) {
   if (!u) return null;

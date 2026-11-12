@@ -62,6 +62,9 @@ describe('words', () => {
     expect(lines({ rebalance: 'monthly' }).Trades).toBe('monthly, equal weights');
     expect(lines({ universe: { type: 'fund_list', set: 'held_mix', cap_stocks_pct: 10 } })['Picks from']).toBe('what you hold today, no single stock above 10%');
     expect(lines({ universe: { type: 'french' } })['Picks from']).toBe('Ken French research portfolios');
+    expect(lines({ universe: { type: 'french', set: 'value_deciles' } })['Picks from']).toBe('ten US portfolios sorted from cheap to expensive');
+    expect(lines({ universe: { type: 'screen' } })['Picks from']).toBe('a short list of stocks, which leans on hindsight');
+    expect(lines({ signals: [{ metric_id: 'insider.buyers', window: '126d', transform: 'raw' }] }).Signal).toBe('insiders buying over 126 days');
     expect(paramText({ debit_pct: 10, rate_pct: 12 })).toBe('10% starting debit, 12% rate');
   });
 });
