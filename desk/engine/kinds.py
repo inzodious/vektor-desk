@@ -6,6 +6,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine.lab import runner, simcache
 from desk.engine.lab.data import data_path, ledger_path
+from desk.engine.lab.spec import local_only
 from desk.worker import Kind, offer, online
 
 # ---- Lab simulations on a worker ----
@@ -64,6 +65,8 @@ def offer_queue(cfg: Config, *, now: datetime | None = None) -> dict:
         kept = before["files"] if before.get("snapshot") == snapshot else {}
         files, fresh = {}, 0
         for name, request in waiting(cfg):
+            if local_only(request.get("spec")):
+                continue
             key = simcache.job_key(snapshot, request)
             old = kept.get(name)
             if isinstance(old, dict) and old.get("key") == key and old.get("at"):
