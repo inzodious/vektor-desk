@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from datetime import UTC, datetime
 
 import pytest
@@ -174,9 +175,12 @@ def test_every_problem_names_a_fix(cfg, mirror, monkeypatch):
     seed_like_the_box(mirror)
     run_holdings(cfg)
     checks = health(cfg)
-    assert checks["market_keys"][0] == "warn" and "TIINGO_API_KEY" in checks["market_keys"][1]
+    assert checks["market_keys"][0] == "warn" and "the Tiingo key (held prices" in checks["market_keys"][1]
+    assert checks["market_keys"][1].endswith("the Alpaca paper key ID and the Alpaca paper secret key in Settings, Data, Keys.")
     problems = {c: d for c, (s, d) in checks.items() if s != "ok"}
     assert problems and all("Fix:" in d for d in problems.values()), problems
+    shell = re.compile(r"`|[A-Z]{3,}_[A-Z_]{2,}|python -m|docker|sudo|\.yaml|\.sh\b|fidelity folder")
+    assert not [d for _, d in checks.values() if shell.search(d)]
     monkeypatch.setenv("TIINGO_API_KEY", "k")
     monkeypatch.setenv("FINNHUB_API_KEY", "k")
     monkeypatch.setenv("FRED_API_KEY", "k")
@@ -392,7 +396,7 @@ def test_market_keys_warn_for_any_missing_key(cfg, mirror, monkeypatch):
     run_holdings(cfg)
     checks = health(cfg)
     status, detail = checks["market_keys"]
-    assert status == "warn" and detail.endswith("Fix: run `sudo bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set DESK_SEC_USER_AGENT`.")
+    assert status == "warn" and detail == "Missing the SEC contact (no SEC research or fund look-through). Fix: set the SEC contact in Settings, Data, Keys."
     assert all("answer n" not in d for _, d in checks.values())
 
 

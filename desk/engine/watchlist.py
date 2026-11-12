@@ -82,7 +82,7 @@ def remove(conn: sqlite3.Connection, symbol: str) -> str:
     row = conn.execute("SELECT role FROM market_symbols WHERE symbol=?", (sym,)).fetchone()
     if row is None or row[0] != "watch":
         if sym in env_symbols():
-            raise WatchError(f"{sym} comes from DESK_WATCHLIST; change it there")
+            raise WatchError(f"{sym} is on the watchlist from the box's own setup, not from this page, so it cannot be removed here")
         raise WatchError(f"{sym} is not on the watchlist")
     with conn:
         conn.execute("DELETE FROM market_symbols WHERE symbol=? AND role='watch'", (sym,))
