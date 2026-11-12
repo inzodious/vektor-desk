@@ -1127,6 +1127,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
 | Every 5 minutes, any hour | `restate` ("Catch the book up"): exits at once unless official closes landed for a provisional day or the book is behind the last finished session; then the daily pass and the review run again and the debrief is asked for. Never twice on the same closes |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
+| Daily 10:30 and 14:30 ET | `public`: the public stock list dry run; fetches only when the stored list is over 6 days old or incomplete |
 | Nightly 00:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ## Strategy library
@@ -1201,7 +1202,23 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Where it runs | On the box in the night lab pass only; `lab-offer` skips it and a worker refuses it |
 | Not run | No held mix exported yet, or the holdings have not all traded long enough before the holdout (see "A fund that had not started trading") |
 
-**Stock screens lean on hindsight.** The screen universe is the stocks the desk has bars for: a few large quality names plus names he holds, watches or has held. So every screen spec carries the caveat `spec.SCREEN_HINDSIGHT`, and the six screen rows have `leans_on_hindsight: true`, that caveat first, and a `line` that ends "Leans on hindsight: the stock list is small and includes names you hold or held." The view adds both to a result stored before the caveat existed. A screen row that would read held up is shown as within noise instead ("Ahead, but it leans on hindsight: ...") and is not in `counts.held_up`. A public stock universe is the fix, not yet built.
+**Stock screens lean on hindsight.** The screen universe is the stocks the desk has bars for: a few large quality names plus names he holds, watches or has held. So every screen spec carries the caveat `spec.SCREEN_HINDSIGHT`, and the six screen rows have `leans_on_hindsight: true`, that caveat first, and a `line` that ends "Leans on hindsight: the stock list is small and includes names you hold or held." The view adds both to a result stored before the caveat existed. A screen row that would read held up is shown as within noise instead ("Ahead, but it leans on hindsight: ...") and is not in `counts.held_up`. A public stock list is the fix; its dry run is built, the switch is not.
+
+**Public stock list (dry run).** `public.py`, job `public` ("Public stock list"), `GET /api/engine/public-stocks`. It only counts; no screen reads it yet and no price is fetched.
+
+| Step | Rule |
+|---|---|
+| The list | The 200 US companies with the largest public float in their annual report, measured nearest June 30, 2011. SEC frames `dei/EntityPublicFloat` for the four quarters to mid-2011, so every fiscal year end is covered; one figure per company; floats under $1B or over $700B are treated as misfiled |
+| Why it is fair | Size in mid-2011 was public then, and tests start January 2012. A company had to file that annual report, so one that vanished before early 2012 is missed |
+| Ticker | Today's SEC ticker list first. If none of those is priced, the 2011 filing: the trading symbol on its cover page (`R1.htm`), then the prefix of its data file |
+| Priced | Tiingo's public ticker file lists the ticker as a US-dollar stock with history that covers the first session of 2012. `state` is `priced`, `late` (history starts later, often a reused ticker), `missing` (not at Tiingo), `no_ticker` or `unasked` (the SEC stopped answering; tried again next run) |
+| Stopped trading | A priced name whose Tiingo history ended more than 10 days before the newest date in the file |
+| Check by eye | Priced from the filing and still trading: the company may have a new SEC number, or the ticker may have been reused |
+| Enough | 90% priced. Under that, stock screens stay research only |
+| Tiingo room | `tiingo.left` is this month's new-name allowance left, `new_names` what the list would use, `size` 200 or 150 when fewer than 220 are left |
+| Cost | Four SEC frames, one Tiingo file (no key, no quota), and up to two small SEC requests per company not on today's list. Kept 6 days; runs at 10:30 and 14:30 ET and exits at once while the list is fresh |
+
+The job's `detail` and the route's `detail` are the same sentence, for example "Of the 200 largest US companies of mid-2011, 191 have a ticker and Tiingo prices 183 of them from January 2012 (91.5%)."
 
 **Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the five stock screens (see "What a worker can read").
 
