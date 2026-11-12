@@ -65,6 +65,40 @@ test('jobs list plain names, how each last went and when it runs', async ({ page
   expect(errors).toEqual([]);
 });
 
+test('a finished job shows what the run did, and never raw output', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/settings/box');
+  const card = page.getByTestId('jobs');
+  const backfill = card.locator('[data-job="engine-backfill"]');
+  await expect(backfill.getByTestId('job-did')).toHaveText('Asked Tiingo for 2 names. FXAIX and FTEC answered with nothing new for 2026-11-06.');
+  await expect(card.getByTestId('job-did')).toHaveCount(1);
+  await card.getByText(/Agents and housekeeping/).click();
+  const paper = card.locator('[data-job="engine-paper"]');
+  await expect(paper).toContainText('Ran ');
+  await expect(paper.getByTestId('job-did')).toHaveCount(0);
+  await expect(card).not.toContainText('{');
+  await expect(card).not.toContainText('filled');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  expect(errors).toEqual([]);
+});
+
+test('a waiting job gives the reason the desk names, and none when it names none', async ({ page }) => {
+  const state = structuredClone(JOBS);
+  const set = (name, more) => Object.assign(state.jobs.find((j) => j.name === name), { waiting: true, waiting_since: null, can_run: false }, more);
+  set('engine-research', { waiting_for: 'night' });
+  set('engine-lookthrough', { waiting_for: 'memory' });
+  set('engine-french', { waiting_for: null });
+  await page.route(/\/api\/jobs(\?.*)?$/, (route) => route.fulfill({ json: state }));
+  await page.goto('/settings/box');
+  const card = page.getByTestId('jobs');
+  await expect(card.locator('[data-job="engine-research"]')).toContainText('Waiting for its turn: the overnight run goes one step at a time');
+  await expect(card.locator('[data-job="engine-lookthrough"]')).toContainText('Waiting for its turn: low-memory mode runs heavy jobs one at a time');
+  await expect(card.locator('[data-job="engine-french"] small').first()).toHaveText('Waiting for its turn');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+});
+
 test('run now shows starting, running, then done', async ({ page }) => {
   const asked = fakeScheduler(page);
   await page.goto('/settings/box');

@@ -73,6 +73,8 @@ function libraryRow([id, title, kind, family, description, benchmark, outcome, e
     noise: tested && !rule && excess != null ? { trials: 212, excess_total_pts: excess * 7.8, band_total_pts: 12.4, luck: Math.abs(excess * 7.8) < 12.4 } : null,
     rule: rule && tested ? { horizon_years: 10, starts: 100, p5_pts: -3.2, p50_pts: id === 'deposit-monthly' ? -1.4 : 0.8, p95_pts: 4.1, share_better: id === 'deposit-monthly' ? 0.32 : 0.81 } : null,
     research_only: family === 'Insiders' || family === 'Earnings',
+    yardstick: false,
+    outdated: tested && id === 'dual-momentum',
     caveats: family === 'Insiders' ? ['Insider filings arrive up to two days late.'] : [],
     detail: `/api/lab/strategies/${id}`,
   };
@@ -84,7 +86,7 @@ function library(rows) {
     as_of: rows.some((r) => r.status === 'tested') ? at('08:12:00') : null,
     trials: 212,
     note: rows.some((r) => r.status === 'tested') ? 'Every result is out of sample. The bar for “held up” rises with every strategy tried: 212 so far.' : 'Nothing has run yet. The lab works through the list tonight, from 1 AM.',
-    counts: { total: rows.length, tested: n((r) => r.status === 'tested'), held_up: n((r) => r.verdict === 'held_up'), within_noise: n((r) => r.verdict === 'within_noise'), fell_short: n((r) => r.verdict === 'fell_short'), inconclusive: n((r) => r.verdict === 'inconclusive'), waiting: n((r) => r.status === 'waiting'), not_run: n((r) => r.status === 'not_run') },
+    counts: { outdated: n((r) => r.outdated), total: rows.length, tested: n((r) => r.status === 'tested'), held_up: n((r) => r.verdict === 'held_up'), within_noise: n((r) => r.verdict === 'within_noise'), fell_short: n((r) => r.verdict === 'fell_short'), inconclusive: n((r) => r.verdict === 'inconclusive'), waiting: n((r) => r.status === 'waiting'), not_run: n((r) => r.status === 'not_run') },
     kinds: KINDS,
     rows,
   };
@@ -202,6 +204,8 @@ const OPPS = [
     source_label: 'Discount scanner + written case',
     stance: 'buy',
     stance_label: 'Worth buying now',
+    group: 'buy',
+    group_label: 'Worth buying',
     why_now: 'A broad sell-off pulled quality names down with everything else; earnings estimates for the fund’s top holdings have not moved. Cheap for a reason that looks temporary.',
     facts: ['12.1% under its 52-week high', 'First close 10% under the high on Nov 6', 'Cheaper than 81% of its last 5 years', '2.4% above its 200-day average'],
     entry: { low: 171.2, high: 180.4, price: 180.4, in_zone: true, basis: ZONE },
@@ -224,6 +228,8 @@ const OPPS = [
     source_label: 'Scout idea',
     stance: 'watch',
     stance_label: 'Watch: Skeptic disagreed',
+    group: 'could',
+    group_label: 'Could become a buy',
     why_now: 'Scout: order backlog doubled year over year while the price sits 18% under its high after a guidance cut the company tied to one customer.',
     facts: ['18.3% under its 52-week high', 'Scout confidence 55%'],
     entry: { low: 41, high: 45.5, price: 45.5, in_zone: true, basis: ZONE },
@@ -243,13 +249,15 @@ const OPPS = [
     next_earnings: { date: '2026-11-18', days: 9 },
     score: 64,
   }),
-  opp(3, 'ACME', 'Acme Launch Corp', 'stock', {
+  opp(4, 'ACME', 'Acme Launch Corp', 'stock', {
     held: true,
     weight_pct: 0.5,
     sources: ['scanner', 'case'],
     source_label: 'Discount scanner + written case',
     stance: 'watch',
     stance_label: 'Watch: a loss sale is planned',
+    group: 'not_now',
+    group_label: 'Not now',
     why_now: 'Fell 6.8% on a scrubbed launch. The case has not changed, but buying now would void the planned loss sale.',
     facts: ['31.0% under its 52-week high', 'Fell 6.8% on Nov 6, a 2.3-sigma day'],
     entry: { low: 24.1, high: 28.9, price: 28.9, in_zone: true, basis: ZONE },
@@ -262,11 +270,13 @@ const OPPS = [
     not_queued: null,
     as_of_words: 'Priced at Mon Nov 9, 11:40 AM ET. The written case is from the same day.',
   }),
-  opp(4, 'VXUS', 'Synthetic International Index ETF', 'fund', {
+  opp(3, 'VXUS', 'Synthetic International Index ETF', 'fund', {
     held: true,
     weight_pct: 13.7,
     sources: ['standing'],
     source_label: 'On sale by the numbers',
+    group: 'could',
+    group_label: 'Could become a buy',
     why_now: '10.4% under its 52-week high, which is 2.1 of its usual monthly swings, and still above its 200-day average.',
     facts: ['10.4% under its 52-week high', '1.1% above its 200-day average'],
     entry: { low: 58.2, high: 61.3, price: 61.3, in_zone: true, basis: ZONE },
@@ -286,8 +296,8 @@ const opportunities = {
   built_at: at('15:05:00'),
   advice_only: true,
   freshness: { scanner_as_of: '2026-11-09', last_case_at: at('07:20:00'), last_scout_at: at('08:40:00'), night_run_at: at('08:41:00'), night_status: 'ok', note: '1 of these has no written case yet. The numbers stand on their own; the cases are written overnight.' },
-  headline: '1 worth buying now, 3 to watch. Top: QUAL, 12% under its high.',
-  counts: { total: 4, buy: 1, watch: 2, screen: 1, held: 2, outside: 2, with_case: 2 },
+  headline: '1 worth buying now. 2 could become a buy, 1 not for now. Top: QUAL, 12% under its high.',
+  counts: { total: 4, buy: 1, watch: 2, screen: 1, held: 2, outside: 2, with_case: 2, could: 2, not_now: 1 },
   note: null,
   profile: PROFILE,
   cash: { free_usd: 142, account: 'individual', next_deposit_usd: 500, next_deposit_on: '2026-11-18', note: 'Sizes come from free cash first, then the next deposit. Never from margin.' },
@@ -300,9 +310,9 @@ const DEBIT = 'Pay the margin debit first: $1,500 is open, so no buy goes to the
 const opportunitiesDebit = {
   ...opportunities,
   headline: '2 worth buying once the margin debit is paid, 2 to watch. Top: QUAL, 12% under its high.',
-  counts: { ...opportunities.counts, buy: 2, watch: 1 },
+  counts: { ...opportunities.counts, buy: 2, watch: 1, could: 1 },
   cash: { ...opportunities.cash, free_usd: 0, margin_debit_usd: 1500, note: 'A margin debit of $1,500 is open. It is paid before anything here is bought.' },
-  rows: OPPS.map((r) => (r.symbol === 'QUAL' || r.symbol === 'NOVA' ? { ...r, stance: 'buy', stance_label: 'Worth buying once cash is free', queued: false, not_queued: DEBIT, size: { ...r.size, usd: 0, shares: 0, funding: 'wait', note: 'Nothing to buy until the margin debit is paid.' } } : r)),
+  rows: OPPS.map((r) => (r.symbol === 'QUAL' || r.symbol === 'NOVA' ? { ...r, stance: 'buy', stance_label: 'Worth buying once cash is free', group: 'buy', group_label: 'Worth buying', queued: false, not_queued: DEBIT, size: { ...r.size, usd: 0, shares: 0, funding: 'wait', note: 'Nothing to buy until the margin debit is paid.' } } : r)),
 };
 const opportunitiesFresh = {
   as_of: null,
@@ -359,3 +369,17 @@ export function morningFixtures() {
 
 // ---------- write ----------
 for (const [name, body] of Object.entries(morningFixtures())) write(name, body);
+
+// ---------- what a finished job did ----------
+const jobs = read('jobs');
+const backfill = jobs.jobs.find((j) => j.name === 'engine-backfill');
+if (backfill?.last_run) {
+  backfill.last_run.did = 'Asked Tiingo for 2 names. FXAIX and FTEC answered with nothing new for 2026-11-06.';
+  backfill.last_run.said = backfill.last_run.did;
+}
+const paper = jobs.jobs.find((j) => j.name === 'engine-paper');
+if (paper?.last_run) {
+  paper.last_run.did = null;
+  paper.last_run.said = '{"filled": 0, "skipped": 4}';
+}
+write('jobs', jobs);

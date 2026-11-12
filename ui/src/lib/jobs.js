@@ -48,6 +48,10 @@ export function jobWord(job) {
   return { title: job?.title || name, blurb: null };
 }
 
+export function stepTitle(step) {
+  return WORD[step?.job]?.[0] || step?.title || jobWord({ name: step?.job || step?.id }).title;
+}
+
 function clock(h, m) {
   const ap = h < 12 ? 'AM' : 'PM';
   const hh = h % 12 || 12;
@@ -103,17 +107,35 @@ function when(iso) {
 }
 
 // ---------- state ----------
+const WAITING = {
+  memory: 'low-memory mode runs heavy jobs one at a time',
+  night: 'the overnight run goes one step at a time',
+};
+
+function waitingWhy(reason, lead, sentence = false) {
+  const why = reason === undefined ? WAITING.memory : WAITING[reason];
+  if (!why) return '';
+  return sentence ? `${lead}${why[0].toUpperCase()}${why.slice(1)}.` : `${lead}${why}`;
+}
+
+export function plainLine(text) {
+  if (typeof text !== 'string') return null;
+  const line = text.trim();
+  if (!line || /^[[{]/.test(line) || /^Traceback\b/.test(line)) return null;
+  return line;
+}
+
 export function jobState(job) {
   if (!job) return { state: 'unknown', line: '' };
   const last = job.last_run;
   if (job.running) return { state: 'running', line: `Running since ${when(job.running_since) || 'just now'}` };
-  if (job.waiting) return { state: 'waiting', line: `Waiting for its turn${when(job.waiting_since) ? ` since ${when(job.waiting_since)}` : ''}: low-memory mode runs heavy jobs one at a time` };
+  if (job.waiting) return { state: 'waiting', line: `Waiting for its turn${when(job.waiting_since) ? ` since ${when(job.waiting_since)}` : ''}${waitingWhy(job.waiting_for, ': ')}` };
   if (job.queued) return { state: 'queued', line: 'Starting in a few seconds' };
   if (!last) return { state: 'never', line: 'Hasn’t run since the desk started' };
   const at = when(last.finished || last.started);
   const by = last.trigger === 'request' ? ', on request' : last.trigger === 'start' ? ', from Start the desk' : '';
   if (last.result === 'ok' && last.note) return { state: 'skipped', line: `Skipped ${at}${by}: ${last.note}` };
-  if (last.result === 'ok') return { state: 'ok', line: `Ran ${at}${by}` };
+  if (last.result === 'ok') return { state: 'ok', line: `Ran ${at}${by}`, did: plainLine(last.did) };
   const why = last.error || last.detail;
   if (last.result === 'failed') return { state: 'failed', line: `Didn’t finish ${at}${by}${why ? `: ${why}` : ''}` };
   if (last.result === 'skipped') return { state: 'skipped', line: `Skipped ${at}${last.detail ? `: ${last.detail}` : ''}` };
@@ -143,7 +165,7 @@ export function refreshPlan(health, jobs = []) {
 export function refusalText(err) {
   const body = err?.body || {};
   if (body.error === 'cooldown') return `Asked for a moment ago. ${body.cooldown_until ? `Try again at ${when(body.cooldown_until)}.` : 'Try again in a few minutes.'}`;
-  if (body.error === 'waiting') return 'It’s already waiting for its turn. Low-memory mode runs heavy jobs one at a time.';
+  if (body.error === 'waiting') return `It’s already waiting for its turn.${waitingWhy(body.waiting_for, ' ', true)}`;
   if (body.error === 'scheduler_down') return 'The scheduler is taking a break, so nothing would pick this up. It’s back once the cron service runs.';
   if (body.error === 'unknown_job') return 'The desk doesn’t know that job any more. Refresh the page.';
   return err?.message || 'The desk didn’t take that. Try again in a moment.';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { excessWords, holdingsDoor, libraryChip, libraryGroups, opportunitiesDoor, passWords, strategiesDoor, whenWords } from './morning.js';
+import { excessWords, holdingsDoor, libraryChip, libraryGroups, nightSteps, opportunitiesDoor, passWords, strategiesDoor, whenWords } from './morning.js';
 import { guideFor } from './guide.js';
-import { earningsLine, entryLine, heldLine, inQueue, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
+import { earningsLine, entryLine, heldLine, inQueue, opportunityGroups, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
 import { holdingChip } from './research.js';
 
 const NOW = new Date('2026-11-12T15:00:00Z');
@@ -113,10 +113,43 @@ describe('buying opportunities', () => {
     expect(inQueue({ decision_id: 'd_1', queued: false })).toBe(false);
     expect(inQueue({ decision_id: 'd_1' })).toBe(true);
     expect(inQueue({ decision_id: null, queued: true })).toBe(false);
+    expect(opportunityGroups([{ symbol: 'A' }, { symbol: 'B' }])).toBeNull();
+    const groups = opportunityGroups([{ symbol: 'A', group: 'buy', group_label: 'Worth buying' }, { symbol: 'B', group: 'not_now' }, { symbol: 'C', group: 'could' }, { symbol: 'D', group: 'odd' }]);
+    expect(groups.map((g) => [g.key, g.title, g.fold, g.rows.map((r) => r.symbol).join('')])).toEqual([
+      ['buy', 'Worth buying', false, 'A'],
+      ['could', 'Could become a buy', false, 'C'],
+      ['not_now', 'Not now', true, 'BD'],
+    ]);
     expect(passWords('2026-11-13T00:05:00-05:00', NOW)).toBe('Fri Nov 13, 12:05 AM ET');
     expect(passWords('2026-11-12T23:05:00-05:00', NOW)).toBe('Today, 11:05 PM ET');
     expect(passWords('Tonight from 11:05 PM', NOW)).toBe('Tonight from 11:05 PM');
     expect(passWords(null)).toBeNull();
+  });
+});
+
+describe('overnight steps', () => {
+  it('lists each step with a plain name, how it went and the line it left', () => {
+    const night = {
+      state: 'done',
+      steps: [
+        { id: 'mirror', job: 'mirror', title: 'Mirror', state: 'ok', detail: null, ready: null, finished_at: '2026-11-12T04:30:40+00:00' },
+        { id: 'strategies', job: 'strategies', title: 'Queue the strategy library', state: 'ok', detail: 'Queued 2 that had not run.', ready: '24 strategies tested', finished_at: '2026-11-12T04:33:10+00:00' },
+        { id: 'engine-paper', job: 'engine-paper', title: 'Engine paper', state: 'ok', detail: '{"filled": 0}', ready: null, finished_at: '2026-11-12T05:00:00+00:00' },
+        { id: 'agents-run-debrief', job: 'agents-run-debrief', title: 'Write the debrief', state: 'failed', detail: 'The model call timed out.', ready: null, started_at: '2026-11-12T08:55:31+00:00', finished_at: null },
+        { id: 'night', job: 'night', title: 'Work up tonight’s buying opportunities', state: 'pending', detail: null, ready: null },
+      ],
+    };
+    const steps = nightSteps(night, NOW);
+    expect(steps.map((s) => [s.title, s.word, s.dot, s.when, s.line])).toEqual([
+      ['Accounts', 'Done', 'ok', 'Wed Nov 11, 11:30 PM', null],
+      ['Queue the strategy library', 'Done', 'ok', 'Wed Nov 11, 11:33 PM', '24 strategies tested Queued 2 that had not run.'],
+      ['Paper trades', 'Done', 'ok', 'Today, 12:00 AM', null],
+      ['Write the debrief', 'Didn’t finish', 'failed', 'Today, 3:55 AM', 'The model call timed out.'],
+      ['Work up tonight’s buying opportunities', 'To come', 'never', null, null],
+    ]);
+    expect(nightSteps({ state: 'idle', steps: night.steps }, NOW)).toEqual([]);
+    expect(nightSteps(null, NOW)).toEqual([]);
+    expect(nightSteps({ state: 'done' }, NOW)).toEqual([]);
   });
 });
 

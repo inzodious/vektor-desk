@@ -31,6 +31,11 @@ export function AsOfLine() {
           </span>
         </>
       ) : null}
+      {a.waiting ? (
+        <span className="ph-asof-wait" data-testid="asof-waiting">
+          {a.waiting}
+        </span>
+      ) : null}
     </p>
   );
 }

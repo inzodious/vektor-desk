@@ -364,7 +364,9 @@
     "finished": "2026-11-09T11:12:00Z",
     "result": "ok",
     "exit_code": 0,
-    "detail": null
+    "detail": null,
+    "did": "Asked Tiingo for 2 names. FXAIX and FTEC answered with nothing new for 2026-11-06.",
+    "said": "Asked Tiingo for 2 names. FXAIX and FTEC answered with nothing new for 2026-11-06."
    },
    "cooldown_until": null,
    "can_run": true,
@@ -579,7 +581,9 @@
     "finished": "2026-11-09T13:46:00Z",
     "result": "ok",
     "exit_code": 0,
-    "detail": null
+    "detail": null,
+    "did": null,
+    "said": "{\"filled\": 0, \"skipped\": 4}"
    },
    "cooldown_until": null,
    "can_run": true,

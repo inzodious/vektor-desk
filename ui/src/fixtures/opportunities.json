@@ -10,7 +10,7 @@
   "night_status": "ok",
   "note": "1 of these has no written case yet. The numbers stand on their own; the cases are written overnight."
  },
- "headline": "1 worth buying now, 3 to watch. Top: QUAL, 12% under its high.",
+ "headline": "1 worth buying now. 2 could become a buy, 1 not for now. Top: QUAL, 12% under its high.",
  "counts": {
   "total": 4,
   "buy": 1,
@@ -18,7 +18,9 @@
   "screen": 1,
   "held": 2,
   "outside": 2,
-  "with_case": 2
+  "with_case": 2,
+  "could": 2,
+  "not_now": 1
  },
  "note": null,
  "profile": {
@@ -87,6 +89,8 @@
    "next_earnings": null,
    "as_of": "2026-11-09",
    "score": 78,
+   "group": "buy",
+   "group_label": "Worth buying",
    "queued": false,
    "not_queued": null,
    "price_as_of": "2026-11-09",
@@ -141,6 +145,8 @@
    },
    "as_of": "2026-11-06",
    "score": 64,
+   "group": "could",
+   "group_label": "Could become a buy",
    "queued": true,
    "not_queued": null,
    "price_as_of": "2026-11-06",
@@ -151,7 +157,7 @@
    "as_of_words": "Priced at the Fri Nov 6 close. Scout’s idea is from Thu Nov 5; the price is 2.3% higher since. The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands overnight."
   },
   {
-   "rank": 3,
+   "rank": 4,
    "symbol": "ACME",
    "name": "Acme Launch Corp",
    "kind": "stock",
@@ -198,12 +204,14 @@
    "next_earnings": null,
    "as_of": "2026-11-09",
    "score": 51,
+   "group": "not_now",
+   "group_label": "Not now",
    "queued": false,
    "not_queued": null,
    "as_of_words": "Priced at Mon Nov 9, 11:40 AM ET. The written case is from the same day."
   },
   {
-   "rank": 4,
+   "rank": 3,
    "symbol": "VXUS",
    "name": "Synthetic International Index ETF",
    "kind": "fund",
@@ -244,6 +252,8 @@
    "next_earnings": null,
    "as_of": "2026-11-09",
    "score": 44,
+   "group": "could",
+   "group_label": "Could become a buy",
    "queued": false,
    "not_queued": null,
    "as_of_words": "Priced at Mon Nov 9, 11:40 AM ET. The numbers here are worked out from that price."

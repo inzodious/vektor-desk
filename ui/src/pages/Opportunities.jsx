@@ -3,7 +3,7 @@ import { ApiDown, ResearchHero } from '../research/parts.jsx';
 import { useApi } from '../lib/api.js';
 import { useAsOf, fromDay } from '../lib/asof.js';
 import { whenWords } from '../lib/morning.js';
-import { earningsLine, entryLine, heldLine, inQueue, opportunityNotes, sizeLine, stanceOf } from '../lib/opportunities.js';
+import { earningsLine, entryLine, heldLine, inQueue, opportunityGroups, opportunityNotes, sizeLine, stanceOf } from '../lib/opportunities.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 
 // ---------- one idea ----------
@@ -112,6 +112,10 @@ export default function Opportunities() {
   const fresh = whenWords(d.freshness?.night_run_at || d.built_at);
   const notes = opportunityNotes(d);
   const passed = Array.isArray(d.passed) ? d.passed : [];
+  const groups = opportunityGroups(rows);
+  const open = groups ? groups.filter((g) => !g.fold) : [];
+  const openCount = open.reduce((n, g) => n + g.rows.length, 0);
+  const later = groups ? rows.length - openCount : 0;
 
   return (
     <>
@@ -119,8 +123,10 @@ export default function Opportunities() {
         kicker="Opportunities"
         big={
           <>
-            <b data-testid="opp-count">{total}</b>
-            <span className="muted">{total === 1 ? 'idea' : 'ideas'} · advice only, nothing here places a trade</span>
+            <b data-testid="opp-count">{groups ? openCount : total}</b>
+            <span className="muted">
+              {groups ? `${openCount === 1 ? 'idea' : 'ideas'} to look at${later ? ` · ${later} not for now` : ''}` : total === 1 ? 'idea' : 'ideas'} · advice only, nothing here places a trade
+            </span>
           </>
         }
       />
@@ -138,11 +144,43 @@ export default function Opportunities() {
         {d.method ? <p className="muted opp-note">{d.method}</p> : null}
       </section>
       {rows.length ? (
-        <section className="ideas" data-testid="ideas">
-          {rows.map((r) => (
-            <Idea row={r} deskDay={clock?.day} key={r.symbol} />
-          ))}
-        </section>
+        groups ? (
+          <div className="idea-groups" data-testid="ideas">
+            {groups.map((g) =>
+              g.fold ? (
+                <details className="idea-fold" key={g.key} data-group={g.key}>
+                  <summary>
+                    <b>{g.title}</b>
+                    <span className="chip">{g.rows.length}</span>
+                    <small>Held names the research says to hold, and ideas a cap, a rule or a waiting window blocks.</small>
+                  </summary>
+                  <section className="ideas">
+                    {g.rows.map((r) => (
+                      <Idea row={r} deskDay={clock?.day} key={r.symbol} />
+                    ))}
+                  </section>
+                </details>
+              ) : (
+                <section className="idea-group" key={g.key} data-group={g.key}>
+                  <h2 className="idea-group-head">
+                    {g.title} <small>{g.rows.length}</small>
+                  </h2>
+                  <div className="ideas">
+                    {g.rows.map((r) => (
+                      <Idea row={r} deskDay={clock?.day} key={r.symbol} />
+                    ))}
+                  </div>
+                </section>
+              ),
+            )}
+          </div>
+        ) : (
+          <section className="ideas" data-testid="ideas">
+            {rows.map((r) => (
+              <Idea row={r} deskDay={clock?.day} key={r.symbol} />
+            ))}
+          </section>
+        )
       ) : null}
       {passed.length ? (
         <section className="card" data-testid="opp-passed">

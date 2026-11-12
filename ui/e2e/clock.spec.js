@@ -95,6 +95,25 @@ test('after the close, with the closing run still to come, every page shows the 
   expect(errors).toEqual([]);
 });
 
+test('funds still waiting on a close are named on the line in the desk’s words, on every page', async ({ page }) => {
+  const errors = watchErrors(page);
+  const seen = await walk(page, 'waiting');
+  seen.forEach((c) => expect(c).toMatchObject({ day: '2026-11-09', words: 'As of Mon Nov 9, at the close' }));
+  const wait = page.getByTestId('asof-waiting');
+  await expect(wait).toHaveText('Waiting on the official close for FXAIX and FTEC; the day is restated when it lands.');
+  await expect(page.getByTestId('asof')).toContainText('Provisional');
+  const line = await page.getByTestId('asof').boundingBox();
+  const box = await wait.boundingBox();
+  expect(box.x).toBeGreaterThanOrEqual(line.x - 1);
+  expect(box.x + box.width).toBeLessThanOrEqual(line.x + line.width + 1);
+  expect(box.height).toBeLessThanOrEqual(64);
+
+  await page.goto('/?scenario=evening');
+  await expect(page.getByTestId('asof')).toBeVisible();
+  await expect(page.getByTestId('asof-waiting')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('a number from an older day carries its day in words', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/?scenario=lagging');

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
 import { useApi } from '../lib/api.js';
-import { DOORS } from '../lib/morning.js';
+import { DOORS, nightSteps } from '../lib/morning.js';
 import { useNow } from '../lib/useNow.js';
 
 function Door({ door, now }) {
@@ -29,6 +29,34 @@ function Door({ door, now }) {
   );
 }
 
+function NightSteps({ night, now }) {
+  const steps = nightSteps(night, now);
+  if (!steps.length) return null;
+  return (
+    <details className="night-steps" data-testid="night-steps">
+      <summary>
+        <b>What ran overnight</b>
+        <span className="chip">{steps.length === 1 ? '1 step' : `${steps.length} steps`}</span>
+      </summary>
+      <ol>
+        {steps.map((s) => (
+          <li key={s.id} data-step={s.id} data-state={s.state}>
+            <span className={`job-dot ${s.dot}`} aria-hidden="true" />
+            <span>
+              <b>{s.title}</b>
+              <small>
+                {s.word}
+                {s.when ? ` · ${s.when} ET` : ''}
+              </small>
+              {s.line ? <small className="night-line">{s.line}</small> : null}
+            </span>
+          </li>
+        ))}
+      </ol>
+    </details>
+  );
+}
+
 export function Morning() {
   const now = useNow(300000);
   const night = useApi('/api/overnight', { every: 120000 });
@@ -46,6 +74,7 @@ export function Morning() {
           <Door door={d} now={now} key={d.key} />
         ))}
       </div>
+      <NightSteps night={night.data} now={now} />
     </section>
   );
 }

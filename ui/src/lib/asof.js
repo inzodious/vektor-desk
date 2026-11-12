@@ -10,6 +10,12 @@ export function useAsOf() {
 }
 
 // ---------- words ----------
+function restOf(words) {
+  const text = String(words || '').trim();
+  const cut = text.indexOf('. ');
+  return cut < 0 ? null : text.slice(cut + 2).trim() || null;
+}
+
 function firstSentence(words) {
   const text = String(words || '').trim();
   const cut = text.indexOf('. ');
@@ -71,6 +77,7 @@ export function asOfView(d, now = new Date()) {
     ticking: Boolean(live && /^Live\b/.test(quoted)),
     provisional: Boolean(d.provisional) && !older,
     behind: live ? null : behind,
+    waiting: !live && d.prices?.waiting?.length ? restOf(d.words) : null,
     books: older ? `Book as of ${book}` : null,
     title: [live ? `Prices: ${quoted}. Cash, margin and the review come from the closed book, ${book}.` : d.words, behind].filter(Boolean).join(' ') || null,
     tone: behind && !live ? 'watch' : '',
