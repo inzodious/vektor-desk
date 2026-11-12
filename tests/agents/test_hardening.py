@@ -170,3 +170,24 @@ def test_a_busy_scheduled_run_waits_then_queues_a_retry(cli_env, monkeypatch, ca
 def test_overnight_queue_runs_every_hour_of_the_window():
     assert ("30 1-5 * * *", "python -m desk.agents queue") in JOBS
     assert get("plan_keeper").weekly_runs >= 10
+
+
+# ---- The night reads the last line ----
+
+
+def test_a_desk_that_declines_ends_with_a_skipped_line(cli_env, monkeypatch, capsys):
+    import json
+
+    monkeypatch.setattr("desk.agents.runner.ClaudeCli", lambda: FakeAdapter({"plan_keeper": answer()}))
+    assert cli.main(["run", "plan_keeper"]) == 0
+    ran = capsys.readouterr().out.strip().splitlines()
+    assert ran[-1].startswith("Plan keeper: ok, ") and not ran[-1].startswith("{")
+    assert cli.main(["run", "plan_keeper"]) == 0
+    out = capsys.readouterr().out.strip().splitlines()
+    assert out[-2].startswith("Plan keeper: unchanged, 0 proposals") and json.loads(out[-1]) == {"skipped": "Nothing in the brief changed since the last run."}
+    store.set_enabled(cli_env, "tax", False)
+    assert cli.main(["run", "tax"]) == 0
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {"skipped": "Switched off in Settings."}
+    monkeypatch.setattr(Desk, "due_on", lambda self, day: False)
+    assert cli.main(["run", "scout"]) == 0
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {"skipped": "Scout: not due today."}

@@ -16,8 +16,8 @@ from desk.agents.filings import run_filings_desk
 from desk.agents.pipeline import prepare, run_proposal_desk
 from desk.agents.plans import preview as preview_plans
 from desk.agents.plans import run_plan_desk
+from desk.agents.portfolio import VERDICTS, run_pass
 from desk.agents.portfolio import preview as preview_portfolio
-from desk.agents.portfolio import run_pass
 from desk.agents.runner import GUARD_NOTE, LOCK, UNGUARDED, run_desk
 from desk.agents.sources import NotReady, RealLab
 from desk.agents.status import crew
@@ -29,9 +29,18 @@ from desk.runlock import running
 SMOKE = Desk("smoke", "Smoke test", "low", 0, 1, 1000)
 SMOKE_SYSTEM = "You are a connectivity check. Reply with the single word OK."
 EXIT = {"ok": 0, "disabled": 0, "over_budget": 0, "not_ready": 0, "unchanged": 0, "unhealthy": 0, "guarded": 0, "busy": 75, "deferred": 75}
+SKIPPED = ("disabled", "over_budget", "not_ready", "unchanged", "unhealthy", "guarded")
+REASON_CHARS = 300
 RUN_WAIT = 2700
 STANDALONE = ("filings", "discounts", "debrief", "plans")
 NIGHTLY = "research"
+
+
+def _end(status: str, line: str, note: str | None = None) -> int:
+    print(line)
+    if status in SKIPPED:
+        print(json.dumps({"skipped": " ".join((note or line).split())[:REASON_CHARS]}))
+    return EXIT.get(status, 1)
 
 
 def _recover(cfg: Config) -> None:
@@ -124,7 +133,13 @@ def _portfolio(cfg: Config, args) -> int:
     print(f"Portfolio pass: {night.status}, {tally}. {night.note or ''}".strip())
     for line in night.lines:
         print(f"  {line}")
-    print(json.dumps(night.ready))
+    last = night.ready
+    if "ready" in last:
+        votes = list(night.verdicts.values())
+        split = ", ".join(f"{votes.count(v)} {v}" for v in VERDICTS if v in votes)
+        detail = f"{tally}{f' ({split})' if split else ''}." if night.pending else night.note
+        last = last | ({"detail": detail[:REASON_CHARS]} if detail else {})
+    print(json.dumps(last))
     return EXIT.get(night.status, 1)
 
 
@@ -204,45 +219,42 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     if args.trigger == "schedule" and not desk.due_on(datetime.now(ZoneInfo(cfg.timezone)).date()):
         print(f"{desk.title}: not due today.")
+        print(json.dumps({"skipped": f"{desk.title}: not due today."}))
         return 0
     if desk.name == "strategy":
         nightly = run_nightly(cfg, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
         queued = f" Queued {nightly.queued.name}." if nightly.queued else ""
         if nightly.lane:
             queued = f" Registered lane {nightly.lane['id']} v{nightly.lane['version']}."
-        print(f"{desk.title}: {nightly.status}.{queued} {nightly.note or ''}".rstrip())
-        return EXIT.get(nightly.status, 1)
+        return _end(nightly.status, f"{desk.title}: {nightly.status}.{queued} {nightly.note or ''}".rstrip(), nightly.note)
     if desk.name == "debrief":
         wait = RUN_WAIT if args.trigger == "schedule" else 0.0
         review = run_debrief_desk(cfg, kinds=parse_kinds(args.kinds), so_far=args.so_far, trigger=args.trigger, wait=wait)
         done = ", ".join(review.written) or "none"
-        print(f"{desk.title}: {review.status}, wrote {done}, {len(review.failed)} failed. {review.note or ''}".strip())
-        return EXIT.get(review.status, 1)
+        return _end(review.status, f"{desk.title}: {review.status}, wrote {done}, {len(review.failed)} failed. {review.note or ''}".strip(), review.note)
     if desk.name == "plans":
         wait = RUN_WAIT if args.trigger == "schedule" else 0.0
         symbols = (args.symbol,) if args.symbol else None
         book = run_plan_desk(cfg, symbols=symbols, full=True if args.all else None, trigger=args.trigger, limit=args.limit, wait=wait)
         left = f", {book.left} left for the next run" if book.left else ""
         tally = f"{len(book.drafted)} drafted, {len(book.kept)} kept, {len(book.failed)} failed of {book.pending}{left}"
-        print(f"{desk.title}: {book.status}, {tally}. {book.note or ''}".strip())
-        return EXIT.get(book.status, 1)
+        return _end(book.status, f"{desk.title}: {book.status}, {tally}. {book.note or ''}".strip(), book.note)
     if desk.name == "discounts":
         day = run_discount_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
         votes = list(day.verdicts.values())
         tally = ", ".join(f"{v} {votes.count(v)}" for v in ("buy", "wait", "avoid") if v in votes)
         written = f"{len(day.written)} written" + (f" ({tally})" if tally else "")
-        print(f"{desk.title}: {day.status}, {written}, {len(day.failed)} failed of {day.pending}. {day.note or ''}".strip())
-        return EXIT.get(day.status, 1)
+        return _end(day.status, f"{desk.title}: {day.status}, {written}, {len(day.failed)} failed of {day.pending}. {day.note or ''}".strip(), day.note)
     if desk.name == "filings":
         night = run_filings_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
         extra = f", {len(night.rejected)} refused" if night.rejected else ""
-        print(f"{desk.title}: {night.status}, {len(night.scored)} scored, {len(night.failed)} failed{extra} of {night.pending}. {night.note or ''}".strip())
-        return EXIT.get(night.status, 1)
+        line = f"{desk.title}: {night.status}, {len(night.scored)} scored, {len(night.failed)} failed{extra} of {night.pending}. {night.note or ''}".strip()
+        return _end(night.status, line, night.note)
     report = run_proposal_desk(cfg, desk.name, trigger=args.trigger, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
     if report.status in ("deferred", "busy") and args.trigger == "schedule":
         queue_retry(cfg, desk.name)
-    print(f"{desk.title}: {report.status}, {len(report.created)} proposals, {len(report.rejected)} rejected. {report.note or ''}".strip())
-    return EXIT.get(report.status, 1)
+    line = f"{desk.title}: {report.status}, {len(report.created)} proposals, {len(report.rejected)} rejected. {report.note or ''}".strip()
+    return _end(report.status, line, report.note)
 
 
 if __name__ == "__main__":
