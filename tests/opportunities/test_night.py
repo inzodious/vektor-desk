@@ -56,7 +56,7 @@ def test_the_night_scans_when_stale_writes_cases_and_runs_an_overdue_scout(cfg):
     out = night.run_night(cfg, now=NOW, **fakes(calls))
     assert calls == [("scan", None), ("cases", "schedule"), ("list_cases", 1), ("scout", "schedule")]
     assert out["status"] == "ok" and [s["step"] for s in out["steps"]] == ["scan", "cases", "list_cases", "scout"]
-    assert out["summary"] == "Scanned 20 names, 2 hits. Wrote 2 of 2 discount cases. Switched off for the test. Scout wrote 1 idea."
+    assert out["summary"] == "Scanned 20 names, 2 hits. This run wrote 2 of 2 discount cases. Switched off for the test. Scout wrote 1 idea."
     assert night.last_night(cfg)["status"] == "ok"
     fresh = ob.build(cfg, now=NOW)["freshness"]
     assert fresh["night_status"] == "ok" and fresh["night_run_at"] == "2026-11-07T07:00:00Z"
@@ -142,7 +142,13 @@ def test_rows_on_sale_with_no_written_case_get_one_and_a_second_run_pays_for_not
     calls = []
     out = night.run_night(cfg, now=NOW, scan=lambda cfg: {}, cases=writer(calls), scout=quiet_scout)
     assert calls == [("schedule", night.CASES_WAIT, ["QUAL"])]
-    assert step(out, "list_cases") == {"step": "list_cases", "status": "ok", "note": "Wrote 1 of 1 cases for rows on sale.", "written": 1, "pending": 1}
+    assert step(out, "list_cases") == {
+        "step": "list_cases",
+        "status": "ok",
+        "note": "This run wrote 1 of 1 cases for rows on sale.",
+        "written": 1,
+        "pending": 1,
+    }
     r = next(r for r in ob.build(cfg, now=NOW)["rows"] if r["symbol"] == "QUAL")
     assert r["stance"] == "buy" and r["case"]["verdict"] == "buy" and "case" in r["sources"] and r["why_now"] == "QUAL fell with its sector."
     assert r["analysis_as_of"] == AS_OF and "The written case is from the same day." in r["as_of_words"]
@@ -176,12 +182,40 @@ def test_the_night_s_lines_and_the_newest_case_time_can_be_read_from_the_list(cf
     night.run_night(cfg, now=NOW, scan=lambda cfg: {}, cases=writer([]), scout=quiet_scout)
     fresh = ob.build(cfg, now=NOW)["freshness"]
     assert fresh["last_case_at"] == NOW.isoformat()
-    assert fresh["night_summary"].endswith("Wrote 1 of 1 cases for rows on sale. Scout looked and proposed nothing.")
-    assert {"step": "list_cases", "status": "ok", "note": "Wrote 1 of 1 cases for rows on sale."} in fresh["night_steps"]
+    assert fresh["night_summary"] == "The discount scan is current to Nov 6. 2 cases written overnight. Scout looked and proposed nothing."
+    assert {"step": "list_cases", "status": "ok", "note": "This run wrote 1 of 1 cases for rows on sale."} in fresh["night_steps"]
     from desk.opportunities import ready
 
-    assert ready(cfg, now=NOW).endswith("; 2 cases written overnight")
-    assert ready(cfg, now=NOW + timedelta(hours=30)).endswith(" rated a buy")
+    said = ready(cfg, now=NOW)
+    assert said == "2 buying opportunities, 1 rated a buy; 2 cases written overnight" == night.last_night(cfg)["ready"]
+    assert night.last_night(cfg)["cases_written"] == 2
+    assert ready(cfg, now=NOW + timedelta(hours=30)) == "2 buying opportunities, 1 rated a buy"
+
+
+def test_the_morning_line_is_the_one_the_night_recorded_so_it_is_never_listed_twice(cfg):
+    conn = seed(cfg)
+    signal(conn, "QUAL", case="buy")
+    out = night.run_night(cfg, now=NOW, **fakes([]))
+    from desk.opportunities import line, ready
+
+    assert out["ready"] == "1 buying opportunity, 1 rated a buy; 1 case written overnight"
+    with conn:
+        conn.execute("DELETE FROM discount_cases")
+    assert line(cfg, now=NOW + timedelta(hours=4)) != out["ready"]
+    assert ready(cfg, now=NOW + timedelta(hours=4)) == out["ready"]
+
+
+def test_one_count_and_one_sentence_for_the_cases_written_overnight():
+    steps = [
+        {"step": "scan", "status": "current", "note": "The discount scan is current to Nov 11."},
+        {"step": "cases", "status": "ok", "note": "No discount hits today."},
+        {"step": "list_cases", "status": "ok", "note": "This run wrote 2 of 2 cases for rows on sale."},
+        {"step": "scout", "status": "fresh", "note": "Scout last ran on Nov 11; it runs about once a month."},
+    ]
+    assert night.summary(steps, 3) == "The discount scan is current to Nov 11. 3 cases written overnight. Scout last ran on Nov 11; it runs about once a month."
+    assert "No discount hits today. This run wrote 2 of 2" in night.summary(steps, 0)
+    steps[2] = {"step": "list_cases", "status": "deferred", "note": "Usage limit reached; resets at 9 AM."}
+    assert "1 case written overnight. Usage limit reached; resets at 9 AM." in night.summary(steps, 1)
 
 
 def test_no_case_is_started_close_to_morning(cfg):
@@ -199,7 +233,12 @@ def test_the_job_ends_with_the_line_the_morning_alert_reads(cfg, monkeypatch, ca
     monkeypatch.setattr(cli, "run_night", lambda cfg: night.run_night(cfg, now=NOW, **fakes([])))
     assert cli.main(["night"]) == 0
     last = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert set(last) == {"ready", "detail"} and last["ready"].endswith("1 rated a buy") and len(last["ready"]) < 120 and "$" not in last["ready"]
+    assert (
+        set(last) == {"ready", "detail"}
+        and last["ready"].startswith("1 buying opportunity, 1 rated a buy")
+        and len(last["ready"]) < 120
+        and "$" not in last["ready"]
+    )
     assert last["detail"] == night.last_night(cfg)["summary"] and last["detail"].startswith("The discount scan is current to Nov 6.")
 
 
