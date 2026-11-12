@@ -98,7 +98,7 @@ def test_edit_profile_merges_writes_backup_and_versions(cfg, yaml_file):
     assert text.startswith("# My desk\nrisk_level: 3\n") and "# Tail comment stays" in text
     data = active_profile(cfg).data
     assert data["alerts"]["min_priority"] == "high" and data["agents"]["enabled"] is True and data["agents"]["desks"]["tax"] is True
-    assert data["agents"]["desks"]["risk"] is False
+    assert data["agents"]["desks"]["risk"] is False and data["agents"]["desks"]["scout"] is True
     again = edit_profile(cfg, {"alerts": {"min_priority": "high"}})
     assert again["changed"] is False and again["backup"] is None
 
