@@ -11,10 +11,12 @@ from desk.engine.lab.data import data_path, lab_build, ledger_path, plan_path, r
 from desk.engine.lab.rulebook import STAND_IN
 from desk.engine.lab.runner import PBO_BAR
 from desk.engine.lab.simcache import queue_dir
+from desk.engine.lab.spec import SCREEN_HINDSIGHT
 
 FAMILY = "library"
 HINDSIGHT_FAMILY = "library-hindsight"
 HINDSIGHT_LINE = "Hindsight, not a test: you hold these knowing how they did, and the last two years are held back."
+LEAN_WORDS = "Leans on hindsight: the stock list is small and includes names you hold or held."
 HINDSIGHT_NOTE = "The rows for what you hold today are hindsight, not a test, and are never counted as held up."
 KINDS = (("classic", "Old and tested"), ("practical", "Practical"), ("novel", "Novel and creative"))
 SPY, PLAN, MARKET, SMALL = "S&P 500 (SPY)", "Your plan's mix", "US stock market (French)", "Small caps (IWM)"
@@ -1027,6 +1029,7 @@ def view(cfg: Config) -> dict:
         row["benchmark_words"] = BENCH_WORDS[entry["benchmark"]]
         row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
         row |= {"yardstick": False, "gap_pts": None, "outdated": False, "hindsight": bool(entry.get("hindsight"))}
+        row["leans_on_hindsight"] = lean = (entry.get("spec") or {}).get("universe", {}).get("type") == "screen"
         row |= {
             "research_only": (entry.get("spec") or {}).get("universe", {}).get("type") == "french",
             "caveats": [],
@@ -1046,6 +1049,9 @@ def view(cfg: Config) -> dict:
                     row |= _rule_row(entry, body)
                 else:
                     row |= _hindsight(entry, body) if row["hindsight"] else _experiment(entry, body, trials, alone)
+                if lean:
+                    row["caveats"] = [SCREEN_HINDSIGHT, *(c for c in row["caveats"] if c != SCREEN_HINDSIGHT)]
+                    row["line"] = f"{row['line']} {LEAN_WORDS}" if row["line"] else row["line"]
         rows.append(row)
     kinds = [k for k, _ in KINDS]
     rows.sort(

@@ -148,6 +148,9 @@ def _sizing(value) -> str:
     return next((code for word, code in SIZING if word in text), "equal")
 
 
+SCREEN_HINDSIGHT = "Tested on a small set of stocks that includes names you hold or held, so it leans on hindsight."
+
+
 def _weights(value, problems: list[str]) -> dict[str, float] | None:
     raw = value.get("weights") if isinstance(value, dict) else None
     if not raw:
@@ -276,6 +279,7 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
         return {"kind": FRENCH_KIND, "set": name} | ({"members": members} if members else {})
     if kind == "screen":
         caveats.append("Screens run over today's backfill list, which skips companies that vanished before the backfill: survivorship bias.")
+        caveats.append(SCREEN_HINDSIGHT)
         return {"kind": "screen", "min_history_days": int(u.get("min_history_days") or 252), "min_price": float(u.get("min_price") or 5.0)}
     if kind in SMALLCAP_TYPES:
         if data is not None and not data.smallcap:

@@ -13,7 +13,7 @@ from desk.engine.lab import rulebook, runner, shelf, sim, simcache
 from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, data_path, held_path, load, plan_path
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
-from desk.engine.lab.spec import HINDSIGHT, SETS, SpecError, local_only, parse, resolve, variants
+from desk.engine.lab.spec import HINDSIGHT, SCREEN_HINDSIGHT, SETS, SpecError, local_only, parse, resolve, variants
 from desk.engine.market import LIBRARY_FUNDS
 from desk.worker import store
 
@@ -583,6 +583,31 @@ def test_every_row_says_what_it_is_measured_against_and_the_note_says_how_the_lu
     after = shelf.view(cfg)
     assert after["trials"] == 3 and after["note"] == f"{shelf.NOTE} {shelf.BAR_NOTE.format(trials=3)}"
     assert "all 3 variants tried across the library" in after["note"] and {r["noise"]["trials"] for r in after["rows"]} == {3}
+
+
+def test_stock_screen_rows_say_they_lean_on_hindsight_even_on_a_result_stored_before_the_caveat(stocked, monkeypatch):
+    cfg = stocked
+    data = load(data_path(cfg))
+    screens = [e["id"] for e in shelf.LIBRARY if (e.get("spec") or {}).get("universe", {}).get("type") == "screen"]
+    assert len(screens) == 6 and all(SCREEN_HINDSIGHT in parse(spec_of(sid), data).caveats for sid in screens)
+    assert SCREEN_HINDSIGHT not in parse(spec_of("lib-three-fund"), data).caveats
+    ids = ("lib-stock-momentum", "lib-three-fund")
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
+    monkeypatch.setattr(shelf, "IDS", frozenset(ids))
+    shelf.queue_missing(cfg, now=NOW)
+    process_queue(cfg, now=NOW)
+    conn = sqlite3.connect(shelf.ledger_path(cfg))
+    with conn:
+        for sid, body in conn.execute("SELECT strategy_id, body FROM lab_results").fetchall():
+            old = json.loads(body)
+            old["caveats"] = [c for c in old.get("caveats") or [] if c != SCREEN_HINDSIGHT]
+            conn.execute("UPDATE lab_results SET body=? WHERE strategy_id=?", (json.dumps(old), sid))
+    conn.close()
+    rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    screen, mix = rows["lib-stock-momentum"], rows["lib-three-fund"]
+    assert screen["leans_on_hindsight"] and screen["caveats"][0] == SCREEN_HINDSIGHT and screen["caveats"].count(SCREEN_HINDSIGHT) == 1
+    assert screen["line"].endswith(shelf.LEAN_WORDS) and "S&P 500 (SPY)" in screen["line"]
+    assert not mix["leans_on_hindsight"] and SCREEN_HINDSIGHT not in mix["caveats"] and "hindsight" not in mix["line"]
 
 
 def test_the_library_grew_and_each_kind_names_its_new_rows():
