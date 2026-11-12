@@ -41,6 +41,16 @@ CREATE TABLE IF NOT EXISTS agent_dossiers (
   created_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS agent_dossiers_symbol ON agent_dossiers (symbol, id);
+CREATE TABLE IF NOT EXISTS agent_holding_tries (
+  id INTEGER PRIMARY KEY,
+  symbol TEXT NOT NULL,
+  status TEXT NOT NULL,
+  note TEXT,
+  run_id INTEGER,
+  started_at TEXT NOT NULL,
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS agent_holding_tries_symbol ON agent_holding_tries (symbol, id);
 CREATE TABLE IF NOT EXISTS agent_requests (
   id INTEGER PRIMARY KEY,
   desk TEXT NOT NULL,

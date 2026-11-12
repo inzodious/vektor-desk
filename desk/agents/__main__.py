@@ -16,6 +16,8 @@ from desk.agents.filings import run_filings_desk
 from desk.agents.pipeline import prepare, run_proposal_desk
 from desk.agents.plans import preview as preview_plans
 from desk.agents.plans import run_plan_desk
+from desk.agents.portfolio import preview as preview_portfolio
+from desk.agents.portfolio import run_pass
 from desk.agents.runner import GUARD_NOTE, LOCK, UNGUARDED, run_desk
 from desk.agents.sources import NotReady, RealLab
 from desk.agents.status import crew
@@ -29,6 +31,7 @@ SMOKE_SYSTEM = "You are a connectivity check. Reply with the single word OK."
 EXIT = {"ok": 0, "disabled": 0, "over_budget": 0, "not_ready": 0, "unchanged": 0, "unhealthy": 0, "guarded": 0, "busy": 75, "deferred": 75}
 RUN_WAIT = 2700
 STANDALONE = ("filings", "discounts", "debrief", "plans")
+NIGHTLY = "research"
 
 
 def _recover(cfg: Config) -> None:
@@ -42,6 +45,19 @@ def _dry_run(cfg: Config, name: str, args) -> int:
         print("The Skeptic only runs on a proposal; dry-run research or scout instead.")
         return 2
     print(f"# Dry run: {get(name).title} (no model call, nothing written)")
+    if name == NIGHTLY and not args.question and args.trigger == "schedule":
+        report, prompt = preview_portfolio(cfg, symbols=(args.symbol,) if args.symbol else None)
+        print(report.note)
+        if store.guard_on(cfg):
+            print(f"Would skip (guarded): {GUARD_NOTE}")
+        if not prompt:
+            return 0
+        if args.system:
+            print("\n## System prompt\n")
+            print(briefs.prompt_file("portfolio"))
+        print(f"\n## Prompt ({len(prompt):,} characters, about {len(prompt) // 4:,} tokens)\n")
+        print(prompt)
+        return 0
     if name in STANDALONE:
         if name == "debrief":
             report, prompt = preview_debrief(cfg, kinds=parse_kinds(args.kinds), so_far=args.so_far)
@@ -100,6 +116,18 @@ def _dry_run(cfg: Config, name: str, args) -> int:
     return 0
 
 
+def _portfolio(cfg: Config, args) -> int:
+    symbols = (args.symbol,) if args.symbol else None
+    night = run_pass(cfg, symbols=symbols, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
+    left = f", {night.left} left for the next run" if night.left else ""
+    tally = f"{len(night.analysed)} analysed, {len(night.failed) + len(night.rejected)} failed of {night.pending}{left}"
+    print(f"Portfolio pass: {night.status}, {tally}. {night.note or ''}".strip())
+    for line in night.lines:
+        print(f"  {line}")
+    print(json.dumps(night.ready))
+    return EXIT.get(night.status, 1)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m desk.agents", description="Vektor Desk agents.")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -111,6 +139,10 @@ def main(argv: list[str] | None = None) -> int:
     run.add_argument("--so-far", action="store_true", help="debrief desk only: also debrief periods that are still open")
     run.add_argument("--symbol", help="plan desk only: write this holding's plan")
     run.add_argument("--all", action="store_true", help="plan desk only: refresh every holding's plan, as on Saturday")
+    passp = sub.add_parser("portfolio", help="the nightly pass: one current analysis per holding")
+    passp.add_argument("--trigger", default="schedule")
+    passp.add_argument("--symbol", help="analyse this holding now, even if its analysis is current")
+    passp.add_argument("--limit", type=int, help="at most this many holdings this run")
     queue = sub.add_parser("queue", help="work through Console and trigger requests")
     queue.add_argument("--now-only", action="store_true", help="only requests marked Run now")
     sub.add_parser("triggers", help="turn today's engine triggers into requests")
@@ -127,7 +159,9 @@ def main(argv: list[str] | None = None) -> int:
     dry.add_argument("--kinds", help="debrief desk only: day,week,month,year")
     dry.add_argument("--so-far", action="store_true", help="debrief desk only: include periods that are still open")
     dry.add_argument("--all", action="store_true", help="plan desk only: every holding, as on Saturday")
-    guard = sub.add_parser("guard", help="the first-run guard: only the Plan keeper, Tax, Debrief and Plan desks run while it is on")
+    guard = sub.add_parser(
+        "guard", help="the first-run guard: only the Plan keeper, Tax, Debrief and Plan desks run until the Plan keeper and Tax desk have each finished a run"
+    )
     guard.add_argument("state", choices=("on", "off", "status"), nargs="?", default="status")
     args = parser.parse_args(argv)
     cfg = Config.from_env()
@@ -143,8 +177,10 @@ def main(argv: list[str] | None = None) -> int:
         on = store.guard_on(cfg)
         print(f"first-run guard {'on: only ' + ', '.join(UNGUARDED) + ' run' if on else 'off: every enabled desk runs'}")
         return 0
-    if args.cmd in ("run", "queue"):
+    if args.cmd in ("run", "queue", "portfolio"):
         _recover(cfg)
+    if args.cmd == "portfolio" or (args.cmd == "run" and args.desk == NIGHTLY):
+        return _portfolio(cfg, args)
     if args.cmd == "smoke":
         out = run_desk(SMOKE, SMOKE_SYSTEM, "Connectivity check.", cfg=cfg, trigger="smoke", wait=60)
         print(f"{out.status}: {(out.result.text if out.result else out.note) or ''}".strip())
