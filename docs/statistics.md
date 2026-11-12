@@ -1167,6 +1167,8 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Where it runs | On the box in the night lab pass only; `lab-offer` skips it and a worker refuses it |
 | Not run | No held mix exported yet, or the holdings have not all traded long enough before the holdout (see "A fund that had not started trading") |
 
+**Stock screens lean on hindsight.** The screen universe is the stocks the desk has bars for: a few large quality names plus names he holds, watches or has held. So every screen spec carries the caveat `spec.SCREEN_HINDSIGHT`, and the six screen rows have `leans_on_hindsight: true`, that caveat first, and a `line` that ends "Leans on hindsight: the stock list is small and includes names you hold or held." The view adds both to a result stored before the caveat existed. A public stock universe is the fix, not yet built.
+
 **Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the five stock screens (see "What a worker can read").
 
 **Rule rows.** A deposit rule is compared with its baseline for every start month. `share_better` and `share_worse` count the start months that ended ahead and behind; the rest ended the same, which happens when the rule never had cause to act. The row's line says ahead, behind and no different, and never counts a tie as worse. A result stored before `share_worse` existed states only what its numbers support. When the 5th, 50th and 95th percentile all round to 0.0 points the row reads "No difference" and is `within_noise` whatever the stored verdict.
@@ -1175,7 +1177,7 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 
 | Library funds | Rule |
 |---|---|
-| Price backfill | `backfill.DAILY` is the quality list plus the library funds. `sync_roles` registers them; a fund with no bars is asked for at once, then every day. Once it has history it sorts after the quality names, so the scanner's names are refreshed first when the hourly cap bites |
+| Price backfill | `backfill.DAILY` is the quality list plus the library funds. `sync_roles` registers them; a fund with no bars is asked for at once (after held, benchmark, plan and watched names, before any other name never fetched), then every day. Once it has history it sorts after the quality names, so the scanner's names are refreshed first when the hourly cap bites |
 | Why daily | The simulator sells a holding whose bars stop early at its last price less 30%, so a library fund left to the 90-day rotation would poison its rows |
 | In `lab.db` | `data.PUBLIC_FUNDS` (benchmarks, library funds, IWM) export as kind `fund` and role `benchmark` whatever he holds, so a held benchmark fund no longer reads `universe` |
 | Short histories | UFO starts in 2019, so the two theme rows test from then; a fixed mix starts once 90% of it is trading |

@@ -361,6 +361,9 @@ def test_library_funds_are_fetched_once_at_once_and_then_daily_after_the_names_t
     scan = [s for s in order if s in QUALITY and s not in BENCHMARKS]
     late = [s for s in order if s in LIBRARY_FUNDS and s not in QUALITY and s not in ("GLD", "TLT")]
     assert order.index("GLD") < order.index(scan[0]) and order.index("TLT") < order.index(scan[0])
+    add_symbols(conn, ["AAAA"], "past")
+    fresh = [r["symbol"] for r in due(conn, NOV_12)]
+    assert fresh.index("GLD") < fresh.index("TLT") < fresh.index("AAAA") < fresh.index(scan[0])
     assert max(order.index(s) for s in scan) < min(order.index(s) for s in late) and len(late) == len(set(LIBRARY_FUNDS) - set(QUALITY)) - 2
     conn.close()
 
