@@ -169,6 +169,21 @@ def test_the_six_a_night_cap_counts_scanner_cases_too(cfg, monkeypatch):
     assert calls[-1][2] == ["ACME", "WTCH"]
 
 
+def test_the_night_s_lines_and_the_newest_case_time_can_be_read_from_the_list(cfg):
+    conn = seed(cfg)
+    signal(conn, "IVV", case="wait")
+    assert ob.build(cfg, now=NOW)["freshness"]["last_case_at"] == "2026-11-07T02:00:00+00:00"
+    night.run_night(cfg, now=NOW, scan=lambda cfg: {}, cases=writer([]), scout=quiet_scout)
+    fresh = ob.build(cfg, now=NOW)["freshness"]
+    assert fresh["last_case_at"] == NOW.isoformat()
+    assert fresh["night_summary"].endswith("Wrote 1 of 1 cases for rows on sale. Scout looked and proposed nothing.")
+    assert {"step": "list_cases", "status": "ok", "note": "Wrote 1 of 1 cases for rows on sale."} in fresh["night_steps"]
+    from desk.opportunities import ready
+
+    assert ready(cfg, now=NOW).endswith("; 2 cases written overnight")
+    assert ready(cfg, now=NOW + timedelta(hours=30)).endswith(" rated a buy")
+
+
 def test_no_case_is_started_close_to_morning(cfg):
     seed(cfg)
     calls = []
@@ -184,7 +199,8 @@ def test_the_job_ends_with_the_line_the_morning_alert_reads(cfg, monkeypatch, ca
     monkeypatch.setattr(cli, "run_night", lambda cfg: night.run_night(cfg, now=NOW, **fakes([])))
     assert cli.main(["night"]) == 0
     last = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
-    assert set(last) == {"ready"} and last["ready"].endswith("1 rated a buy") and len(last["ready"]) < 120 and "$" not in last["ready"]
+    assert set(last) == {"ready", "detail"} and last["ready"].endswith("1 rated a buy") and len(last["ready"]) < 120 and "$" not in last["ready"]
+    assert last["detail"] == night.last_night(cfg)["summary"] and last["detail"].startswith("The discount scan is current to Nov 6.")
 
 
 def test_the_job_says_why_when_there_is_nothing_to_show(cfg, monkeypatch, capsys):
