@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
-import { benchmarkWords, excessWords, libraryChip, libraryGroups, libraryLegend, libraryTop, whenWords } from '../lib/morning.js';
+import { benchmarkWords, benchmarksView, excessWords, libraryChip, libraryGroups, libraryLegend, libraryTop, whenWords } from '../lib/morning.js';
 
 function Row({ r }) {
   const chip = libraryChip(r);
@@ -13,7 +13,7 @@ function Row({ r }) {
         <span style={{ minWidth: 0 }}>
           <b>{r.title}</b>
           {bench ? (
-            <small className="lib-bench" data-testid="lib-bench">
+            <small className="lib-bench" data-testid="lib-bench" title={r.benchmark_words || undefined}>
               {bench}
             </small>
           ) : null}
@@ -43,6 +43,31 @@ function Row({ r }) {
   ) : (
     <div className="row still lib-row" data-lib={r.id} data-verdict={r.status}>
       {body}
+    </div>
+  );
+}
+
+function Benchmarks({ v }) {
+  if (!v) return null;
+  return (
+    <div className="lib-benchmarks" data-testid="lib-benchmarks">
+      <p>
+        <b>{v.lead}</b>
+        {v.words ? ` ${v.words}` : ''}
+      </p>
+      {v.rest.length ? (
+        <details>
+          <summary>The other {v.rest.length === 1 ? 'benchmark' : `${v.rest.length} benchmarks`}</summary>
+          <ul>
+            {v.rest.map((b) => (
+              <li key={b.name}>
+                <b>{b.name}</b> <span className="muted">· {b.count}</span>
+                {b.words ? <small>{b.words}</small> : null}
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -109,6 +134,7 @@ export function Library({ api }) {
           {d.note}
         </p>
       ) : null}
+      <Benchmarks v={benchmarksView(d)} />
       {groups.length ? groups.map((g) => <Group g={g} top={top} key={g.key} />) : <p className="empty-hint">The library is empty. It fills in with the next desk update.</p>}
     </section>
   );

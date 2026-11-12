@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { LIB_LEGEND, benchmarkWords, excessWords, holdingsDoor, libraryChip, libraryGroups, libraryLegend, libraryTop, nightSteps, opportunitiesDoor, passWords, strategiesDoor, whenWords } from './morning.js';
+import { LIB_LEGEND, benchmarkWords, benchmarksView, excessWords, holdingsDoor, libraryChip, libraryGroups, libraryLegend, libraryTop, nightSteps, opportunitiesDoor, passWords, strategiesDoor, whenWords } from './morning.js';
 import { guideFor } from './guide.js';
 import { earningsLine, entryLine, heldLine, inQueue, opportunityGroups, opportunityNotes, sizeLine, stanceOf } from './opportunities.js';
 import { holdingChip } from './research.js';
@@ -64,6 +64,28 @@ describe('this morning', () => {
     expect(benchmarkWords('QQQ')).toBe('Measured against QQQ');
     expect(benchmarkWords('')).toBeNull();
     expect(benchmarkWords(null)).toBeNull();
+  });
+
+  it('leads the benchmarks legend with the most used one and folds the rest', () => {
+    const v = benchmarksView({
+      rows: Array(10).fill({}),
+      benchmarks: [
+        { name: 'Small caps (IWM)', words: 'The small-company index fund IWM.', rows: 2 },
+        { name: 'S&P 500 (SPY)', words: 'The S&P 500 index fund SPY, bought and held with dividends reinvested.', rows: 7 },
+        { name: 'The same deposits, never borrowing', words: 'The same deposits into the same funds, with no borrowing.', rows: 1 },
+        { name: 'Your plan’s mix', words: 'The funds in your plan.', rows: 0 },
+      ],
+    });
+    expect(v.lead).toBe('7 of 10 are measured against the S&P 500 (SPY).');
+    expect(v.words).toBe('The S&P 500 index fund SPY, bought and held with dividends reinvested.');
+    expect(v.rest.map((b) => [b.name, b.count])).toEqual([
+      ['Small caps (IWM)', '2 strategies'],
+      ['The same deposits, never borrowing', '1 strategy'],
+    ]);
+    expect(benchmarksView({ rows: [{}, {}], benchmarks: [{ name: 'S&P 500 (SPY)', words: null, rows: 2 }] })).toEqual({ lead: 'Every strategy here is measured against the S&P 500 (SPY).', words: null, rest: [] });
+    expect(benchmarksView({ rows: [{}] })).toBeNull();
+    expect(benchmarksView({ rows: [{}], benchmarks: [{ name: 'S&P 500 (SPY)', rows: 0 }] })).toBeNull();
+    expect(benchmarksView(null)).toBeNull();
   });
 
   it('adds the Held up legend only when the desk note does not carry it, and shortens a long library', () => {

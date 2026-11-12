@@ -45,5 +45,6 @@
   "rate_pct": 12,
   "source": "default"
  },
- "starter": null
+ "starter": null,
+ "init": null
 }

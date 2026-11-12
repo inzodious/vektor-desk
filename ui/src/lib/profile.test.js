@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultsText, keyWord, marginWords, profileSource } from './profile.js';
+import { INIT_LABEL, INIT_PATH, defaultsText, keyWord, marginWords, profileInit, profileSource } from './profile.js';
 
 describe('desk profile', () => {
   it('words dotted keys', () => {
@@ -19,6 +19,16 @@ describe('desk profile', () => {
     expect(profileSource({ exists: false, source: 'defaults' })).toBe('Built-in defaults');
     expect(profileSource({ exists: true, source: '/data/desk.yaml' })).toBe('Your profile');
     expect(profileSource(null)).toBeNull();
+  });
+
+  it('offers the set-up route only while there is no profile', () => {
+    expect(profileInit({ exists: false, init: { method: 'POST', path: '/api/decisions/profile/init', label: 'Set up my profile from my data' } })).toEqual({ path: INIT_PATH, label: INIT_LABEL });
+    expect(profileInit({ exists: false, init: { path: '/api/decisions/profile/start', label: ' Start my profile ' } })).toEqual({ path: '/api/decisions/profile/start', label: 'Start my profile' });
+    expect(profileInit({ exists: false, init: { path: 'https://elsewhere.example/x' } })).toEqual({ path: INIT_PATH, label: INIT_LABEL });
+    expect(profileInit({ exists: false, starter: 'a command' })).toEqual({ path: INIT_PATH, label: INIT_LABEL });
+    expect(profileInit({ exists: false })).toBeNull();
+    expect(profileInit({ exists: true, init: null })).toBeNull();
+    expect(profileInit(null)).toBeNull();
   });
 
   it('sums up all-default and all-set profiles, and lists a mix', () => {
