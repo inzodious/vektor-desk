@@ -286,7 +286,9 @@ def test_the_morning_alert_says_what_is_ready_and_what_did_not_finish(cfg, tmp_p
         def ready(cfg):
             return "34 strategies tested, 3 held up out of sample"
 
-    monkeypatch.setattr(overnight.importlib, "import_module", lambda path: Shelf if path == "desk.engine.lab.shelf" else (_ for _ in ()).throw(ImportError(path)))
+    monkeypatch.setattr(
+        overnight.importlib, "import_module", lambda path: Shelf if path == "desk.engine.lab.shelf" else (_ for _ in ()).throw(ImportError(path))
+    )
     sent = []
     monkeypatch.setattr(notify, "publish", lambda *a, **kw: sent.append((a, kw)) or True)
     out = overnight.alert(cfg, morning)
