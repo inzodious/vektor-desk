@@ -887,7 +887,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 | Path | Writer | Holds |
 |---|---|---|
-| `lab/data/lab.db` | Engine `lab-export` job (00:55 nightly), atomic replace | `bars` (price bars plus mirror closes), `symbols` (kind, role, first and last day), `macro`, `plan_mix`, `settings` (marginal rate), `factors` and `french` (phase 9b). SQLite in rollback-journal mode, never WAL, so it opens read-only on the lab's read-only mount |
+| `lab/data/lab.db` | Engine `lab-export` job (00:55 nightly), atomic replace | `bars` (price bars plus mirror closes), `symbols` (kind, role, first and last day), `macro`, `plan_mix`, `held_mix` (what is held today as weights only: symbol and share of the priced, invested book; no accounts, shares or dollar amounts), `settings` (marginal rate, `held_mix_covered`, `held_mix_as_of`), `factors` and `french` (phase 9b). SQLite in rollback-journal mode, never WAL, so it opens read-only on the lab's read-only mount |
 | `lab/queue/*.json` | Strategy desk runner | Experiment and finalize requests |
 | `lab/runs/ledger.db` | Lab only | `strategies` (status `lab`, `paper`, `research`, `failed`, `inconclusive`), `strategy_trials` (kinds `train`, `test`, `full`, `holdout`, `rule`; never pruned), `lab_results` (`experiment`, `finalize`, `rejected`, `rule` bodies), `queue_done`. Older ledgers migrate in place |
 | `desk.db` | Engine `lab-export` job | `paper_portfolios`, `paper_positions`, `paper_trades` |
@@ -902,7 +902,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 | `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
 | `rebalance`, `sizing` | Weekly, monthly or quarterly; `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash |
 | `filters` | `[{"metric_id": "ma_gap", "window": "200d", "min": 0}]`: a name is eligible only while each raw value sits inside `min` and `max`; slots left empty stay in cash |
-| Fixed mixes | `"sizing": {"weights": {"SPY": 60, "AGG": 40}}` holds funds at fixed weights and needs no signal; `{"type": "fund_list", "set": "plan_mix"}` is the plan at its target weights. A fund with no history in the lab is dropped and the rest scaled up, with a caveat; under half the mix present is refused |
+| Fixed mixes | `"sizing": {"weights": {"SPY": 60, "AGG": 40}}` holds funds at fixed weights and needs no signal; `{"type": "fund_list", "set": "plan_mix"}` is the plan at its target weights; `"set": "held_mix"` is today's holdings at today's weights, single stocks included, always with a hindsight caveat, and a pass on it is research only, never paper. A fund with no history in the lab is dropped and the rest scaled up, with a caveat; under half the mix present is refused |
 | Named French portfolios | `{"type": "french", "set": "size_deciles", "members": ["lo"]}` keeps the portfolios whose name starts that way and needs no signal |
 | `params`, `grid` | `{"top_n": {"min": 1, "max": 4, "default": 3}}` or a list; grid values must sit inside. Over the trial budget (max 200), a seeded, deterministic subset runs |
 
@@ -1118,6 +1118,20 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 **No plan loaded.** `lib-rebalance-bands-plan` carries `mix_without_plan` (the built-in safe mix). With no plan mix in the lab data the rule runs on it: funds with no prices, or under 8 years of them, are left out and the rest scaled up (at least half the weight must remain). The row's `line` starts "Run on the built-in safe mix" and `caveats` names what was left out. `lib-plan-mix` stays `not_run` with a plain reason, since the safe mix has its own row.
 
 **Yardstick.** `lib-buy-hold-sp500` is judged against the plan's mix. With no plan mix in the lab data the simulator's benchmark falls back to the S&P 500, so the row would be judged against itself. `shelf.view` then marks it `yardstick: true`, gives it no verdict and no `excess_pts`, sorts it first in its group and counts it under `counts.yardstick`. `gap_pts` is what it shows against itself, which should be zero. That is the lab's self-check: the payload's `self_check` is `{gap_pts, level}`, and when a current yardstick row is 0.2 points a year or more away from level, `note` says every experiment row may lean by that much.
+
+**Hindsight row.** `lib-as-held` ("What you hold today") tests today's holdings at today's weights, set back to them every quarter, against the S&P 500. Cash and holdings nothing prices are left out; the caveats say what share that is. It is never judged.
+
+| Field | Hindsight row |
+|---|---|
+| `hindsight` | `true` |
+| `verdict`, `noise` | `null`; counted under `counts.hindsight`, never under held up, within noise or fell short |
+| `line` | "From Nov 2022 to Nov 2024, today's mix would have run 3.2 points a year ahead of S&P 500 (SPY). Hindsight, not a test: ..." |
+| `out_of_sample` | Same keys as an experiment row |
+| Trial count | Its own family (`library-hindsight`), so it never widens the luck band of the other rows |
+| Order | First in the Practical group once tested |
+| Rerun | Every 7 days, not 30, so it follows what is held; a caveat gives the holdings date |
+| `note` | Adds one sentence saying the row is hindsight while it is tested |
+| Not run | No held mix exported yet, or the holdings have not all traded long enough before the holdout (see "A fund that had not started trading") |
 
 **Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt).
 

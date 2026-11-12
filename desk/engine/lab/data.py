@@ -25,6 +25,7 @@ CREATE TABLE bars (
 CREATE TABLE symbols (symbol TEXT PRIMARY KEY, kind TEXT NOT NULL, role TEXT, first TEXT, last TEXT) WITHOUT ROWID;
 CREATE TABLE macro (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
 CREATE TABLE plan_mix (symbol TEXT PRIMARY KEY, weight REAL NOT NULL) WITHOUT ROWID;
+CREATE TABLE held_mix (symbol TEXT PRIMARY KEY, weight REAL NOT NULL) WITHOUT ROWID;
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
 CREATE TABLE factors (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
 CREATE TABLE french (set_name TEXT NOT NULL, name TEXT NOT NULL, date TEXT NOT NULL, ret REAL NOT NULL, PRIMARY KEY (set_name, name, date)) WITHOUT ROWID;
@@ -112,6 +113,10 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
             "SELECT value FROM metric_values WHERE metric_id='tax.marginal_rate' AND scope='portfolio' AND value IS NOT NULL ORDER BY as_of DESC LIMIT 1"
         ).fetchone()
         settings = {"exported_at": now.isoformat(timespec="seconds"), "marginal_rate_pct": str(rate[0]) if rate else None}
+        held, covered, held_day = _held_mix(desk, spans)
+        if held:
+            out.executemany("INSERT INTO held_mix VALUES (?, ?)", list(held.items()))
+            settings |= {"held_mix_as_of": held_day, "held_mix_covered": str(covered)}
         if small and _has(desk, "insider_buys"):
             from desk.engine.insider import coverage
 
@@ -126,7 +131,23 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
     finally:
         out.close()
     os.replace(tmp, final)
-    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": bars, "french_rows": french_rows, "small_caps": len(small)}
+    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": bars, "french_rows": french_rows, "small_caps": len(small), "held_mix": len(held)}
+
+
+def _held_mix(desk: sqlite3.Connection, priced) -> tuple[dict[str, float], float | None, str | None]:
+    if not _has(desk, "holdings_daily"):
+        return {}, None, None
+    day = desk.execute("SELECT max(date) FROM holdings_daily").fetchone()[0]
+    if not day:
+        return {}, None, None
+    rows = desk.execute("SELECT symbol, sum(value) FROM holdings_daily WHERE date=? AND is_cash=0 GROUP BY symbol HAVING sum(value) > 0", (day,))
+    values = {r[0]: r[1] for r in rows}
+    kept = {s: v for s, v in values.items() if s in priced}
+    have = sum(kept.values())
+    if not have:
+        return {}, None, day
+    mix = {s: round(v / have, 4) for s, v in kept.items()}
+    return {s: w for s, w in mix.items() if w > 0}, round(have / sum(values.values()), 2), day
 
 
 def _has(conn: sqlite3.Connection, name: str) -> bool:
@@ -215,6 +236,7 @@ class LabData:
     insider: dict[str, tuple[list[str], list[int], list[float]]] = field(default_factory=dict)
     smallcap: dict[str, set[str]] = field(default_factory=dict)
     earnings: dict[str, tuple[list[str], list[float]]] = field(default_factory=dict)
+    held_mix: dict[str, float] = field(default_factory=dict)
 
     def coverage(self, key: str = "insider_coverage") -> dict | None:
         raw = self.settings.get(key)
@@ -333,6 +355,7 @@ def load(path: Path) -> LabData:
             d.append(r[1])
             v.append(r[2])
         plan = {r[0]: r[1] for r in conn.execute("SELECT symbol, weight FROM plan_mix")}
+        held = {r[0]: r[1] for r in conn.execute("SELECT symbol, weight FROM held_mix")} if _has(conn, "held_mix") else {}
         settings = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings")}
         factors: dict[str, dict[str, float]] = {}
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name='factors'").fetchone():
@@ -365,5 +388,18 @@ def load(path: Path) -> LabData:
     if not ref:
         raise NotReady("The lab data has no prices yet.")
     return LabData(
-        series, kinds, roles, last, macro, plan, settings, list(series[ref].dates), factors, path, insider=insider, smallcap=smallcap, earnings=earnings
+        series,
+        kinds,
+        roles,
+        last,
+        macro,
+        plan,
+        settings,
+        list(series[ref].dates),
+        factors,
+        path,
+        insider=insider,
+        smallcap=smallcap,
+        earnings=earnings,
+        held_mix=held,
     )

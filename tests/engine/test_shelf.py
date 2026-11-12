@@ -13,7 +13,7 @@ from desk.engine.lab import rulebook, runner, shelf, simcache
 from desk.engine.lab.data import EXPORT_SCHEMA, data_path, load
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
-from desk.engine.lab.spec import SETS, SpecError, parse, resolve, variants
+from desk.engine.lab.spec import HINDSIGHT, SETS, SpecError, parse, resolve, variants
 from desk.worker import store
 
 NOW = datetime(2025, 1, 2, 5, 55, tzinfo=UTC)
@@ -70,6 +70,9 @@ def lab_file(tmp_path_factory):
     conn.executemany("INSERT INTO macro VALUES ('DGS3MO', ?, 2.0)", [(d,) for d in days[::5]])
     conn.executemany("INSERT INTO plan_mix VALUES (?, ?)", [("SPY", 0.6), ("VXUS", 0.2), ("AGG", 0.2)])
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
+    conn.executemany("INSERT INTO held_mix VALUES (?, ?)", [("SPY", 0.5), ("STK0", 0.3), ("FTEC", 0.2)])
+    conn.execute("INSERT INTO settings VALUES ('held_mix_covered', '0.88')")
+    conn.execute("INSERT INTO settings VALUES ('held_mix_as_of', '2024-12-31')")
     conn.commit()
     conn.close()
     return path
@@ -107,7 +110,8 @@ def test_every_entry_is_a_valid_request_on_lab_data(stocked):
             assert rulebook.parse({k: v for k, v in req.items() if k not in ("request", "written_at")}, data).variants
             continue
         spec = parse(req["spec"], data, model="library")
-        assert spec.parent_id == shelf.FAMILY and 1 <= len(variants(spec, req["grid"], req["trial_budget"], req["seed"])) <= 4
+        assert spec.parent_id == (shelf.HINDSIGHT_FAMILY if entry.get("hindsight") else shelf.FAMILY)
+        assert 1 <= len(variants(spec, req["grid"], req["trial_budget"], req["seed"])) <= 4
         assert runner.windows(data, req.get("date_range") or {}, spec.universe.get("kind"))["folds"]
 
 
@@ -424,6 +428,65 @@ def test_a_result_from_an_older_revision_is_flagged_and_run_again(stocked, monke
     bumped = {r["id"]: r["outdated"] for r in shelf.view(cfg)["rows"]}
     assert bumped == {"lib-60-40": True, "lib-dip-reserve": False}
     assert shelf.view(cfg)["note"] == f"{shelf.NOTE} Some of these {shelf.OUTDATED}"
+
+
+def test_what_you_hold_today_is_shown_as_hindsight_and_never_judged(stocked, monkeypatch):
+    cfg = stocked
+    data = load(data_path(cfg))
+    held = parse(spec_of("lib-as-held"), data)
+    assert held.weights == pytest.approx({"SPY": 0.5, "STK0": 0.3, "FTEC": 0.2}) and held.rebalance == "Q"
+    assert held.caveats[:3] == [HINDSIGHT, "Holdings as of 2024-12-31.", "Holdings with no market price history, about 12% of what is invested, are left out."]
+    with pytest.raises(SpecError, match="not funds"):
+        parse(spec_of("lib-60-40") | {"universe": {"type": "fund_list", "symbols": ["STK0", "SPY"]}, "sizing": {"weights": {"STK0": 1, "SPY": 1}}}, data)
+    ids = ("lib-as-held", "lib-60-40", "lib-safe-mix")
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
+    monkeypatch.setattr(shelf, "IDS", frozenset(ids))
+    assert shelf.queue_missing(cfg, now=NOW) == {"queued": 3, "of": 3}
+    process_queue(cfg, now=NOW)
+    view = shelf.view(cfg)
+    row = next(r for r in view["rows"] if r["kind"] == "practical")
+    assert row["id"] == "lib-as-held" and row["hindsight"] and row["status"] == "tested" and row["verdict"] is None and row["noise"] is None
+    assert row["line"].startswith("From ") and ", today's mix would have run " in row["line"] and row["line"].endswith(shelf.HINDSIGHT_LINE)
+    assert row["out_of_sample"]["excess_pts"] is not None and HINDSIGHT in row["caveats"]
+    assert view["counts"]["hindsight"] == 1 and view["counts"]["tested"] == 3 and sum(view["counts"][v] for v in ("held_up", "within_noise", "fell_short")) == 2
+    assert view["note"] == f"{shelf.NOTE} {shelf.HINDSIGHT_NOTE}" and sum(r["hindsight"] for r in view["rows"]) == 1
+    assert shelf.queue_missing(cfg, now=NOW + timedelta(days=6))["queued"] == 0
+    assert shelf.queue_missing(cfg, now=NOW + timedelta(days=8)) == {"queued": 1, "of": 3}
+    ledger = sqlite3.connect(runner.ledger_path(cfg))
+    families = dict(ledger.execute("SELECT id, parent_id FROM strategies"))
+    assert families["lib-as-held"] == shelf.HINDSIGHT_FAMILY and families["lib-60-40"] == shelf.FAMILY
+    assert (
+        view["trials"]
+        == ledger.execute("SELECT count(DISTINCT strategy_id || params) FROM strategy_trials WHERE kind='full' AND strategy_id != 'lib-as-held'").fetchone()[0]
+    )
+    ranked = spec_of("lib-as-held") | {"id": "held-ranked", "signals": [{"metric_id": "ret", "window": "{lookback}d"}], "entry": {"top_n": 2}}
+    ranked |= {"params": {"lookback": {"min": 21, "max": 252, "default": 126}}}
+    asked = {"request": "experiment", "spec": ranked, "grid": {"lookback": [63, 126]}, "seed": 7, "trial_budget": 4, "analyses": []}
+    conn = runner.ledger(cfg)
+    assert runner.run_experiment(None, conn, data, asked, now=NOW)["deploy_params"]
+    monkeypatch.setattr(runner, "_bars", lambda *a: {"walk_forward": True, "holdout": True, "factor": None})
+    final = runner.finalize(cfg, conn, data, {"strategy_id": "held-ranked", "version": 1}, now=NOW)
+    conn.close()
+    assert final["verdict"] == "pass" and final["paper_start"] is None
+    assert ledger.execute("SELECT status FROM strategies WHERE id='held-ranked'").fetchone()[0] == "research"
+    ledger.close()
+
+
+def test_the_hindsight_line_says_ahead_behind_or_level_and_names_the_dates():
+    entry = next(e for e in shelf.LIBRARY if e["id"] == "lib-as-held")
+
+    def line(x):
+        wf = {"days": 500, "excess_pts": x, "start": "2022-11-14", "end": "2024-11-08", "ann_return_pct": 9.0}
+        return shelf._hindsight(entry, {"walk_forward": wf})["line"]
+
+    assert line(3.24) == f"From Nov 2022 to Nov 2024, today's mix would have run 3.2 points a year ahead of S&P 500 (SPY). {shelf.HINDSIGHT_LINE}"
+    assert line(-1.5).startswith("From Nov 2022 to Nov 2024, today's mix would have run 1.5 points a year behind S&P 500 (SPY).")
+    assert "would have run level with S&P 500 (SPY)." in line(0.04)
+    assert shelf._hindsight(entry, {"walk_forward": {}}) == {"verdict": None, "line": f"No record to show for today's mix yet. {shelf.HINDSIGHT_LINE}"}
+    assert (
+        shelf.plain(["there is no held mix in the lab data yet"])
+        == "The desk has not sent the lab what you hold yet. This runs the night after the next lab export."
+    )
 
 
 def test_mixes_that_held_cash_for_a_fund_not_yet_trading_are_run_again():

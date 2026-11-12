@@ -399,6 +399,30 @@ def test_engine_export_writes_the_lab_copy(cfg, mirror):
     data = load(data_path(cfg))
     assert data.kinds["FXAIX"] == "fund" and data.kinds["ACME"] == "stock" and data.plan_mix == {"FXAIX": 0.8, "VXUS": 0.2}
     assert data.series["SPY"].open_adj[0] == 99 and data.end == "2026-11-03"
+    assert result["held_mix"] == 2 and data.held_mix == {"FXAIX": 0.8333, "ACME": 0.1667}
+    assert data.settings["held_mix_covered"] == "1.0" and data.settings["held_mix_as_of"] == "2026-11-04"
+    out = sqlite3.connect(data_path(cfg))
+    assert [r[1] for r in out.execute("PRAGMA table_info(held_mix)")] == ["symbol", "weight"]
+    everything = " ".join(str(r) for name in ("held_mix", "settings", "symbols") for r in out.execute(f"SELECT * FROM {name}"))
+    out.close()
+    assert "individual" not in everything and "1000" not in everything and "1200" not in everything
+
+
+def test_the_held_mix_leaves_out_what_nothing_prices(cfg, mirror):
+    seed(mirror)
+    run_holdings(cfg)
+    desk = connect(cfg.desk_db)
+    with desk:
+        desk.execute("DELETE FROM prices_daily WHERE symbol='ACME'")
+    desk.close()
+    run_lab_export(cfg)
+    data = load(data_path(cfg))
+    assert data.held_mix == {"FXAIX": 1.0} and data.settings["held_mix_covered"] == "0.83"
+    old = sqlite3.connect(data_path(cfg))
+    old.execute("DROP TABLE held_mix")
+    old.commit()
+    old.close()
+    assert load(data_path(cfg)).held_mix == {}
 
 
 def test_lab_views_before_anything_ran(cfg):
@@ -696,7 +720,7 @@ def test_the_offer_job_is_light_and_runs_through_the_lab_hours(cfg):
     assert entry == {"schedule": "* 1-5 * * *", "command": "python -m desk.engine lab-offer", "heavy": False, "title": "Lab work to the worker"}
     assert engine_main.run_lab_offer(cfg) == {
         "ok": True,
-        "library": {"queued": 38, "of": 38},
+        "library": {"queued": 39, "of": 39},
         "offered": 0,
         "note": "No worker is online, so the lab runs its queue itself.",
     }

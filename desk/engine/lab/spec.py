@@ -20,6 +20,9 @@ SIZING = (("fixed", "fixed"), ("inverse", "inverse_vol"), ("volatility", "invers
 MIN_WEIGHT_PRESENT = 0.5
 MIN_LIVE = 0.9
 PLAN_SET = "plan_mix"
+HELD_SET = "held_mix"
+MIX_SETS = {PLAN_SET: "there is no plan mix in the lab data yet", HELD_SET: "there is no held mix in the lab data yet"}
+HINDSIGHT = "Today's holdings tested on the past. You chose them knowing how they had done, so this is hindsight, not evidence; a pass never goes to paper."
 SHELTERED = ("hsa", "ira", "roth", "401k", "401(k)")
 MAX_VARIANTS = 200
 
@@ -197,10 +200,10 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
         if not symbols and not name:
             text = str(u.get("rule") or "").lower()
             name = next((n for w, n in SET_WORDS if w in text), None)
-        if name == PLAN_SET:
-            symbols = sorted(data.plan_mix) if data is not None else []
+        if name in MIX_SETS:
+            symbols = sorted(set_mix(data, name)) if data is not None else []
             if data is not None and not symbols:
-                problems.append("there is no plan mix in the lab data yet")
+                problems.append(MIX_SETS[name])
                 return {}
             return {"kind": "fund_list", "symbols": symbols, "set": name}
         if name and not symbols:
@@ -246,6 +249,10 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
     return {}
 
 
+def set_mix(data: LabData, name: str) -> dict[str, float]:
+    return data.held_mix if name == HELD_SET else data.plan_mix
+
+
 def french_members(symbols: list[str], members: list[str]) -> list[str]:
     if not members:
         return symbols
@@ -282,11 +289,20 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
     if constraints.get("margin") or constraints.get("long_only") is False:
         problems.append("the lab runs long only and never on margin")
     universe = _universe(raw.get("universe") or {}, data, problems, caveats, weights)
-    if universe.get("set") == PLAN_SET:
-        weights = dict(data.plan_mix) if data is not None and data.plan_mix else {s: 1.0 for s in universe["symbols"]} or None
+    if universe.get("set") in MIX_SETS:
+        mix = set_mix(data, universe["set"]) if data is not None else {}
+        weights = dict(mix) if mix else {s: 1.0 for s in universe["symbols"]} or None
         if weights:
             total = sum(weights.values())
             weights = {s: w / total for s, w in weights.items()}
+    if universe.get("set") == HELD_SET:
+        caveats.append(HINDSIGHT)
+        settings = data.settings if data is not None else {}
+        if settings.get("held_mix_as_of"):
+            caveats.append(f"Holdings as of {settings['held_mix_as_of']}.")
+        left_out = 1 - float(settings.get("held_mix_covered") or 1)
+        if left_out >= 0.005:
+            caveats.append(f"Holdings with no market price history, about {left_out:.0%} of what is invested, are left out.")
     if weights is not None:
         if universe.get("kind") != "fund_list":
             problems.append("fixed weights need a fund_list universe")
@@ -305,7 +321,7 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
             caveats.append(f"Uses prices from {start} on, the first day funds making up at least {MIN_LIVE:.0%} of the mix were trading.")
         if late:
             caveats.append(f"{', '.join(late)} started trading later; until each one lists, the rest of the mix carries its share.")
-    fixed = weights is not None or bool(universe.get("members")) or universe.get("set") == PLAN_SET
+    fixed = weights is not None or bool(universe.get("members")) or universe.get("set") in MIX_SETS
     if not signals and not fixed:
         problems.append("at least one signal is required, unless the spec holds a fixed mix (sizing weights) or named French portfolios (members)")
     entry_raw = raw.get("entry")

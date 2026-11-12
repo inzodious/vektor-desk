@@ -15,7 +15,7 @@ from desk.engine.lab import factors, rulebook, simcache, stats
 from desk.engine.lab.data import FRENCH_KIND, SMALL_CAPS, LabData, data_path, lab_build, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
 from desk.engine.lab.simcache import Cache, Run
-from desk.engine.lab.spec import Spec, SpecError, Variant, parse, resolve, variants
+from desk.engine.lab.spec import HELD_SET, Spec, SpecError, Variant, parse, resolve, variants
 
 HOLDOUT_YEARS = 2
 DEFAULT_CUTOFF = "2026-06-30"
@@ -485,7 +485,7 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
     factor_ran = bars["factor"] is not None
     computed = [x for k, x in bars.items() if k != "factor" or factor_ran]
     verdict = "fail" if any(x is False for x in computed) else ("pass" if computed and all(x is True for x in computed) else "inconclusive")
-    research = spec.universe.get("kind") == FRENCH_KIND
+    research = spec.universe.get("kind") == FRENCH_KIND or spec.universe.get("set") == HELD_SET
     status = {"pass": "research" if research else "paper", "fail": "failed", "inconclusive": "inconclusive"}[verdict]
     _close(conn, spec, status)
     body = {
