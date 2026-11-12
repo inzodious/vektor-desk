@@ -38,13 +38,18 @@ def drive(cfg, jobs, now, limit=40):
     def busy(name):
         return any(j.name == name and (j.proc is not None or j.waiting is not None) for j in jobs)
 
-    for _ in range(limit * 20):
-        reap(jobs, cfg)
-        scheduler.drain(jobs, cfg)
-        chain = overnight.advance(cfg, jobs, lambda job, rid: launch(jobs, job, cfg, "overnight", rid), busy, now)
-        if chain and chain["state"] == "done":
-            return chain
-        time.sleep(0.05)
+    real = jobrun.now_utc
+    jobrun.now_utc = lambda: now.astimezone(ZoneInfo("UTC"))
+    try:
+        for _ in range(limit * 20):
+            reap(jobs, cfg)
+            scheduler.drain(jobs, cfg)
+            chain = overnight.advance(cfg, jobs, lambda job, rid: launch(jobs, job, cfg, "overnight", rid), busy, now)
+            if chain and chain["state"] == "done":
+                return chain
+            time.sleep(0.05)
+    finally:
+        jobrun.now_utc = real
     raise AssertionError("the night never finished")
 
 
