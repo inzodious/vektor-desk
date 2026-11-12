@@ -20,7 +20,7 @@ from desk.api.app import create_app
 from desk.worker import Kind, offer, online, registry, snapshots, store
 from desk.worker import api as worker_api
 from desk.worker.__main__ import apply
-from desk.worker.client import loop
+from desk.worker.client import loop, one
 
 NOW = datetime(2026, 11, 11, 21, 0, tzinfo=UTC)
 
@@ -386,6 +386,46 @@ def test_the_worker_loop_fetches_code_and_a_copy_runs_the_job_and_sends_the_resu
     second = offer(cfg, "worker.check", {}, ("lab",))
     assert loop(live, made["key"], work, rounds=1, idle=0.05) == 0 and store.get(cfg, second["id"])["state"] == "returned"
     assert len(list((work / "code").iterdir())) == 1 and len(list((work / "snapshots").iterdir())) == 1
+
+
+def test_the_worker_keeps_only_the_copy_its_job_is_using(live, cfg, tmp_path):
+    lab_db(cfg)
+    made = store.add_worker(cfg, "Horizon")
+    first = offer(cfg, "worker.check", {}, ("lab",))
+    work = tmp_path / "work"
+    assert loop(live, made["key"], work, rounds=1, idle=0.05) == 0 and store.get(cfg, first["id"])["state"] == "returned"
+    lab_db(cfg, 7)
+    second = offer(cfg, "worker.check", {}, ("lab",))
+    old, new = first["snapshots"][0]["sha256"], second["snapshots"][0]["sha256"]
+    assert old != new and [p.name for p in (work / "snapshots").iterdir()] == [f"{old}.db"]
+    assert loop(live, made["key"], work, rounds=1, idle=0.05) == 0 and store.get(cfg, second["id"])["state"] == "returned"
+    assert [p.name for p in (work / "snapshots").iterdir()] == [f"{new}.db"]
+
+
+def test_the_job_itself_clears_older_copies_so_a_worker_on_an_old_image_is_covered(cfg, tmp_path, capsys):
+    source = lab_db(cfg)
+    folder = tmp_path / "work" / "snapshots"
+    folder.mkdir(parents=True)
+    names = ["a" * 64, "b" * 64, "c" * 64]
+    for name in names:
+        (folder / f"{name}.db").write_bytes(source.read_bytes())
+        (folder / f"{name}.db").chmod(0o444)
+    leftovers = [f".{names[0]}.gz", f"..{names[0]}.gz.part", f".{names[1]}.db.4242.tmp"]
+    others = ["lab.latest.json", f"{names[0]}.db.gz", "notes.txt"]
+    for name in leftovers + others:
+        (folder / name).write_text("x")
+    spec = tmp_path / "job.json"
+    out = tmp_path / "result.json.gz"
+    spec.write_text(json.dumps({"kind": "worker.check", "inputs": {}, "files": {"lab": str(folder / f"{names[2]}.db")}, "out": str(out)}))
+    assert one(spec) == 0 and out.is_file()
+    assert sorted(p.name for p in folder.iterdir()) == sorted([f"{names[2]}.db", *others])
+    assert "removed 5 older copies of the desk's data" in capsys.readouterr().out
+    elsewhere = tmp_path / "plain"
+    elsewhere.mkdir()
+    for name in names[:2]:
+        (elsewhere / f"{name}.db").write_bytes(source.read_bytes())
+    spec.write_text(json.dumps({"kind": "worker.check", "inputs": {}, "files": {"lab": str(elsewhere / f"{names[0]}.db")}, "out": str(out)}))
+    assert one(spec) == 0 and len(list(elsewhere.iterdir())) == 2
 
 
 def test_a_job_that_raises_on_the_worker_comes_back_as_a_plain_failure(live, cfg, tmp_path, monkeypatch):
