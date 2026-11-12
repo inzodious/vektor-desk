@@ -6,6 +6,7 @@ from statistics import median
 from zoneinfo import ZoneInfo
 
 from desk.config import Config
+from desk.engine import cash
 
 HORIZONS = (30, 90, 365)
 SCORED = ("buy", "sell", "trim", "rebalance", "harvest", "deposit_route", "hold_off")
@@ -310,7 +311,7 @@ def metrics(
 ) -> dict:
     rows = decision_rows(cfg) if rows is None else rows
     rows = [d for d in rows if d["status"] not in SKIP]
-    margin_rate = _env_float("DESK_MARGIN_RATE_PCT")
+    margin_rate = cash.margin_rate(cfg)[0]
     scored = [score(d, tr, cal, targets, tz=cfg.timezone, rate=rate, margin_rate=margin_rate, fallback=fallback) for d in rows]
     for s in scored:
         for h, v in s["scores"].items():

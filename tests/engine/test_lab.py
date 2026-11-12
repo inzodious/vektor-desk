@@ -625,7 +625,7 @@ def test_the_offer_job_is_light_and_runs_through_the_lab_hours(cfg):
     from desk.engine import __main__ as engine_main
     from desk.engine.jobs import JOBS
 
-    (entry,) = [e for e in JOBS if isinstance(e, dict)]
+    (entry,) = [e for e in JOBS if isinstance(e, dict) and e["command"].endswith("lab-offer")]
     assert entry == {"schedule": "* 1-5 * * *", "command": "python -m desk.engine lab-offer", "heavy": False, "title": "Lab work to the worker"}
     assert engine_main.run_lab_offer(cfg) == {"ok": True, "offered": 0, "note": "No worker is online, so the lab runs its queue itself."}
     (job,) = [j for j in scheduler.package_jobs(["engine"]) if j.name == "engine-lab-offer"]

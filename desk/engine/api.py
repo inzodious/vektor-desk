@@ -8,8 +8,9 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import discounts, lab, lane, leaderboard, paper_exec, planfacts, review, schema, watchlist
+from desk.engine import asof, discounts, lab, lane, leaderboard, paper_exec, planfacts, review, schema, watchlist
 from desk.engine.compare import CompareError, compare
+from desk.engine.lab import shelf
 from desk.engine.live import live_view
 from desk.engine.lots import current_lots
 from desk.engine.preflight import PreflightError, check_trade
@@ -130,6 +131,16 @@ def live(request: Request) -> JSONResponse:
         return _json(live_view(conn))
     finally:
         conn.close()
+
+
+@router.get("/api/asof")
+def as_of(request: Request) -> JSONResponse:
+    conn = _open(get_cfg(request))
+    try:
+        return _json(asof.view(conn))
+    finally:
+        if conn is not None:
+            conn.close()
 
 
 def _has(conn: sqlite3.Connection, table: str) -> bool:
@@ -438,6 +449,11 @@ def lab_strategy(request: Request, strategy_id: str) -> JSONResponse:
         finally:
             conn.close()
     return _json(view | {"paper_trades": trades})
+
+
+@router.get("/api/lab/library")
+def lab_library(request: Request) -> JSONResponse:
+    return _json(shelf.view(get_cfg(request)))
 
 
 @router.get("/api/engine/watchlist")

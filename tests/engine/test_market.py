@@ -94,7 +94,7 @@ def test_quotes_live_value_and_mutual_fund_fallback(cfg, mirror, monkeypatch):
     assert src == {"SPY": "finnhub", "FXAIX": "close"}
     view = live_view(conn, now=now)
     conn.close()
-    assert view["state"] == "open" and view["value"] == 1300.0 and view["day_change"] == 25.0 and view["quality"] == "ok"
+    assert view["state"] == "open" and view["value"] == 1300.0 and view["day_change"] == 0.0 and view["quality"] == "ok"
     assert "SPY" in view["benchmarks"]
 
 

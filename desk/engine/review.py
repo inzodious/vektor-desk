@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, time, timedelta
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import broker, catalog
+from desk.engine import asof, broker, catalog
 from desk.engine.bands import limit
 from desk.engine.core import PROFILE_ERRORS, convictions, latest_plan, rules_in_force
 from desk.engine.holdings import BACKCAST, CASH_SYMBOLS, bar_series, price_series
@@ -119,6 +119,7 @@ class Data:
     filings: list[dict]
     earnings: list[dict]
     pnl: dict[tuple[str, str], dict[str, tuple[float, float]]] = field(default_factory=dict)
+    provisional: dict[str, list[str]] = field(default_factory=dict)
     dip_days: list[str] = field(default_factory=list)
     dip_cash: list[float] = field(default_factory=list)
 
@@ -214,6 +215,8 @@ def load(cfg: Config | None, mirror: sqlite3.Connection | None, desk: sqlite3.Co
         filings=_rows(desk, "filing_signals", "SELECT symbol, filed_at, form, event_type, direction FROM filing_signals ORDER BY filed_at"),
         earnings=_rows(desk, "earnings", "SELECT symbol, date, eps_actual, eps_estimate FROM earnings ORDER BY date"),
     )
+    if days and asof.provisional_symbols(desk, days[-1]):
+        data.provisional[days[-1]] = asof.prices(desk, days[-1])["carried"]
     dip = catalog.Dip()
     for day in data.tr.dates.get(catalog.BENCHMARK, []):
         data.dip_days.append(day)
@@ -580,6 +583,11 @@ def build_pack(data: Data, kind: str, start: str, end: str) -> dict | None:
         "fi": fi,
         "events": event_rows(data, base, as_of, partial, held),
     }
+    if as_of in data.provisional:
+        carried = data.provisional[as_of]
+        waits = f" {', '.join(carried)} carry their last close until then." if carried else ""
+        note = f"{asof.day_words(as_of)} is priced from the closing quotes and is restated when official closes land overnight.{waits}"
+        pack["provisional"] = {"day": as_of, "carried": carried, "note": note}
     pack["numbers"] = numbers(pack)
     return pack
 

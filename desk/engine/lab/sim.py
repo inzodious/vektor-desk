@@ -3,7 +3,7 @@ from datetime import date
 
 from desk.engine.lab import library as features
 from desk.engine.lab.data import FRENCH_KIND, FUND_KINDS, SMALL_CAPS, LabData
-from desk.engine.lab.spec import Spec, Variant
+from desk.engine.lab.spec import Spec, Variant, french_members
 
 START_CASH = 10_000.0
 FUND_BPS = 5.0
@@ -54,7 +54,7 @@ def universe(data: LabData, spec: Spec, day: str) -> list[str]:
     if u["kind"] == "fund_list":
         return [s for s in u["symbols"] if s in data.series]
     if u["kind"] == FRENCH_KIND:
-        return data.french(u["set"])
+        return french_members(data.french(u["set"]), u.get("members") or [])
     if u["kind"] == SMALL_CAPS:
         month = day[:7]
         out = []
@@ -105,6 +105,14 @@ def _events(data: LabData, metric: str, sym: str):
     return data.insider.get(sym)
 
 
+def _passes(data: LabData, spec: Spec, sym: str, s, i: int) -> bool:
+    for metric, days, lo, hi in spec.filters:
+        x = features.value(metric, s, i, days, _events(data, metric, sym))
+        if x is None or (lo is not None and x < lo) or (hi is not None and x > hi):
+            return False
+    return True
+
+
 def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dict[str, float]:
     raw: dict[str, list[float]] = {}
     for sym in universe(data, spec, day):
@@ -113,7 +121,7 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         if i is None:
             continue
         vals = [features.value(m, s, i, w, _events(data, m, sym)) for (m, _, _), w in zip(spec.signals, v.windows, strict=True)]
-        if any(x is None for x in vals):
+        if any(x is None for x in vals) or not _passes(data, spec, sym, s, i):
             continue
         raw[sym] = vals
     if not raw:
@@ -123,12 +131,15 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         for sym, x in features.transform(t, {sym: vals[j] for sym, vals in raw.items()}).items():
             score[sym] += x / len(spec.signals)
     ranked = sorted(score, key=lambda k: (-score[k], k))
-    eligible = [s for s in ranked if v.min_signal is None or raw[s][0] > v.min_signal]
+    eligible = [s for s in ranked if v.min_signal is None or not raw[s] or raw[s][0] > v.min_signal]
     rank = {s: i + 1 for i, s in enumerate(ranked)}
     keep = [s for s in ranked if s in held and s in eligible and v.hold_rank and rank[s] <= v.hold_rank][: v.top_n]
     chosen = keep + [s for s in eligible if s not in keep][: v.top_n - len(keep)]
     if not chosen:
         return {}
+    if spec.weights is not None:
+        cap = spec.constraints["max_position_pct"] / 100
+        return {s: min(spec.weights[s], cap) for s in chosen if spec.weights.get(s)}
     if spec.sizing == "inverse_vol":
         inv = {}
         for s in chosen:

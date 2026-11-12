@@ -16,7 +16,9 @@ SETS = {
 }
 SET_WORDS = (("sector", "sector_etfs"), ("core", "core_etfs"), ("broad", "core_etfs"), ("benchmark", "benchmarks"))
 REBALANCE = {"weekly": "W", "monthly": "M", "quarterly": "Q", "w": "W", "m": "M", "q": "Q"}
-SIZING = (("inverse", "inverse_vol"), ("volatility", "inverse_vol"), ("risk parity", "inverse_vol"), ("rank", "rank"), ("equal", "equal"))
+SIZING = (("fixed", "fixed"), ("inverse", "inverse_vol"), ("volatility", "inverse_vol"), ("risk parity", "inverse_vol"), ("rank", "rank"), ("equal", "equal"))
+MIN_WEIGHT_PRESENT = 0.5
+PLAN_SET = "plan_mix"
 SHELTERED = ("hsa", "ira", "roth", "401k", "401(k)")
 MAX_VARIANTS = 200
 
@@ -48,6 +50,8 @@ class Spec:
     taxable: bool
     model: str
     caveats: list[str] = field(default_factory=list)
+    filters: list[tuple[str, int, float | None, float | None]] = field(default_factory=list)
+    weights: dict[str, float] | None = None
 
     @property
     def hash(self) -> str:
@@ -130,18 +134,62 @@ def _rebalance(value, problems) -> str:
 
 
 def _sizing(value) -> str:
+    if isinstance(value, dict) and value.get("weights"):
+        return "fixed"
     text = str(value.get("method") if isinstance(value, dict) else value).lower()
     return next((code for word, code in SIZING if word in text), "equal")
 
 
-def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[str]) -> dict:
+def _weights(value, problems: list[str]) -> dict[str, float] | None:
+    raw = value.get("weights") if isinstance(value, dict) else None
+    if not raw:
+        return None
+    try:
+        out = {str(s).upper(): float(w) for s, w in raw.items() if float(w) > 0}
+    except (TypeError, ValueError, AttributeError):
+        problems.append('sizing weights must look like {"SPY": 60, "AGG": 40}')
+        return None
+    if not out:
+        problems.append("sizing weights need at least one fund above zero")
+        return None
+    total = sum(out.values())
+    return {s: w / total for s, w in out.items()}
+
+
+def _filters(raw, problems: list[str]) -> list[tuple[str, int, float | None, float | None]]:
+    out = []
+    for i, f in enumerate(raw or []):
+        metric = f.get("metric_id") if isinstance(f, dict) else None
+        if metric not in FEATURES:
+            problems.append(f"filter {i + 1}: {metric!r} is not in the feature library ({', '.join(FEATURES)})")
+            continue
+        try:
+            days = window_days(f.get("window"))
+            lo, hi = (float(f[k]) if f.get(k) is not None else None for k in ("min", "max"))
+        except (TypeError, ValueError) as e:
+            problems.append(f"filter {i + 1}: {e}")
+            continue
+        if lo is None and hi is None:
+            problems.append(f"filter {i + 1}: give a min, a max or both")
+            continue
+        out.append((metric, days, lo, hi))
+    return out
+
+
+def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[str], weights: dict[str, float] | None = None) -> dict:
     kind = str(u.get("type") or u.get("kind") or "").lower()
     if kind in ("fund_list", "funds", "etf_list", "fund_set"):
-        symbols = [str(s).upper() for s in u.get("symbols") or []]
+        symbols = [str(s).upper() for s in u.get("symbols") or []] or list(weights or {})
         name = u.get("set")
         if not symbols and not name:
             text = str(u.get("rule") or "").lower()
             name = next((n for w, n in SET_WORDS if w in text), None)
+        if name == PLAN_SET:
+            symbols = sorted(data.plan_mix) if data is not None else []
+            if data is not None and not symbols:
+                problems.append("there is no plan mix in the lab data yet")
+                return {}
+            return {"kind": "fund_list", "symbols": symbols, "set": name}
         if name and not symbols:
             if name not in SETS:
                 problems.append(f"universe set {name!r} is not one of {', '.join(SETS)}")
@@ -151,7 +199,8 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
             problems.append(f"a fund_list universe needs symbols or a set ({', '.join(SETS)})")
             return {}
         if data is not None:
-            stocks = [s for s in symbols if data.kinds.get(s, "unknown") not in FUND_KINDS and s not in BENCHMARKS and s not in data.plan_mix]
+            known = [s for s in symbols if weights is None or s in data.series]
+            stocks = [s for s in known if data.kinds.get(s, "unknown") not in FUND_KINDS and s not in BENCHMARKS and s not in data.plan_mix]
             if stocks:
                 problems.append(f"{', '.join(stocks)} are not funds; single stocks enter only through a screen, never a hand-picked list")
         return {"kind": "fund_list", "symbols": symbols, "set": name}
@@ -163,8 +212,12 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
         if data is not None and not data.french(name):
             problems.append(f"French {name} data is not in the lab yet; the engine's monthly french job fetches it")
             return {}
+        members = [str(m).lower() for m in u.get("members") or []]
+        if members and data is not None and not french_members(data.french(name), members):
+            problems.append(f"French {name} has no portfolio starting with {', '.join(members)}")
+            return {}
         caveats.append("French portfolios are value-weighted research portfolios, not funds you can buy; a pass here is research and never goes to paper.")
-        return {"kind": FRENCH_KIND, "set": name}
+        return {"kind": FRENCH_KIND, "set": name} | ({"members": members} if members else {})
     if kind == "screen":
         caveats.append("Screens run over today's backfill list, which skips companies that vanished before the backfill: survivorship bias.")
         return {"kind": "screen", "min_history_days": int(u.get("min_history_days") or 252), "min_price": float(u.get("min_price") or 5.0)}
@@ -178,6 +231,12 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
         return {"kind": SMALL_CAPS, "min_price": float(u.get("min_price") or 2.0)}
     problems.append('universe type must be "fund_list", "french", "screen" or "small_caps"')
     return {}
+
+
+def french_members(symbols: list[str], members: list[str]) -> list[str]:
+    if not members:
+        return symbols
+    return [s for s in symbols if any(s.rsplit(".", 1)[-1].lower().startswith(m) for m in members)]
 
 
 def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
@@ -204,13 +263,35 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
             except ValueError as e:
                 problems.append(f"signal {i + 1}: {e}")
         signals.append((metric, window, transform))
-    if not signals:
-        problems.append("at least one signal is required")
+    weights = _weights(raw.get("sizing"), problems)
+    filters = _filters(raw.get("filters"), problems)
     constraints = raw.get("constraints") or {}
     if constraints.get("margin") or constraints.get("long_only") is False:
         problems.append("the lab runs long only and never on margin")
-    universe = _universe(raw.get("universe") or {}, data, problems, caveats)
-    entry = _entry(raw.get("entry"), params, problems)
+    universe = _universe(raw.get("universe") or {}, data, problems, caveats, weights)
+    if universe.get("set") == PLAN_SET:
+        weights = dict(data.plan_mix) if data is not None and data.plan_mix else {s: 1.0 for s in universe["symbols"]} or None
+        if weights:
+            total = sum(weights.values())
+            weights = {s: w / total for s, w in weights.items()}
+    if weights is not None:
+        if universe.get("kind") != "fund_list":
+            problems.append("fixed weights need a fund_list universe")
+        elif data is not None:
+            missing = sorted(s for s in weights if s not in data.series)
+            have = sum(w for s, w in weights.items() if s in data.series)
+            if have < MIN_WEIGHT_PRESENT:
+                problems.append(f"{', '.join(missing)} have no price history in the lab yet, which is most of this mix")
+            elif missing:
+                caveats.append(f"{', '.join(missing)} have no price history in the lab yet; the rest of the mix was scaled up to cover them.")
+                weights = {s: w / have for s, w in weights.items() if s in data.series}
+    fixed = weights is not None or bool(universe.get("members")) or universe.get("set") == PLAN_SET
+    if not signals and not fixed:
+        problems.append("at least one signal is required, unless the spec holds a fixed mix (sizing weights) or named French portfolios (members)")
+    entry_raw = raw.get("entry")
+    if entry_raw is None and fixed:
+        entry_raw = {"top_n": len(weights or universe.get("members") or [1])}
+    entry = _entry(entry_raw, params, problems)
     exit_ = _exit(raw.get("exit"), params, problems)
     rebalance = _rebalance(raw.get("rebalance") or "monthly", problems)
     horizons = [int(h) for h in raw.get("horizons") or [] if int(h) in (3, 5, 10)]
@@ -241,6 +322,8 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
         taxable=not any(k in account for k in SHELTERED),
         model=model or str(raw.get("model") or ""),
         caveats=caveats,
+        filters=filters,
+        weights=weights,
     )
 
 
