@@ -338,6 +338,7 @@ def run_experiment(cfg: Config | None, conn, data: LabData, request: dict, *, no
         "horizons": horizons,
         "deflated_sharpe": round(dsr, 4) if dsr is not None else None,
         "pbo": round(pbo, 4) if pbo is not None else None,
+        "noise": gate.measure(oos_vals, oos_bench, max(trials, len(params))) if len(oos_vals) > 2 else None,
         "deploy_params": deploy,
         "factor_check": factor,
         "analyses": _analyses(cfg, data, spec, request.get("analyses") or [], full, favorite, win, factor, cache),
@@ -626,7 +627,7 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
         if not waiting and not simcache.staged(cfg):
             return {"ok": True, "done": []}
         cache = simcache.open_cache(cfg, simcache.snapshot_hash(data_path(cfg)), now=now)
-        offers = simcache.open_offers(cfg, cache.snapshot, now)
+        offers = simcache.open_offers(cfg, cache.snapshot, now, cache.last_answer())
         seen = simcache.worker_seen(cfg, now)
 
         def owed(path: Path) -> bool:
@@ -640,6 +641,8 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
         for s in staged:
             if s.get("job"):
                 cache.answer(s.pop("job"))
+        if staged:
+            offers = simcache.open_offers(cfg, cache.snapshot, now, cache.last_answer())
         for path in waiting:
             if owed(path):
                 held = [p.name for p in waiting[waiting.index(path) :]]

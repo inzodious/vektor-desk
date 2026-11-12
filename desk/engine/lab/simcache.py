@@ -165,6 +165,11 @@ class Cache:
         with self.conn:
             self.conn.execute("INSERT OR IGNORE INTO sim_answers VALUES (?, ?, ?)", (job, self.snapshot, self.stamp))
 
+    def last_answer(self) -> str | None:
+        if self.conn is None:
+            return self.stamp if self.answers else None
+        return self.conn.execute("SELECT max(at) FROM sim_answers WHERE snapshot=?", (self.snapshot,)).fetchone()[0]
+
     def answered(self, job: str) -> bool:
         if self.conn is None:
             return job in self.answers
@@ -298,12 +303,17 @@ def _within(text: object, now: datetime, minutes: float) -> bool:
         return False
 
 
-def open_offers(cfg: Config, snapshot: str, now: datetime) -> dict[str, str]:
+def open_offers(cfg: Config, snapshot: str, now: datetime, progress: str | None = None) -> dict[str, str]:
     body = read_offers(cfg)
     if body.get("snapshot") != snapshot:
         return {}
     wait = wait_minutes()
-    return {str(name): str(e["key"]) for name, e in body["files"].items() if isinstance(e, dict) and e.get("key") and _within(e.get("at"), now, wait)}
+    moving = _within(progress, now, wait)
+    return {
+        str(name): str(e["key"])
+        for name, e in body["files"].items()
+        if isinstance(e, dict) and e.get("key") and (_within(e.get("at"), now, wait) or (moving and str(e.get("at")) <= str(progress)))
+    }
 
 
 def worker_seen(cfg: Config, now: datetime) -> bool:
