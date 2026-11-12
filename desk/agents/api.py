@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from desk.agents import console, portfolio, store, switches
+from desk.agents import console, debrief, portfolio, store, switches
 from desk.agents.desks import DESKS
 from desk.agents.runner import UNGUARDED
 from desk.agents.sources import NotReady, RealDecisions
@@ -62,6 +62,13 @@ def put_guard(body: Switch, cfg: CfgDep) -> dict:
 @router.get("/brief")
 def get_brief(cfg: CfgDep) -> JSONResponse:
     return JSONResponse(store.latest_brief(cfg, "plan_keeper") or {"summary": None}, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/debrief")
+def get_debrief(cfg: CfgDep, kind: str = "day", end: str | None = None) -> JSONResponse:
+    if kind not in debrief.KINDS:
+        raise HTTPException(404, f"unknown kind {kind}")
+    return JSONResponse(debrief.rewrite(cfg, kind, end), headers={"Cache-Control": "no-store"})
 
 
 @router.get("/runs")
