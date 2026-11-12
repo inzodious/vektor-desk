@@ -7,10 +7,10 @@ from desk.config import Config
 from desk.runlock import Busy, job_lock
 
 LOCK = "agents"
-FIRST_RUN = ("plan_keeper", "tax")
+FIRST_RUN = store.GUARD_UNTIL
 UNGUARDED = (*FIRST_RUN, "debrief", "plans")
 CAPPED = ("schedule", "trigger", "retry", "lab")
-GUARD_NOTE = "First-run guard: only the Plan keeper, Tax, Debrief and Plan desks run until you lift it in Settings or with `python -m desk.agents guard off`."
+GUARD_NOTE = "First-run guard: the other desks start once the Plan keeper and the Tax desk have each finished a run. It lifts itself then."
 
 
 @dataclass

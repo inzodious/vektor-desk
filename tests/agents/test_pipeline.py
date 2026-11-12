@@ -83,9 +83,10 @@ def test_decisions_not_built_keeps_answer_in_run_log(cfg):
 
 
 def test_live_desks_have_jobs():
-    commands = {c for _, c in JOBS}
+    commands = {j["command"] if isinstance(j, dict) else j[1] for j in JOBS}
     assert ("30 17 * * *", "python -m desk.agents run plan_keeper") in JOBS
-    assert {f"python -m desk.agents run {d}" for d in ("plan_keeper", "tax", "risk", "research")} <= commands
+    assert {f"python -m desk.agents run {d}" for d in ("plan_keeper", "tax", "risk")} <= commands
+    assert "python -m desk.agents run research" in commands
     assert "python -m desk.agents run skeptic" not in commands
     assert {"python -m desk.agents queue --now-only", "python -m desk.agents queue", "python -m desk.agents triggers"} <= commands
 
