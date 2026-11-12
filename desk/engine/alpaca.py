@@ -3,6 +3,7 @@ import sqlite3
 import time
 from datetime import UTC, datetime, timedelta
 
+from desk.engine import NO_ALPACA, SKIPS
 from desk.engine.market import ET, ProviderError
 from desk.paper_check import KEYS, paper_base
 
@@ -64,7 +65,7 @@ def _day(stamp: str) -> str:
 def fetch_assets(conn: sqlite3.Connection, http, *, now: datetime) -> int:
     hdrs = headers()
     if hdrs is None:
-        raise ProviderError("ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set")
+        raise ProviderError(SKIPS[NO_ALPACA])
     body = _get(http, paper_base() + ASSETS_PATH, {"status": "active", "asset_class": "us_equity"}, hdrs) or []
     rows = [
         (str(a["symbol"]).upper(), str(a.get("name") or ""), str(a.get("exchange") or ""), int(bool(a.get("tradable"))), now.isoformat(timespec="seconds"))
@@ -84,7 +85,7 @@ def fetch_assets(conn: sqlite3.Connection, http, *, now: datetime) -> int:
 def fetch_bars(http, symbols: list[str], start: str, end: str, adjustment: str, *, sleep=time.sleep, skipped: list | None = None) -> dict[str, list[dict]]:
     hdrs = headers()
     if hdrs is None:
-        raise ProviderError("ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set")
+        raise ProviderError(SKIPS[NO_ALPACA])
     out: dict[str, list[dict]] = {}
     for i in range(0, len(symbols), CHUNK):
         _batch(http, symbols[i : i + CHUNK], start, end, adjustment, hdrs, sleep, out, skipped)

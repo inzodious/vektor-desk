@@ -181,7 +181,7 @@ def test_live_form4s_come_from_the_filings_feed(cfg):
 def test_job_skips_without_an_sec_agent(cfg, monkeypatch):
     monkeypatch.delenv("DESK_SEC_USER_AGENT", raising=False)
     conn = desk(cfg)
-    assert "DESK_SEC_USER_AGENT" in insider.run(conn, FakeSec(), now=NOW)["skipped"]
+    assert insider.run(conn, FakeSec(), now=NOW)["skipped_code"] == "no_sec_contact"
     conn.close()
 
 

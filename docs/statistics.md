@@ -1130,6 +1130,20 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Daily 10:30 and 14:30 ET | `public`: the public stock list dry run; fetches only when the stored list is over 6 days old or incomplete |
 | Nightly 00:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
+### When a run skips
+
+A statistics run that cannot do its work returns `ok: true`, a plain sentence in `skipped` and a stable `skipped_code` (`engine.skip(code)`, sentences in `engine.SKIPS`). The sentence is what he reads on the job; the code is for pages and tests, so wording can change without breaking them. A missing key raised as an error uses the same sentence.
+
+| `skipped_code` | He reads | Runs that use it |
+|---|---|---|
+| `no_sec_contact` | The SEC contact is not set. Add it in Settings, Data, Keys. | `universe`, `earnings`, `filings`, `insider`, `public`, SEC research, fund look-through |
+| `no_alpaca_keys` | The Alpaca paper keys are not set. Add them in Settings, Data, Keys. | `universe`, `paper`, insider price history |
+| `no_fred_key` | The FRED key is not set. Add it in Settings, Data, Keys. | Macro series |
+| `no_finnhub_key` | The Finnhub key is not set. Add it in Settings, Data, Keys. | Earnings dates, insider trades, sector profiles |
+| `no_small_companies` | The list of small companies is not built yet. It builds itself on weekday evenings. | `filings` |
+
+A test fails if a skip or a provider error in these files names a setting key. Quotes, the review and the catch-up keep their own skip sentences (the day thread's files).
+
 ## Strategy library
 
 A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/shelf.py`. Each entry has an id, a kind, a family, a title, a one-line description, a benchmark label and either a strategy spec or a deposit rule.

@@ -6,7 +6,7 @@ import time
 from datetime import UTC, date, datetime, timedelta
 from xml.parsers import expat
 
-from desk.engine import JOBS_AT, heal, key_fix, research
+from desk.engine import JOBS_AT, NO_FINNHUB, NO_SEC, heal, key_fix, research, skip
 from desk.engine.market import ProviderError, finnhub_key
 from desk.engine.research import SEC_ARCHIVE, SEC_SUBMISSIONS, _fresh, _get, _log, _stamp, sec_agent, sec_ciks
 
@@ -234,7 +234,7 @@ def held_funds(conn: sqlite3.Connection, kinds: dict[str, str]) -> list[str]:
 def run_nport(conn: sqlite3.Connection, http, funds: list[str], *, now: datetime, sleep=time.sleep) -> dict:
     agent = sec_agent()
     if not agent:
-        return {"ok": True, "skipped": "DESK_SEC_USER_AGENT is not set"}
+        return skip(NO_SEC)
     series = fund_series(conn, http, agent, now, sleep)
     titles = title_map(conn)
     done, missing, errors = [], [], []
@@ -310,7 +310,7 @@ def _scan(conn, http, agent, cik: int, want: str, now: datetime, sleep):
 def run_profiles(conn: sqlite3.Connection, http, symbols: list[str], *, now: datetime, sleep=time.sleep) -> dict:
     key = finnhub_key()
     if not key:
-        return {"ok": True, "skipped": "FINNHUB_API_KEY is not set"}
+        return skip(NO_FINNHUB)
     cap = int(os.environ.get("DESK_SECTOR_PROFILES", "150") or 150)
     cut = _stamp(now - timedelta(days=PROFILE_DAYS))
     fresh = {r[0] for r in conn.execute("SELECT symbol FROM sym_profiles WHERE fetched_at >= ?", (cut,))}

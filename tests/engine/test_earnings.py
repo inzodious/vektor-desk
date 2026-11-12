@@ -124,7 +124,7 @@ def test_job_skips_without_an_sec_agent_and_is_scheduled(cfg, monkeypatch):
 
     monkeypatch.delenv("DESK_SEC_USER_AGENT", raising=False)
     conn = desk(cfg)
-    assert "DESK_SEC_USER_AGENT" in earnings.run(conn, FakeSec(), now=NOW)["skipped"]
+    assert earnings.run(conn, FakeSec(), now=NOW)["skipped_code"] == "no_sec_contact"
     conn.close()
     assert "earnings" in engine_main.JOBS and ("50 23 * * *", "python -m desk.engine earnings") in JOBS
 

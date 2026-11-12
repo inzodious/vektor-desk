@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine import JOBS_AT, schema
+from desk.engine import JOBS_AT, NO_SEC, NO_SMALL_COMPANIES, schema, skip
 from desk.engine.market import ProviderError
 from desk.engine.research import SEC_ARCHIVE, SEC_GAP, SEC_SUBMISSIONS, sec_agent
 from desk.engine.universe import members
@@ -160,10 +160,10 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None, sleep=ti
     now = now or datetime.now(UTC)
     agent = sec_agent()
     if not agent:
-        return {"ok": True, "skipped": "DESK_SEC_USER_AGENT is not set"}
+        return skip(NO_SEC)
     names = {m["cik"]: m for m in members(conn)}
     if not names:
-        return {"ok": True, "skipped": "No universe yet; the universe job builds it"}
+        return skip(NO_SMALL_COMPANIES)
     stamp = now.isoformat(timespec="seconds")
     found: dict[int, dict[str, str]] = {}
     days_done, errors = [], []
