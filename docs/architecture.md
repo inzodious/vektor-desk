@@ -294,6 +294,20 @@ The NAS has 16 GB, no swap and most of it held outside the desk, so the desk wat
 
 State lives in `data/run/`: `low-memory.mode.json` (his choice), `low-memory.state.json` (the scheduler's verdict every 30 seconds; other containers trust it for 10 minutes, then read `/proc/meminfo` themselves), `waiting.json`, `oom.log`.
 
+## Container health
+
+`/api/status` has `containers`, built from what the host already exports every 5 minutes into `data/run/logs` (`containers.txt`, `tailscale.log`, `exported_at`). It needs no newer box script and no tap. Code: `desk/containers.py`.
+
+| Field | Meaning |
+|---|---|
+| `state` | `ok`, `trouble` (a core service is down, or the Tailscale log shows why the address isn't answering), `unknown` (no report yet, or older than 15 minutes) |
+| `note` | The whole story in one or two sentences |
+| `checked_at`, `fresh` | When the host last reported |
+| `services` | `[{name, title, container, status (Docker's words), state: up\|starting\|unhealthy\|restarting\|stopped\|missing, up_seconds, exit_code, restarted_alone, words}]` for api, cron, caddy, ntfy, tailscale, and lab and eval when they exist. `restarted_alone` is true when a service came up more than 10 minutes after the last deploy |
+| `tailnet` | `{state: ok\|trouble\|unknown, kind: key\|signed_out\|expired\|device\|unreachable, words, address, line}`. Read from the last 200 log lines: trouble counts only if no good start came after it, and a network blip only when it repeats. `address` is the node's tailnet address, to compare with the DNS record for `desk.escape-vektor.com` |
+
+A container that is up says nothing about the path to it. If `tailnet.state` is `ok` and the address still doesn't answer, check that the device is on the tailnet and that the DNS record matches `address`.
+
 ## Workers
 
 A second machine on the home network (Horizon) can take heavy jobs off the NAS. It runs the same image as `python -m desk.worker` with two settings, the desk's LAN address and a worker key, and it only ever calls the desk: the NAS opens no connection to it and needs no SSH. It holds no broker, Claude or Firestore key, and only the NAS writes the desk's databases.

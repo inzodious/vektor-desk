@@ -231,6 +231,20 @@ def test_while_the_night_runs_heavy_jobs_take_turns_and_a_fallback_schedule_line
     reap(everything, cfg)
 
 
+def test_a_fallback_line_runs_when_the_night_has_stalled_or_the_step_did_not_work(cfg, tmp_path, monkeypatch):
+    went_live(cfg, datetime(2026, 11, 11, 14, 0, tzinfo=ET), monkeypatch=monkeypatch)
+    jobs = jobs_for(tmp_path, {"opportunities-night": "exit 1"})
+    overnight.advance(cfg, jobs, lambda job, rid: None, lambda n: True, NIGHT)
+    assert overnight.covers(cfg, "opportunities-night", NIGHT + timedelta(minutes=2))
+    assert not overnight.covers(cfg, "opportunities-night", NIGHT + timedelta(minutes=4))
+    assert not overnight.covers(cfg, "mirror", NIGHT) and not overnight.covers(cfg, "engine-backfill", NIGHT)
+    overnight.chain_file(cfg).unlink()
+    drive(cfg, jobs, NIGHT)
+    later = NIGHT + timedelta(hours=2)
+    assert overnight.covers(cfg, "agents-portfolio", later) and not overnight.covers(cfg, "opportunities-night", later)
+    assert not overnight.covers(cfg, "agents-portfolio", datetime(2026, 11, 12, 7, 0, tzinfo=ET))
+
+
 def test_a_job_joins_the_night_with_one_key_and_shows_under_overnight(monkeypatch):
     class Seam:
         JOBS = [
