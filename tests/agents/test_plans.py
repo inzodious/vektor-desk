@@ -117,6 +117,11 @@ class Served(FakeAdapter):
         return out
 
 
+@pytest.fixture(autouse=True)
+def pinned_clock(monkeypatch):
+    monkeypatch.setattr(plans, "_today", lambda cfg, today=None: today or WED)
+
+
 @pytest.fixture
 def sent(monkeypatch):
     calls = []

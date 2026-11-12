@@ -18,8 +18,9 @@ def m(metric_id, scope_id, window, value, unit="usd"):
     }
 
 
+STAMP = datetime.now(UTC).isoformat(timespec="seconds")
 SLICE = {
-    "as_of": datetime.now(UTC).isoformat(timespec="seconds"),
+    "as_of": STAMP,
     "data_health": [{"check": "reconcile", "status": "ok"}],
     "sections": {
         "drift": [m("plan.drift", "FUNDA", "now", -4.2, "pts"), m("plan.drift", "FUNDB", "now", 3.1, "pts")],
@@ -58,6 +59,8 @@ class FakeEngine:
     def desk_slice(self, cfg, desk):
         if self.slice_ is None:
             raise NotReady("no engine run yet")
+        if self.slice_.get("as_of") == STAMP:
+            return self.slice_ | {"as_of": datetime.now(UTC).isoformat(timespec="seconds")}
         return self.slice_
 
 
