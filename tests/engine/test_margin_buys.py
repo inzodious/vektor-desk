@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from desk.db import connect
 from desk.engine import __main__ as engine_main
 from desk.engine.__main__ import run_holdings
@@ -92,7 +94,7 @@ def test_the_engine_books_a_margin_buy_as_debt(cfg, mirror):
     cash = {r["date"]: (r["value"], r["reported_value"], r["quality"]) for r in conn.execute("SELECT * FROM holdings_daily WHERE symbol='SPAXX' ORDER BY date")}
     conn.close()
     assert cash[WED] == (-110.0, 250.0, "modelled") and cash[THU][0] == -110.0 and cash[FRI] == (-110.0, 0.0, "modelled")
-    out = computed(cfg)
+    out = computed(replace(cfg, stale_hours=48))
     debit = next(m for m in out.metrics if m[0] == "margin.debit")
     assert (debit[5], debit[8]) == (110.0, "modelled") and out.implied == {}
     value = {m[4]: m[5] for m in out.metrics if m[0] == "value.market" and m[1] == "portfolio"}

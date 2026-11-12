@@ -11,6 +11,8 @@ from statistics import median
 from xml.etree import ElementTree
 from xml.parsers import expat
 
+import requests
+
 from desk.engine import alpaca
 from desk.engine.filings import _text
 from desk.engine.market import ProviderError, trading_day
@@ -25,6 +27,7 @@ FORM4_PER_RUN = 200
 HISTORY_START = "2016-01-01"
 HISTORY_PER_RUN = 300
 HISTORY_BATCH = 25
+STEP_ERRORS = (ProviderError, NotPaper, requests.RequestException, zipfile.BadZipFile, json.JSONDecodeError)
 SUBMISSION_FIELDS = ("ISSUERTRADINGSYMBOL", "FILING_DATE", "ISSUERCIK")
 SHARES_LAG_DAYS = 45
 CLUSTER_DAYS = 30
@@ -423,18 +426,27 @@ def run(conn: sqlite3.Connection, http, *, now: datetime, sleep=time.sleep) -> d
     if not agent:
         return {"ok": True, "skipped": "DESK_SEC_USER_AGENT is not set"}
     out: dict = {"ok": True}
-    try:
-        out["cleaned"] = clean_stored(conn)
-        out["bulk"] = fetch_bulk(conn, http, agent, now=now, sleep=sleep)
-        out["live"] = fetch_form4(conn, http, agent, sleep=sleep)
-        out["frames"] = fetch_frames(conn, http, agent, now=now, sleep=sleep)
-        if alpaca.headers() is not None:
-            names = history_names(conn)
-            out["history"] = fetch_history(conn, http, names, now=now, sleep=sleep)
-        else:
-            out["history"] = {"skipped": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"}
-    except (ProviderError, NotPaper) as e:
-        out = {"ok": False, "error": str(e), **{k: v for k, v in out.items() if k != "ok"}}
+    history = (
+        (lambda: fetch_history(conn, http, history_names(conn), now=now, sleep=sleep))
+        if alpaca.headers() is not None
+        else (lambda: {"skipped": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"})
+    )
+    steps = (
+        ("cleaned", lambda: clean_stored(conn)),
+        ("bulk", lambda: fetch_bulk(conn, http, agent, now=now, sleep=sleep)),
+        ("live", lambda: fetch_form4(conn, http, agent, sleep=sleep)),
+        ("frames", lambda: fetch_frames(conn, http, agent, now=now, sleep=sleep)),
+        ("history", history),
+    )
+    errors = []
+    for name, step in steps:
+        try:
+            out[name] = step()
+        except STEP_ERRORS as e:
+            out[name] = {"error": f"{e.__class__.__name__}: {e}"[:200]}
+            errors.append(f"{name}: {e}"[:200])
+    if errors:
+        out |= {"ok": False, "error": "; ".join(errors)}
     out["months"] = months(conn)
     out["buys"] = conn.execute("SELECT count(*) FROM insider_buys").fetchone()[0]
     return out

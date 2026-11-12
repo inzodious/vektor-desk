@@ -212,7 +212,11 @@ def lamp_funding(ctx, t, before, after):
     added = a - b
     if t["side"] == "buy" and (t["funding"] == "margin" or added > 0.005):
         cost = added * ctx.margin_rate / 100 * 30 / 360 if ctx.margin_rate is not None else None
-        money = f", about ${cost:,.0f} a month in interest." if cost is not None else ". Set DESK_MARGIN_RATE_PCT to see the interest in dollars."
+        money = (
+            f", about ${cost:,.0f} a month in interest."
+            if cost is not None
+            else ". The margin rate could not be read from your profile, so the interest is not shown in dollars."
+        )
         covered = t["amount_usd"] - added
         lead = f"Cash covers ${covered:,.0f}; the other ${added:,.0f} goes on margin" if covered > 0.5 else f"All ${added:,.0f} goes on margin"
         drop = after["call_drop"].get(t["account"])
