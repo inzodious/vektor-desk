@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { MONDAY_MIDDAY, overflow, watchErrors } from './helpers.js';
 
@@ -87,30 +86,6 @@ test('a debrief the desk is about to rewrite shows no warning', async ({ page })
   await expect(card).not.toContainText('Heads up');
   await expect(card).not.toContainText('Written before the final numbers');
   expect(errors).toEqual([]);
-});
-
-test('a review that does not carry the rewrite yet asks the debrief desk, once', async ({ page }) => {
-  const day = JSON.parse(readFileSync(new URL('../src/fixtures/engine.reviews.day.json', import.meta.url), 'utf8'));
-  delete day.debrief.rewrite;
-  day.debrief.stale = true;
-  let asked = 0;
-  let answer = { kind: 'day', end: day.end, stale: true, rewrite: { state: 'due', due_at: '2026-11-09T22:46:00+00:00', words: null } };
-  await page.route('**/api/engine/reviews?kind=day*', (route) => route.fulfill({ json: day }));
-  await page.route('**/api/agents/debrief?*', (route) => {
-    asked += 1;
-    return route.fulfill({ json: answer });
-  });
-  await page.goto('/results/day');
-  const card = page.getByTestId('rs-debrief');
-  await expect(card).toHaveAttribute('data-state', 'rewriting');
-  await expect(card.locator('.rs-stale')).toHaveCount(0);
-  expect(asked).toBe(1);
-  answer = { ...answer, rewrite: { state: 'late', due_at: null, words: 'Written before the final numbers. The Debrief desk is switched off, so it stays as written.' } };
-  await page.reload();
-  await expect(card.locator('.rs-stale')).toHaveText('Heads up Written before the final numbers. The Debrief desk is switched off, so it stays as written.');
-  await page.goto('/results/week');
-  await expect(page.getByTestId('rs-debrief')).toHaveAttribute('data-state', 'ok');
-  expect(asked).toBe(2);
 });
 
 test('before the first run the page is armed, not empty', async ({ page }) => {

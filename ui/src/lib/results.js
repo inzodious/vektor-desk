@@ -189,19 +189,12 @@ export function eventWord(e) {
 // ---------- debrief ----------
 const REWRITE_LATE = ['late', 'failed'];
 
-export function rewritePath(review) {
-  const d = review?.debrief;
-  if (!d || !d.stale || d.rewrite !== undefined || !review.kind) return null;
-  return `/api/agents/debrief?kind=${review.kind}${review.end ? `&end=${review.end}` : ''}`;
-}
-
-export function debriefState(review, side = null) {
+export function debriefState(review) {
   if (!review?.pack) return { state: 'none', hint: null };
   const d = review.debrief;
   if (!d) return { state: 'waiting', hint: review.closed ? 'The debrief desk writes this up after its next run.' : `The debrief lands when the ${KIND_WORD[review.kind] || 'period'} closes.` };
   if (!d.stale) return { state: 'ok', hint: null };
-  const given = d.rewrite !== undefined ? d.rewrite : side?.rewrite;
-  const r = given && typeof given === 'object' ? given : null;
+  const r = d.rewrite && typeof d.rewrite === 'object' ? d.rewrite : null;
   if (!r || !REWRITE_LATE.includes(r.state)) return { state: 'rewriting', hint: null };
   return { state: 'stale', hint: plainLine(r.words) || 'Written before the final numbers.' };
 }
