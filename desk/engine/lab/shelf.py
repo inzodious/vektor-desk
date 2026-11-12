@@ -7,7 +7,8 @@ from statistics import NormalDist
 from desk.config import Config
 from desk.db import connect
 from desk.engine import catalog, gate
-from desk.engine.lab.data import ledger_path
+from desk.engine.lab.data import lab_build, ledger_path
+from desk.engine.lab.rulebook import STAND_IN
 from desk.engine.lab.runner import PBO_BAR
 from desk.engine.lab.simcache import queue_dir
 
@@ -20,6 +21,15 @@ NOTE = (
 )
 N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
+PLAIN = (
+    (("no plan mix",), "No plan of your own is loaded on the desk yet, so there is no plan mix to test. The Safe mix row is the built-in stand-in."),
+    (("small-cap history",), "Small-company price history is still loading. This runs once that finishes."),
+    (("is not in the lab yet",), "Its data file has not reached the lab yet. This runs the night after the file arrives."),
+    (("no price history", "too little price history"), "Most of its funds have no price history in the lab yet."),
+    (("no common history", "too late for anything"), "Its funds do not share enough price history yet."),
+    (("not funds", "not a fund"), "The lab did not recognise one of its funds, so it was held back."),
+)
+PLAIN_DEFAULT = "The lab could not run this one. It is tried again on a later night."
 ORDER = {"held_up": 0, "within_noise": 1, "fell_short": 2, "inconclusive": 3, None: 4}
 
 SECTORS = {"type": "fund_list", "set": "sector_etfs"}
@@ -366,6 +376,7 @@ LIBRARY: tuple[dict, ...] = (
         "The same 5 and 10 point bands, on your plan's own funds and weights.",
         "rebalance_band",
         {"band_pts": [5, 10]},
+        mix_without_plan=SAFE_MIX,
     ),
     _rule(
         "lib-harvest",
@@ -502,7 +513,8 @@ def _latest(cfg: Config, bodies: bool = True) -> tuple[dict[str, dict], set[str]
         return {}, set(), 0
     conn = connect(path, readonly=True)
     try:
-        rows = conn.execute(f"SELECT strategy_id, kind, result_at, {'body' if bodies else 'NULL AS body'} FROM lab_results ORDER BY result_at").fetchall()
+        body = "body" if bodies else "CASE WHEN kind='rejected' THEN body END AS body"
+        rows = conn.execute(f"SELECT strategy_id, kind, result_at, {body} FROM lab_results ORDER BY result_at").fetchall()
         done = {r[0] for r in conn.execute("SELECT file FROM queue_done")}
         trials = conn.execute(
             "SELECT count(*) FROM (SELECT DISTINCT strategy_id, version, params FROM strategy_trials WHERE kind='full' AND strategy_id IN "
@@ -527,6 +539,16 @@ def _queued(cfg: Config, done: set[str]) -> set[str]:
     return out
 
 
+def _retry(seen: dict, now: datetime) -> bool:
+    if seen["kind"] != "rejected":
+        return False
+    try:
+        build = json.loads(seen["body"] or "{}").get("lab_build")
+    except ValueError:
+        build = None
+    return build != lab_build() or now - datetime.fromisoformat(seen["result_at"]) >= RETRY_AFTER
+
+
 def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     try:
@@ -538,7 +560,7 @@ def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
         ordered = sorted(LIBRARY, key=lambda e: e["type"] == "rule")
         for i, entry in enumerate(ordered):
             seen = latest.get(entry["id"])
-            if entry["id"] in waiting or (seen and (seen["kind"] != "rejected" or now - datetime.fromisoformat(seen["result_at"]) < RETRY_AFTER)):
+            if entry["id"] in waiting or (seen and not _retry(seen, now)):
                 continue
             final = folder / f"{stamp}-{i:02d}-{entry['id']}-v1-{entry['type']}.json"
             tmp = folder / f".{final.name}.tmp"
@@ -551,6 +573,11 @@ def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
 
 
 # ---- Results ----
+
+
+def plain(problems: list) -> str:
+    text = " ".join(str(p) for p in problems).lower()
+    return next((line for words, line in PLAIN if any(w in text for w in words)), PLAIN_DEFAULT)
 
 
 def _years(a: str | None, b: str | None) -> float | None:
@@ -611,6 +638,8 @@ def _rule_row(entry: dict, body: dict) -> dict:
         f"{lead}: a typical {h['p50_pts']:+.1f} points of the money put in over {h['years']} years against {entry['benchmark'].lower()}, "
         f"and worse in {worse}% of {h['starts']} start months."
     )
+    if any(str(c).startswith(STAND_IN) for c in body.get("caveats") or []):
+        line = f"Run on the built-in safe mix, as no plan of your own is loaded. {line}"
     return {
         "verdict": verdict,
         "line": line,
@@ -638,7 +667,7 @@ def view(cfg: Config) -> dict:
             body = json.loads(seen["body"])
             row["tested_at"] = seen["result_at"]
             if seen["kind"] == "rejected":
-                row |= {"status": "not_run", "reason": "; ".join(str(p) for p in body.get("problems") or [])[:300] or "The lab could not run it."}
+                row |= {"status": "not_run", "reason": plain(body.get("problems") or [])}
             else:
                 row |= {"status": "tested", "reason": None, "caveats": body.get("caveats") or []}
                 row |= _rule_row(entry, body) if seen["kind"] == "rule" else _experiment(entry, body, trials)

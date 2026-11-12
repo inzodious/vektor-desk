@@ -1,3 +1,4 @@
+import hashlib
 import json
 import os
 import sqlite3
@@ -6,6 +7,7 @@ from bisect import bisect_right
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from functools import cache
 from pathlib import Path
 
 from desk.config import Config
@@ -15,6 +17,7 @@ from desk.engine.market import BENCHMARKS
 SMALLCAP_BENCHMARK = "IWM"
 
 FUND_KINDS = ("fund", "etf")
+LISTED_FUNDS = ("IVV", "VOO", "FTEC", "SMH", "SCHD", "GRID", "ICLN", "NLR", "UFO", "DIA", "MDY")
 EXPORT_SCHEMA = """
 CREATE TABLE bars (
   symbol TEXT NOT NULL, date TEXT NOT NULL, open REAL, close REAL NOT NULL, adj_close REAL, volume REAL, PRIMARY KEY (symbol, date)
@@ -54,6 +57,15 @@ def data_path(cfg: Config) -> Path:
 
 def ledger_path(cfg: Config) -> Path:
     return lab_dir(cfg) / "runs" / "ledger.db"
+
+
+@cache
+def lab_build() -> str:
+    h = hashlib.sha256()
+    for path in sorted(Path(__file__).parent.glob("*.py")):
+        h.update(path.name.encode())
+        h.update(path.read_bytes())
+    return h.hexdigest()[:16]
 
 
 # ---- Export (engine side) ----
@@ -312,6 +324,9 @@ def load(path: Path) -> LabData:
         kinds, roles, last = {}, {}, {}
         for r in conn.execute("SELECT symbol, kind, role, last FROM symbols"):
             kinds[r[0]], roles[r[0]], last[r[0]] = r[1], r[2], r[3]
+        for sym in LISTED_FUNDS:
+            if sym in kinds and kinds[sym] not in FUND_KINDS:
+                kinds[sym] = "etf"
         macro: dict[str, tuple[list[str], list[float]]] = {}
         for r in conn.execute("SELECT series, date, value FROM macro ORDER BY series, date"):
             d, v = macro.setdefault(r[0], ([], []))
