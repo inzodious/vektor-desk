@@ -10,7 +10,10 @@ from desk.decisions.plan import upcoming_deposits
 from desk.decisions.profile import active_profile
 from desk.decisions.rules import active_rules
 from desk.engine import ENGINE_VERSION, SET_KEY, bands, broker, catalog, fi, lookthrough, patterns, replay, risk, scoring
+from desk.engine.asof import day_words, provisional_symbols
 from desk.engine.backfill import NO_PRICES
+from desk.engine.cash import margin_rate
+from desk.engine.cash import picture as cash_picture
 from desk.engine.flows import classify, income
 from desk.engine.flows import store as store_flows
 from desk.engine.holdings import BACKCAST, Prices, matching_close, price_series
@@ -22,7 +25,7 @@ from desk.engine.shadows import TotalReturn, deposit_split, shadow
 from desk.engine.source import current_rows
 from desk.engine.tax import held_long, realized, wash_windows
 
-UNITS = {"usd": 2, "pct": 4, "pts": 2, "ratio": 4, "days": 0, "count": 0}
+UNITS = {"usd": 2, "pct": 4, "pts": 2, "ratio": 4, "days": 0, "count": 0, "flag": 0}
 SP500 = risk.SP500
 SHELTERED = ("hsa", "roth", "ira", "401k", "401(k)", "403b", "457")
 ADHERENCE_WINDOWS = ("MTD", "QTD", "YTD", "1Y", "ITD")
@@ -327,7 +330,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
     total = totals[as_of]
     amount, when = next_deposit(cfg, plan, as_of, now)
     _plan_metrics(out, cfg, plan, targets, kinds, now_rows, total, holdings, days, activity, q_now, amount, own)
-    _margin_metrics(out, now_rows, total)
+    _margin_metrics(out, now_rows, total, cfg)
     _margin_paid(out, activity, as_of)
     _risk_metrics(out, now_rows, total, index, days, values, flows_on, q_now)
     risk.metrics(out, desk, tr, days=days, values=values, flows_on=flows_on, rows=now_rows, total=total, kinds=kinds, targets=targets, q=q_now)
@@ -422,10 +425,12 @@ def _value_metrics(out: Out, days, values, flows_on, holdings, q, income_rows):
         out.m("value.market", v, "usd", scope="holding", scope_id=sym, quality=q)
         out.m("value.weight", v / values[-1] * 100 if values[-1] else None, "pct", scope="holding", scope_id=sym, quality=q)
     out.m("value.day_change", values[-1] - values[-2] - flows_on[-1] if len(values) > 1 else None, "usd", quality=q)
-    cash = sum(h["value"] for h in holdings[as_of] if h["is_cash"] and h["value"] > 0)
-    debit = -sum(h["value"] for h in holdings[as_of] if h["is_cash"] and h["value"] < 0)
-    out.m("cash.share", cash / values[-1] * 100 if values[-1] else None, "pct", quality=q)
-    out.m("cash.ready", cash - debit, "usd", quality=q)
+    pic = cash_picture(holdings[as_of])
+    cash_q = "modelled" if pic["modelled"] else q
+    out.m("cash.share", pic["ready"] / values[-1] * 100 if values[-1] else None, "pct", quality=q)
+    out.m("cash.ready", pic["ready"], "usd", quality=cash_q)
+    for acct in pic["accounts"]:
+        out.m("cash.ready", pic["ready_by_account"].get(acct, 0.0), "usd", scope="account", scope_id=acct, quality=cash_q)
     for w in WINDOWS:
         i0 = base_index(days, w)
         if i0 is None:
@@ -529,63 +534,93 @@ def _plan_metrics(out: Out, cfg, plan, targets, kinds, rows, total, holdings, da
         )
     rules, source = rules_in_force(cfg, plan)
     conv = convictions(rules)
-    debit = -sum(h["value"] for h in rows if h["is_cash"] and h["value"] < 0)
+    debit = cash_picture(rows)["debit"]
+    judged = []
     for rule in rules:
-        ok = _rule_ok(rule, weights, singles, targets if own else {}, debit, holdings, days, activity, kinds, conv)
-        if ok is not None:
-            out.m("plan.rules", 1 if ok else 0, "count", scope="rule", scope_id=rule["id"], quality=q if source == "profile" else "modelled")
+        breaks = _rule_breaks(rule, weights, singles, targets if own else {}, debit, holdings, days, activity, kinds, conv)
+        if breaks is None:
+            continue
+        rule_q = q if source == "profile" else "modelled"
+        out.m("plan.rules", 0 if breaks else 1, "flag", scope="rule", scope_id=rule["id"], quality=rule_q)
+        out.m("plan.rule_breaks", len(breaks), "count", scope="rule", scope_id=rule["id"], quality=rule_q)
+        judged.append({"id": rule["id"], "kind": rule.get("kind"), "holds": not breaks, "count": len(breaks), "breaks": breaks[:RULE_BREAKS_SHOWN]})
+    out.views["rules"] = {"as_of": out.as_of, "source": source, "rules": judged}
+
+
+RULE_BREAKS_SHOWN = 5
 
 
 def _rule_ok(rule, weights, singles, targets, debit, holdings, days, activity, kinds, conv=None) -> bool | None:
+    breaks = _rule_breaks(rule, weights, singles, targets, debit, holdings, days, activity, kinds, conv)
+    return None if breaks is None else not breaks
+
+
+def _rule_breaks(rule, weights, singles, targets, debit, holdings, days, activity, kinds, conv=None) -> list[str] | None:
     kind, p = rule.get("kind"), rule.get("params") or {}
     conv = conv or {}
     if kind == "conviction_hold":
         sym = str((rule.get("symbols") or [""])[0]).upper()
         if not sym or not rule.get("enabled", True):
             return None
-        return p.get("band_min_pct", 0) <= weights.get(sym, 0.0) <= p.get("band_max_pct", 100)
+        lo, hi, w = p.get("band_min_pct", 0), p.get("band_max_pct", 100), weights.get(sym, 0.0)
+        return [] if lo <= w <= hi else [f"{sym} is {w:.1f}% of the book, outside its {lo:g} to {hi:g}% band."]
     if kind == "single_stock_band":
         names = [s for s in (rule.get("symbols") or list(singles)) if s not in conv]
-        return all(p.get("min_pct", 0) <= singles.get(s, 0.0) <= p.get("max_pct", 100) for s in names) if names else True
+        lo, hi = p.get("min_pct", 0), p.get("max_pct", 100)
+        return [
+            f"{s} is {singles.get(s, 0.0):.1f}% of the book, outside the {lo:g} to {hi:g}% band." for s in sorted(names) if not lo <= singles.get(s, 0.0) <= hi
+        ]
     if kind == "drift_max_pts":
-        return all(abs(weights.get(s, 0.0) - t * 100) <= p.get("pts", 5) for s, t in targets.items()) if targets else None
+        if not targets:
+            return None
+        pts = p.get("pts", 5)
+        gaps = {s: weights.get(s, 0.0) - t * 100 for s, t in sorted(targets.items())}
+        return [f"{s} is {gap:+.1f} points from its target, past the {pts:g} point limit." for s, gap in gaps.items() if abs(gap) > pts]
     if kind == "cash_floor_pct":
         cash = sum(h["value"] for h in holdings[days[-1]] if h["is_cash"])
         total = sum(h["value"] for h in holdings[days[-1]])
-        return cash / total * 100 >= p.get("pct", 0) if total else None
+        if not total:
+            return None
+        share, floor = cash / total * 100, p.get("pct", 0)
+        return [] if share >= floor else [f"Cash is {share:.1f}% of the book, under the {floor:g}% floor."]
     if kind == "no_margin_buys":
         since = (date.fromisoformat(days[-1]) - timedelta(days=30)).isoformat()
+        found = []
         for r in activity:
             d = str(r.get("date") or "")[:10]
             if r.get("kind") == "buy" and not r.get("core") and d > since and d in holdings:
                 cash = sum(h["value"] for h in holdings[d] if h["is_cash"] and h["account"] == r.get("accountKey"))
                 if cash < 0:
-                    return False
-        return True
+                    sym = str(r.get("symbol") or "").upper() or "A buy"
+                    found.append((d, f"{sym} was bought on {d} with borrowed money: the account's cash was negative that day."))
+        return [text for _, text in sorted(found, reverse=True)]
     if kind == "no_new_single_stocks":
         before = (date.fromisoformat(days[-1]) - timedelta(days=30)).isoformat()
         old = max((d for d in days if d <= before), default=None)
         if old is None:
             return None
         held_then = {h["symbol"] for h in holdings[old]}
-        return all(s in held_then or s in conv for s in singles)
+        return [f"{s} is a single stock that was not held on {old}." for s in sorted(singles) if s not in held_then and s not in conv]
     return None
 
 
-def _margin_metrics(out: Out, rows, total):
-    rate = env_float("DESK_MARGIN_RATE_PCT")
+def _margin_metrics(out: Out, rows, total, cfg: Config | None = None):
+    rate, rate_source = margin_rate(cfg)
     maint = env_float("DESK_MARGIN_MAINT_PCT") or 30.0
+    pic = cash_picture(rows)
     by_acct = defaultdict(lambda: {"debit": 0.0, "value": 0.0})
     for h in rows:
-        a = by_acct[h["account"]]
-        a["value"] += h["value"] if not (h["is_cash"] and h["value"] < 0) else 0.0
-        if h["is_cash"] and h["value"] < 0:
-            a["debit"] -= h["value"]
-    debit = sum(a["debit"] for a in by_acct.values())
+        if not h["is_cash"]:
+            by_acct[h["account"]]["value"] += h["value"]
+    for acct in pic["accounts"]:
+        by_acct[acct]["value"] += pic["ready_by_account"].get(acct, 0.0)
+        by_acct[acct]["debit"] = pic["debit_by_account"].get(acct, 0.0)
+    debit = pic["debit"]
     modelled = any(h["is_cash"] and h["value"] < 0 and h["quality"] == "modelled" for h in rows)
     out.m("margin.debit", debit, "usd", quality="modelled" if modelled else "ok")
     if debit > 0:
-        out.m("margin.cost_month", debit * rate / 100 * 30 / 360 if rate is not None else None, "usd", quality="ok" if rate is not None else "modelled")
+        known = rate is not None and rate_source != "default"
+        out.m("margin.cost_month", debit * rate / 100 * 30 / 360 if rate is not None else None, "usd", quality="ok" if known else "modelled")
         out.m("margin.funded_share", debit / total * 100 if total else None, "pct")
         for acct, a in sorted(by_acct.items()):
             if a["debit"] > 0 and a["value"] > 0:
@@ -593,6 +628,8 @@ def _margin_metrics(out: Out, rows, total):
                 out.m("margin.call_drop", max(0.0, drop) * 100, "pct", scope="account", scope_id=acct, quality="modelled")
         if rate is None:
             out.h("margin_rate", "warn", f"There is a margin debit but no rate, so its interest cost is unknown. Fix: {env_fix(['DESK_MARGIN_RATE_PCT'])}")
+        elif rate_source == "default":
+            out.h("margin_rate", "ok", f"Margin interest is estimated at a typical {rate:g}% a year until you set your own rate in Settings.")
     else:
         out.m("margin.cost_month", 0.0, "usd")
 
@@ -844,19 +881,24 @@ def _closes_check(desk, rows, as_of: str) -> tuple[str, str, str]:
     if desk.execute("SELECT 1 FROM sqlite_master WHERE name='market_symbols'").fetchone():
         no_source = {r[0] for r in desk.execute("SELECT symbol FROM market_symbols WHERE error LIKE ?", (NO_PRICES + "%",))}
     snap = {h["symbol"] for h in rows if h["source"] == "snapshot"}
-    missing = [s for s in held if s not in newest and s not in no_source]
+    quoted = provisional_symbols(desk, as_of)
+    missing = [s for s in held if s not in newest and s not in no_source and s not in quoted]
     session = last_trading_day(date.fromisoformat(as_of)).isoformat()
-    stale = [s for s in held if s in newest and newest[s] < session and s not in snap]
+    stale = [s for s in held if s in newest and newest[s] < session and s not in snap and s not in quoted]
     broker = [s for s in held if s not in newest and s in no_source]
     notes = []
     fix = "the overnight backfill fills them" if os.environ.get("TIINGO_API_KEY") else env_fix(["TIINGO_API_KEY"]).rstrip(".")
     if missing:
         notes.append(f"No close for {', '.join(missing)} on {as_of}. Fix: {fix}.")
-    if stale:
+    if quoted:
+        notes.append(f"{day_words(as_of)} is priced from the closing quotes until official closes land overnight; the day is restated then.")
+        if stale:
+            notes.append(f"{', '.join(stale)} have no quote, so they carry their last close until then.")
+    elif stale:
         notes.append(f"Closes for {', '.join(stale)} stop at {min(newest[s] for s in stale)}. Fix: {fix}.")
     if broker:
         notes.append(f"{', '.join(broker)} have no market price anywhere, so they're valued at the broker's snapshot price.")
-    status = "warn" if missing or stale else "ok"
+    status = "warn" if missing or (stale and not quoted) else "ok"
     return "closes", status, " ".join(notes) or f"Every holding has a close on {as_of}."
 
 

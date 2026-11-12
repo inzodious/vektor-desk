@@ -7,6 +7,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.decisions.profile import active_profile
 from desk.engine import ENGINE_VERSION, broker, schema
+from desk.engine.cash import margin_rate
 from desk.engine.core import (
     PROFILE_ERRORS,
     convictions,
@@ -433,7 +434,7 @@ def load_context(cfg: Config, mirror: sqlite3.Connection | None, desk: sqlite3.C
     ctx.windows = wash_windows(activity, sold, lots, today)
     ctx.wash_accounts = list(tax.get("wash_sale_accounts") or [])
     ctx.lot_method = tax.get("lot_method") or "highest_cost"
-    ctx.margin_rate = env_float("DESK_MARGIN_RATE_PCT")
+    ctx.margin_rate = margin_rate(cfg)[0]
     ctx.satellite_cap = float(cap) if isinstance(cap, int | float) else None
     federal, state, _ = marginal_rate(cfg, mirror)
     ctx.tax_rate = None if federal is None else federal + state

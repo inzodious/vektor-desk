@@ -3,6 +3,7 @@ JOBS = [
     ("*/15 * * * *", "python -m desk.engine lots"),
     ("*/5 4-20 * * 1-5", "python -m desk.engine quotes"),
     ("10 1-6 * * *", "python -m desk.engine backfill"),
+    ("25 1-6 * * *", "python -m desk.engine restate"),
     ("40 0 * * *", "python -m desk.engine research"),
     ("10 2 * * 0", "python -m desk.engine lookthrough"),
     ("55 0 * * *", "python -m desk.engine lab-export"),

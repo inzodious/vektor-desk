@@ -49,12 +49,20 @@ def _dials(cfg: Config) -> tuple[float, float | None]:
 
 def market_close(conn: sqlite3.Connection, symbol: str, day: str) -> tuple[str, float] | None:
     best = None
-    for tbl in ("price_bars", "prices_daily"):
+    for tbl in ("price_bars", "prices_daily", "closes_provisional"):
         if conn.execute("SELECT 1 FROM sqlite_master WHERE name=?", (tbl,)).fetchone():
             r = conn.execute(f"SELECT date, close FROM {tbl} WHERE symbol=? AND date<=? ORDER BY date DESC LIMIT 1", (symbol, day)).fetchone()
             if r and r["close"] and (best is None or r["date"] > best[0]):
                 best = (r["date"], r["close"])
     return best
+
+
+def rule_breaks(conn: sqlite3.Connection, as_of: str) -> dict[str, dict]:
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='engine_views'").fetchone() is None:
+        return {}
+    row = conn.execute("SELECT body FROM engine_views WHERE name='rules' AND as_of=?", (as_of,)).fetchone()
+    rules = json.loads(row["body"]).get("rules") or [] if row else []
+    return {r["id"]: {"breaks": r["count"], "what": r["breaks"][:3]} for r in rules if not r["holds"]}
 
 
 def detect(cfg: Config, conn: sqlite3.Connection, as_of: str, *, now: datetime | None = None) -> list[tuple[str, str, str, dict]]:
@@ -76,12 +84,13 @@ def detect(cfg: Config, conn: sqlite3.Connection, as_of: str, *, now: datetime |
                 pct = (now_close[1] / before[1] - 1) * 100
                 if abs(pct) >= move * HOLDING_MOVE_X:
                     found.append((as_of, "daily_move", sym, {"ret_pct": round(pct, 2), "dial_pct": move * HOLDING_MOVE_X}))
+    broken = rule_breaks(conn, as_of)
     picks = "SELECT metric_id, scope_id, value FROM metric_values WHERE as_of=? AND scope IN ('holding', 'rule') "
     for r in conn.execute(picks + "AND metric_id IN ('plan.single_stock', 'plan.rules')", (as_of,)):
         if r["metric_id"] == "plan.single_stock" and cap is not None and r["value"] is not None and r["value"] > cap:
             found.append((as_of, "concentration", r["scope_id"], {"weight_pct": r["value"], "band_pct": cap}))
         if r["metric_id"] == "plan.rules" and r["value"] == 0:
-            found.append((as_of, "rule_breach", r["scope_id"], {}))
+            found.append((as_of, "rule_breach", r["scope_id"], broken.get(r["scope_id"], {})))
     for r in conn.execute("SELECT scope_id FROM metric_values WHERE as_of=? AND metric_id='sig.earnings_reported' AND value=1", (as_of,)):
         found.append((as_of, "earnings", r["scope_id"], {"surprise_pct": _metric(conn, as_of, "sig.eps_surprise", "holding", r["scope_id"])}))
     total = _metric(conn, as_of, "plan.single_stock")
@@ -137,7 +146,8 @@ def _words(t: dict) -> str:
         who = "Single stocks together" if s == "satellite" else s
         return f"{who} at {d['weight_pct']:.1f}% of the portfolio, past the {d['band_pct']:g}% band."
     if t["kind"] == "rule_breach":
-        return f"Rule {s} doesn't hold today. Plan shows why."
+        what = (d.get("what") or [""])[0]
+        return f"Rule {s} doesn't hold today. {what or 'Plan shows why.'}"
     if t["kind"] == "deposit_landed":
         if d.get("scheduled", True):
             return f"The deposit expected {d['expected']} landed on {d['date']}."
