@@ -19,7 +19,7 @@ from desk.engine.lab import library as features
 from desk.engine.lab import paper, runner, simcache, stats
 from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, ledger_path, load
 from desk.engine.lab.runner import ledger, process_queue
-from desk.engine.lab.sim import _year_tax, simulate
+from desk.engine.lab.sim import _year_tax, pick, simulate
 from desk.engine.lab.spec import SETS, SpecError, parse, resolve, variants
 from desk.worker import registry, store
 from desk.worker.__main__ import apply as worker_apply
@@ -190,6 +190,63 @@ def test_simulator_trades_next_open_with_costs_taxes_and_delisting(cfg):
     assert "XLE" in late.delisted
     assert _year_tax({"st": 1000.0, "lt": -400.0}, 0.0, 0.24) == (pytest.approx(144.0), 0.0)
     assert _year_tax({"st": -500.0, "lt": 0.0}, -100.0, 0.24) == (0.0, -600.0)
+
+
+YOUNG = "2016-01-04"
+
+
+def young_lab(cfg):
+    days = weekdays("2008-01-02", "2024-12-31")
+    path = data_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.unlink(missing_ok=True)
+    conn = sqlite3.connect(path)
+    conn.executescript(EXPORT_SCHEMA)
+    px = 100.0
+    for d in days:
+        px *= 1.0004
+        conn.execute("INSERT INTO bars VALUES ('SPY', ?, ?, ?, ?, 1e6)", (d, px, px, px))
+        if d >= YOUNG:
+            conn.execute("INSERT INTO bars VALUES ('NEWF', ?, ?, ?, ?, 1e6)", (d, px, px, px))
+    conn.execute("INSERT INTO symbols VALUES ('SPY', 'etf', 'benchmark', ?, ?)", (days[0], days[-1]))
+    conn.execute("INSERT INTO symbols VALUES ('NEWF', 'etf', 'universe', ?, ?)", (YOUNG, days[-1]))
+    conn.executemany("INSERT INTO macro VALUES ('DGS3MO', ?, 2.0)", [(d,) for d in days[::5]])
+    conn.commit()
+    conn.close()
+    return load(path)
+
+
+def mix(weights, **more):
+    base = {"id": "young-mix", "version": 1, "title": "A mix with a newer fund", "universe": {"type": "fund_list", "symbols": list(weights)}}
+    return base | {"sizing": {"method": "fixed", "weights": weights}, "rebalance": "monthly", "exit": "rebalance", "horizons": [5], "benchmark": "SPY"} | more
+
+
+def test_a_fixed_mix_holds_no_cash_for_a_fund_that_has_not_started_trading(cfg):
+    data = young_lab(cfg)
+    spec = parse(mix({"SPY": 95, "NEWF": 5}, account="ira"), data)
+    v = resolve(spec, {})
+    assert pick(data, spec, v, "2011-06-01", set()) == {"SPY": pytest.approx(1.0)}
+    assert pick(data, spec, v, "2018-06-01", set()) == {"SPY": pytest.approx(0.95), "NEWF": pytest.approx(0.05)}
+    early = simulate(data, spec, v, "2011-01-03", "2011-12-30")
+    assert early.cash < 50 and early.values[-1] / early.values[0] == pytest.approx(early.bench[-1] / early.bench[0], abs=2e-3)
+    assert spec.start == data.calendar[0] and spec.caveats == ["NEWF started trading later; until each one lists, the rest of the mix carries its share."]
+    four = parse(mix({"SPY": 50, "NEWF": 50}) | {"signals": [{"metric_id": "ret", "window": "21d"}], "entry": {"top_n": 2}, "sizing": "equal"}, data)
+    assert pick(data, four, resolve(four, {}), "2011-06-01", set()) == {"SPY": pytest.approx(1.0)}
+    assert sum(pick(data, four, resolve(four, {}), "2018-06-01", set()).values()) == pytest.approx(1.0)
+
+
+def test_a_fixed_mix_is_tested_from_the_day_most_of_it_was_trading(cfg):
+    data = young_lab(cfg)
+    spec = parse(mix({"SPY": 70, "NEWF": 30}), data)
+    assert spec.start == YOUNG and spec.caveats == [f"Uses prices from {YOUNG} on, the first day funds making up at least 90% of the mix were trading."]
+    conn = ledger(cfg)
+    asked = {"request": "experiment", "spec": spec.raw, "grid": {}, "date_range": {"start": "2009-01-02"}, "seed": 7, "trial_budget": 4, "analyses": []}
+    body = runner.run_experiment(None, conn, data, asked, now=NOW)
+    assert body["kind"] == "experiment" and body["windows"]["start"] == YOUNG and body["folds"][0]["train_window"][0] == YOUNG
+    assert body["walk_forward"]["excess_pts"] == pytest.approx(0.0, abs=0.1)
+    whole = runner.run_experiment(None, conn, data, asked | {"spec": mix({"SPY": 100}) | {"id": "old-only"}}, now=NOW)
+    assert whole["windows"]["start"] == "2009-01-02"
+    conn.close()
 
 
 # ---- Statistics ----

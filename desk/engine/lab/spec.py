@@ -18,6 +18,7 @@ SET_WORDS = (("sector", "sector_etfs"), ("core", "core_etfs"), ("broad", "core_e
 REBALANCE = {"weekly": "W", "monthly": "M", "quarterly": "Q", "w": "W", "m": "M", "q": "Q"}
 SIZING = (("fixed", "fixed"), ("inverse", "inverse_vol"), ("volatility", "inverse_vol"), ("risk parity", "inverse_vol"), ("rank", "rank"), ("equal", "equal"))
 MIN_WEIGHT_PRESENT = 0.5
+MIN_LIVE = 0.9
 PLAN_SET = "plan_mix"
 SHELTERED = ("hsa", "ira", "roth", "401k", "401(k)")
 MAX_VARIANTS = 200
@@ -52,6 +53,7 @@ class Spec:
     caveats: list[str] = field(default_factory=list)
     filters: list[tuple[str, int, float | None, float | None]] = field(default_factory=list)
     weights: dict[str, float] | None = None
+    start: str | None = None
 
     @property
     def hash(self) -> str:
@@ -154,6 +156,17 @@ def _weights(value, problems: list[str]) -> dict[str, float] | None:
         return None
     total = sum(out.values())
     return {s: w / total for s, w in out.items()}
+
+
+def mix_start(data: LabData, weights: dict[str, float]) -> tuple[str | None, list[str]]:
+    firsts = sorted((data.series[s].dates[0], s) for s in weights if s in data.series)
+    live, start = 0.0, None
+    for first, s in firsts:
+        live += weights[s]
+        if live >= MIN_LIVE - 1e-9:
+            start = first
+            break
+    return start, [s for first, s in firsts if start and first > start]
 
 
 def _filters(raw, problems: list[str]) -> list[tuple[str, int, float | None, float | None]]:
@@ -285,6 +298,13 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
             elif missing:
                 caveats.append(f"{', '.join(missing)} have no price history in the lab yet; the rest of the mix was scaled up to cover them.")
                 weights = {s: w / have for s, w in weights.items() if s in data.series}
+    start = None
+    if weights is not None and data is not None and universe.get("kind") == "fund_list":
+        start, late = mix_start(data, weights)
+        if start and data.calendar and start > data.calendar[0]:
+            caveats.append(f"Uses prices from {start} on, the first day funds making up at least {MIN_LIVE:.0%} of the mix were trading.")
+        if late:
+            caveats.append(f"{', '.join(late)} started trading later; until each one lists, the rest of the mix carries its share.")
     fixed = weights is not None or bool(universe.get("members")) or universe.get("set") == PLAN_SET
     if not signals and not fixed:
         problems.append("at least one signal is required, unless the spec holds a fixed mix (sizing weights) or named French portfolios (members)")
@@ -324,6 +344,7 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
         caveats=caveats,
         filters=filters,
         weights=weights,
+        start=start,
     )
 
 

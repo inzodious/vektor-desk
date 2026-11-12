@@ -114,9 +114,15 @@ def _passes(data: LabData, spec: Spec, sym: str, s, i: int) -> bool:
     return True
 
 
+def _listed(data: LabData, sym: str, day: str) -> bool:
+    s = data.series.get(sym)
+    return bool(s) and s.dates[0] <= day
+
+
 def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dict[str, float]:
     raw: dict[str, list[float]] = {}
-    for sym in universe(data, spec, day):
+    members = universe(data, spec, day)
+    for sym in members:
         s = data.series[sym]
         i = s.index.get(day)
         if i is None:
@@ -140,7 +146,8 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         return {}
     if spec.weights is not None:
         cap = spec.constraints["max_position_pct"] / 100
-        return {s: min(spec.weights[s], cap) for s in chosen if spec.weights.get(s)}
+        live = sum(w for s, w in spec.weights.items() if _listed(data, s, day))
+        return {s: min(spec.weights[s] / (live or 1.0), cap) for s in chosen if spec.weights.get(s)}
     if spec.sizing == "inverse_vol":
         inv = {}
         for s in chosen:
@@ -155,7 +162,10 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         w = {s: x / total for s, x in pts.items()}
     else:
         w = {s: 1 / len(chosen) for s in chosen}
-    fill = len(chosen) / v.top_n
+    slots = v.top_n
+    if spec.universe["kind"] == "fund_list":
+        slots = max(1, min(slots, sum(_listed(data, s, day) for s in members)))
+    fill = len(chosen) / slots
     cap = spec.constraints["max_position_pct"] / 100
     return {s: min(x * fill, cap) for s, x in w.items() if x > 0}
 

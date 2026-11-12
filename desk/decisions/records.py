@@ -24,6 +24,8 @@ DRIFT_PCT = 10.0
 PRICE_GAP_DAYS = 5
 CASH_QUALITY = ("ok", "trimmed", "pro_forma", "modelled")
 NOTE_DAYS = 7
+PLAN_DAYS = 60
+CLEARED_DAYS = 2
 SUBJECT_MAX = 80
 REPLACED = "A newer proposal on the same subject replaced this one on {day}."
 NOTE_REASON = "A heads-up that needs no decision, so it is kept in the journal."
@@ -788,10 +790,74 @@ def notes(cfg: Config, *, days: int = NOTE_DAYS, now: datetime | None = None) ->
     return {"count": len(items), "days": days, "items": items}
 
 
-def tidy_now(cfg: Config, *, now: datetime | None = None) -> dict:
-    at = now_iso(_now(now))
+def _desk_check():
+    try:
+        from desk.agents.checks import queue_problem
+    except ImportError:
+        return None
+    return queue_problem
+
+
+def _problem(check, d: dict, steps: list[dict], today: str, standing: list[dict]) -> str | None:
+    try:
+        return _text(check(d, steps=steps, today=today, standing=standing))
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def clear_contradictions(cfg: Config, conn: sqlite3.Connection, moment: datetime) -> int:
+    check = _desk_check()
+    rows = [to_dict(r) for r in conn.execute("SELECT * FROM decisions WHERE status IN ('proposed', 'snoozed') ORDER BY created_at, rowid")]
+    if check is None or all(d["origin"] == "you" for d in rows):
+        return 0
+    from desk.decisions.plans import open_steps
+
+    try:
+        steps = open_steps(cfg, days=PLAN_DAYS, now=moment)
+    except Exception:  # noqa: BLE001
+        return 0
+    at = now_iso(moment)
+    today = moment.astimezone(ZoneInfo(cfg.timezone)).date().isoformat()
+    standing = list(rows)
+    cleared = 0
+    with conn:
+        for d in rows:
+            if d["origin"] == "you":
+                continue
+            reason = _problem(check, d, steps, today, standing)
+            if reason and _close(conn, d["id"], at, "cleared", reason, {"check": "plan"}):
+                standing = [s for s in standing if s["id"] != d["id"]]
+                cleared += 1
+    return cleared
+
+
+def cleared(cfg: Config, *, days: int = CLEARED_DAYS, now: datetime | None = None) -> dict:
+    moment = _now(now)
+    since = now_iso(moment - timedelta(days=max(1, min(int(days), 90))))
+    with session(cfg) as conn:
+        tidy(cfg, conn, now_iso(moment))
+        rows = conn.execute(
+            "SELECT * FROM decisions WHERE status='expired' AND status_reason IS NOT NULL AND decided_at >= ? ORDER BY decided_at DESC, rowid DESC", (since,)
+        ).fetchall()
+        items = []
+        for r in rows:
+            d = to_dict(r)
+            last = conn.execute(
+                "SELECT event, detail FROM decision_events WHERE decision_id=? AND event IN ('expired', 'replaced', 'cleared') ORDER BY seq DESC LIMIT 1",
+                (d["id"],),
+            ).fetchone()
+            d["check"] = "replaced" if last and last["event"] == "replaced" else (loads(last["detail"]) or {}).get("check") if last else None
+            d["cleared_at"] = d["decided_at"]
+            items.append(d)
+    return {"count": len(items), "days": days, "items": items}
+
+
+def tidy_now(cfg: Config, *, checks: bool = False, now: datetime | None = None) -> dict:
+    moment = _now(now)
+    at = now_iso(moment)
     with session(cfg) as conn:
         moved = tidy(cfg, conn, at)
+        moved["cleared"] = clear_contradictions(cfg, conn, moment) if checks else 0
         waiting = conn.execute("SELECT COUNT(*) FROM decisions WHERE status='proposed' OR (status='snoozed' AND snoozed_until <= ?)", (at,)).fetchone()[0]
     return {**moved, "waiting": waiting}
 
