@@ -1,4 +1,5 @@
 import importlib
+import sqlite3
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -274,4 +275,51 @@ class PlanFacts(Protocol):
 @dataclass
 class RealPlanFacts:
     def facts(self, cfg: Config, symbol: str | None = None) -> list[dict]:
-        return [dict(r) for r in _guarded("desk.engine.planfacts", "facts", cfg, symbol)]
+        rows = [dict(r) for r in _guarded("desk.engine.planfacts", "facts", cfg, symbol)]
+        book = self.book(cfg)
+        for row in rows:
+            known = book.get(str(row.get("symbol") or "").upper()) or {}
+            row["name"] = row.get("name") or known.get("name")
+            if known.get("held_in"):
+                row["held_in"] = known["held_in"]
+        return rows
+
+    def book(self, cfg: Config) -> dict[str, dict]:
+        try:
+            source = _module("desk.engine.source")
+            mirror = source.open_mirror(cfg)
+        except (NotReady, sqlite3.Error):
+            return {}
+        if mirror is None:
+            return {}
+        try:
+            snaps = {s.get("id"): s for s in source.current_rows(mirror, "snapshots")}
+            positions = list(source.current_rows(mirror, "positions"))
+        except sqlite3.Error:
+            return {}
+        finally:
+            mirror.close()
+        return book_names(snaps, positions)
+
+
+def book_names(snaps: dict, positions: list[dict]) -> dict[str, dict]:
+    def stamp(p: dict) -> str:
+        return str((snaps.get(p.get("snapshotId")) or {}).get("asOf") or "")
+
+    out: dict[str, dict] = {}
+    for p in sorted(positions, key=stamp):
+        symbol = str(p.get("symbol") or "").strip().upper()
+        if not symbol or p.get("isCash"):
+            continue
+        at = stamp(p)
+        entry = out.setdefault(symbol, {"name": None, "held_in": [], "at": at})
+        if entry["at"] != at:
+            entry["at"], entry["held_in"] = at, []
+        name = " ".join(str(p.get("description") or "").split())[:120]
+        entry["name"] = name or entry["name"]
+        accounts = (snaps.get(p.get("snapshotId")) or {}).get("accounts") or ()
+        account = next((a for a in accounts if isinstance(a, dict) and a.get("key") == p.get("accountKey")), None) or {}
+        label = {k: str(account[k])[:60] for k in ("name", "kind") if account.get(k)}
+        if label and label not in entry["held_in"]:
+            entry["held_in"].append(label)
+    return {s: {"name": e["name"], "held_in": e["held_in"]} for s, e in out.items()}
