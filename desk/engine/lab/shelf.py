@@ -16,6 +16,8 @@ from desk.engine.lab.spec import SCREEN_HINDSIGHT
 FAMILY = "library"
 HINDSIGHT_FAMILY = "library-hindsight"
 HINDSIGHT_LINE = "Hindsight, not a test: you hold these knowing how they did, and the last two years are held back."
+LEAN_AHEAD = "Ahead, but it leans on hindsight:"
+LEAN_BARRED = "Not counted as held up, because the stock list is small and includes names you hold or held."
 LEAN_WORDS = "Leans on hindsight: the stock list is small and includes names you hold or held."
 HINDSIGHT_NOTE = "The rows for what you hold today are hindsight, not a test, and are never counted as held up."
 KINDS = (("classic", "Old and tested"), ("practical", "Practical"), ("novel", "Novel and creative"))
@@ -1051,7 +1053,10 @@ def view(cfg: Config) -> dict:
                     row |= _hindsight(entry, body) if row["hindsight"] else _experiment(entry, body, trials, alone)
                 if lean:
                     row["caveats"] = [SCREEN_HINDSIGHT, *(c for c in row["caveats"] if c != SCREEN_HINDSIGHT)]
-                    row["line"] = f"{row['line']} {LEAN_WORDS}" if row["line"] else row["line"]
+                    if row["verdict"] == "held_up":
+                        row |= {"verdict": "within_noise", "line": f"{LEAN_AHEAD} {row['line'][0].lower()}{row['line'][1:]} {LEAN_BARRED}"}
+                    elif row["line"]:
+                        row["line"] = f"{row['line']} {LEAN_WORDS}"
         rows.append(row)
     kinds = [k for k, _ in KINDS]
     rows.sort(

@@ -65,7 +65,7 @@ def health(cfg, mirror_builder=None, now=SAT_NOW):
     finally:
         desk.close()
         mirror.close()
-    return {c: (s, d) for _, c, s, d in out.health}
+    return {c: (s, d) for _, c, s, d, *_ in out.health}
 
 
 def add_bars(cfg, rows):
@@ -289,7 +289,7 @@ def test_a_margin_buy_and_deposit_are_flows_not_return(cfg, mirror):
     want = (end - 1000.0 - 3030.0 - 32.8) / start - 1
     assert day == pytest.approx(want * 100, abs=1e-3) and abs(day) < 1.5
     assert not [f for f in found if f[1] == "daily_move" and f[2] == "portfolio"]
-    status, detail = {c: (s, d) for _, c, s, d in out.health}["flows"]
+    status, detail = {c: (s, d) for _, c, s, d, *_ in out.health}["flows"]
     assert status == "ok" and IND in detail and "+3,030.00" in detail and "not return" in detail
 
 
