@@ -6,6 +6,8 @@ from desk.engine.market import EARLY_CLOSE, ET, session, trading_day
 
 CLOSE_GRACE = timedelta(seconds=60)
 KEEP_DAYS = 7
+WAIT_DAYS = 7
+NAMED = 3
 NUMBERS = (
     ("value", "value.market", "now"),
     ("day_change", "value.day_change", "now"),
@@ -129,6 +131,51 @@ def provisional_symbols(conn: sqlite3.Connection, day: str) -> set[str]:
     return {r[0] for r in conn.execute("SELECT symbol FROM closes_provisional WHERE date=?", (day,))} - _official(conn, day)
 
 
+def _official_close(conn: sqlite3.Connection, symbol: str, day: str) -> float | None:
+    for tbl in ("price_bars", "prices_daily"):
+        if _has(conn, tbl):
+            r = conn.execute(f"SELECT close FROM {tbl} WHERE symbol=? AND date=?", (symbol, day)).fetchone()
+            if r is not None:
+                return float(r[0])
+    return None
+
+
+def _rolled(conn: sqlite3.Connection, day: str) -> dict[str, float]:
+    if not _has(conn, "holdings_daily"):
+        return {}
+    rows = conn.execute("SELECT symbol, close FROM holdings_daily WHERE date=? AND is_cash=0 AND source != 'snapshot' AND close IS NOT NULL", (day,))
+    return {r["symbol"]: float(r["close"]) for r in rows}
+
+
+def waiting(conn: sqlite3.Connection, day: str) -> list[str]:
+    official, quoted, rolled = _official(conn, day), provisional_symbols(conn, day), _rolled(conn, day)
+    carried = [s for s in _held(conn, day) if s in rolled and s not in official and s not in quoted]
+    if not carried:
+        return []
+    floor = (date.fromisoformat(day) - timedelta(days=WAIT_DAYS)).isoformat()
+    recent: set[str] = set()
+    for tbl in ("price_bars", "prices_daily"):
+        if _has(conn, tbl):
+            recent |= {r[0] for r in conn.execute(f"SELECT DISTINCT symbol FROM {tbl} WHERE date >= ? AND date < ?", (floor, day))}
+    return [s for s in carried if s in recent]
+
+
+def late_closes(conn: sqlite3.Connection, day: str) -> list[str]:
+    out = []
+    for symbol, booked in sorted(_rolled(conn, day).items()):
+        close = _official_close(conn, symbol, day)
+        if close is not None and abs(close - booked) > 1e-6 * max(1.0, abs(close)):
+            out.append(symbol)
+    return out
+
+
+def names(symbols: list[str]) -> str:
+    shown = list(symbols[:NAMED])
+    if len(symbols) > NAMED:
+        shown.append(f"{len(symbols) - NAMED} more")
+    return shown[0] if len(shown) == 1 else f"{', '.join(shown[:-1])} and {shown[-1]}"
+
+
 # ---- Does the book need another pass ----
 
 
@@ -160,14 +207,17 @@ def pending(conn: sqlite3.Connection, *, now: datetime | None = None) -> dict:
         marks = ",".join("?" * len(held))
         newest = conn.execute(f"SELECT max(date) FROM price_bars WHERE symbol IN ({marks}) AND date <= ?", (*held, want)).fetchone()[0]
     quoted = sorted(closing_quotes(conn, want)) if day < want else []
+    late = [s for s in late_closes(conn, day) if s not in landed]
     why = []
     if landed:
         why.append(f"official closes landed for {len(landed)} symbols on {day}")
+    if late:
+        why.append(f"late official closes landed for {names(late)} on {day}")
     if newest and newest > day:
         why.append(f"official closes reach {newest}, the book stops at {day}")
     if quoted and not (newest and newest >= want):
         why.append(f"closing quotes for {want} are in, the book stops at {day}")
-    signature = json.dumps([day, want, landed, newest, len(quoted)])
+    signature = json.dumps([day, want, landed, newest, len(quoted), *([late] if late else [])])
     return {"due": bool(why), "why": "; ".join(why) or "the book is on the latest day it can reach", "signature": signature, "day": day, "want": want}
 
 
@@ -199,6 +249,7 @@ def prices(conn: sqlite3.Connection, day: str) -> dict:
         "official": sum(1 for s in held if s in official),
         "quoted": sum(1 for s in held if s in quoted),
         "carried": [s for s in held if s not in official and s not in quoted],
+        "waiting": waiting(conn, day),
     }
 
 
@@ -260,7 +311,7 @@ def view(conn: sqlite3.Connection | None, *, now: datetime | None = None) -> dic
         "previous_day": None,
         "expected_day": None,
         "behind": None,
-        "prices": {"official": 0, "quoted": 0, "carried": []},
+        "prices": {"official": 0, "quoted": 0, "carried": [], "waiting": []},
         "numbers": {},
         "live": None,
         "market": market,
@@ -275,7 +326,8 @@ def view(conn: sqlite3.Connection | None, *, now: datetime | None = None) -> dic
     )
     at = run["finished_at"] if run and run["finished_at"] else None
     priced = prices(conn, day)
-    provisional = bool(provisional_symbols(conn, day))
+    quoted = bool(provisional_symbols(conn, day))
+    provisional = quoted or bool(priced["waiting"])
     want = max(last_session(now), day)
     behind = None
     if day < want:
@@ -286,9 +338,11 @@ def view(conn: sqlite3.Connection | None, *, now: datetime | None = None) -> dic
                 "sessions": n,
                 "reason": f"{got} for {day_words(want)}, and the book stops at {day_words(day)}. The next engine run moves it; nothing to tap.",
             }
-    if provisional:
+    if quoted:
         when = f", {time_words(_stamp(at))}" if at else ""
         words = f"{day_words(day)}{when}. Provisional until official closes land overnight."
+    elif provisional:
+        words = f"{day_words(day)}, at the close. Waiting on the official close for {names(priced['waiting'])}; the day is restated when it lands."
     else:
         words = f"{day_words(day)}, at the close."
     review, debrief = _review(conn)

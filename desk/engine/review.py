@@ -120,6 +120,7 @@ class Data:
     earnings: list[dict]
     pnl: dict[tuple[str, str], dict[str, tuple[float, float]]] = field(default_factory=dict)
     provisional: dict[str, list[str]] = field(default_factory=dict)
+    waiting: dict[str, list[str]] = field(default_factory=dict)
     dip_days: list[str] = field(default_factory=list)
     dip_cash: list[float] = field(default_factory=list)
 
@@ -217,6 +218,8 @@ def load(cfg: Config | None, mirror: sqlite3.Connection | None, desk: sqlite3.Co
     )
     if days and asof.provisional_symbols(desk, days[-1]):
         data.provisional[days[-1]] = asof.prices(desk, days[-1])["carried"]
+    elif days and asof.waiting(desk, days[-1]):
+        data.waiting[days[-1]] = asof.waiting(desk, days[-1])
     dip = catalog.Dip()
     for day in data.tr.dates.get(catalog.BENCHMARK, []):
         data.dip_days.append(day)
@@ -587,6 +590,10 @@ def build_pack(data: Data, kind: str, start: str, end: str) -> dict | None:
         carried = data.provisional[as_of]
         waits = f" {', '.join(carried)} carry their last close until then." if carried else ""
         note = f"{asof.day_words(as_of)} is priced from the closing quotes and is restated when official closes land overnight.{waits}"
+        pack["provisional"] = {"day": as_of, "carried": carried, "note": note}
+    elif as_of in data.waiting:
+        carried = data.waiting[as_of]
+        note = f"{asof.day_words(as_of)} still waits on the official close for {asof.names(carried)}, carried at the last close. The day is restated then."
         pack["provisional"] = {"day": as_of, "carried": carried, "note": note}
     pack["numbers"] = numbers(pack)
     return pack
