@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     night = run_night(cfg)
     for step in night["steps"]:
         print(f"{step['step']}: {step['status']}. {step.get('note') or ''}".rstrip())
-    line = ready(cfg)
+    line = night.get("ready") or ready(cfg)
     print(json.dumps({"ready": line, "detail": night["summary"]} if line else {"skipped": night["summary"]}))
     return 0
 
