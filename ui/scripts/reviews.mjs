@@ -47,6 +47,8 @@ const DEBRIEF = {
   },
 };
 
+const REWRITE_LATE = { state: 'late', due_at: '2026-11-10T06:40:00+00:00', words: 'Written before the final numbers. The rewrite is running late; the next try is tomorrow at 1:40 AM.' };
+
 // ---------- synthetic fill for what the demo desk lacks ----------
 function fill(review, { debrief = false, stale = false } = {}) {
   if (!review?.pack) return review;
@@ -75,7 +77,7 @@ function fill(review, { debrief = false, stale = false } = {}) {
     ...review,
     computed_at: `${pack.as_of}T22:36:00+00:00`,
     pack,
-    debrief: words ? { ...words, numbers_cited: ['change_usd', 'change_pct', 'vs.spy.pts'], model: 'synthetic', written_at: `${pack.as_of}T22:52:00+00:00`, pack_digest: review.digest, stale } : null,
+    debrief: words ? { ...words, numbers_cited: ['change_usd', 'change_pct', 'vs.spy.pts'], model: 'synthetic', written_at: `${pack.as_of}T22:52:00+00:00`, pack_digest: review.digest, stale, rewrite: stale ? REWRITE_LATE : null } : null,
   };
 }
 

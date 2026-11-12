@@ -25,7 +25,7 @@ describe('desk profile', () => {
     expect(profileInit({ exists: false, init: { method: 'POST', path: '/api/decisions/profile/init', label: 'Set up my profile from my data' } })).toEqual({ path: INIT_PATH, label: INIT_LABEL });
     expect(profileInit({ exists: false, init: { path: '/api/decisions/profile/start', label: ' Start my profile ' } })).toEqual({ path: '/api/decisions/profile/start', label: 'Start my profile' });
     expect(profileInit({ exists: false, init: { path: 'https://elsewhere.example/x' } })).toEqual({ path: INIT_PATH, label: INIT_LABEL });
-    expect(profileInit({ exists: false, starter: 'a command' })).toEqual({ path: INIT_PATH, label: INIT_LABEL });
+    expect(profileInit({ exists: false, starter: 'a command' })).toBeNull();
     expect(profileInit({ exists: false })).toBeNull();
     expect(profileInit({ exists: true, init: null })).toBeNull();
     expect(profileInit(null)).toBeNull();

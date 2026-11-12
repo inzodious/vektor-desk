@@ -2004,6 +2004,11 @@
   "model": "synthetic",
   "written_at": "2026-11-06T22:52:00+00:00",
   "pack_digest": "474db80b8feb12e5",
-  "stale": true
+  "stale": true,
+  "rewrite": {
+   "state": "late",
+   "due_at": "2026-11-10T06:40:00+00:00",
+   "words": "Written before the final numbers. The rewrite is running late; the next try is tomorrow at 1:40 AM."
+  }
  }
 }

@@ -385,12 +385,15 @@ const notes = {
 };
 
 // ---------- cleared by the queue rule ----------
-const gone = (id, origin, kind, title, symbol, reason, check, when) => ({ id, created_at: at('05:10:00'), updated_at: at(when), origin, run_id: 'r-seed-7', kind, title, symbol, status: 'expired', status_reason: reason, decided_at: at(when), check, cleared_at: at(when) });
+const REPLACED = 'A newer proposal on the same subject replaced this one on Nov 9.';
+const gone = (id, origin, kind, title, symbol, reason, check, when, successor = null) => ({ id, created_at: at('05:10:00'), updated_at: at(when), origin, run_id: 'r-seed-7', kind, title, symbol, status: 'expired', status_reason: reason, replaced_by: successor ? successor.via || successor.id : null, decided_at: at(when), check, cleared_at: at(when), successor: successor ? { id: successor.id, title: successor.title, status: successor.status, status_reason: successor.status_reason, open: successor.open } : null });
 const cleared = {
-  count: 2,
+  count: 4,
   days: 2,
   items: [
+    gone('d_20261109051000_cc03', 'research', 'buy', 'Buy $350 ACME', 'ACME', REPLACED, 'replaced', '14:05:00', { id: 'd_20261109140500_9747d0', title: 'Buy $400 ACME', status: 'proposed', status_reason: null, open: true }),
     gone('d_20261109051000_cc01', 'tax', 'sell', 'Sell ACME to harvest the loss', 'ACME', 'Your ACME plan already times this sale for Nov 13, so a second proposal would double it.', 'plan', '13:10:00'),
+    gone('d_20261109051000_cc04', 'scout', 'buy', 'Buy $200 ACME', 'ACME', REPLACED, 'replaced', '09:15:00', { id: 'd_20261109091500_cc05', title: 'Buy $300 ACME', status: 'expired', status_reason: 'ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.', open: false }),
     gone('d_20261109051000_cc02', 'risk', 'memo', 'Hold off on new margin', null, 'The Plan keeper already has a margin hold-off waiting on you, so this one was a repeat.', 'plan', '08:40:00'),
   ],
 };
@@ -425,6 +428,18 @@ export function morningFixtures() {
 
 // ---------- write ----------
 for (const [name, body] of Object.entries(morningFixtures())) write(name, body);
+
+// ---------- snoozed, still standing ----------
+const queue = read('decisions.queue');
+const SNOOZED = [
+  { id: 'd_20261109130500_ea1ca9', until: at('14:30:00', '2026-11-10'), reason: 'Waiting for Friday’s deposit.' },
+  { id: 'd_20261109140500_c3bf78', until: at('14:30:00', '2026-11-12'), reason: 'Carries the snooze from the proposal it replaced.' },
+];
+const asleep = SNOOZED.map((z) => ({ ...queue.items.find((d) => d.id === z.id), status: 'snoozed', status_reason: z.reason, snoozed_until: z.until }));
+const awake = queue.items.filter((d) => !SNOOZED.some((z) => z.id === d.id));
+write('decisions.queue', { ...queue, snoozed_items: queue.snoozed_items || [] });
+write('decisions.queue.snoozed', { ...queue, count: awake.length, snoozed: asleep.length, items: awake, snoozed_items: asleep });
+for (const z of asleep) write(`decisions.${z.id}.snoozed`, { ...read(`decisions.${z.id}`), status: 'snoozed', status_reason: z.status_reason, snoozed_until: z.snoozed_until });
 
 // ---------- what a finished job did ----------
 const jobs = read('jobs');

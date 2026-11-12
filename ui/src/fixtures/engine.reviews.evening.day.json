@@ -257,6 +257,7 @@
   "model": "synthetic",
   "written_at": "2026-11-09T22:50:03+00:00",
   "pack_digest": "efbc227492ea814b",
-  "stale": false
+  "stale": false,
+  "rewrite": null
  }
 }

@@ -450,11 +450,12 @@ test('what the desk cleared from the queue sits in a closed fold with each reaso
   await page.goto('/decisions');
   const fold = page.getByTestId('cleared');
   await expect(fold.locator('summary')).toContainText('Cleared overnight');
-  await expect(fold.locator('summary .chip')).toHaveText('2');
+  await expect(fold.locator('summary .chip')).toHaveText('4');
   await expect(fold.locator('[data-cleared]').first()).toBeHidden();
   await fold.locator('summary').click();
-  await expect(fold.locator('[data-cleared]')).toHaveCount(2);
-  const first = fold.locator('[data-cleared]').first();
+  await expect(fold.locator('[data-cleared]')).toHaveCount(4);
+  const first = fold.locator('[data-cleared="d_20261109051000_cc01"]');
+  await expect(first.getByTestId('cleared-next')).toHaveCount(0);
   await expect(first).toContainText('Sell ACME to harvest the loss');
   await expect(first).toContainText('Your ACME plan already times this sale for Nov 13, so a second proposal would double it.');
   await expect(first).toContainText('Tax desk · cleared Today, 8:10 AM ET');
@@ -464,6 +465,58 @@ test('what the desk cleared from the queue sits in a closed fold with each reaso
   await page.goto('/decisions?scenario=fresh');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Decisions');
   await expect(page.getByTestId('cleared')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('a replaced proposal says what became of it, and the open one is a tap away', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/decisions');
+  const fold = page.getByTestId('cleared');
+  await fold.locator('summary').click();
+  const live = fold.locator('[data-cleared="d_20261109051000_cc03"]');
+  await expect(live).toContainText('A newer proposal on the same subject replaced this one on Nov 9.');
+  await expect(live.getByTestId('cleared-next')).toHaveAttribute('data-open', 'yes');
+  await expect(live.getByTestId('cleared-next')).toContainText('The latest one, “Buy $400 ACME”, is waiting in your queue.');
+  const ended = fold.locator('[data-cleared="d_20261109051000_cc04"]');
+  await expect(ended.getByTestId('cleared-next')).toHaveAttribute('data-open', 'no');
+  await expect(ended.getByTestId('cleared-next')).toHaveText('The latest one, “Buy $300 ACME”, has left the queue too. ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.');
+  await expect(ended.getByRole('link')).toHaveCount(0);
+  await page.locator('.prop', { hasText: 'Trim $150 FTEC' }).first().click();
+  await expect(page.getByTestId('detail').getByRole('heading', { level: 2 })).toHaveText('Trim $150 FTEC');
+  await live.getByRole('link', { name: 'Open it' }).click();
+  await expect(page).toHaveURL(/d=d_20261109140500_9747d0/);
+  await expect(page.getByTestId('detail').getByRole('heading', { level: 2 })).toHaveText('Buy $400 ACME');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  expect(errors).toEqual([]);
+});
+
+test('snoozed proposals stay in sight in a closed fold that the chip opens', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/decisions?scenario=snoozed');
+  await expect(page.locator('.ph-big b')).toHaveText('2');
+  await expect(page.locator('.prop')).toHaveCount(2);
+  const fold = page.getByTestId('snoozed');
+  await expect(fold.locator('summary')).toContainText('Snoozed');
+  await expect(fold.locator('summary .chip')).toHaveText('2');
+  await expect(fold.locator('[data-snoozed]').first()).toBeHidden();
+  await page.getByTestId('snoozed-chip').click();
+  await expect(fold.locator('[data-snoozed]')).toHaveCount(2);
+  const first = fold.locator('[data-snoozed]').first();
+  await expect(first).toContainText('Trim $150 FTEC');
+  await expect(first).toContainText('Waiting for Friday’s deposit.');
+  await expect(first).toContainText('Plan keeper · back Tue Nov 10, 9:30 AM ET');
+  await expect(fold.locator('[data-snoozed]').nth(1)).toContainText('Carries the snooze from the proposal it replaced.');
+  await first.click();
+  await expect(page).toHaveURL(/d=d_20261109130500_ea1ca9/);
+  await expect(page.getByTestId('detail').getByRole('heading', { level: 2 })).toHaveText('Trim $150 FTEC');
+  await expect(first).toHaveAttribute('aria-pressed', 'true');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  await page.goto('/decisions');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Decisions');
+  await expect(page.getByTestId('snoozed')).toHaveCount(0);
+  await expect(page.getByTestId('snoozed-chip')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

@@ -1,0 +1,179 @@
+{
+ "id": "d_20261109140500_c3bf78",
+ "created_at": "2026-11-09T14:05:00+00:00",
+ "updated_at": "2026-11-09T14:05:00+00:00",
+ "origin": "risk",
+ "run_id": "r-seed-3",
+ "kind": "hold_off",
+ "title": "Hold off on new BND until the rate decision",
+ "symbol": "BND",
+ "account": null,
+ "amount_usd": null,
+ "shares": null,
+ "funding": null,
+ "thesis": "BND is on target. Nothing to add before the synthetic rate decision on Nov 18.",
+ "bear_case": null,
+ "invalidation": null,
+ "horizon": "2 weeks",
+ "rule_served": null,
+ "confidence": 0.7,
+ "numbers_used": [],
+ "sources": [],
+ "order_ticket": null,
+ "skeptic": null,
+ "expires_at": "2026-11-16T21:00:00+00:00",
+ "status": "snoozed",
+ "status_reason": "Carries the snooze from the proposal it replaced.",
+ "snoozed_until": "2026-11-12T14:30:00+00:00",
+ "override": false,
+ "override_reason": null,
+ "preflight_status": "clear",
+ "preflight": {
+  "as_of": "2026-11-06",
+  "engine_version": "0.1.0",
+  "lights": [
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "concentration",
+    "label": "Concentration",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "drift_after",
+    "label": "Drift after",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "funding",
+    "label": "Funding",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "wash_sales",
+    "label": "Wash sales",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "lots_tax",
+    "label": "Lots and tax",
+    "status": "ok"
+   },
+   {
+    "after": null,
+    "before": null,
+    "detail": "Nothing to trade.",
+    "id": "plan_rules",
+    "label": "Plan rules",
+    "status": "ok"
+   }
+  ],
+  "metrics": [
+   {
+    "after": 16393.49,
+    "before": 16393.49,
+    "flag": "ok",
+    "metric_id": "value.market"
+   },
+   {
+    "after": 58.8504,
+    "before": 58.8504,
+    "flag": "ok",
+    "metric_id": "risk.top1"
+   },
+   {
+    "after": 0.4816,
+    "before": 0.4816,
+    "flag": "ok",
+    "metric_id": "plan.single_stock"
+   },
+   {
+    "after": 1.3218,
+    "before": 1.3218,
+    "flag": "ok",
+    "metric_id": "plan.drift_max"
+   },
+   {
+    "after": 0,
+    "before": 0,
+    "flag": "ok",
+    "metric_id": "margin.debit"
+   },
+   {
+    "after": null,
+    "before": null,
+    "flag": "ok",
+    "metric_id": "margin.cost_month"
+   },
+   {
+    "after": null,
+    "before": null,
+    "flag": "ok",
+    "metric_id": "margin.call_drop"
+   },
+   {
+    "after": 0.8662,
+    "before": 0.8662,
+    "flag": "ok",
+    "metric_id": "cash.share"
+   }
+  ],
+  "quality": "ok",
+  "status": "clear",
+  "tax": {
+   "wash_clear_date": null
+  },
+  "trade": {
+   "account": null,
+   "amount_usd": null,
+   "funding": "cash",
+   "kind": "hold_off",
+   "lot_method": "highest_cost",
+   "price": 77.35,
+   "shares": null,
+   "side": null,
+   "symbol": "BND"
+  }
+ },
+ "preflight_at": "2026-11-09T14:05:00+00:00",
+ "tax_impact": {
+  "wash_clear_date": null
+ },
+ "profile_version": 1,
+ "rules_version": 1,
+ "decided_at": null,
+ "placed_at": null,
+ "filled_at": null,
+ "fill": null,
+ "activity_id": null,
+ "decision": null,
+ "events": [
+  {
+   "at": "2026-11-09T14:05:00+00:00",
+   "event": "proposed",
+   "reason": null,
+   "detail": null
+  },
+  {
+   "at": "2026-11-09T14:05:00+00:00",
+   "event": "preflight",
+   "reason": null,
+   "detail": {
+    "status": "clear"
+   }
+  }
+ ]
+}

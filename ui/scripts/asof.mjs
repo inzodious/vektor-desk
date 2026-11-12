@@ -89,6 +89,11 @@ eveningReview.pack.provisional = { day: MONDAY, carried: ['FXAIX'], note: 'Mon N
 if (eveningReview.debrief) Object.assign(eveningReview.debrief, { headline: 'Up $87 on Monday, in step with the S&P 500.', written_at: `${MONDAY}T22:50:03+00:00`, stale: false });
 write('engine.reviews.evening.day', eveningReview);
 
+// ---------- a debrief written before the numbers moved ----------
+const stale = (rewrite) => ({ ...review, debrief: { ...review.debrief, stale: true, rewrite } });
+write('engine.reviews.rewriting.day', stale({ state: 'due', due_at: `${MONDAY}T22:46:00+00:00`, words: null }));
+write('engine.reviews.rewritefail.day', stale({ state: 'failed', due_at: `${MONDAY}T22:46:00+00:00`, words: 'Written before the final numbers. The rewrite did not finish; the desk tries again at 5:46 PM.' }));
+
 const eveningIndex = JSON.parse(JSON.stringify(index));
 eveningIndex.as_of = MONDAY;
 eveningIndex.kinds.day = [{ start: MONDAY, end: MONDAY, as_of: MONDAY, label: 'Mon Nov 9, 2026', closed: true, final: false, change_usd: EVENING.day_change, change_pct: EVENING.day_change_pct, has_debrief: true }, ...index.kinds.day];

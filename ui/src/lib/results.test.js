@@ -21,6 +21,7 @@ import {
   ledger,
   moverLine,
   moverRows,
+  rewritePath,
   periodPath,
   riskFacts,
   scoreLine,
@@ -137,7 +138,28 @@ describe('results', () => {
 
   it('knows what the debrief is waiting on', () => {
     expect(debriefState(week)).toEqual({ state: 'ok', hint: null });
-    expect(debriefState(year)).toEqual({ state: 'stale', hint: 'Written before the final numbers.' });
+    expect(debriefState(year)).toEqual({ state: 'stale', hint: 'Written before the final numbers. The rewrite is running late; the next try is tomorrow at 1:40 AM.' });
+    const stale = (rewrite) => ({ ...day, debrief: { ...day.debrief, stale: true, rewrite } });
+    expect(debriefState(stale(undefined))).toEqual({ state: 'rewriting', hint: null });
+    expect(debriefState(stale(null))).toEqual({ state: 'rewriting', hint: null });
+    expect(debriefState(stale({ state: 'due', due_at: '2026-11-09T22:46:00+00:00', words: null }))).toEqual({ state: 'rewriting', hint: null });
+    expect(debriefState(stale({ state: 'failed', words: 'Written before the final numbers. The rewrite did not finish; the desk tries again at 5:46 PM.' })).hint).toBe('Written before the final numbers. The rewrite did not finish; the desk tries again at 5:46 PM.');
+    expect(debriefState(stale({ state: 'late', words: null }))).toEqual({ state: 'stale', hint: 'Written before the final numbers.' });
+    expect(debriefState({ ...day, debrief: { ...day.debrief, stale: false, rewrite: { state: 'failed', words: 'x' } } })).toEqual({ state: 'ok', hint: null });
+  });
+
+  it('asks the debrief desk only when the review does not say', () => {
+    const { rewrite, ...bare } = day.debrief;
+    const old = { ...day, debrief: { ...bare, stale: true } };
+    expect(rewrite).toBeNull();
+    expect(rewritePath(old)).toBe('/api/agents/debrief?kind=day&end=2026-11-06');
+    expect(rewritePath({ ...old, debrief: { ...bare, stale: false } })).toBeNull();
+    expect(rewritePath(year)).toBeNull();
+    expect(rewritePath(month)).toBeNull();
+    expect(debriefState(old, null)).toEqual({ state: 'rewriting', hint: null });
+    expect(debriefState(old, { kind: 'day', end: '2026-11-06', stale: true, rewrite: { state: 'due', due_at: null, words: null } })).toEqual({ state: 'rewriting', hint: null });
+    expect(debriefState(old, { rewrite: { state: 'late', due_at: null, words: 'Written before the final numbers. The Debrief desk is switched off, so it stays as written.' } })).toEqual({ state: 'stale', hint: 'Written before the final numbers. The Debrief desk is switched off, so it stays as written.' });
+    expect(debriefState(year, { rewrite: null }).state).toBe('stale');
     expect(debriefState(month)).toMatchObject({ state: 'waiting', hint: 'The debrief lands when the month closes.' });
     expect(debriefState({ ...day, debrief: null }).hint).toBe('The debrief desk writes this up after its next run.');
     expect(debriefState(fresh).state).toBe('none');

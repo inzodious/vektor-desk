@@ -725,5 +725,6 @@
    "activity_id": null,
    "decision": null
   }
- ]
+ ],
+ "snoozed_items": []
 }

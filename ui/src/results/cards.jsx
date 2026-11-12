@@ -3,7 +3,8 @@ import { Icon } from '../components/Icon.jsx';
 import { dayLabel, dayWords } from '../lib/charts.js';
 import { etStamp, usd } from '../lib/format.js';
 import { statusWord } from '../lib/convictions.js';
-import { accountName, bandLine, debriefState, decisionRows, diffText, eventWord, kpis, ledger, moverLine, moverRows, riskFacts, scoreLine, versusLine, versusRows, versusScale } from '../lib/results.js';
+import { useApi } from '../lib/api.js';
+import { accountName, bandLine, debriefState, decisionRows, diffText, eventWord, kpis, ledger, moverLine, moverRows, rewritePath, riskFacts, scoreLine, versusLine, versusRows, versusScale } from '../lib/results.js';
 import { signedPct } from '../lib/strategy.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 
@@ -36,7 +37,8 @@ export function Numbers({ pack, i }) {
 // ---------- debrief ----------
 export function Debrief({ review }) {
   const d = review.debrief;
-  const st = debriefState(review);
+  const side = useApi(rewritePath(review));
+  const st = debriefState(review, side.data);
   return (
     <div className="card rs-debrief" data-testid="rs-debrief" data-state={st.state}>
       <div className="card-head">
