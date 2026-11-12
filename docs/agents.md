@@ -77,7 +77,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Strategy desk** | Nightly 05:45, one variant in a rotating family (below); on request from the Console; when a lab result lands; 12 runs a week | Research dossiers, the lab's feature list, past lab results | Strategy specs for the lab, then a memo on each result (see [Strategy lab](#strategy-lab)) | xhigh; WebSearch, WebFetch |
 | **Filings desk** | Daily 04:15, one call per new filing, up to 40 a night | One small-cap SEC filing from the statistics queue: form, 8-K items, excerpt (first 12,000 characters) | A score per filing in the signal table (see [Filings desk](#filings-desk)); never a proposal or a trade | high; no tools |
 | **Discount cases** | Weekdays 18:15, after the close, up to 3 a day | One discount-day scanner hit (held, watchlist or quality list), his risk band, conviction bands and planned actions, plus the web | A buy / wait / avoid case per hit, through `desk.engine.discounts.record`; never a proposal or a trade | xhigh; WebSearch, WebFetch |
-| **Debrief desk** | Weekdays 17:50 (day; week, month and year when they close); Friday 18:30 catches up anything missed | One period pack from the 17:35 review job, his risk band, conviction bands and stock plans | What happened, why, what worked against past decisions, what to watch, up to 3 next steps, through `desk.engine.review.record` (see [Debrief desk](#debrief-desk)); never a proposal or a trade | high; no tools |
+| **Debrief desk** | Weekdays 17:50 (day; week, month and year when they close); Friday 18:30 catches up anything missed; hourly 01:40 to 06:40 Tuesday to Saturday, a model call only when the day was restated after its debrief | One period pack from the 17:35 review job, his risk band, conviction bands and stock plans | What happened, why, what worked against past decisions, what to watch, up to 3 next steps, through `desk.engine.review.record` (see [Debrief desk](#debrief-desk)); never a proposal or a trade | high; no tools |
 | **Plan desk** | Weekdays 18:40 (holdings with a reason: no plan yet, a discount day, a band crossing, earnings, a review date); Saturday 03:00 (every holding); from the Console | One holding's plan facts, its current plan, the research dossier, his risk band and conviction bands | A draft stock plan through `desk.decisions.plans.save_draft`, or nothing when the current plan still fits (see [Plan desk](#plan-desk)); never approves, never a trade | high; no tools |
 
 **Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
@@ -293,6 +293,15 @@ Every desk returns the same shape (`agents/schemas/proposal.json`). The UI and t
 
 Decisions Joshua makes are stored against the proposal: `approved`, `dismissed`, `snoozed`, or `override` (he traded against a block), each with an optional one-line reason.
 
+## Wording and the queue
+
+| Rule | Where |
+|---|---|
+| Prose is rounded before it is saved: percentages, points and ratios to one or two decimals, dollars over $1,000 to whole dollars. `numbers_used` and `numbers_cited` are never touched | `wording.tidy`, applied to proposal titles and text, the Brief summary, debrief text and plan summaries |
+| One cash figure, no machinery talk ("the rule's own count reads 0", "no margin rate is set"), nothing raised twice | `prompts/common.md` Writing, `debrief.md`, `plans.md` |
+| Every proposal a desk files carries `subject` and `as_of` | `wording.stamp`: `subject` is stable and has no numbers (`next-deposit`, `margin`, `buy:SYM`, `sell:SYM`, `rebalance:SYM`, `hold_off:SYM`, `rule:<slug>`); `as_of` is the engine day of the brief |
+| What the record does with them | `desk.decisions` replaces an open proposal from the same desk on the same subject, expires stale ones, and logs `alert` and `memo` as notes instead of queue items (see `docs/concept.md`) |
+
 ## Guardrails
 
 **Preflight checks the agents rely on.** Preflight is engine code owned by `docs/statistics.md` and rendered by `docs/design.md`; the runner calls it and never re-implements it. Desk-written fields are above; Preflight adds the result, tax impact, profile version and status. The agents side needs at least these checks:
@@ -365,6 +374,7 @@ desk/agents/
   debrief.py      period debriefs after the review job: pack, debrief, number check, record
   plans.py        stock plan drafts: queue by reason, draft or keep, level check, pinned steps, save
   portfolio.py    nightly portfolio pass: one analysis per holding, tries, status for the app
+  wording.py      rounds prose he reads; gives each proposal its subject and as-of day
   advisor.py      risk band, catalog, convictions and planned actions for every brief
   switches.py     Settings over desk.yaml over defaults
   prompts/        one system prompt per desk (Phase 5 on)

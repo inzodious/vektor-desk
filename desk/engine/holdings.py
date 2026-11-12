@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from desk.engine import broker
+from desk.engine.asof import quote_series
 from desk.engine.market import last_trading_day
 from desk.engine.source import SnapshotVersion, closes, snapshot_versions
 
@@ -287,7 +288,7 @@ def merge(mirror_series: dict, bars: dict) -> dict[str, dict[str, tuple[float, f
 
 
 def price_series(mirror: sqlite3.Connection, desk: sqlite3.Connection) -> dict[str, dict[str, tuple[float, float | None]]]:
-    return merge(closes(mirror), bar_series(desk))
+    return merge(merge(quote_series(desk), closes(mirror)), bar_series(desk))
 
 
 def build_days(anchor_list: list[Anchor], prices: Prices, through: str | None = None) -> list[str]:
@@ -448,7 +449,7 @@ def rebuild(mirror: sqlite3.Connection, desk: sqlite3.Connection, *, through: st
     versions = snapshot_versions(mirror)
     series = closes(mirror)
     bars = bar_series(desk)
-    prices = Prices(merge(series, bars))
+    prices = Prices(merge(merge(quote_series(desk), series), bars))
     anchor_list, records = anchors(versions, prices)
     rows_in, history = broker.history(mirror, desk)
     activity = activity_by_date(rows_in)
