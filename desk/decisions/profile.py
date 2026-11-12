@@ -13,7 +13,10 @@ from desk.config import Config
 from desk.decisions.store import dumps, now_iso, session
 
 DESKS = ("plan_keeper", "tax", "risk", "research", "skeptic", "scout", "strategy", "filings", "discounts", "debrief", "plans")
-DEFAULT_ON = ("debrief", "plans")
+SWITCHED_ON = ("research", "scout", "strategy", "discounts", "filings")
+DEFAULT_ON = (*SWITCHED_ON, "debrief", "plans")
+DESKS_ON_ID = "desks-on-2026-11-11"
+MARGIN_RATE_PCT = 12.0
 LOT_METHODS = ("highest_cost", "lowest_cost", "fifo", "lifo", "tax_efficient")
 TILTS = ("growth", "balanced", "income")
 
@@ -35,6 +38,7 @@ DEFAULTS: dict = {
     },
     "usage": {"overnight_window": "01:00-05:00", "weekly_runs": {}},
     "agents": {"enabled": False, "desks": {d: d in DEFAULT_ON for d in DESKS}},
+    "margin": {"rate_pct": MARGIN_RATE_PCT},
     "deposits": "auto",
     "alerts": {"min_priority": "default"},
     "rules": [
@@ -148,6 +152,13 @@ def fi_goal(data: dict) -> dict | None:
     }
 
 
+def margin_rate(data: dict) -> dict:
+    rate = (data.get("margin") or {}).get("rate_pct")
+    if isinstance(rate, bool) or not isinstance(rate, int | float):
+        return {"rate_pct": MARGIN_RATE_PCT, "source": "default"}
+    return {"rate_pct": float(rate), "source": "default" if rate == MARGIN_RATE_PCT else "profile"}
+
+
 def validate(data) -> list[str]:
     from desk.decisions.rules import validate_rules
 
@@ -199,6 +210,9 @@ def validate(data) -> list[str]:
             errors.append(f"fi.{name} must be a date like 1990-01-31")
     if "inflation_adjusted" in fi and not isinstance(fi["inflation_adjusted"], bool):
         errors.append("fi.inflation_adjusted must be true or false")
+    margin = _section(errors, data, "margin")
+    if margin.get("rate_pct") is not None:
+        _num(errors, "margin.rate_pct", margin["rate_pct"], 0, 40)
     usage = _section(errors, data, "usage")
     runs = usage.get("weekly_runs", {}) or {}
     if not isinstance(runs, dict):
@@ -325,9 +339,44 @@ def sync(conn: sqlite3.Connection, path: Path) -> Profile:
     return latest(conn)
 
 
+def desks_on_once(conn: sqlite3.Connection, path: Path) -> list[str] | None:
+    from desk.decisions.yamlfile import dump_section, replace_section, write_with_backup
+
+    if conn.execute("SELECT 1 FROM profile_passes WHERE id=?", (DESKS_ON_ID,)).fetchone():
+        return None
+    switched: list[str] = []
+    if path.exists():
+        try:
+            text = path.read_text()
+            raw = yaml.safe_load(text)
+        except (OSError, yaml.YAMLError):
+            return None
+        agents = raw.get("agents") if isinstance(raw, dict) else None
+        desks = agents.get("desks") if isinstance(agents, dict) else None
+        switched = [d for d in SWITCHED_ON if isinstance(desks, dict) and desks.get(d) is False]
+        if switched:
+            out = replace_section(text, "agents", dump_section("agents", {**agents, "desks": {**desks, **{d: True for d in switched}}}))
+            try:
+                parse(out)
+                write_with_backup(path, out)
+            except (ProfileError, OSError):
+                return None
+    with conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO profile_passes (id, applied_at, detail) VALUES (?, ?, ?)", (DESKS_ON_ID, now_iso(), json.dumps({"switched_on": switched}))
+        )
+    return switched
+
+
+def passes(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute("SELECT id, applied_at, detail FROM profile_passes ORDER BY applied_at")
+    return [{"id": r["id"], "applied_at": r["applied_at"], **json.loads(r["detail"])} for r in rows]
+
+
 def active_profile(cfg: Config | None = None) -> Profile:
     cfg = cfg or Config.from_env()
     with session(cfg) as conn:
+        desks_on_once(conn, profile_path(cfg))
         profile = sync(conn, profile_path(cfg))
         from desk.decisions.risk import overlay
 

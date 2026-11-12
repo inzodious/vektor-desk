@@ -39,6 +39,11 @@ DOSSIER = {
             },
         },
         "verdict": {"enum": ["add", "hold", "trim", "avoid", "watch", None]},
+        "verdict_line": {"type": "string", "maxLength": 240},
+        "what_it_is": {"type": "string", "maxLength": 500},
+        "valuation_note": {"type": "string", "maxLength": 600},
+        "risks": {"type": "array", "maxItems": 6, "items": {"type": "string", "maxLength": 300}},
+        "fit": {"type": "string", "maxLength": 800},
         "what_would_change": {"type": "string", "maxLength": 800},
         "changes_since_last": {"type": ["string", "null"], "maxLength": 800},
         "sources": {

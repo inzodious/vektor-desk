@@ -2,7 +2,7 @@ from desk.agents import store
 from desk.agents.desks import DESKS
 from desk.config import Config
 
-DEFAULT_OFF = ("filings", "discounts")
+DEFAULT_OFF: tuple[str, ...] = ()
 NOTES = {
     "app": "Switched off in Settings.",
     "desk.yaml": "Switched off in desk.yaml.",

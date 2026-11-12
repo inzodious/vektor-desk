@@ -293,11 +293,11 @@ def test_weight_band_and_conviction_hold(cfg):
 
 
 def test_new_desks_default_on_behind_the_master_switch(cfg):
-    assert (DEFAULTS["agents"]["desks"]["debrief"], DEFAULTS["agents"]["desks"]["plans"], DEFAULTS["agents"]["desks"]["research"]) == (True, True, False)
+    assert (DEFAULTS["agents"]["desks"]["debrief"], DEFAULTS["agents"]["desks"]["plans"], DEFAULTS["agents"]["desks"]["research"]) == (True, True, True)
     assert DEFAULTS["agents"]["enabled"] is False
     (cfg.data_dir / "desk.yaml").write_text("agents:\n  enabled: true\n  desks:\n    tax: true\n")
     profile = active_profile(cfg)
-    assert profile.desk_enabled("plans") and profile.desk_enabled("debrief") and not profile.desk_enabled("scout")
+    assert profile.desk_enabled("plans") and profile.desk_enabled("debrief") and profile.desk_enabled("scout")
 
 
 # ---- API ----

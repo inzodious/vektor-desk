@@ -72,8 +72,10 @@ def go(cfg, queue, profile=ON, answer=CASE, **kw):
     return report, box, fake
 
 
-def test_off_by_default_and_guarded(cfg):
+def test_on_by_default_off_in_desk_yaml_and_guarded(cfg):
     report, _, fake = go(cfg, [hit(1)], profile={})
+    assert report.status == "ok" and len(fake.calls) == 1
+    report, _, fake = go(cfg, [hit(2)], profile={"agents": {"desks": {"discounts": False}}})
     assert report.status == "disabled" and not fake.calls
     store.set_guard(cfg, True)
     report, _, fake = go(cfg, [hit(1)])
