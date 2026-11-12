@@ -45,6 +45,25 @@ describe('words', () => {
     expect(specLines({ entry: { top_n: 'param:top_n' }, params: { top_n: [4, 5] } })[0].v).toBe('top 4 by rank');
     expect(specLines(null)).toEqual([]);
   });
+
+  it('words filters, fixed weights, a volatility target and a stock cap', () => {
+    const lines = (spec) => Object.fromEntries(specLines(spec).map((l) => [l.k, l.v]));
+    expect(lines({ universe: { type: 'fund_list', symbols: ['SPY'] }, sizing: { method: 'fixed', weights: { SPY: 100 } }, filters: [{ metric_id: 'ma_cross', window: '200d', min: 0 }], rebalance: 'monthly' })).toEqual({
+      'Picks from': 'SPY',
+      'Only while': 'its 50-day average is above its 200-day average',
+      Trades: 'monthly, fixed weights: SPY 100%',
+    });
+    expect(lines({ filters: [{ metric_id: 'ma_gap', window: '200d', min: 0, symbol: 'spy' }] })['Only while']).toBe('SPY is above its 200-day average');
+    expect(lines({ filters: [{ metric_id: 'ret', window: '126d', min: 0, symbol: 'EEM' }, { metric_id: 'ret', window: '126d', min: 0, symbol: 'AGG' }] })['Only while']).toBe('EEM is up over 126 days; AGG is up over 126 days');
+    expect(lines({ filters: [{ metric_id: 'vol', window: '63d', max: 0.25, symbol: 'SPY' }] })['Only while']).toBe('SPY has moved less than 25% a year over 63 days');
+    expect(lines({ filters: [{ metric_id: 'dd', window: '252d', max: -0.1 }] })['Only while']).toBe('it is 10% or more below its 252-day high');
+    expect(lines({ filters: [{ metric_id: 'range_52w', window: '252d', min: 0.8 }] })['Only while']).toBe('place in its range over 252 days at least 0.8');
+    expect(lines({ rebalance: 'quarterly', sizing: { method: 'fixed', weights: { FTEC: 25, VTI: 75 }, vol_target: 0.15 } }).Trades).toBe('quarterly, fixed weights: FTEC 25%, VTI 75%; scaled down while the last three months ran hotter than 15% a year');
+    expect(lines({ rebalance: 'monthly' }).Trades).toBe('monthly, equal weights');
+    expect(lines({ universe: { type: 'fund_list', set: 'held_mix', cap_stocks_pct: 10 } })['Picks from']).toBe('what you hold today, no single stock above 10%');
+    expect(lines({ universe: { type: 'french' } })['Picks from']).toBe('Ken French research portfolios');
+    expect(paramText({ debit_pct: 10, rate_pct: 12 })).toBe('10% starting debit, 12% rate');
+  });
 });
 
 describe('list', () => {

@@ -34,6 +34,9 @@ export const RULE_WORD = {
   deposit_steering: 'Steer deposits',
   harvest: 'Harvest losses',
   margin: 'Margin in a dip',
+  dip_reserve: 'Hold cash for a dip',
+  spread: 'Spread a lump sum',
+  paydown: 'Pay the margin debit first',
 };
 
 const PARAM_WORD = {
@@ -42,6 +45,9 @@ const PARAM_WORD = {
   dip_pct: (v) => `${v}% dip`,
   borrow_pct: (v) => `borrow ${v}%`,
   rate_pct: (v) => `${v}% rate`,
+  debit_pct: (v) => `${v}% starting debit`,
+  hold_pct: (v) => `hold back ${v}%`,
+  months: (v) => `over ${v} months`,
   top_n: (v) => `top ${v}`,
   lookback: (v) => `${v}-day lookback`,
 };
@@ -208,16 +214,17 @@ export function factorItems(loadings = {}) {
   return Object.entries(loadings || {}).map(([k, l]) => ({ label: FACTOR_WORD[k] || k, value: l?.beta ?? null, hint: l?.t != null ? `t ${l.t}` : undefined }));
 }
 
-const METRIC_WORD = { ret: 'return', ret_skip: 'return skipping the last month', vol: 'volatility', ma_gap: 'gap to its average', range_52w: 'place in its range', dd: 'drop from the high' };
+const METRIC_WORD = { ret: 'return', ret_skip: 'return skipping the last month', vol: 'volatility', ma_gap: 'gap to its average', ma_cross: '50-day average against the long average', range_52w: 'place in its range', dd: 'drop from the high' };
 const TRANSFORM_WORD = { raw: '', rank: 'ranked high to low', inverse_rank: 'ranked low to high', zscore: 'as a z-score', inverse: 'flipped' };
-const SET_WORD = { sector_etfs: 'US sector ETFs', core_etfs: 'core ETFs', benchmarks: 'benchmarks' };
+const SET_WORD = { sector_etfs: 'US sector ETFs', core_etfs: 'core ETFs', benchmarks: 'benchmarks', plan_mix: 'the funds in your plan', held_mix: 'what you hold today' };
+const TYPE_WORD = { french: 'Ken French research portfolios', small_caps: 'US small companies' };
 
 function universeText(u) {
   if (!u) return null;
   if (typeof u === 'string') return u;
-  if (u.set) return SET_WORD[u.set] || u.set.replace(/_/g, ' ');
-  if (u.symbols?.length) return u.symbols.join(', ');
-  return u.rule || u.type || null;
+  const base = u.set ? SET_WORD[u.set] || u.set.replace(/_/g, ' ') : u.symbols?.length ? u.symbols.join(', ') : u.rule || TYPE_WORD[u.type] || u.type || null;
+  const cap = Number(u.cap_stocks_pct);
+  return base && cap > 0 ? `${base}, no single stock above ${cap}%` : base;
 }
 
 function fill(text, params = {}) {
@@ -235,6 +242,36 @@ function signalText(g, params) {
   if (typeof g === 'string') return fill(g, params);
   const w = g.window ? windowText(fill(g.window, params)) : '';
   return [METRIC_WORD[g.metric_id] || g.metric_id, w ? `over ${w}` : '', TRANSFORM_WORD[g.transform] ?? g.transform].filter(Boolean).join(' ');
+}
+
+const share = (x) => `${Math.round(Math.abs(Number(x)) * 1000) / 10}%`;
+
+// ---------- filters: the rule only holds while these are true ----------
+function filterText(f, params) {
+  if (typeof f === 'string') return fill(f, params);
+  if (!f || typeof f !== 'object') return null;
+  const days = f.window ? windowText(fill(f.window, params)).replace(/ days$/, '-day').replace(/ months$/, '-month').replace(/ years$/, '-year') : '';
+  const span = f.window ? windowText(fill(f.window, params)) : '';
+  const who = f.symbol ? String(f.symbol).toUpperCase() : 'it';
+  const has = (k) => f[k] != null && !Number.isNaN(Number(f[k]));
+  if (f.metric_id === 'ma_gap' && (has('min') || has('max')) && Number(f.min ?? f.max) === 0) return `${who} is ${has('min') ? 'above' : 'below'} its ${days} average`;
+  if (f.metric_id === 'ma_cross' && (has('min') || has('max')) && Number(f.min ?? f.max) === 0) return `${f.symbol ? `the 50-day average of ${who}` : 'its 50-day average'} is ${has('min') ? 'above' : 'below'} its ${days} average`;
+  if (f.metric_id === 'ret' && (has('min') || has('max')) && Number(f.min ?? f.max) === 0) return `${who} is ${has('min') ? 'up' : 'down'} over ${span}`;
+  if (f.metric_id === 'vol' && has('max') && !has('min')) return `${who} has moved less than ${share(f.max)} a year over ${span}`;
+  if (f.metric_id === 'dd' && has('max') && !has('min')) return `${who} is ${share(f.max)} or more below its ${days} high`;
+  if (f.metric_id === 'dd' && has('min') && !has('max')) return `${who} is within ${share(f.min)} of its ${days} high`;
+  const bounds = [has('min') ? `at least ${f.min}` : '', has('max') ? `at most ${f.max}` : ''].filter(Boolean).join(' and ');
+  return [f.symbol ? `${who}:` : '', METRIC_WORD[f.metric_id] || String(f.metric_id || '').replace(/_/g, ' '), span ? `over ${span}` : '', bounds].filter(Boolean).join(' ');
+}
+
+function sizingText(z, params) {
+  if (z == null) return 'equal weights';
+  if (typeof z === 'string') return `${fill(z, params).replace(/_/g, ' ')} weights`;
+  if (typeof z !== 'object') return `${z} weights`;
+  const w = z.weights && typeof z.weights === 'object' ? Object.entries(z.weights) : [];
+  const base = w.length ? `fixed weights: ${w.map(([k, v]) => `${k} ${v}%`).join(', ')}` : `${String(z.method || 'equal').replace(/_/g, ' ')} weights`;
+  const hot = Number(z.vol_target);
+  return hot > 0 ? `${base}; scaled down while the last three months ran hotter than ${share(hot)} a year` : base;
 }
 
 const asText = (v, params) => (v == null ? null : typeof v === 'string' ? fill(v, params) : fill(JSON.stringify(v).replace(/[{}"]/g, '').replace(/:/g, ' ').replace(/,/g, ', '), params));
@@ -259,7 +296,8 @@ export function specLines(spec) {
     { k: 'Signal', v: (spec.signals || []).map((g) => signalText(g, spec.params)).join('; ') || null },
     { k: 'Buys', v: entryText(spec.entry, spec.params) },
     { k: 'Sells', v: exitText(spec.exit, spec.params) },
-    { k: 'Trades', v: spec.rebalance ? `${spec.rebalance}, ${(asText(spec.sizing) || 'equal').replace(/_/g, ' ')} weights` : null },
+    { k: 'Only while', v: (spec.filters || []).map((f) => filterText(f, spec.params)).filter(Boolean).join('; ') || null },
+    { k: 'Trades', v: spec.rebalance ? `${spec.rebalance}, ${sizingText(spec.sizing, spec.params)}` : null },
     { k: 'Horizons', v: spec.horizons?.length ? spec.horizons.map((h) => `${h} years`).join(', ') : null },
   ].filter((l) => l.v);
 }
