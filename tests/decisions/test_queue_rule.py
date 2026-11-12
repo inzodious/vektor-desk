@@ -3,7 +3,7 @@ from datetime import timedelta
 
 import pytest
 
-from desk.decisions import create_proposal, draft, get, journal, notes, queue, snooze, summary
+from desk.decisions import create_proposal, desk_history, draft, get, journal, notes, queue, snooze, summary
 from desk.decisions.__main__ import main, night
 from desk.decisions.records import subject_of
 from desk.decisions.schema import SCHEMA
@@ -140,6 +140,7 @@ def test_without_a_zone_a_desk_trade_expires_after_a_big_move(cfg, preflight, no
     quote(desk_db, "ABCD", "2026-11-11T15:00:00+00:00", 17.5)
     quote(desk_db, "WXYZ", "2026-11-11T15:00:00+00:00", 105.0)
     later = now + timedelta(days=2)
+    assert [h["decision"] for h in desk_history(cfg, "research", now=later)] == ["open", "expired"]
     assert {d["id"] for d in queue(cfg, now=later)["items"]} == {steady["id"], mine["id"]}
     assert reason(cfg, moved) == "ABCD is down 12% since this was written on Nov 9 ($20.00 then, $17.50 now), so its numbers no longer hold."
 

@@ -849,8 +849,9 @@ def journal(
     return {"days": days, "count": len(items)}
 
 
-def desk_history(cfg: Config, desk: str, limit: int = 20) -> list[dict]:
+def desk_history(cfg: Config, desk: str, limit: int = 20, *, now: datetime | None = None) -> list[dict]:
     with session(cfg) as conn:
+        tidy(cfg, conn, now_iso(_now(now)))
         rows = conn.execute("SELECT * FROM decisions WHERE origin=? ORDER BY created_at DESC, rowid DESC LIMIT ?", (desk, limit)).fetchall()
     out = []
     for r in rows:
