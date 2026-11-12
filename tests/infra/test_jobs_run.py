@@ -134,3 +134,25 @@ def test_a_second_schedule_line_waits_for_the_first(cfg):
     reap([a, b], cfg)
     assert jobrun.last_run(cfg, "agents-run-tax")["result"] == "ok"
     assert jobrun.last_run(cfg, "agents-run-tax")["trigger"] == "schedule"
+
+
+def test_the_last_ten_runs_of_a_job_can_be_read(app_client, cfg):
+    from desk.scheduler import start
+
+    client = app_client(packages=["mirror", "engine"])
+    assert client.get("/api/jobs/mirror/runs").json() == {"name": "mirror", "title": "Mirror", "keeps": 10, "runs": []}
+    assert client.get("/api/jobs/nope/runs").status_code == 404 and client.get("/api/jobs/rm%20-rf/runs").json()["error"] == "unknown_job"
+    for n in range(12):
+        job = make_job("m", "0 0 1 1 *", ["sh", "-c", f"echo run {n}; exit {1 if n == 11 else 0}"], name="mirror")
+        start(job, cfg, "schedule")
+        assert jobrun.runs(cfg, "mirror") == jobrun.runs(cfg, "mirror") and len(jobrun.runs(cfg, "mirror")) == min(n, 10)
+        job.proc.wait()
+        reap([job], cfg)
+    body = client.get("/api/jobs/mirror/runs")
+    assert body.headers["cache-control"] == "no-store"
+    kept = body.json()["runs"]
+    assert [r["said"] for r in kept] == [f"run {n}" for n in range(11, 1, -1)]
+    assert (kept[0]["result"], kept[0]["exit_code"], kept[1]["result"], kept[1]["did"]) == ("failed", 1, "ok", "run 10")
+    assert kept[0] == jobrun.last_run(cfg, "mirror")
+    jobrun.history_file(cfg, "mirror").write_text("not json")
+    assert jobrun.runs(cfg, "mirror") == [] and client.get("/api/jobs/mirror/runs").json()["runs"] == []
