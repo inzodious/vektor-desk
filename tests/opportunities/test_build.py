@@ -11,6 +11,9 @@ from desk.opportunities import ready, sizing
 
 NOW = datetime(2026, 11, 7, 3, 0, tzinfo=UTC)
 AS_OF = "2026-11-06"
+LATER = datetime(2026, 11, 10, 3, 0, tzinfo=UTC)
+NEXT = "2026-11-09"
+DEBIT = "A margin debit of $900 is open, so ready cash goes there first and no buy is proposed."
 
 
 def sessions(n, end=date(2026, 11, 6)):
@@ -84,7 +87,7 @@ def rules(monkeypatch):
     monkeypatch.setattr("desk.engine.preflight.rules_in_force", lambda cfg, plan: (RULES, "profile"))
 
 
-def scout_idea(cfg, symbol="MSFT", *, flag=False):
+def scout_idea(cfg, symbol="MSFT", *, flag=False, rejected=None):
     from desk import decisions
 
     idea = {
@@ -100,6 +103,8 @@ def scout_idea(cfg, symbol="MSFT", *, flag=False):
         "confidence": 0.6,
         "sources": [{"url": "https://example.com/a", "title": "A"}, {"url": "https://example.com/b", "title": "B"}],
     }
+    if rejected:
+        return decisions.reject_proposal(cfg, idea, "scout", rejected, run_id="9")
     record = decisions.create_proposal(cfg, idea, "scout", run_id="9")
     if flag:
         decisions.attach_skeptic(cfg, record["id"], "flag", "The delay may repeat next quarter.")
@@ -114,6 +119,7 @@ def test_no_engine_run_gives_an_empty_list_with_its_reason(cfg):
     assert out["rows"] == [] and out["as_of"] is None
     assert out["note"] == ob.NO_ENGINE and out["headline"] == ob.NO_ENGINE
     assert out["counts"]["total"] == 0 and out["advice_only"] is True
+    assert out["asof"]["day"] is None and out["prices"] == {"day": None, "words": None, "older": []}
     assert out["profile"]["source"] == "default_moderate" and "Moderate" in out["profile"]["note"]
     assert ready(cfg) is None
 
@@ -248,13 +254,15 @@ def test_nothing_is_ever_sized_on_margin(cfg, rules, monkeypatch):
     assert r["size"]["usd"] == 0 and r["size"]["funding"] == "wait" and r["size"]["blocked"] is None
     assert "the margin debit comes first" in r["size"]["note"] and "Never on margin" in r["size"]["note"]
     assert r["stance"] == "buy" and r["stance_label"] == "Worth buying once cash is free"
-    assert out["headline"].startswith("1 worth buying once cash is free")
+    assert out["headline"].startswith("1 worth buying once the margin debit is paid")
     assert out["cash"]["free_usd"] == 0 and out["cash"]["margin_debit_usd"] == 900.0
+    assert r["queued"] is False and r["not_queued"] == "Pay the margin debit first: $900 is open, so no buy goes to the queue."
     monkeypatch.setattr("desk.engine.preflight.next_deposit", lambda cfg, plan, day, now=None: (1000.0, "2026-11-18"))
     r = row(ob.build(cfg, now=NOW), "QUAL")
     assert r["size"]["funding"] == "deposit" and r["size"]["usd"] == pytest.approx(100.0)
     assert "Waits for the Nov 18 deposit after it clears the margin debit" in r["size"]["note"]
     assert r["stance_label"] == "Worth buying with the next deposit"
+    assert r["not_queued"].endswith("The Nov 18 deposit clears it and covers this.")
 
 
 def test_a_planned_loss_sale_window_blocks_buys_of_that_name(cfg, rules, monkeypatch):
@@ -271,6 +279,143 @@ def test_sizes_never_exceed_free_cash(cfg, rules):
     signal(conn, "QUAL", case="buy")
     r = row(ob.build(cfg, now=NOW), "QUAL")
     assert r["size"]["usd"] == 60.0 and r["size"]["limited_by"] == "free cash"
+    assert r["stance_label"] == "Worth buying now" and r["not_queued"] is None
+
+
+def test_a_buy_with_no_ready_cash_still_shows_and_says_why_it_is_not_queued(cfg, rules):
+    conn = seed(cfg, cash=10.0)
+    signal(conn, "QUAL", case="buy")
+    out = ob.build(cfg, now=NOW)
+    r = row(out, "QUAL")
+    assert r["stance"] == "buy" and r["size"]["usd"] == 0 and r["stance_label"] == "Worth buying once cash is free"
+    assert r["not_queued"] == "Needs more ready cash than there is: $10 is ready today."
+    assert out["headline"].startswith("1 worth buying once cash is free")
+
+
+def test_cash_and_the_margin_debit_come_from_the_desk_s_own_numbers(cfg, rules):
+    conn = seed(cfg)
+    signal(conn, "QUAL", case="buy")
+    with conn:
+        for metric, value in (("cash.ready", 50.0), ("margin.debit", 1200.0)):
+            conn.execute("INSERT INTO metric_values VALUES (?, 'portfolio', 'all', 'now', ?, ?, 'usd', 1, 'ok', '1')", (metric, AS_OF, value))
+    out = ob.build(cfg, now=NOW)
+    assert out["cash"]["free_usd"] == 50.0 and out["cash"]["margin_debit_usd"] == 1200.0
+    r = row(out, "QUAL")
+    assert r["stance"] == "buy" and r["size"]["usd"] == 0 and r["size"]["funding"] == "wait"
+    assert r["not_queued"].startswith("Pay the margin debit first: $1,200 is open")
+
+
+def test_cash_ready_elsewhere_never_sizes_a_buy_the_buying_account_cannot_pay_for(cfg, rules):
+    conn = seed(cfg, cash=10.0)
+    signal(conn, "QUAL", case="buy")
+    with conn:
+        conn.execute("INSERT INTO metric_values VALUES ('cash.ready', 'portfolio', 'all', 'now', ?, 600.0, 'usd', 1, 'ok', '1')", (AS_OF,))
+    r = row(ob.build(cfg, now=NOW), "QUAL")
+    assert r["stance"] == "buy" and r["size"]["usd"] == 0 and r["size"]["funding"] == "wait" and r["size"]["blocked"] is None
+    assert r["size"]["note"] == "It needs more settled cash than the buying account holds today. Never on margin."
+    assert r["not_queued"] == "Needs more ready cash than the buying account holds today."
+
+
+# ---- The newest price ----
+
+
+def test_a_provisional_close_moves_the_price_the_drop_and_the_zone(cfg, rules):
+    conn = seed(cfg)
+    signal(conn, "QUAL", case="buy")
+    before = row(ob.build(cfg, now=NOW), "QUAL")
+    assert before["price_as_of"] == AS_OF and before["price_source"] == "close" and before["entry"]["high"] == 180.0
+    assert before["as_of_words"] == "Priced at the Fri Nov 6 close. The written case is from the same day."
+    with conn:
+        conn.execute("INSERT INTO closes_provisional VALUES ('QUAL', ?, 171.0, 180.0, '2026-11-09T21:00:00+00:00', '2026-11-09T21:02:00+00:00')", (NEXT,))
+    out = ob.build(cfg, now=LATER)
+    r = row(out, "QUAL")
+    assert r["price_as_of"] == NEXT and r["as_of"] == NEXT and r["price_source"] == "provisional" and r["price_behind"] is False
+    assert r["entry"]["high"] == 171.0 and r["entry"]["low"] < before["entry"]["low"] and r["invalid_below"] < before["invalid_below"]
+    assert r["analysis_as_of"] == AS_OF and r["since_analysis_pct"] == pytest.approx(-5.0)
+    assert r["as_of_words"].startswith("Priced at the Mon Nov 9 close, provisional until the official close lands.")
+    assert "The written case is from Fri Nov 6; the price is 5.0% lower since." in r["as_of_words"]
+    assert any(f.startswith("20.9% under its 52-week high") for f in r["facts"])
+    assert out["as_of"] == AS_OF and out["asof"]["day"] == AS_OF and out["prices"]["day"] == NEXT
+
+
+def test_a_name_with_no_newer_price_says_so_on_its_row(cfg, rules):
+    conn = seed(cfg)
+    signal(conn, "QUAL", case="buy")
+    with conn:
+        conn.execute("INSERT INTO closes_provisional VALUES ('QUAL', ?, 171.0, 180.0, '2026-11-09T21:00:00+00:00', '2026-11-09T21:02:00+00:00')", (NEXT,))
+    out = ob.build(cfg, now=LATER)
+    r = row(out, "WTCH")
+    assert r["price_as_of"] == AS_OF and r["price_behind"] is True
+    assert r["as_of_words"].endswith("The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands overnight.")
+    assert {"symbol": "WTCH", "price_as_of": AS_OF, "held": False} in out["prices"]["older"]
+    assert out["prices"]["words"].startswith("Prices run to Mon Nov 9.") and "WTCH" in out["prices"]["words"]
+
+
+def test_a_live_quote_marks_a_held_name_and_an_old_quote_changes_nothing(cfg, rules):
+    conn = seed(cfg)
+    quote = "INSERT INTO quotes_live VALUES (?, ?, ?, ?, ?, ?)"
+    with conn:
+        conn.execute(quote, ("ACME", "2026-11-09T15:30:00-05:00", 22.0, 24.0, "finnhub", "2026-11-09T20:30:05+00:00"))
+        conn.execute(quote, ("ACME", "2026-11-09T10:00:00-05:00", 23.5, 24.0, "finnhub", "2026-11-09T15:00:05+00:00"))
+        conn.execute(quote, ("WTCH", "2026-11-06T15:59:00-05:00", 9.0, 10.2, "finnhub", "2026-11-06T21:00:05+00:00"))
+        conn.execute(quote, ("IVV", "2026-11-09T16:00:00-05:00", 90.0, 107.0, "close", "2026-11-09T20:30:05+00:00"))
+    out = ob.build(cfg, now=datetime(2026, 11, 9, 20, 40, tzinfo=UTC))
+    r = row(out, "ACME")
+    assert r["price_source"] == "quote" and r["price_as_of"] == NEXT and r["price_at"] == "2026-11-09T15:30:00-05:00"
+    assert r["entry"]["high"] == 22.0 and r["as_of_words"].startswith("Priced at Mon Nov 9, 3:30 PM ET.")
+    w = row(out, "WTCH")
+    assert w["price_source"] == "close" and w["price_as_of"] == AS_OF and w["entry"]["high"] == 10.0
+    assert all(x["symbol"] != "IVV" for x in out["rows"])
+
+
+def test_the_scanner_hit_s_day_is_the_analysis_day_when_no_case_is_written(cfg, rules):
+    conn = seed(cfg)
+    signal(conn, "QUAL", day="2026-11-04")
+    r = row(ob.build(cfg, now=NOW), "QUAL")
+    assert r["analysis_as_of"] == "2026-11-04" and r["price_as_of"] == AS_OF
+    assert "The scanner hit is from Wed Nov 4; the price is" in r["as_of_words"]
+    a = row(ob.build(cfg, now=NOW), "ACME")
+    assert a["analysis_as_of"] == AS_OF and a["as_of_words"] == "Priced at the Fri Nov 6 close. The numbers here are worked out from that price."
+
+
+# ---- Ideas that cannot be bought yet ----
+
+
+def test_a_scout_buy_turned_back_for_the_margin_debit_still_shows_as_a_buy(cfg, rules):
+    seed(cfg, cash=-900.0)
+    record = scout_idea(cfg, "MSFT", rejected=DEBIT)
+    out = ob.build(cfg, now=NOW)
+    r = row(out, "MSFT")
+    assert r["stance"] == "buy" and r["stance_label"] == "Worth buying once cash is free" and "scout" in r["sources"]
+    assert r["decision_id"] == record["id"] and r["queued"] is False
+    assert r["not_queued"] == "Pay the margin debit first: $900 is open, so no buy goes to the queue."
+    assert r["why_now"].startswith("Scout: Backlog doubled") and "One customer is a large share of sales." in r["wrong_if"]
+    assert out["counts"]["buy"] == 1 and out["headline"].startswith("1 worth buying once the margin debit is paid")
+
+
+def test_an_open_scout_idea_wins_over_an_older_turned_back_one(cfg, rules):
+    seed(cfg)
+    scout_idea(cfg, "MSFT", rejected="It needs $100 of ready cash and there is $40.")
+    r = row(ob.build(cfg, now=NOW), "MSFT")
+    assert r["stance"] == "buy" and r["stance_label"] == "Worth buying now" and r["queued"] is False
+    assert r["not_queued"].startswith("Scout's idea was turned back on ") and "It needs $100 of ready cash and there is $40." in r["not_queued"]
+    record = scout_idea(cfg, "MSFT")
+    r = row(ob.build(cfg, now=NOW), "MSFT")
+    assert r["decision_id"] == record["id"] and r["queued"] is True and r["not_queued"] is None
+
+
+def test_a_hold_off_note_makes_it_a_watch_and_other_rejections_stay_out(cfg, rules):
+    seed(cfg)
+    held = "A standing note says to hold off: No new buys until the margin is cleared."
+    scout_idea(cfg, "MSFT", rejected=held)
+    scout_idea(cfg, "WTCH", rejected="WTCH is inside a planned wash-sale window: no buys until 2027-01-15.")
+    scout_idea(cfg, "QUAL", rejected="Numbers don't match the brief: price")
+    out = ob.build(cfg, now=NOW)
+    r = row(out, "MSFT")
+    assert r["stance"] == "watch" and r["stance_label"] == "Watch: a standing note says hold off" and r["not_queued"] == held
+    w = row(out, "WTCH")
+    assert w["stance"] == "watch" and w["stance_label"] == "Watch: inside a no-buy window" and "wash-sale window" in w["not_queued"]
+    assert "scout" not in (row(out, "QUAL") or {"sources": []})["sources"]
 
 
 # ---- Order ----
@@ -295,7 +440,11 @@ def test_the_endpoint_returns_the_list(cfg, rules, app_client):
     assert res.status_code == 200 and res.headers["cache-control"] == "no-store"
     body = res.json()
     assert body["rows"][0]["symbol"] == "QUAL" and body["counts"]["total"] == len(body["rows"])
-    assert set(body) == {"as_of", "built_at", "advice_only", "freshness", "headline", "counts", "note", "profile", "cash", "method", "rows", "passed"}
+    top = {"as_of", "asof", "prices", "built_at", "advice_only", "freshness", "headline", "counts", "note", "profile", "cash", "method", "rows", "passed"}
+    assert set(body) == top
+    timing = {"price_as_of", "price_source", "price_at", "price_behind", "analysis_as_of", "since_analysis_pct", "as_of_words", "queued", "not_queued"}
+    assert timing <= set(body["rows"][0])
+    assert set(body["asof"]) == {"day", "words", "status", "provisional", "expected_day", "behind"}
 
 
 def test_a_fault_while_building_gives_an_empty_list_that_says_so(cfg, rules, monkeypatch):
