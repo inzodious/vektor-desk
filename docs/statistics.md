@@ -867,6 +867,9 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 | `entry` | `{"top_n": 3 \| "param:top_n", "min_signal": 0}` or "top 3 by rank". `min_signal` applies to the first signal's raw value; slots it leaves empty stay in cash |
 | `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
 | `rebalance`, `sizing` | Weekly, monthly or quarterly; `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash |
+| `filters` | `[{"metric_id": "ma_gap", "window": "200d", "min": 0}]`: a name is eligible only while each raw value sits inside `min` and `max`; slots left empty stay in cash |
+| Fixed mixes | `"sizing": {"weights": {"SPY": 60, "AGG": 40}}` holds funds at fixed weights and needs no signal; `{"type": "fund_list", "set": "plan_mix"}` is the plan at its target weights. A fund with no history in the lab is dropped and the rest scaled up, with a caveat; under half the mix present is refused |
+| Named French portfolios | `{"type": "french", "set": "size_deciles", "members": ["lo"]}` keeps the portfolios whose name starts that way and needs no signal |
 | `params`, `grid` | `{"top_n": {"min": 1, "max": 4, "default": 3}}` or a list; grid values must sit inside. Over the trial budget (max 200), a seeded, deterministic subset runs |
 
 **A run.** Signals at the close, fills at the next open (`adjClose`-scaled), costs 5 bps for funds, 15 for stocks, 25 under $20M a day. FIFO lots, year-end tax on net realized gains at the exported marginal rate (else 24%) and 15% long-term, losses carried. Cash earns the 3-month bill. A symbol whose bars stop before the data ends is sold at its last price less 30%. The benchmark is `spec.benchmark`, else the plan mix, else the S&P 500, rebalanced monthly; the S&P 500 is always reported.
@@ -1004,6 +1007,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | `GET /api/engine/preflight?ticket_id=` | Stored before and after rows for a ticket |
 | `GET /api/engine/wash` | Open wash-sale windows `{symbol, kind, date, clears, account, amount}` |
 | `GET /api/lab/strategies`, `/api/lab/strategies/{id}` | Strategy list, status, feature catalog and grammar; one strategy's tear sheet, verdict and paper trades |
+| `GET /api/lab/library` | The strategy library: one row per built-in experiment with its kind, out-of-sample verdict, benchmark, trial count and luck band |
 | `GET /api/engine/scorecard?origin=` | Flight record: groups, desks, saves, off-plan gap, per-decision scores |
 | `GET /api/engine/patterns` | Patterns: market, holdings, drawdown tables, seasonality, correlation shifts, behavior |
 | `GET /api/engine/replay` | Rule replays: you, the index, and each rule's end value, by-symbol effect and weekly path |
@@ -1030,6 +1034,42 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
 | Nightly 03:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
+
+## Strategy library
+
+A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/shelf.py`. Each entry has an id, a kind, a family, a title, a one-line description, a benchmark label and either a strategy spec or a deposit rule.
+
+| Kind | Entries | Examples |
+|---|---|---|
+| Old and tested | 16 | Buy and hold, 60/40, risk parity, 200-day trend, volatility cap, dual momentum, 12-1 momentum (sectors, stocks, industries), sector rotation, low volatility, size and momentum tilts from the French portfolios |
+| Practical | 12 | The plan's mix, safe mix, aggressive tech tilt, dip-only, beaten-down sectors, deposits held back for a dip, margin dip-buy, lump sum spread over months, deposit steering, rebalance bands, tax-loss harvesting |
+| Novel and creative | 7 | Trend-filtered dip-buy, sector momentum in uptrends only, calm winners, 52-week-high breakout with a volatility cap, discount-day entries, insider cluster with a momentum filter, earnings drift where insiders also bought |
+
+Not on the shelf yet: value, profitability and quality tilts (their French files are not downloaded) and the as-held mix (the lab file carries the plan's weights, not position sizes; as-held runs in the paper race).
+
+| Step | When | What happens |
+|---|---|---|
+| Queue | End of `lab-export` (00:55), before the offer to a worker | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Experiments sort before rules. An entry the lab refused is queued again the next evening. A second run the same night queues nothing |
+| Run | Lab, with a worker first | Experiments are `lab.sims` jobs like any other; deposit rules run in the lab itself. The lab keeps waiting for an offered file while the worker has answered something in the last `DESK_LAB_WORKER_WAIT_MIN` minutes, then runs what is left |
+| Count | Ledger | Every shelf strategy has `parent_id: "library"`, so they are one family and each variant counts toward the trial count. `insider-` and `drift-` ids also count in those gate families |
+| Report | `GET /api/lab/library` | One row per entry, sorted by kind, verdict, then excess |
+
+`lab-export` is a light job (54 MB), so low-memory mode never makes it wait for its turn. Shelf results never queue a Strategy desk review, and they are never finalized by the shelf, so the two-year holdout stays untouched and nothing goes to paper.
+
+**New deposit rules.** `dip_reserve` (`hold_pct`, `dip_pct`): that share of each deposit waits in cash and is all invested when the mix is that far below its high. `spread` (`months`): the starting sum goes in over that many monthly parts; the baseline invests it on day one. Waiting cash earns the three-month Treasury rate.
+
+**Verdicts** use out-of-sample numbers only (the stitched walk-forward test windows; start-month distributions for rules):
+
+| Verdict | Experiment | Deposit rule |
+|---|---|---|
+| `held_up` | Ahead of the benchmark by at least the luck band, and overfitting probability under 0.2 | `helps`: 5th percentile above zero and the holdout not negative |
+| `within_noise` | Ahead, but inside the band, or the best settings look fitted | `no_clear_edge` |
+| `fell_short` | Behind the benchmark | `hurts`: 95th percentile below zero |
+| `inconclusive` | No out-of-sample record | No horizon with a start month |
+
+The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 / k)) * tracking_error / sqrt(years)`, with `k` the library's trial count. Each experiment result now also stores `noise` (`gate.measure` on the walk-forward record).
+
+**Row** (`rows[]`): `id`, `title`, `kind`, `family`, `description`, `benchmark`, `type` (`experiment` or `rule`), `status` (`tested`, `waiting`, `not_run`), `verdict`, `line` (one sentence with the numbers), `reason` (why it has not run), `tested_at`, `out_of_sample` (`start`, `end`, `ann_return_pct`, `excess_pts`, `sharpe`, `mdd_pct`), `noise` (`trials`, `band_pts`, `luck`), `rule` (`horizon_years`, `starts`, `p5_pts`, `p50_pts`, `p95_pts`, `share_better`), `deflated_sharpe`, `pbo`, `variants`, `research_only`, `caveats`, `detail`. The payload also has `as_of`, `trials`, `note`, `counts` and `kinds`. `shelf.ready(cfg)` gives the morning alert its line.
 
 ## Memory budget
 
@@ -1067,7 +1107,7 @@ On the synthetic database the heaviest experiment (French industries, 781 simula
 | Offer | NAS: end of `lab-export` (00:55), then `lab-offer` each minute from 01:00 to 05:59 | If a worker is online, every queued experiment the lab has not run becomes a `lab.sims` job keyed by `simcache.job_key`, with the current `lab.db` as its copy. `lab/queue/offers.sims` records each file's key and first offer time, and when a worker was last seen. A file is offered once per `lab.db`; later passes keep its time. No worker online: nothing is offered and nothing waits |
 | Run | Worker | `runner.sims` on its downloaded copy. An answer over 3 million simulated days is cut short and marked `partial`; the lab computes the rest |
 | Accept | NAS, `worker-apply` | `simcache.stage_file` copies the gzip into `lab/queue/` unread, so it costs no memory in the scheduler. It runs within seconds of the worker's post |
-| Use | Lab | An offered file, and everything queued after it, waits up to `DESK_LAB_WORKER_WAIT_MIN` (10) minutes from its offer for the answer; `waiting_for_worker` in the run's output names them. An experiment queued in the last 3 minutes also waits if a worker was seen in the last 6, so the offer can reach it first. When the answer arrives it is checked as above and used, good or bad. When it does not, the lab runs the queue itself. A wait still open at 06:00 is finished before the lab stops for the day |
+| Use | Lab | An offered file, and everything queued after it, waits up to `DESK_LAB_WORKER_WAIT_MIN` (10) minutes from its offer, or from the worker's latest answer if that is later, for the answer; `waiting_for_worker` in the run's output names them. An experiment queued in the last 3 minutes also waits if a worker was seen in the last 6, so the offer can reach it first. When the answer arrives it is checked as above and used, good or bad. When it does not, the lab runs the queue itself. A wait still open at 06:00 is finished before the lab stops for the day |
 
 **Rules for new jobs.** Iterate cursors, do not `fetchall` a bar table. Write downloads in batches inside the loop that fetches them. A second run of a job must be a no-op, not a double write.
 

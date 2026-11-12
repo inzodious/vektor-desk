@@ -18,7 +18,7 @@ from desk.engine.backfill import never_fetched, run_backfill
 from desk.engine.holdings import rebuild
 from desk.engine.kinds import offer_queue
 from desk.engine.lab import data as lab_data
-from desk.engine.lab import paper
+from desk.engine.lab import paper, shelf
 from desk.engine.live import refresh_quotes
 from desk.engine.lookthrough import run_all as run_lookthrough_all
 from desk.engine.lots import import_inbox
@@ -196,7 +196,7 @@ def run_lab_export(cfg: Config) -> dict:
 
     def work(desk):
         exported = lab_data.export(cfg, desk, kinds, targets)
-        return {**exported, **paper.run(cfg, desk), "worker": offer_queue(cfg)}
+        return {**exported, **paper.run(cfg, desk), "library": shelf.queue_missing(cfg), "worker": offer_queue(cfg)}
 
     return _with_desk(cfg, "lab-export", work)
 

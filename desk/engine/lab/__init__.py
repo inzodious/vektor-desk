@@ -30,18 +30,21 @@ SPEC_FIELDS = (
 def grammar() -> dict:
     return {
         "universe": {
-            "fund_list": 'symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks. {"type": "fund_list", "set": "sector_etfs"}',
+            "fund_list": "symbols: funds or ETFs, or set: sector_etfs | core_etfs | benchmarks | plan_mix (the plan at its target weights). "
+            '{"type": "fund_list", "set": "sector_etfs"}',
             "screen": "single stocks in the backfill universe; min_history_days, min_price. Carries a survivorship caveat",
             "small_caps": 'point-in-time US small caps from insider-filing names since 2016; min_price (default 2); benchmark IWM. {"type": "small_caps"}',
             "french": "Ken French research portfolios, no survivorship bias, daily from 1963 on the factor calendar. set: "
             + " | ".join(PORTFOLIO_FILES)
-            + '. {"type": "french", "set": "industry_12"}. Benchmark defaults to FF.MKT; a pass is research only, never paper',
+            + '. {"type": "french", "set": "industry_12"}. members: ["hi"] keeps only the portfolios whose name starts that way. '
+            "Benchmark defaults to FF.MKT; a pass is research only, never paper",
         },
+        "filters": '[{"metric_id": "ma_gap", "window": "200d", "min": 0}]: a name is only eligible while each raw value sits inside min and max',
         "signals": "metric_id from features, window like 63d, 6m or 1y (or {param}d), transform: " + ", ".join(TRANSFORMS),
         "entry": '{"top_n": 3 or "param:top_n", "min_signal": 0} (min_signal applies to the first signal\'s raw value), or "top 3 by rank"',
         "exit": '"rebalance", or {"hold_rank": 5} to keep a holding while it ranks in the top 5',
         "rebalance": "weekly, monthly or quarterly; signals at the close, trades at the next open",
-        "sizing": "equal, inverse_vol (63-day) or rank",
+        "sizing": 'equal, inverse_vol (63-day), rank, or a fixed mix {"weights": {"SPY": 60, "AGG": 40}} (funds only; needs no signal)',
         "params": '{"top_n": {"min": 2, "max": 5, "default": 3}} or a list of allowed values; grid values must sit inside',
         "costs": "set by the lab: 5 bps funds and French portfolios, 15 bps stocks, 25 bps thin stocks",
         "factor_check": "automatic: alpha after the six French factors on the walk-forward record; alpha t of 2 or more passes",
@@ -94,12 +97,15 @@ def strategies(cfg: Config) -> list[dict]:
         counts = {(r[0], r[1]): r[2] for r in conn.execute("SELECT strategy_id, version, count(*) FROM strategy_trials GROUP BY strategy_id, version")}
     finally:
         conn.close()
+    from desk.engine.lab.shelf import IDS
+
     paper = _paper(cfg)
     for r in rows:
         r["hypothesis"] = _raw(r.pop("spec")).get("hypothesis")
         r["trials"] = counts.get((r["id"], r["version"]), 0)
         p = paper.get((r["id"], r["version"]))
         r["kind"] = "strategy"
+        r["library"] = r["id"] in IDS
         if p:
             r["paper"] = p
             r["status"] = p["status"] if p["status"] != "paper" else r["status"]
@@ -253,7 +259,9 @@ def pending_reviews(cfg: Config, now: datetime | None = None) -> list[dict]:
         ).fetchall()
     finally:
         conn.close()
-    return [dict(r) for r in rows]
+    from desk.engine.lab.shelf import IDS
+
+    return [dict(r) for r in rows if r["strategy_id"] not in IDS]
 
 
 def eligible(cfg: Config) -> list[dict]:
