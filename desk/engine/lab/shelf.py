@@ -11,17 +11,37 @@ from desk.engine.lab.data import data_path, lab_build, ledger_path, plan_path, r
 from desk.engine.lab.rulebook import STAND_IN
 from desk.engine.lab.runner import PBO_BAR
 from desk.engine.lab.simcache import queue_dir
+from desk.engine.lab.spec import SCREEN_HINDSIGHT
 
 FAMILY = "library"
 HINDSIGHT_FAMILY = "library-hindsight"
 HINDSIGHT_LINE = "Hindsight, not a test: you hold these knowing how they did, and the last two years are held back."
-HINDSIGHT_NOTE = "The row for what you hold today is hindsight, not a test, and is never counted as held up."
+LEAN_WORDS = "Leans on hindsight: the stock list is small and includes names you hold or held."
+HINDSIGHT_NOTE = "The rows for what you hold today are hindsight, not a test, and are never counted as held up."
 KINDS = (("classic", "Old and tested"), ("practical", "Practical"), ("novel", "Novel and creative"))
 SPY, PLAN, MARKET, SMALL = "S&P 500 (SPY)", "Your plan's mix", "US stock market (French)", "Small caps (IWM)"
+PLAINLY = "The same deposits, invested plainly"
+RULE_BENCH = {
+    "spread": "Investing it all on day one",
+    "margin": "The same deposits, never borrowing",
+    "paydown": "Investing every deposit and leaving the debit",
+}
+BENCH_WORDS = {
+    SPY: "The S&P 500 index fund SPY, bought and held with dividends reinvested.",
+    PLAN: "The funds in your plan at their target weights. With no plan loaded this is the S&P 500.",
+    MARKET: "Every US stock weighted by size, from Ken French's research data.",
+    SMALL: "The small-company index fund IWM, bought and held with dividends reinvested.",
+    PLAINLY: "The same starting money and monthly deposits put into the same funds, without the rule.",
+    RULE_BENCH["spread"]: "The whole sum invested in the same funds on the first day.",
+    RULE_BENCH["margin"]: "The same deposits into the same funds, with no borrowing.",
+    RULE_BENCH["paydown"]: "The same starting debit, with every deposit invested and the debit left to grow with interest.",
+}
 NOTE = (
     "Every number here is out of sample: from periods the strategy was not tuned on. The last two years of data are held back and untouched. "
+    "Each row names what it is measured against; for most that is the S&P 500 with dividends reinvested. "
     "Held up means ahead of its benchmark by more than luck allows across every variant tried in the library."
 )
+BAR_NOTE = "The luck bar counts all {trials} variants tried across the library, not only a row's own, so it rises for every row as strategies are added."
 N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
 REFRESH_AFTER = timedelta(days=30)
@@ -49,6 +69,8 @@ STOCKS = {"type": "screen", "min_history_days": 300, "min_price": 5}
 SMALL_CAPS = {"type": "small_caps"}
 SAFE_MIX = {s: round(w * 100, 2) for s, w in catalog.proxied(catalog.SAFE_MIX)[0].items()}
 TECH_TILT = {s: round(w * 100, 2) for s, w in catalog.TECH_TILT.items()}
+THEMES = ("UFO", "NLR", "GRID", "SMH", "ICLN")
+ASSETS = ("SPY", "EFA", "IEF", "VNQ", "DBC")
 
 
 def _sig(metric: str, window: str, transform: str = "rank") -> dict:
@@ -75,7 +97,7 @@ def _exp(sid, kind, family, title, description, benchmark, spec, grid=None, rev=
 
 def _rule(sid, kind, family, title, description, rule, params, mix=None, rev=REV, **more) -> dict:
     body = {"rule": rule, "params": params, "horizons": [5, 10], **({"mix": mix} if mix else {}), **more}
-    benchmark = {"spread": "Investing it all on day one", "margin": "The same deposits, never borrowing"}.get(rule, "The same deposits, invested plainly")
+    benchmark = RULE_BENCH.get(rule, PLAINLY)
     return {
         "id": sid,
         "kind": kind,
@@ -90,6 +112,14 @@ def _rule(sid, kind, family, title, description, rule, params, mix=None, rev=REV
 
 
 TOP = {"top_n": {"min": 1, "max": 5, "default": 3}}
+DISCOUNT_DAY = {
+    "universe": STOCKS,
+    "signals": [_sig("ret", "5d", "inverse_rank")],
+    "filters": [_flt("ret", "5d", max=-0.07), _flt("ma_gap", "200d", min=0)],
+    "entry": {"top_n": 10},
+    "rebalance": "weekly",
+    "benchmark": "SPY",
+}
 LOOK = {"lookback": {"min": 21, "max": 504, "default": 126}}
 
 LIBRARY: tuple[dict, ...] = (
@@ -297,6 +327,121 @@ LIBRARY: tuple[dict, ...] = (
         },
         date_range={"start": "1990-01-01"},
     ),
+    _exp(
+        "lib-three-fund",
+        "classic",
+        "Allocation",
+        "Three-fund portfolio",
+        "US stocks, international stocks and US bonds at 60/20/20, rebalanced monthly.",
+        SPY,
+        _mix({"VTI": 60, "VXUS": 20, "AGG": 20}, benchmark="SPY"),
+    ),
+    _exp(
+        "lib-permanent",
+        "classic",
+        "Allocation",
+        "Permanent portfolio",
+        "A quarter each in stocks, long Treasuries, gold and Treasury bills.",
+        SPY,
+        _mix({"SPY": 25, "TLT": 25, "GLD": 25, "BIL": 25}, benchmark="SPY"),
+    ),
+    _exp(
+        "lib-all-weather",
+        "classic",
+        "Allocation",
+        "All-weather style mix",
+        "30% stocks, 55% long and medium Treasuries, and 15% split between gold and commodities.",
+        SPY,
+        _mix({"VTI": 30, "TLT": 40, "IEF": 15, "GLD": 7.5, "DBC": 7.5}, benchmark="SPY"),
+    ),
+    _exp(
+        "lib-trend-five",
+        "classic",
+        "Trend",
+        "10-month trend across five asset classes",
+        "A fifth each in US stocks, foreign stocks, bonds, real estate and commodities, each held only while above its 10-month average.",
+        SPY,
+        _mix(dict.fromkeys(ASSETS, 20), filters=[_flt("ma_gap", "210d", min=0)], benchmark="SPY"),
+    ),
+    _exp(
+        "lib-golden-cross",
+        "classic",
+        "Trend",
+        "Golden cross on the S&P 500",
+        "Hold the S&P 500 while its 50-day average is above its 200-day average, cash otherwise.",
+        SPY,
+        _mix({"SPY": 100}, filters=[_flt("ma_cross", "200d", min=0)], benchmark="SPY"),
+    ),
+    _exp(
+        "lib-asset-momentum",
+        "classic",
+        "Momentum",
+        "Momentum across asset classes",
+        "Hold the two best of US stocks, foreign stocks, bonds, real estate, commodities and gold, skipping any that is falling.",
+        SPY,
+        {
+            "universe": {"type": "fund_list", "symbols": [*ASSETS, "GLD"]},
+            "signals": [_sig("ret", "{lookback}d", "raw")],
+            "entry": {"top_n": 2, "min_signal": 0},
+            "params": LOOK,
+            "benchmark": "SPY",
+        },
+        {"lookback": [126, 252]},
+    ),
+    _exp(
+        "lib-equal-sectors",
+        "classic",
+        "Allocation",
+        "Equal-weight sectors",
+        "Hold every US sector fund at the same weight instead of by company size.",
+        SPY,
+        {"universe": SECTORS, "signals": [_sig("ret", "21d")], "entry": {"top_n": 11}, "benchmark": "SPY"},
+    ),
+    _exp(
+        "lib-equal-weight-500",
+        "classic",
+        "Factor tilt",
+        "Equal-weight S&P 500",
+        "Own the 500 companies at the same weight each, as one fund, instead of by size.",
+        SPY,
+        _mix({"RSP": 100}, benchmark="SPY"),
+    ),
+    _exp(
+        "lib-dividend-growers",
+        "classic",
+        "Factor tilt",
+        "Dividend growers",
+        "Own a fund of companies that have raised their dividend for ten years running.",
+        SPY,
+        _mix({"VIG": 100}, benchmark="SPY"),
+    ),
+    _exp(
+        "lib-small-value-fund",
+        "classic",
+        "Factor tilt",
+        "Small value companies, as a fund",
+        "Own a fund of small, cheaply priced US companies.",
+        SPY,
+        _mix({"VBR": 100}, benchmark="SPY"),
+    ),
+    _exp(
+        "lib-value-momentum",
+        "classic",
+        "Factor tilt",
+        "Value and momentum together",
+        "Half in a fund of cheap stocks and half in a fund of recent winners, rebalanced monthly.",
+        SPY,
+        _mix({"VLUE": 50, "MTUM": 50}, benchmark="SPY"),
+    ),
+    _exp(
+        "lib-small-reversal",
+        "classic",
+        "Reversal",
+        "Short-term reversal in small caps",
+        "Hold the 20 small caps that fell most over the past month, on the bet that they bounce.",
+        SMALL,
+        {"universe": SMALL_CAPS, "signals": [_sig("ret", "21d", "inverse_rank")], "entry": {"top_n": 20}},
+    ),
     # ---- Practical ----
     _exp(
         "lib-plan-mix",
@@ -428,6 +573,44 @@ LIBRARY: tuple[dict, ...] = (
         {"threshold_usd": [500, 1000]},
         {"SPY": 1.0},
     ),
+    _exp(
+        "lib-core-satellite",
+        "practical",
+        "Allocation",
+        "Core and satellite",
+        "80% S&P 500 with 4% each in space, nuclear, grid, chip and clean-energy funds.",
+        SPY,
+        _mix({"SPY": 80} | dict.fromkeys(THEMES, 4), benchmark="SPY"),
+    ),
+    _exp(
+        "lib-themes-equal",
+        "practical",
+        "Allocation",
+        "Theme funds, equal weight",
+        "Space, nuclear, grid, chip and clean-energy funds at a fifth each, with no index core.",
+        SPY,
+        _mix(dict.fromkeys(THEMES, 20), benchmark="SPY"),
+    ),
+    _exp(
+        "lib-as-held-capped",
+        "practical",
+        "Allocation",
+        "What you hold today, single stocks capped",
+        "Today's holdings with any single stock above 10% trimmed to 10% each quarter and the rest spread over your other holdings.",
+        SPY,
+        {"universe": {"type": "fund_list", "set": "held_mix", "cap_stocks_pct": 10}, "rebalance": "quarterly", "benchmark": "SPY"},
+    )
+    | {"hindsight": True},
+    _rule(
+        "lib-margin-paydown",
+        "practical",
+        "Margin",
+        "Pay the margin debit first",
+        "Start with a margin debit worth 10% of the account at 12% interest, and send each deposit to the debit before investing.",
+        "paydown",
+        {"debit_pct": 10, "rate_pct": 12},
+        {"SPY": 1.0},
+    ),
     # ---- Novel and creative ----
     _exp(
         "lib-trend-dip",
@@ -488,14 +671,7 @@ LIBRARY: tuple[dict, ...] = (
         "Discount-day entries",
         "Each week buy the stocks that fell 7% or more in five days while still above their 200-day average, and hold them a week.",
         SPY,
-        {
-            "universe": STOCKS,
-            "signals": [_sig("ret", "5d", "inverse_rank")],
-            "filters": [_flt("ret", "5d", max=-0.07), _flt("ma_gap", "200d", min=0)],
-            "entry": {"top_n": 10},
-            "rebalance": "weekly",
-            "benchmark": "SPY",
-        },
+        DISCOUNT_DAY,
         rev=SCREEN_REV,
     ),
     _exp(
@@ -525,6 +701,80 @@ LIBRARY: tuple[dict, ...] = (
             "filters": [_flt("insider.buyers", "126d", min=1)],
             "entry": {"top_n": 20, "min_signal": 0},
         },
+    ),
+    _exp(
+        "lib-momentum-calm",
+        "novel",
+        "Momentum",
+        "Sector momentum that stands down in rough markets",
+        "Hold the three leading sectors, but wait in cash while the S&P 500's three-month volatility is above 25%.",
+        SPY,
+        {
+            "universe": SECTORS,
+            "signals": [_sig("ret", "126d")],
+            "filters": [_flt("vol", "63d", max=0.25, symbol="SPY")],
+            "entry": {"top_n": 3},
+            "benchmark": "SPY",
+        },
+    ),
+    _exp(
+        "lib-drawdown-stop",
+        "novel",
+        "Trend",
+        "Drawdown stop with a way back in",
+        "Hold the S&P 500 while it is within 10% of its one-year high; step aside below that and return when it climbs back.",
+        SPY,
+        _mix({"SPY": 100}, filters=[_flt("dd", "252d", min=-0.10)], rebalance="weekly", benchmark="SPY"),
+    ),
+    _exp(
+        "lib-down-week",
+        "novel",
+        "Dip buying",
+        "Buy after a 5% down week",
+        "Hold the S&P 500 for the week after it falls 5% or more in five days, cash otherwise.",
+        SPY,
+        _mix({"SPY": 100}, filters=[_flt("ret", "5d", max=-0.05)], rebalance="weekly", benchmark="SPY"),
+    ),
+    _exp(
+        "lib-canary",
+        "novel",
+        "Trend",
+        "Canary rule",
+        "Hold the S&P 500 only while emerging markets and US bonds are both up over six months; cash when either turns down.",
+        SPY,
+        _mix({"SPY": 100}, filters=[_flt("ret", "126d", min=0, symbol="EEM"), _flt("ret", "126d", min=0, symbol="AGG")], benchmark="SPY"),
+    ),
+    _exp(
+        "lib-credit-canary",
+        "novel",
+        "Trend",
+        "Credit canary",
+        "Hold the S&P 500 only while high-yield bonds are above their 200-day average, cash otherwise.",
+        SPY,
+        _mix({"SPY": 100}, filters=[_flt("ma_gap", "200d", min=0, symbol="HYG")], benchmark="SPY"),
+    ),
+    _exp(
+        "lib-tech-tilt-vol-target",
+        "novel",
+        "Allocation",
+        "Tech tilt held to a volatility target",
+        "The aggressive tech tilt, scaled back into cash whenever its last three months ran hotter than 15% a year.",
+        SPY,
+        {
+            "universe": {"type": "fund_list", "symbols": list(TECH_TILT)},
+            "sizing": {"method": "fixed", "weights": TECH_TILT, "vol_target": 0.15},
+            "benchmark": "SPY",
+        },
+    ),
+    _exp(
+        "lib-discount-day-uptrend",
+        "novel",
+        "Dip buying",
+        "Discount-day entries, only in an uptrend",
+        "The discount-day rule, switched off while the S&P 500 itself is below its 200-day average.",
+        SPY,
+        DISCOUNT_DAY | {"filters": [*DISCOUNT_DAY["filters"], _flt("ma_gap", "200d", min=0, symbol="SPY")]},
+        rev=SCREEN_REV,
     ),
 )
 IDS = frozenset(e["id"] for e in LIBRARY)
@@ -776,8 +1026,10 @@ def view(cfg: Config) -> dict:
     rows = []
     for entry in LIBRARY:
         row = {k: entry[k] for k in ("id", "title", "kind", "family", "description", "benchmark", "type")}
+        row["benchmark_words"] = BENCH_WORDS[entry["benchmark"]]
         row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
         row |= {"yardstick": False, "gap_pts": None, "outdated": False, "hindsight": bool(entry.get("hindsight"))}
+        row["leans_on_hindsight"] = lean = (entry.get("spec") or {}).get("universe", {}).get("type") == "screen"
         row |= {
             "research_only": (entry.get("spec") or {}).get("universe", {}).get("type") == "french",
             "caveats": [],
@@ -797,6 +1049,9 @@ def view(cfg: Config) -> dict:
                     row |= _rule_row(entry, body)
                 else:
                     row |= _hindsight(entry, body) if row["hindsight"] else _experiment(entry, body, trials, alone)
+                if lean:
+                    row["caveats"] = [SCREEN_HINDSIGHT, *(c for c in row["caveats"] if c != SCREEN_HINDSIGHT)]
+                    row["line"] = f"{row['line']} {LEAN_WORDS}" if row["line"] else row["line"]
         rows.append(row)
     kinds = [k for k, _ in KINDS]
     rows.sort(
@@ -818,7 +1073,8 @@ def view(cfg: Config) -> dict:
     several = "All of these" if old == counts["tested"] else "Some of these"
     gap = next((r["gap_pts"] for r in rows if r["yardstick"] and not r["outdated"] and r["gap_pts"] is not None), None)
     level = gap is None or abs(gap) < LEVEL_PTS
-    note = f"{NOTE} {HINDSIGHT_NOTE}" if hind else NOTE
+    note = f"{NOTE} {BAR_NOTE.format(trials=trials)}" if trials > 1 else NOTE
+    note = f"{note} {HINDSIGHT_NOTE}" if hind else note
     note = f"{note} {several} {OUTDATED}" if old else note
     if not level:
         note += (
@@ -833,6 +1089,7 @@ def view(cfg: Config) -> dict:
         "self_check": None if gap is None else {"gap_pts": gap, "level": level},
         "counts": counts,
         "kinds": [{"key": k, "title": t} for k, t in KINDS],
+        "benchmarks": [{"name": name, "words": words, "rows": sum(r["benchmark"] == name for r in rows)} for name, words in BENCH_WORDS.items()],
         "rows": rows,
     }
 

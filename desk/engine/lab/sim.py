@@ -1,3 +1,4 @@
+import math
 from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import date
@@ -107,8 +108,13 @@ def _events(data: LabData, metric: str, sym: str):
 
 
 def _passes(data: LabData, spec: Spec, sym: str, s, i: int) -> bool:
-    for metric, days, lo, hi in spec.filters:
-        x = features.value(metric, s, i, days, _events(data, metric, sym))
+    for metric, days, lo, hi, market in spec.filters:
+        if market:
+            ser = data.series.get(market)
+            at = ser.index.get(s.dates[i]) if ser else None
+            x = features.value(metric, ser, at, days, _events(data, metric, market)) if at is not None else None
+        else:
+            x = features.value(metric, s, i, days, _events(data, metric, sym))
         if x is None or (lo is not None and x < lo) or (hi is not None and x > hi):
             return False
     return True
@@ -147,7 +153,9 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
     if spec.weights is not None:
         cap = spec.constraints["max_position_pct"] / 100
         live = sum(w for s, w in spec.weights.items() if _listed(data, s, day))
-        return {s: min(spec.weights[s] / (live or 1.0), cap) for s in chosen if spec.weights.get(s)}
+        whole = sum(spec.weights.values())
+        whole = whole if whole < 1 - 1e-9 else 1.0
+        return _to_target(data, spec, {s: min(spec.weights[s] * whole / (live or 1.0), cap) for s in chosen if spec.weights.get(s)}, day)
     if spec.sizing == "inverse_vol":
         inv = {}
         for s in chosen:
@@ -167,7 +175,26 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         slots = max(1, min(slots, sum(_listed(data, s, day) for s in members)))
     fill = len(chosen) / slots
     cap = spec.constraints["max_position_pct"] / 100
-    return {s: min(x * fill, cap) for s, x in w.items() if x > 0}
+    return _to_target(data, spec, {s: min(x * fill, cap) for s, x in w.items() if x > 0}, day)
+
+
+def _to_target(data: LabData, spec: Spec, weights: dict[str, float], day: str) -> dict[str, float]:
+    if not spec.vol_target or not weights:
+        return weights
+    at = {s: data.series[s].index.get(day) for s in weights}
+    if any(i is None or i < VOL_WINDOW for i in at.values()):
+        return weights
+    rets = []
+    for k in range(VOL_WINDOW):
+        r = 0.0
+        for s, w in weights.items():
+            a, i = data.series[s].adj, at[s] - k
+            r += w * (a[i] / a[i - 1] - 1) if a[i - 1] else 0.0
+        rets.append(r)
+    mean = sum(rets) / len(rets)
+    vol = math.sqrt(sum((r - mean) ** 2 for r in rets) / (len(rets) - 1) * 252)
+    scale = min(1.0, spec.vol_target / vol) if vol else 1.0
+    return {s: w * scale for s, w in weights.items()}
 
 
 def _benchmark(data: LabData, spec: Spec) -> dict[str, float]:

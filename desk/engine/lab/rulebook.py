@@ -15,6 +15,7 @@ RULES = {
     "margin": {"dip_pct": (5.0, 60.0), "borrow_pct": (1.0, 50.0), "rate_pct": (0.0, 30.0)},
     "dip_reserve": {"hold_pct": (5.0, 90.0), "dip_pct": (5.0, 60.0)},
     "spread": {"months": (2.0, 36.0)},
+    "paydown": {"debit_pct": (1.0, 50.0), "rate_pct": (0.0, 30.0)},
 }
 REQUIRED = {
     "rebalance_band": ("band_pts",),
@@ -22,8 +23,10 @@ REQUIRED = {
     "margin": ("dip_pct", "borrow_pct", "rate_pct"),
     "dip_reserve": ("hold_pct", "dip_pct"),
     "spread": ("months",),
+    "paydown": ("debit_pct", "rate_pct"),
 }
-SCALAR = ("rate_pct",)
+SCALAR = ("rate_pct", "debit_pct")
+PAYDOWN_HOLD = "paydown_hold"
 DEFAULT_DEPOSIT = 1_000.0
 DEFAULT_START = 10_000.0
 ORDINARY_OFFSET = 3_000.0
@@ -143,7 +146,7 @@ def parse(raw: dict, data: LabData) -> Rule:
         problems.append("tax-loss harvesting only means something in a taxable account")
     deposit = _num(raw.get("deposit_monthly", DEFAULT_DEPOSIT), 0.0, 1_000_000.0, "deposit_monthly", problems)
     start_value = _num(raw.get("start_value", DEFAULT_START), 0.0, 100_000_000.0, "start_value", problems)
-    if deposit == 0 and name in ("deposit_steering", "dip_reserve"):
+    if deposit == 0 and name in ("deposit_steering", "dip_reserve", "paydown"):
         problems.append(f"{name.replace('_', ' ')} needs a monthly deposit above zero")
     if start_value == 0 and name == "spread":
         problems.append("spreading a lump sum needs a start_value above zero")
@@ -160,6 +163,11 @@ def parse(raw: dict, data: LabData) -> Rule:
         caveats.append("Money held back earns the three-month Treasury rate until it is invested.")
     if name == "margin":
         caveats.append("Margin interest is charged at the given rate on a 360-day year and not deducted; a margin call sells at 30% equity, back to 35%.")
+    if name == "paydown":
+        caveats.append(
+            "Both sides start with the same margin debit on top of the account. One pays it from each deposit before investing; the other invests "
+            "every deposit and lets the interest add up. Interest is charged at the given rate on a 360-day year and not deducted."
+        )
     return Rule(rid, int(raw.get("version") or 1), name, combos, {s: w / total for s, w in mix.items()}, horizons, deposit, start_value, taxable, raw, caveats)
 
 
@@ -201,6 +209,9 @@ def simulate(data: LabData, rule: Rule, params: dict | None, start: str, end: st
     syms = list(rule.mix)
     series = {s: data.series[s] for s in syms}
     cash, loan = rule.start_value, 0.0
+    if rule.rule in ("paydown", PAYDOWN_HOLD):
+        loan = rule.start_value * params["debit_pct"] / 100
+        cash += loan
     out.contributed = rule.start_value
     slices = int(params.get("months") or 0) if rule.rule == "spread" else 0
     reserve = rule.start_value * (1 - 1 / slices) if slices else 0.0
@@ -314,7 +325,7 @@ def simulate(data: LabData, rule: Rule, params: dict | None, start: str, end: st
         flow = 0.0
         if day in firsts and k:
             deposit = rule.deposit
-            if loan > 0:
+            if loan > 0 and rule.rule != PAYDOWN_HOLD:
                 pay = min(loan, deposit)
                 loan -= pay
                 deposit -= pay
@@ -505,8 +516,9 @@ def evaluate(data: LabData, rule: Rule, date_range: dict | None = None) -> dict:
 
 
 def _baseline(data: LabData, rule: Rule, start: str, end: str, rate: float) -> Outcome:
-    plain = Rule(rule.id, rule.version, "deposit_only", [{}], rule.mix, rule.horizons, rule.deposit, rule.start_value, rule.taxable, rule.raw)
-    return simulate(data, plain, {}, start, end, rate=rate)
+    name, params = (PAYDOWN_HOLD, rule.variants[0]) if rule.rule == "paydown" else ("deposit_only", {})
+    plain = Rule(rule.id, rule.version, name, [params], rule.mix, rule.horizons, rule.deposit, rule.start_value, rule.taxable, rule.raw)
+    return simulate(data, plain, params, start, end, rate=rate)
 
 
 def _baseline_text(name: str) -> str:
@@ -515,6 +527,7 @@ def _baseline_text(name: str) -> str:
         "dip_reserve": "Same deposits invested in full every month, nothing held back",
         "spread": "The whole sum invested on the first day",
         "harvest": "Same deposits split pro rata, never harvesting",
+        "paydown": "Same starting debit, every deposit invested, the debit left to grow with interest",
     }.get(name, "Deposits split pro rata to the mix, never selling")
 
 

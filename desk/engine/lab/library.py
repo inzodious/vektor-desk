@@ -5,11 +5,13 @@ from bisect import bisect_left, bisect_right
 from desk.engine.lab.data import Series
 
 SKIP = 21
+FAST_MA = 50
 FEATURES = {
     "ret": "Total return over the window (dividends reinvested)",
     "ret_skip": "Total return over the window, skipping the most recent month (12-1 momentum)",
     "vol": "Annualized volatility of daily returns over the window",
     "ma_gap": "Distance of the close from its moving average over the window",
+    "ma_cross": "Distance of the 50-day moving average from the moving average over the window; above zero with a 200-day window is a golden cross",
     "range_52w": "Position between the window's low (0) and high (1); 252 days is the 52-week range",
     "dd": "Drawdown from the window's high",
     "insider.buyers": "Distinct directors and officers with open-market Form 4 purchases known inside the window (small caps; known the session after filing)",
@@ -104,6 +106,11 @@ def value(metric_id: str, s: Series, i: int, days: int, events=None) -> float | 
     if metric_id == "ma_gap":
         avg = sum(window) / len(window)
         return a[i] / avg - 1 if avg else None
+    if metric_id == "ma_cross":
+        if days <= FAST_MA:
+            return None
+        slow = sum(window) / len(window)
+        return sum(a[i - FAST_MA + 1 : i + 1]) / FAST_MA / slow - 1 if slow else None
     if metric_id == "range_52w":
         lo, hi = min(window), max(window)
         return (a[i] - lo) / (hi - lo) if hi > lo else 0.5

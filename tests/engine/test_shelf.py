@@ -13,11 +13,13 @@ from desk.engine.lab import rulebook, runner, shelf, sim, simcache
 from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, data_path, held_path, load, plan_path
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
-from desk.engine.lab.spec import HINDSIGHT, SETS, SpecError, local_only, parse, resolve, variants
+from desk.engine.lab.spec import HINDSIGHT, SCREEN_HINDSIGHT, SETS, SpecError, local_only, parse, resolve, variants
+from desk.engine.market import LIBRARY_FUNDS
 from desk.worker import store
 
 NOW = datetime(2025, 1, 2, 5, 55, tzinfo=UTC)
-FUNDS = ("SPY", "VTI", "VXUS", "AGG", "QQQ", "IWM", *SETS["sector_etfs"], "IVV", "FTEC")
+BAR = f"{shelf.NOTE} {shelf.BAR_NOTE.format(trials=2)}"
+FUNDS = ("SPY", "VTI", "VXUS", "AGG", "QQQ", "IWM", *SETS["sector_etfs"], "FTEC", *LIBRARY_FUNDS)
 STOCKS = tuple(f"STK{i}" for i in range(8))
 SMALLS = tuple(f"SML{i}" for i in range(6))
 FRENCH = (
@@ -123,6 +125,8 @@ def test_a_fixed_mix_holds_its_weights_and_drops_funds_without_history(stocked):
     day = data.calendar[400]
     assert pick(data, spec, resolve(spec, {}), day, set()) == {"SPY": 0.6, "AGG": 0.4}
     raw = spec_of("lib-safe-mix")
+    for gone in ("NLR", "GRID", "ICLN", "UFO"):
+        del data.series[gone]
     safe = parse(raw, data)
     assert set(safe.weights) == {"IVV", "FTEC", "VXUS"} and sum(safe.weights.values()) == pytest.approx(1.0) and "scaled up" in safe.caveats[0]
     with pytest.raises(SpecError, match="most of this mix"):
@@ -346,7 +350,7 @@ def test_the_sp500_row_reads_as_the_yardstick_when_there_is_no_plan_to_compare_i
     assert first["out_of_sample"]["excess_pts"] is None and first["out_of_sample"]["ann_return_pct"] is not None
     assert view["counts"]["tested"] == 2 and view["counts"]["yardstick"] == 1 and view["counts"]["fell_short"] == (other["verdict"] == "fell_short")
     assert other["yardstick"] is False and abs(first["gap_pts"]) < 0.05
-    assert view["note"] == shelf.NOTE and "cash" not in view["note"] and view["self_check"] == {"gap_pts": first["gap_pts"], "level": True}
+    assert view["note"] == BAR and "cash" not in view["note"] and view["self_check"] == {"gap_pts": first["gap_pts"], "level": True}
     ledger = sqlite3.connect(runner.ledger_path(cfg))
     ledger.execute("UPDATE lab_results SET body = json_set(body, '$.walk_forward.excess_pts', 0.6) WHERE strategy_id='lib-buy-hold-sp500'")
     ledger.commit()
@@ -389,7 +393,7 @@ def test_with_a_plan_the_sp500_row_is_judged_against_it(stocked, monkeypatch):
     view = shelf.view(cfg)
     row = next(r for r in view["rows"] if r["id"] == "lib-buy-hold-sp500")
     assert row["verdict"] in ("held_up", "within_noise", "fell_short") and not row["yardstick"] and "Your plan's mix" in row["line"]
-    assert view["counts"]["yardstick"] == 0 and view["counts"]["outdated"] == 0 and view["note"] == shelf.NOTE
+    assert view["counts"]["yardstick"] == 0 and view["counts"]["outdated"] == 0 and view["note"] == BAR
 
 
 def test_a_result_from_an_older_revision_is_flagged_and_run_again(stocked, monkeypatch):
@@ -445,7 +449,7 @@ def test_what_you_hold_today_is_shown_as_hindsight_and_never_judged(stocked, mon
     assert row["line"].startswith("From ") and ", today's mix would have run " in row["line"] and row["line"].endswith(shelf.HINDSIGHT_LINE)
     assert row["out_of_sample"]["excess_pts"] is not None and HINDSIGHT in row["caveats"]
     assert view["counts"]["hindsight"] == 1 and view["counts"]["tested"] == 3 and sum(view["counts"][v] for v in ("held_up", "within_noise", "fell_short")) == 2
-    assert view["note"] == f"{shelf.NOTE} {shelf.HINDSIGHT_NOTE}" and sum(r["hindsight"] for r in view["rows"]) == 1
+    assert view["note"] == f"{BAR} {shelf.HINDSIGHT_NOTE}" and sum(r["hindsight"] for r in view["rows"]) == 1
     assert shelf.queue_missing(cfg, now=NOW + timedelta(days=6))["queued"] == 0
     assert shelf.queue_missing(cfg, now=NOW + timedelta(days=8)) == {"queued": 1, "of": 3}
     ledger = sqlite3.connect(runner.ledger_path(cfg))
@@ -485,6 +489,142 @@ def test_the_hindsight_line_says_ahead_behind_or_level_and_names_the_dates():
     )
 
 
+# ---- Grammar added for the wider library ----
+
+
+def test_a_market_wide_switch_sends_the_whole_strategy_to_cash(stocked):
+    data = load(data_path(stocked))
+    spec = parse(spec_of("lib-canary"), data)
+    v = resolve(spec, {})
+    assert [f[4] for f in spec.filters] == ["EEM", "AGG"]
+    days = data.calendar[300::21]
+    held = {d: pick(data, spec, v, d, set()) for d in days}
+    assert {str(sorted(w.items())) for w in held.values()} == {"[]", "[('SPY', 1.0)]"}
+    for d, w in held.items():
+        up = [data.series[s].adj[data.series[s].index[d]] / data.series[s].adj[data.series[s].index[d] - 126] - 1 >= 0 for s in ("EEM", "AGG")]
+        assert bool(w) == all(up)
+    calm = parse(spec_of("lib-momentum-calm"), data)
+    picks = [pick(data, calm, resolve(calm, {}), d, set()) for d in days]
+    assert all(len(w) in (0, 3) for w in picks) and any(picks)
+    with pytest.raises(SpecError, match="NOPE has no price history"):
+        parse(spec_of("lib-canary") | {"filters": [{"metric_id": "ret", "window": "126d", "min": 0, "symbol": "NOPE"}]}, data)
+
+
+def test_the_golden_cross_compares_the_50_day_average_with_the_long_one(stocked):
+    data = load(data_path(stocked))
+    s = data.series["SPY"]
+    i = 600
+    fast, slow = sum(s.adj[i - 49 : i + 1]) / 50, sum(s.adj[i - 199 : i + 1]) / 200
+    assert sim.features.value("ma_cross", s, i, 200) == pytest.approx(fast / slow - 1)
+    assert sim.features.value("ma_cross", s, i, 50) is None and sim.features.value("ma_cross", s, 150, 200) is None
+    spec = parse(spec_of("lib-golden-cross"), data)
+    for d in data.calendar[300::21]:
+        above = sim.features.value("ma_cross", s, s.index[d], 200) >= 0
+        assert bool(pick(data, spec, resolve(spec, {}), d, set())) == above
+
+
+def test_a_volatility_target_only_ever_scales_down(stocked):
+    data = load(data_path(stocked))
+    raw = spec_of("lib-tech-tilt-vol-target")
+    spec = parse(raw, data)
+    plain = parse(raw | {"sizing": {"method": "fixed", "weights": raw["sizing"]["weights"]}}, data)
+    assert spec.vol_target == 0.15 and plain.vol_target is None and "hotter than 15% a year" in spec.caveats[-1]
+    totals = []
+    for d in data.calendar[300::21]:
+        full, scaled = pick(data, plain, resolve(plain, {}), d, set()), pick(data, spec, resolve(spec, {}), d, set())
+        ratio = {round(scaled[k] / full[k], 9) for k in full}
+        assert len(ratio) == 1 and 0 < ratio.pop() <= 1
+        totals.append(sum(scaled.values()))
+    assert max(totals) == pytest.approx(1.0) or max(totals) < 1.0
+    hot = parse(raw | {"sizing": {"method": "fixed", "weights": raw["sizing"]["weights"], "vol_target": 0.02}}, data)
+    d = data.calendar[400]
+    w = pick(data, hot, resolve(hot, {}), d, set())
+    rets = [
+        sum(w[k] * (data.series[k].adj[data.series[k].index[d] - j] / data.series[k].adj[data.series[k].index[d] - j - 1] - 1) for k in w) for j in range(63)
+    ]
+    mean = sum(rets) / 63
+    assert (sum((r - mean) ** 2 for r in rets) / 62 * 252) ** 0.5 == pytest.approx(0.02)
+    with pytest.raises(SpecError, match="vol_target"):
+        parse(raw | {"sizing": {"method": "fixed", "weights": raw["sizing"]["weights"], "vol_target": 5}}, data)
+
+
+def test_single_stocks_over_the_cap_are_trimmed_and_the_rest_carries_the_difference(stocked):
+    from desk.engine.lab.spec import cap_stocks
+
+    assert cap_stocks({"A": 0.5, "B": 0.3, "F": 0.2}, {"A", "B"}, 0.1) == ({"A": 0.1, "B": 0.1, "F": pytest.approx(0.8)}, ["A", "B"])
+    spread, names = cap_stocks({"A": 0.4, "B": 0.09, "F": 0.51}, {"A", "B"}, 0.1)
+    assert names == ["A", "B"] and spread == {"A": 0.1, "B": 0.1, "F": pytest.approx(0.8)}
+    assert cap_stocks({"A": 0.6, "B": 0.4}, {"A", "B"}, 0.1) == ({"A": 0.1, "B": 0.1}, ["A", "B"])
+    assert cap_stocks({"F": 0.7, "G": 0.3}, set(), 0.1) == ({"F": 0.7, "G": 0.3}, [])
+    data = load(data_path(stocked))
+    raw = spec_of("lib-as-held-capped")
+    capped = parse(raw, data)
+    assert capped.weights == pytest.approx({"SPY": 0.5 + 0.2 * 0.5 / 0.7, "STK0": 0.1, "FTEC": 0.2 + 0.2 * 0.2 / 0.7}) and capped.rebalance == "Q"
+    assert capped.caveats[0] == "STK0 trimmed to 10% each; the difference is spread across the other holdings in proportion." and HINDSIGHT in capped.caveats
+    entry = next(e for e in shelf.LIBRARY if e["id"] == "lib-as-held-capped")
+    assert entry["hindsight"] and local_only(raw) and shelf.request(entry, "2025-01-02T00:00:00+00:00")["spec"]["parent_id"] == shelf.HINDSIGHT_FAMILY
+    with pytest.raises(SpecError, match="cap_stocks_pct"):
+        parse(raw | {"universe": raw["universe"] | {"cap_stocks_pct": 0}}, data)
+
+
+def test_every_row_says_what_it_is_measured_against_and_the_note_says_how_the_luck_bar_counts(stocked, monkeypatch):
+    cfg = stocked
+    view = shelf.view(cfg)
+    assert view["note"] == shelf.NOTE and "Each row names what it is measured against" in shelf.NOTE
+    assert all(r["benchmark"] and r["benchmark_words"] == shelf.BENCH_WORDS[r["benchmark"]] and r["benchmark_words"].endswith(".") for r in view["rows"])
+    legend = {b["name"]: b for b in view["benchmarks"]}
+    assert sum(b["rows"] for b in view["benchmarks"]) == len(shelf.LIBRARY) and legend[shelf.SPY]["rows"] > len(shelf.LIBRARY) / 2
+    assert legend[shelf.SPY]["words"] == "The S&P 500 index fund SPY, bought and held with dividends reinvested."
+    ids = ("lib-three-fund", "lib-asset-momentum")
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
+    monkeypatch.setattr(shelf, "IDS", frozenset(ids))
+    shelf.queue_missing(cfg, now=NOW)
+    process_queue(cfg, now=NOW)
+    after = shelf.view(cfg)
+    assert after["trials"] == 3 and after["note"] == f"{shelf.NOTE} {shelf.BAR_NOTE.format(trials=3)}"
+    assert "all 3 variants tried across the library" in after["note"] and {r["noise"]["trials"] for r in after["rows"]} == {3}
+
+
+def test_stock_screen_rows_say_they_lean_on_hindsight_even_on_a_result_stored_before_the_caveat(stocked, monkeypatch):
+    cfg = stocked
+    data = load(data_path(cfg))
+    screens = [e["id"] for e in shelf.LIBRARY if (e.get("spec") or {}).get("universe", {}).get("type") == "screen"]
+    assert len(screens) == 6 and all(SCREEN_HINDSIGHT in parse(spec_of(sid), data).caveats for sid in screens)
+    assert SCREEN_HINDSIGHT not in parse(spec_of("lib-three-fund"), data).caveats
+    ids = ("lib-stock-momentum", "lib-three-fund")
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
+    monkeypatch.setattr(shelf, "IDS", frozenset(ids))
+    shelf.queue_missing(cfg, now=NOW)
+    process_queue(cfg, now=NOW)
+    conn = sqlite3.connect(shelf.ledger_path(cfg))
+    with conn:
+        for sid, body in conn.execute("SELECT strategy_id, body FROM lab_results").fetchall():
+            old = json.loads(body)
+            old["caveats"] = [c for c in old.get("caveats") or [] if c != SCREEN_HINDSIGHT]
+            conn.execute("UPDATE lab_results SET body=? WHERE strategy_id=?", (json.dumps(old), sid))
+    conn.close()
+    rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    screen, mix = rows["lib-stock-momentum"], rows["lib-three-fund"]
+    assert screen["leans_on_hindsight"] and screen["caveats"][0] == SCREEN_HINDSIGHT and screen["caveats"].count(SCREEN_HINDSIGHT) == 1
+    assert screen["line"].endswith(shelf.LEAN_WORDS) and "S&P 500 (SPY)" in screen["line"]
+    assert not mix["leans_on_hindsight"] and SCREEN_HINDSIGHT not in mix["caveats"] and "hindsight" not in mix["line"]
+
+
+def test_the_library_grew_and_each_kind_names_its_new_rows():
+    by = {e["id"]: e for e in shelf.LIBRARY}
+    assert len(shelf.LIBRARY) == 62 and len(by) == 62
+    new = {
+        "classic": ("lib-three-fund", "lib-permanent", "lib-all-weather", "lib-trend-five", "lib-golden-cross", "lib-asset-momentum")
+        + ("lib-equal-sectors", "lib-equal-weight-500", "lib-dividend-growers", "lib-small-value-fund", "lib-value-momentum", "lib-small-reversal"),
+        "practical": ("lib-core-satellite", "lib-themes-equal", "lib-as-held-capped", "lib-margin-paydown"),
+        "novel": ("lib-momentum-calm", "lib-drawdown-stop", "lib-down-week", "lib-canary", "lib-credit-canary", "lib-tech-tilt-vol-target")
+        + ("lib-discount-day-uptrend",),
+    }
+    assert all(by[sid]["kind"] == kind for kind, ids in new.items() for sid in ids)
+    assert [e["id"] for e in shelf.LIBRARY if e.get("hindsight")] == ["lib-as-held", "lib-as-held-capped"]
+    assert all(local_only(e["spec"]) for e in shelf.LIBRARY if e.get("hindsight"))
+
+
 def test_a_stock_in_the_plan_is_screened_and_costed_like_any_other_so_a_worker_agrees_with_the_box(stocked, tmp_path):
     cfg = stocked
     plan_path(cfg).write_text(json.dumps({"weights": {"SPY": 0.5, "STK0": 0.5}}))
@@ -503,7 +643,7 @@ def test_a_stock_in_the_plan_is_screened_and_costed_like_any_other_so_a_worker_a
 def test_stock_screens_are_run_again_now_that_no_name_is_kept_out_for_being_his():
     screens = {e["id"] for e in shelf.LIBRARY if e["rev"] == shelf.SCREEN_REV}
     assert screens == {e["id"] for e in shelf.LIBRARY if e["type"] == "experiment" and e["spec"]["universe"].get("type") == "screen"}
-    assert len(screens) == 5 and shelf.SCREEN_REV > shelf.MIX_REV
+    assert len(screens) == 6 and shelf.SCREEN_REV > shelf.MIX_REV
     seen = {"kind": "experiment", "rev": shelf.MIX_REV, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
     assert all(shelf._outdated(e, seen) == (e["id"] in screens) for e in shelf.LIBRARY)
 
@@ -533,14 +673,15 @@ def test_an_outdated_row_whose_rerun_left_no_result_waits_before_another_try():
 
 
 def test_every_fund_in_a_built_in_mix_is_known_to_the_lab():
-    from desk.engine.lab.data import LISTED_FUNDS
-    from desk.engine.market import BENCHMARKS
+    from desk.engine.lab.data import LISTED_FUNDS, PUBLIC_FUNDS
 
-    known = set(LISTED_FUNDS) | set(BENCHMARKS)
+    known = set(LISTED_FUNDS) | PUBLIC_FUNDS
     for entry in shelf.LIBRARY:
-        body = entry.get("body") or {}
-        weights = ((entry.get("spec") or {}).get("sizing") or {}).get("weights") if isinstance((entry.get("spec") or {}).get("sizing"), dict) else None
-        for mix in (weights, body.get("mix"), body.get("mix_without_plan")):
+        body, spec = entry.get("body") or {}, entry.get("spec") or {}
+        weights = (spec.get("sizing") or {}).get("weights") if isinstance(spec.get("sizing"), dict) else None
+        named = (spec.get("universe") or {}).get("symbols") or []
+        switches = [f["symbol"] for f in spec.get("filters") or [] if f.get("symbol")]
+        for mix in (weights, body.get("mix"), body.get("mix_without_plan"), named, switches):
             assert set(mix or {}) <= known, entry["id"]
 
 
