@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { postJson, useApi } from '../lib/api.js';
 import { firstRunScore, firstRunSteps } from '../lib/firstrun.js';
+import { healthNeeds } from '../lib/health.js';
 import { readinessMap, startRefusal, startView } from '../lib/start.js';
 import { StartContext } from './context.js';
 
@@ -29,7 +30,8 @@ function useSetup() {
   const score = loading ? null : firstRunScore(steps);
   const [a, b, c, d, e, f, g] = [status.reload, jobs.reload, health.reload, profile.reload, agents.reload, board.reload, risk.reload];
   const reload = useCallback(() => [a, b, c, d, e, f, g].forEach((r) => r()), [a, b, c, d, e, f, g]);
-  return { score, reload };
+  const needs = useMemo(() => healthNeeds(health.data), [health.data]);
+  return { score, needs, reload };
 }
 
 export function StartProvider({ children }) {
@@ -97,8 +99,8 @@ export function StartProvider({ children }) {
   const hidden = view.mode === 'partial' && Boolean(finishedAt) && hiddenAt === finishedAt;
 
   const value = useMemo(
-    () => ({ view, readiness, known: Boolean(ready.data || ready.error), begin, busy, error, justDone, dismiss, hide, hidden, refresh, reloadSetup, setup: setup.score, epoch, memory, recheck: reloadStart }),
-    [view, readiness, ready.data, ready.error, begin, busy, error, justDone, dismiss, hide, hidden, refresh, reloadSetup, setup.score, epoch, memory, reloadStart],
+    () => ({ view, readiness, known: Boolean(ready.data || ready.error), begin, busy, error, justDone, dismiss, hide, hidden, refresh, reloadSetup, setup: setup.score, needs: setup.needs, epoch, memory, recheck: reloadStart }),
+    [view, readiness, ready.data, ready.error, begin, busy, error, justDone, dismiss, hide, hidden, refresh, reloadSetup, setup.score, setup.needs, epoch, memory, reloadStart],
   );
   return <StartContext.Provider value={value}>{children}</StartContext.Provider>;
 }

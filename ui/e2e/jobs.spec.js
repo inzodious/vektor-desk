@@ -136,37 +136,14 @@ test('with the scheduler off, run now is off and says why', async ({ page }) => 
   await expect(card.locator('.job-list').first().getByRole('button', { disabled: false })).toHaveCount(0);
 });
 
-// ---------- refresh by itself ----------
-test('stale data is refreshed by the app itself, once, with nothing to press', async ({ page }) => {
+// ---------- the box refreshes by itself ----------
+test('the app asks for no job on its own: the box does that', async ({ page }) => {
   const asked = fakeScheduler(page);
-  await page.goto('/?scenario=fail');
-  const b = page.getByTestId('health-banner');
-  await expect(b.getByRole('button')).toHaveCount(0);
-  await expect(b.getByTestId('refresh-status')).toContainText('Refreshing daily numbers…');
-  await expect(b.getByTestId('refresh-status')).toHaveCount(0, { timeout: 15000 });
-  expect(asked).toEqual(['engine-daily']);
-  await page.goto('/portfolio?scenario=fail');
-  await expect(page.getByTestId('health-banner')).toBeVisible();
-  await page.waitForLoadState('networkidle');
-  expect(asked).toEqual(['engine-daily']);
-});
-
-test('a check worth a read is refreshed quietly: no banner, the fixing job asked for once', async ({ page }) => {
-  const asked = fakeScheduler(page);
-  await page.goto('/research?scenario=warn');
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await expect.poll(() => asked).toEqual(['engine-lots']);
-  await expect(page.getByTestId('health-banner')).toHaveCount(0);
-});
-
-test('nothing is asked for when no job fixes the check, or the scheduler is off', async ({ page }) => {
-  const asked = fakeScheduler(page);
-  await page.route(/\/api\/engine\/health/, (route) =>
-    route.fulfill({ json: { status: 'warn', as_of: '2026-11-09', checks: [{ check_name: 'marginal_rate', status: 'warn', detail: 'No marginal tax rate yet.' }] } }),
-  );
-  await page.goto('/research');
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-  await page.waitForLoadState('networkidle');
-  await expect(page.getByTestId('health-banner')).toHaveCount(0);
+  for (const path of ['/?scenario=fail', '/research?scenario=warn', '/portfolio?scenario=healing']) {
+    await page.goto(path);
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.waitForLoadState('networkidle');
+  }
+  await expect(page.getByRole('button', { name: 'Refresh data' })).toHaveCount(0);
   expect(asked).toEqual([]);
 });

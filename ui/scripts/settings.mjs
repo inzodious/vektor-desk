@@ -134,3 +134,35 @@ for (const name of ['decisions.profile.status', 'decisions.profile.status.empty'
   const d = read(name);
   write(name, { ...d, init: d.exists ? null : INIT });
 }
+
+// ---------- health: what fixes itself, what needs you, what blocks ----------
+const SAY = {
+  value: ['blocks', 'mirror', 'Your broker’s positions and account totals for Friday do not add up, so values cannot be trusted yet. The desk is reading your accounts again.'],
+  marginal_rate: ['needs_you', null, 'No tax rate yet, so after-tax figures are estimates. Open Taxes in Escape Vektor once and the desk reads it from there.'],
+  shares: ['needs_you', null, 'No tax lots yet, so tax and wash-sale checks are off. Upload your Fidelity history or a lot export in Settings, Data, Inbox.'],
+  symbol_kinds: ['fixes_itself', 'engine-research', 'The desk does not know yet whether 0999999 is a fund or a single stock. It is looking that up.'],
+  closes: ['fixes_itself', 'engine-backfill', 'Two fund prices for Monday are not out yet. The desk checks every hour.'],
+};
+const counted = (c) => c.status === 'fail' || (c.status === 'warn' && c.kind !== 'fixes_itself');
+const annotate = (c) => {
+  if (c.status === 'ok') return { check_name: c.check_name, status: 'ok', detail: c.diagnosis || c.detail, kind: null, counts: false, job: null, heal: null, diagnosis: c.diagnosis || c.detail };
+  const [kind, job, say] = SAY[c.check_name] || [c.status === 'fail' ? 'blocks' : 'needs_you', null, c.detail];
+  const row = { check_name: c.check_name, status: c.status, detail: say, kind, job, heal: job ? { job, asked_at: '2026-11-09T16:35:00+00:00', attempts: 1, stuck: false } : null, diagnosis: c.diagnosis || c.detail };
+  return { ...row, counts: counted(row) };
+};
+const healthOf = (h, checks) => {
+  const kinds = Object.fromEntries(['fixes_itself', 'needs_you', 'blocks'].map((k) => [k, checks.filter((c) => c.kind === k).length]));
+  return { ...h, status: !checks.length ? 'fail' : checks.some((c) => c.status === 'fail') ? 'fail' : checks.some((c) => c.counts) ? 'warn' : 'ok', kinds, checks };
+};
+for (const name of ['engine.health', 'engine.health.warn', 'engine.health.fail', 'engine.health.fresh', 'engine.health.never']) {
+  const h = read(name);
+  write(name, healthOf(h, (h.checks || []).map(annotate)));
+}
+const calm = read('engine.health');
+write(
+  'engine.health.healing',
+  healthOf(
+    calm,
+    calm.checks.map((c) => (c.check_name === 'closes' ? annotate({ ...c, status: 'warn', diagnosis: 'Closes for FXAIX, BND stop at 2026-11-06. A fund’s price for a day can arrive hours after the others. Fix: nothing to do yet.' }) : c)),
+  ),
+);

@@ -75,9 +75,12 @@ export function gapWords(gap, { why, action } = {}) {
   };
 }
 
-export function setupChip(score) {
-  if (!score || !score.total || score.left <= 0) return null;
-  return { text: `Setup · ${score.left} left`, short: `${score.left} left`, label: `Setup: ${score.left} of ${score.total} steps left. Open the first-run checklist.` };
+export function setupChip(score, needs = []) {
+  if (score && score.total && score.left > 0) return { text: `Setup · ${score.left} left`, short: `${score.left} left`, label: `Setup: ${score.left} of ${score.total} steps left. Open the first-run checklist.`, left: score.left };
+  const n = (needs || []).length;
+  if (!n) return null;
+  const words = n === 1 ? '1 needs you' : `${n} need you`;
+  return { text: words, short: words, label: `${n === 1 ? 'One thing needs' : `${n} things need`} you. Open the list.`, left: 0 };
 }
 
 export const FIRST_RUN = { kind: 'link', to: '/settings/first-run', label: 'Open the checklist' };

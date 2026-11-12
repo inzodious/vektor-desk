@@ -54,11 +54,11 @@ export function SettingsButton() {
 
 // ---------- setup ----------
 export function SetupChip() {
-  const { setup } = useStart();
-  const chip = setupChip(setup);
+  const { setup, needs } = useStart();
+  const chip = setupChip(setup, needs);
   if (!chip) return null;
   return (
-    <Link className="setup-chip" to="/settings/first-run" aria-label={chip.label} title="Open the first-run checklist" data-testid="setup-chip" data-left={setup.left}>
+    <Link className="setup-chip" to="/settings/first-run" aria-label={chip.label} title="Open the first-run checklist" data-testid="setup-chip" data-left={chip.left} data-needs={needs.length}>
       <Icon name="flag" />
       <span className="long">{chip.text}</span>
       <span className="short">{chip.short}</span>

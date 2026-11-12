@@ -5,42 +5,87 @@
   {
    "check_name": "closes",
    "status": "ok",
-   "detail": "Every holding has a close on 2026-11-06."
+   "detail": "Every holding has a close on 2026-11-06.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "Every holding has a close on 2026-11-06."
   },
   {
    "check_name": "freshness",
    "status": "ok",
-   "detail": "Mirror pulled 2.7 hours ago (limit 14)."
+   "detail": "Mirror pulled 2.7 hours ago (limit 14).",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "Mirror pulled 2.7 hours ago (limit 14)."
   },
   {
    "check_name": "lookthrough",
    "status": "ok",
-   "detail": "Look-through covers 100% of invested value."
+   "detail": "Look-through covers 100% of invested value.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "Look-through covers 100% of invested value."
   },
   {
    "check_name": "marginal_rate",
    "status": "warn",
-   "detail": "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once; the desk reads the rate from there."
+   "detail": "No tax rate yet, so after-tax figures are estimates. Open Taxes in Escape Vektor once and the desk reads it from there.",
+   "kind": "needs_you",
+   "job": null,
+   "heal": null,
+   "diagnosis": "No marginal tax rate yet. Fix: open Taxes in Escape Vektor once; the desk reads the rate from there.",
+   "counts": true
   },
   {
    "check_name": "research",
    "status": "ok",
-   "detail": "SEC company facts for 2 stocks."
+   "detail": "SEC company facts for 2 stocks.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "SEC company facts for 2 stocks."
   },
   {
    "check_name": "value",
    "status": "ok",
-   "detail": "Values match the broker on 2026-11-06."
+   "detail": "Values match the broker on 2026-11-06.",
+   "kind": null,
+   "counts": false,
+   "job": null,
+   "heal": null,
+   "diagnosis": "Values match the broker on 2026-11-06."
   },
   {
    "check_name": "shares",
    "status": "warn",
-   "detail": "No lot export yet; tax lots and wash-sale checks need one."
+   "detail": "No tax lots yet, so tax and wash-sale checks are off. Upload your Fidelity history or a lot export in Settings, Data, Inbox.",
+   "kind": "needs_you",
+   "job": null,
+   "heal": null,
+   "diagnosis": "No lot export yet; tax lots and wash-sale checks need one.",
+   "counts": true
   },
   {
    "check_name": "symbol_kinds",
    "status": "warn",
-   "detail": "1 symbol has no type yet (0999999); it counts as a fund until its profile loads."
+   "detail": "The desk does not know yet whether 0999999 is a fund or a single stock. It is looking that up.",
+   "kind": "fixes_itself",
+   "job": "engine-research",
+   "heal": {
+    "job": "engine-research",
+    "asked_at": "2026-11-09T16:35:00+00:00",
+    "attempts": 1,
+    "stuck": false
+   },
+   "diagnosis": "1 symbol has no type yet (0999999); it counts as a fund until its profile loads.",
+   "counts": false
   }
  ],
  "last_run": {
@@ -48,5 +93,10 @@
   "started_at": "2026-11-07T15:24:57+00:00",
   "finished_at": "2026-11-07T15:24:57+00:00",
   "ok": 1
+ },
+ "kinds": {
+  "fixes_itself": 1,
+  "needs_you": 2,
+  "blocks": 0
  }
 }
