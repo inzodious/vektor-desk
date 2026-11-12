@@ -589,7 +589,7 @@ def build_pack(data: Data, kind: str, start: str, end: str) -> dict | None:
     if as_of in data.provisional:
         carried = data.provisional[as_of]
         waits = f" {', '.join(carried)} carry their last close until then." if carried else ""
-        note = f"{asof.day_words(as_of)} is priced from the closing quotes and is restated when official closes land overnight.{waits}"
+        note = f"{asof.day_words(as_of)} is priced from the closing quotes and is restated when {asof.CLOSES_LAND}{waits}"
         pack["provisional"] = {"day": as_of, "carried": carried, "note": note}
     elif as_of in data.waiting:
         carried = data.waiting[as_of]

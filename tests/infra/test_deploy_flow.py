@@ -354,6 +354,10 @@ repo() {
 """
 
 
+def box_clock() -> int:
+    return int(subprocess.run(["date", "+%s"], capture_output=True, text=True, check=True).stdout)
+
+
 class BuiltBox(Box):
     def __init__(self, tmp_path: Path, running: str = "aaa", local: str = "aaa", head: str = "bbb", approved: bool = True):
         from desk.worker import builder
@@ -404,9 +408,7 @@ class BuiltBox(Box):
         (self.inbox / f"{commit}.sig").write_text(said + "\n")
 
     def alive(self, age: int = 0) -> None:
-        from datetime import UTC, datetime, timedelta
-
-        at = (datetime.now(UTC) - timedelta(seconds=age)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        at = subprocess.run(["date", "-u", "-d", f"@{box_clock() - age}", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True, check=True).stdout.strip()
         (self.inbox.parent / "builder.alive").write_text(json.dumps({"at": at, "fingerprint": self.mark, "name": "Horizon"}))
 
     def last(self) -> dict:
@@ -628,24 +630,22 @@ def test_auto_builds_here_at_once_when_no_builder_is_working_on_it(tmp_path, how
 
 
 def test_auto_lets_main_settle_so_commits_that_land_together_become_one_deploy(tmp_path):
-    import time
-
     box = BuiltBox(tmp_path, approved=False) if shutil.which("openssl") else None
     if box is None:
         pytest.skip("needs openssl")
-    (box.dir / "landed").write_text(f"{int(time.time()) - 125}\n")
+    (box.dir / "landed").write_text(f"{box_clock() - 125}\n")
     assert box.run("auto").returncode == 0
     assert box.running() == "aaa" and box.calls() == []
     assert "Auto-deploy is letting main settle before bbb: it landed 2 min ago, and a deploy waits until main has been quiet for 10 minutes" in box.log()
     assert box.run("auto").returncode == 0 and box.log().count("letting main settle") == 1
     (box.dir / "head").write_text("ccc")
-    (box.dir / "landed").write_text(f"{int(time.time()) - 30}\n")
+    (box.dir / "landed").write_text(f"{box_clock() - 30}\n")
     assert box.run("auto").returncode == 0 and box.running() == "aaa" and "before ccc: it landed 0 min ago" in box.log()
-    (box.dir / "landed").write_text(f"{int(time.time()) - 601}\n")
+    (box.dir / "landed").write_text(f"{box_clock() - 601}\n")
     assert box.run("auto").returncode == 0 and box.running() == "ccc" and box.calls().count("restart") == 1
     (tmp_path / "now").mkdir()
     now = BuiltBox(tmp_path / "now", approved=False)
-    (now.dir / "landed").write_text(f"{int(time.time())}\n")
+    (now.dir / "landed").write_text(f"{box_clock()}\n")
     assert now.run("deploy").returncode == 0 and now.running() == "bbb"
     now.env["DESK_SETTLE"] = "0"
     (now.dir / "head").write_text("ddd")

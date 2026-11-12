@@ -147,7 +147,9 @@ def test_the_evening_run_closes_today_from_the_closing_quotes(cfg, mirror, monke
     assert evening["numbers"]["value"] == 10 * 23.1 + 5 * 202.0 + 300.0
     assert evening["numbers"]["day_change"] == pytest.approx(21.0)
     assert evening["numbers"]["cash_ready"] == 300.0 and evening["numbers"]["margin_debit"] == 0.0
-    assert evening["words"].startswith("Wed Nov 11, ") and evening["words"].endswith("Provisional until official closes land overnight.")
+    assert evening["words"].startswith("Wed Nov 11, ") and evening["words"].endswith(
+        "Provisional until official closes land, usually the same evening; fund prices can follow the next morning."
+    )
     assert evening["review"]["day"] == WED and evening["debrief"] is None
 
     conn = connect(cfg.desk_db, readonly=True)

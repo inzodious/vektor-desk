@@ -7,7 +7,7 @@ from statistics import NormalDist
 from desk.config import Config
 from desk.db import connect
 from desk.engine import catalog, gate
-from desk.engine.lab.data import data_path, lab_build, ledger_path
+from desk.engine.lab.data import data_path, lab_build, ledger_path, plan_path, read_plan
 from desk.engine.lab.rulebook import STAND_IN
 from desk.engine.lab.runner import PBO_BAR
 from desk.engine.lab.simcache import queue_dir
@@ -28,6 +28,7 @@ REFRESH_AFTER = timedelta(days=30)
 HINDSIGHT_REFRESH = timedelta(days=7)
 REV = 2
 MIX_REV = 3
+SCREEN_REV = 4
 OUTDATED = "were measured before the lab's latest fix and are being run again; until then their numbers lean a little."
 LEVEL_PTS = 0.2
 YARDSTICK = "lib-buy-hold-sp500"
@@ -208,6 +209,7 @@ LIBRARY: tuple[dict, ...] = (
         "Hold the 20 stocks that led over the past year, skipping the latest month.",
         SPY,
         {"universe": STOCKS, "signals": [_sig("ret_skip", "252d")], "entry": {"top_n": 20}, "benchmark": "SPY"},
+        rev=SCREEN_REV,
     ),
     _exp(
         "lib-stock-low-vol",
@@ -217,6 +219,7 @@ LIBRARY: tuple[dict, ...] = (
         "Hold the 20 calmest stocks, refreshed each quarter.",
         SPY,
         {"universe": STOCKS, "signals": [_sig("vol", "252d", "inverse_rank")], "entry": {"top_n": 20}, "rebalance": "quarterly", "benchmark": "SPY"},
+        rev=SCREEN_REV,
     ),
     _exp(
         "lib-size-small",
@@ -460,6 +463,7 @@ LIBRARY: tuple[dict, ...] = (
         "Hold the 20 stocks that score best on past-year return and low volatility together.",
         SPY,
         {"universe": STOCKS, "signals": [_sig("ret_skip", "252d"), _sig("vol", "252d", "inverse_rank")], "entry": {"top_n": 20}, "benchmark": "SPY"},
+        rev=SCREEN_REV,
     ),
     _exp(
         "lib-breakout-vol-cap",
@@ -475,6 +479,7 @@ LIBRARY: tuple[dict, ...] = (
             "entry": {"top_n": 20},
             "benchmark": "SPY",
         },
+        rev=SCREEN_REV,
     ),
     _exp(
         "lib-discount-day",
@@ -491,6 +496,7 @@ LIBRARY: tuple[dict, ...] = (
             "rebalance": "weekly",
             "benchmark": "SPY",
         },
+        rev=SCREEN_REV,
     ),
     _exp(
         "insider-momentum-filter",
@@ -713,17 +719,7 @@ def _yardstick(wf: dict) -> dict:
 
 
 def _no_plan(cfg: Config) -> bool:
-    path = data_path(cfg)
-    if not path.exists():
-        return False
-    try:
-        conn = connect(path, readonly=True)
-        try:
-            return conn.execute("SELECT 1 FROM plan_mix LIMIT 1").fetchone() is None
-        finally:
-            conn.close()
-    except sqlite3.Error:
-        return False
+    return data_path(cfg).exists() and not read_plan(plan_path(cfg))
 
 
 RULE_VERDICT = {"helps": "held_up", "no_clear_edge": "within_noise", "hurts": "fell_short", "inconclusive": "inconclusive"}

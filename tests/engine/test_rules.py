@@ -1,3 +1,4 @@
+import json
 import random
 import sqlite3
 
@@ -5,7 +6,7 @@ import pytest
 
 from desk.engine import lab
 from desk.engine.lab import rulebook as rules
-from desk.engine.lab.data import EXPORT_SCHEMA, data_path, load
+from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, data_path, load
 from desk.engine.lab.runner import process_queue
 from tests.engine.test_lab import NOW, queue, weekdays
 
@@ -29,7 +30,7 @@ def rules_lab(cfg, start="2010-01-04", end="2024-12-31"):
         rows += [("AAA", d, a, a, a, 1e6), ("BBB", d, b, b, b, 1e6)]
     conn.executemany("INSERT INTO bars VALUES (?, ?, ?, ?, ?, ?)", rows)
     conn.executemany("INSERT INTO symbols VALUES (?, 'fund', 'plan', ?, ?)", [("AAA", days[0], days[-1]), ("BBB", days[0], days[-1])])
-    conn.executemany("INSERT INTO plan_mix VALUES (?, ?)", [("AAA", 0.6), ("BBB", 0.4)])
+    path.with_name(PLAN_FILE).write_text(json.dumps({"weights": {"AAA": 0.6, "BBB": 0.4}}))
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
     conn.commit()
     conn.close()

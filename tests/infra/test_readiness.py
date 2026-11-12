@@ -121,6 +121,20 @@ def test_after_the_numbers_and_the_review_each_section_names_its_one_action(demo
         assert keys["state"] == "blocked" and keys["action"] == {"kind": "link", "to": "/settings/data", "label": "Add the Alpaca paper keys"}
 
 
+def test_the_tax_section_stays_ready_when_no_wash_window_is_open(demo_cfg):
+    from desk.db import connect
+    from desk.engine.__main__ import JOBS
+
+    with TestClient(create_app(demo_cfg)) as client:
+        assert JOBS["daily"](demo_cfg)["ok"]
+        conn = connect(demo_cfg.desk_db)
+        conn.execute("DELETE FROM wash_windows")
+        conn.commit()
+        conn.close()
+        assert client.get("/api/engine/wash").json() == {"as_of": None, "windows": []}
+        assert sections(client)[1]["portfolio.tax"]["state"] == "ready"
+
+
 def test_a_package_can_sharpen_its_own_section(cfg, monkeypatch):
     class Hook:
         @staticmethod

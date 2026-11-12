@@ -1,6 +1,7 @@
 import gzip
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -15,8 +16,10 @@ import requests
 from desk.worker import BEAT_EVERY, snapshots
 
 BUILD = os.environ.get("DESK_BUILD", "dev")
-KEEP = 3
+KEEP_CODE = 3
 IDLE = 15
+COPIES = "snapshots"
+WORKER_COPY = re.compile(r"^\.{0,2}[0-9a-f]{64}\.(db|gz)(\.[0-9]+\.tmp|\.part)?$")
 SECRET_ENV = ("DESK_WORKER_KEY", "DESK_URL")
 
 
@@ -74,10 +77,31 @@ class Desk:
 # ---- What a job needs on disk ----
 
 
-def _trim(folder: Path, keep: int = KEEP) -> None:
+def _trim(folder: Path, keep: int = KEEP_CODE) -> None:
     rows = sorted((p for p in folder.iterdir() if not p.name.startswith(".")), key=lambda p: p.stat().st_mtime, reverse=True)
     for old in rows[keep:]:
         shutil.rmtree(old) if old.is_dir() else old.unlink(missing_ok=True)
+
+
+def only_these(in_use: list[Path]) -> list[str]:
+    keep = {p.name for p in in_use}
+    gone = []
+    for folder in {p.parent for p in in_use if p.parent.name == COPIES}:
+        try:
+            found = sorted(folder.iterdir())
+        except OSError:
+            continue
+        for path in found:
+            if path.name in keep or not WORKER_COPY.match(path.name):
+                continue
+            try:
+                path.unlink()
+            except OSError:
+                continue
+            gone.append(path.name)
+    if gone:
+        say(f"removed {len(gone)} older {'copy' if len(gone) == 1 else 'copies'} of the desk's data")
+    return gone
 
 
 def ensure_code(desk: Desk, code: dict, work: Path) -> Path:
@@ -101,7 +125,7 @@ def ensure_code(desk: Desk, code: dict, work: Path) -> Path:
 
 
 def ensure_copy(desk: Desk, copy: dict, work: Path) -> Path:
-    folder = work / "snapshots"
+    folder = work / COPIES
     folder.mkdir(parents=True, exist_ok=True)
     target = folder / f"{copy['sha256']}.db"
     if not target.is_file():
@@ -114,7 +138,6 @@ def ensure_copy(desk: Desk, copy: dict, work: Path) -> Path:
         target.chmod(0o444)
         say(f"fetched a copy of {copy['name']} ({copy.get('bytes', 0) / 2**20:.0f} MB)")
     os.utime(target)
-    _trim(folder)
     return target
 
 
@@ -130,6 +153,7 @@ def run_job(desk: Desk, lease: dict, work: Path) -> tuple[bool, float, int | Non
     try:
         code = ensure_code(desk, lease["code"], work)
         files = {c["name"]: str(ensure_copy(desk, c, work)) for c in job["snapshots"]}
+        only_these([Path(p) for p in files.values()])
     except (OSError, ValueError, tarfile.TarError, requests.RequestException) as e:
         return False, time.monotonic() - began, None, f"The worker couldn't fetch what the job needs: {e}".encode()
     out = scratch / "result.json.gz"
@@ -155,6 +179,7 @@ def one(spec_path: Path) -> int:
     from desk.worker import registry
 
     spec = json.loads(spec_path.read_text())
+    only_these([Path(path) for path in spec["files"].values()])
     kind = registry().get(spec["kind"])
     if kind is None:
         print(f"this build has no job kind called {spec['kind']}", file=sys.stderr)

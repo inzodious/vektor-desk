@@ -887,8 +887,20 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 
 | Path | Writer | Holds |
 |---|---|---|
-| `lab/data/lab.db` | Engine `lab-export` job (00:55 nightly), atomic replace | `bars` (price bars plus mirror closes), `symbols` (kind, role, first and last day), `macro`, `plan_mix`, `settings` (marginal rate), `factors` and `french` (phase 9b). SQLite in rollback-journal mode, never WAL, so it opens read-only on the lab's read-only mount |
-| `lab/data/held.json` | Engine `lab-export`, beside `lab.db` | Today's holdings as weights only (`as_of`, `covered`, `weights`). Box only: a worker is served `lab.db` and nothing else, because holdings never leave the box (project plan, 2026-11-11). For the same reason `lab.db` carries no held, watch or past roles: `symbols.role` reads `universe` for held and watched names and is empty for past ones, and a test opens the file a worker is served to check |
+| `lab/data/lab.db` | Engine `lab-export` job (00:55 nightly), atomic replace | `bars` (price bars plus mirror closes), `symbols` (kind, role, first and last day), `macro`, `settings` (marginal rate), `factors` and `french` (phase 9b). SQLite in rollback-journal mode, never WAL, so it opens read-only on the lab's read-only mount |
+| `lab/data/held.json` | Engine `lab-export`, beside `lab.db` | Today's holdings as weights only (`as_of`, `covered`, `weights`). Box only |
+| `lab/data/plan.json` | Engine `lab-export`, beside `lab.db` | The plan's target weights (`weights`), removed when no plan is loaded. Box only |
+
+**What a worker can read.** A worker is served `lab.db` and nothing else, because holdings and the plan never leave the box (project plan, 2026-11-11). A test opens the file a worker is served to check each row below.
+
+| In `lab.db` | Rule |
+|---|---|
+| Mixes | No held mix and no plan mix, in any table or column |
+| `symbols.role` | `universe` for held, watched, past and plan names alike; only `benchmark` and `small_cap` differ, and both are public lists |
+| `symbols.kind` | A public fact: a stock in the plan stays a stock. A plan name nothing public can classify is a fund |
+| What is left | The file still has bars for every name the desk follows, so which mutual funds it carries can be guessed to be his. `settings.marginal_rate_pct` is the one personal figure a worker sees |
+
+Because a role no longer marks a name as his, a stock screen takes any stock with enough history, past holdings and plan stocks included, and a plan stock pays stock costs. `shelf.SCREEN_REV` reruns the five screen rows for that.
 | `lab/queue/*.json` | Strategy desk runner | Experiment and finalize requests |
 | `lab/runs/ledger.db` | Lab only | `strategies` (status `lab`, `paper`, `research`, `failed`, `inconclusive`), `strategy_trials` (kinds `train`, `test`, `full`, `holdout`, `rule`; never pruned), `lab_results` (`experiment`, `finalize`, `rejected`, `rule` bodies), `queue_done`. Older ledgers migrate in place |
 | `desk.db` | Engine `lab-export` job | `paper_portfolios`, `paper_positions`, `paper_trades` |
@@ -903,7 +915,7 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 | `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
 | `rebalance`, `sizing` | Weekly, monthly or quarterly; `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash |
 | `filters` | `[{"metric_id": "ma_gap", "window": "200d", "min": 0}]`: a name is eligible only while each raw value sits inside `min` and `max`; slots left empty stay in cash |
-| Fixed mixes | `"sizing": {"weights": {"SPY": 60, "AGG": 40}}` holds funds at fixed weights and needs no signal; `{"type": "fund_list", "set": "plan_mix"}` is the plan at its target weights; `"set": "held_mix"` is today's holdings at today's weights, single stocks included, read from `held.json` on the box, always with a hindsight caveat; a pass on it is research only, never paper, and a spec that uses it is never offered to a worker (`spec.local_only`), so the box's own lab computes it. A fund with no history in the lab is dropped and the rest scaled up, with a caveat; under half the mix present is refused |
+| Fixed mixes | `"sizing": {"weights": {"SPY": 60, "AGG": 40}}` holds funds at fixed weights and needs no signal; `{"type": "fund_list", "set": "plan_mix"}` is the plan at its target weights; `"set": "held_mix"` is today's holdings at today's weights, single stocks included, read from `held.json` on the box, always with a hindsight caveat; a pass on it is research only, never paper. A spec that uses either mix is never offered to a worker (`spec.local_only`), and with a plan loaded neither is an experiment with no `benchmark` of its own, since it is judged against the plan; the box's own lab computes those. A fund with no history in the lab is dropped and the rest scaled up, with a caveat; under half the mix present is refused |
 | Named French portfolios | `{"type": "french", "set": "size_deciles", "members": ["lo"]}` keeps the portfolios whose name starts that way and needs no signal |
 | `params`, `grid` | `{"top_n": {"min": 1, "max": 4, "default": 3}}` or a list; grid values must sit inside. Over the trial budget (max 200), a seeded, deterministic subset runs |
 
@@ -1135,7 +1147,7 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Where it runs | On the box in the night lab pass only; `lab-offer` skips it and a worker refuses it |
 | Not run | No held mix exported yet, or the holdings have not all traded long enough before the holdout (see "A fund that had not started trading") |
 
-**Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt).
+**Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the five stock screens (see "What a worker can read").
 
 **Rule rows.** A deposit rule is compared with its baseline for every start month. `share_better` and `share_worse` count the start months that ended ahead and behind; the rest ended the same, which happens when the rule never had cause to act. The row's line says ahead, behind and no different, and never counts a tie as worse. A result stored before `share_worse` existed states only what its numbers support. When the 5th, 50th and 95th percentile all round to 0.0 points the row reads "No difference" and is `within_noise` whatever the stored verdict.
 

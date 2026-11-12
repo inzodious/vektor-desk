@@ -9,11 +9,11 @@ from fastapi.testclient import TestClient
 from desk.api.app import create_app
 from desk.engine import kinds, lab
 from desk.engine.jobs import JOBS
-from desk.engine.lab import rulebook, runner, shelf, simcache
-from desk.engine.lab.data import EXPORT_SCHEMA, data_path, held_path, load
+from desk.engine.lab import rulebook, runner, shelf, sim, simcache
+from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, data_path, held_path, load, plan_path
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
-from desk.engine.lab.spec import HINDSIGHT, SETS, SpecError, parse, resolve, variants
+from desk.engine.lab.spec import HINDSIGHT, SETS, SpecError, local_only, parse, resolve, variants
 from desk.worker import store
 
 NOW = datetime(2025, 1, 2, 5, 55, tzinfo=UTC)
@@ -68,7 +68,7 @@ def lab_file(tmp_path_factory):
     for set_name, names in FRENCH:
         conn.executemany("INSERT INTO french VALUES (?, ?, ?, ?)", [(set_name, n, d, rng.gauss(0.04, 1.0)) for n in names for d in days])
     conn.executemany("INSERT INTO macro VALUES ('DGS3MO', ?, 2.0)", [(d,) for d in days[::5]])
-    conn.executemany("INSERT INTO plan_mix VALUES (?, ?)", [("SPY", 0.6), ("VXUS", 0.2), ("AGG", 0.2)])
+    path.with_name(PLAN_FILE).write_text(json.dumps({"weights": {"SPY": 0.6, "VXUS": 0.2, "AGG": 0.2}}))
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
     conn.commit()
     conn.close()
@@ -81,6 +81,7 @@ def stocked(cfg, lab_file):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(lab_file.read_bytes())
     held_path(cfg).write_text(json.dumps({"as_of": "2024-12-31", "covered": 0.88, "weights": {"SPY": 0.5, "STK0": 0.3, "FTEC": 0.2}}))
+    plan_path(cfg).write_bytes(lab_file.with_name(PLAN_FILE).read_bytes())
     return cfg
 
 
@@ -297,8 +298,8 @@ BOX = ("lib-plan-mix", "lib-safe-mix", "lib-tech-tilt", "lib-rebalance-bands-pla
 
 def test_built_in_mixes_run_without_a_plan_when_their_funds_are_unlabelled(stocked, monkeypatch):
     cfg = stocked
+    plan_path(cfg).unlink()
     conn = sqlite3.connect(data_path(cfg))
-    conn.execute("DELETE FROM plan_mix")
     conn.execute("UPDATE symbols SET kind='unknown' WHERE symbol IN ('IVV', 'FTEC')")
     conn.commit()
     conn.close()
@@ -333,10 +334,7 @@ PAIR = ("lib-buy-hold-sp500", "lib-60-40")
 
 def test_the_sp500_row_reads_as_the_yardstick_when_there_is_no_plan_to_compare_it_with(stocked, monkeypatch):
     cfg = stocked
-    conn = sqlite3.connect(data_path(cfg))
-    conn.execute("DELETE FROM plan_mix")
-    conn.commit()
-    conn.close()
+    plan_path(cfg).unlink()
     monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in PAIR))
     monkeypatch.setattr(shelf, "IDS", frozenset(PAIR))
     shelf.queue_missing(cfg, now=NOW)
@@ -487,11 +485,35 @@ def test_the_hindsight_line_says_ahead_behind_or_level_and_names_the_dates():
     )
 
 
+def test_a_stock_in_the_plan_is_screened_and_costed_like_any_other_so_a_worker_agrees_with_the_box(stocked, tmp_path):
+    cfg = stocked
+    plan_path(cfg).write_text(json.dumps({"weights": {"SPY": 0.5, "STK0": 0.5}}))
+    (tmp_path / "lab.db").write_bytes(data_path(cfg).read_bytes())
+    box, worker = load(data_path(cfg)), load(tmp_path / "lab.db")
+    assert box.plan_mix == {"SPY": 0.5, "STK0": 0.5} and worker.plan_mix == {}
+    spec = parse(spec_of("lib-stock-momentum"), worker)
+    day = box.calendar[400]
+    assert "STK0" in sim.universe(box, spec, day) and sim.universe(box, spec, day) == sim.universe(worker, spec, day)
+    at = box.series["STK0"].index.get(day)
+    assert sim._bps(box, "STK0", at) == sim._bps(worker, "STK0", at) == sim.STOCK_BPS
+    with pytest.raises(SpecError, match="STK0 are not funds"):
+        parse(spec_of("lib-60-40") | {"universe": {"type": "fund_list", "symbols": ["SPY", "STK0"]}, "sizing": "equal"}, box)
+
+
+def test_stock_screens_are_run_again_now_that_no_name_is_kept_out_for_being_his():
+    screens = {e["id"] for e in shelf.LIBRARY if e["rev"] == shelf.SCREEN_REV}
+    assert screens == {e["id"] for e in shelf.LIBRARY if e["type"] == "experiment" and e["spec"]["universe"].get("type") == "screen"}
+    assert len(screens) == 5 and shelf.SCREEN_REV > shelf.MIX_REV
+    seen = {"kind": "experiment", "rev": shelf.MIX_REV, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
+    assert all(shelf._outdated(e, seen) == (e["id"] in screens) for e in shelf.LIBRARY)
+
+
 def test_mixes_that_held_cash_for_a_fund_not_yet_trading_are_run_again():
     again = {e["id"] for e in shelf.LIBRARY if e["rev"] == shelf.MIX_REV}
     assert again == {"lib-buy-hold-total-world", "lib-risk-parity", "lib-plan-mix", "lib-safe-mix", "lib-tech-tilt"} and shelf.MIX_REV > shelf.REV
+    screens = {e["id"] for e in shelf.LIBRARY if e["rev"] == shelf.SCREEN_REV}
     seen = {"kind": "experiment", "rev": shelf.REV, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
-    assert all(shelf._outdated(e, seen) == (e["id"] in again) for e in shelf.LIBRARY)
+    assert all(shelf._outdated(e, seen) == (e["id"] in again | screens) for e in shelf.LIBRARY)
     short = "the walk-forward range 2021-04-01 to 2022-12-30 is 1.7 years; it needs 2.5 or more before the two-year holdout"
     assert shelf.plain([short]) == "Its funds have not all traded long enough to test before the two-year holdout."
 
@@ -549,7 +571,7 @@ def test_the_export_queues_the_library_before_it_offers_and_never_waits_its_turn
     made = store.add_worker(cfg, "Horizon")
     store.beat(cfg, made["id"], {})
     out = run_lab_export(cfg)
-    experiments = sum(e["type"] == "experiment" and not e.get("hindsight") for e in shelf.LIBRARY)
+    experiments = sum(e["type"] == "experiment" and not local_only(e["spec"]) for e in shelf.LIBRARY)
     assert out["library"] == {"queued": len(shelf.LIBRARY), "of": len(shelf.LIBRARY)}
     assert out["worker"]["offered"] == experiments == len(store.in_state(cfg, "queued"))
     entry = next(e for e in JOBS if isinstance(e, dict) and e["command"].endswith("lab-export"))
