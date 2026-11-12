@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 
 from desk.db import connect
-from desk.engine import core, lookthrough, risk
+from desk.engine import core, lookthrough, risk, schema
 from desk.engine.__main__ import run_holdings, run_lookthrough
 from desk.engine.compare import CompareError, compare
 from desk.engine.source import open_mirror
@@ -254,6 +254,127 @@ def test_lookthrough_skips_without_agent(cfg, mirror, monkeypatch):
     http = Http()
     result = run_lookthrough(cfg, http)
     assert "not set" in result["nport"]["skipped"] and http.calls == []
+
+
+ATOM = """<?xml version="1.0" encoding="ISO-8859-1" ?><feed xmlns="http://www.w3.org/2005/Atom">
+<entry><category label="form type" term="NPORT-P"/><content type="text/xml"><accession-number>{acc}</accession-number>
+<filing-date>2026-10-02</filing-date><filing-href>https://www.sec.gov/Archives/x-index.htm</filing-href><filing-type>NPORT-P</filing-type></content></entry>
+</feed>"""
+
+
+class Trust:
+    def __init__(self, *, series_list=True, own=True):
+        self.calls, self.series_list, self.own = [], series_list, own
+        self.accs = [f"0000888-26-{i:06d}" for i in range(45, 0, -1)]
+
+    def xml(self):
+        return [u for u in self.calls if u.endswith("primary_doc.xml")]
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        self.calls.append(url)
+        assert headers == {"User-Agent": "vektor-desk test"}
+        if url.endswith("company_tickers_mf.json"):
+            return Res(200, {"fields": MF["fields"], "data": [[888, "S000000001", "C1", "CLEAN"], [999, "S000000900", "C9", "INDEX"]]})
+        if "browse-edgar" in url:
+            wanted = {"S000000001": self.accs[-1], "S000000900": "0000999-26-000001"}.get(params["CIK"])
+            assert params["type"] == "NPORT-P" and params["output"] == "atom"
+            return Res(200, text=ATOM.format(acc=wanted)) if self.series_list and wanted else Res(404)
+        if "submissions/CIK0000000888" in url:
+            n = len(self.accs)
+            dates = [f"2026-10-{d:02d}" for d in range(n, 0, -1)]
+            return Res(
+                200,
+                {
+                    "filings": {
+                        "recent": {"accessionNumber": self.accs, "form": ["NPORT-P"] * n, "primaryDocument": ["primary_doc.xml"] * n, "filingDate": dates}
+                    }
+                },
+            )
+        if "submissions/CIK0000000555" in url:
+            one = {"accessionNumber": ["0000555-26-000001"], "form": ["NPORT-P"], "primaryDocument": ["primary_doc.xml"], "filingDate": ["2026-10-10"]}
+            return Res(200, {"filings": {"recent": one if self.own else {}}})
+        if "/data/888/" in url and url.endswith("primary_doc.xml"):
+            number = int(url.split("/")[-2][-6:])
+            return Res(200, text=NPORT.format(series=f"S{number:09d}"))
+        if "/data/555/" in url and url.endswith("primary_doc.xml"):
+            return Res(200, text=NPORT.format(series=""))
+        if "/data/999/" in url and url.endswith("primary_doc.xml"):
+            return Res(200, text=NPORT.format(series="S000000900"))
+        return Res(404, {})
+
+
+@pytest.fixture
+def funds_desk(cfg, keys):
+    desk = connect(cfg.desk_db)
+    schema.apply(desk)
+    with desk:
+        desk.execute("INSERT INTO sec_tickers VALUES ('TRUST', 555, 'One Fund Trust', ?)", (NOW.isoformat(),))
+    yield desk
+    desk.close()
+
+
+def nport(desk, http, funds, now=NOW):
+    return lookthrough.run_nport(desk, http, funds, now=now, sleep=lambda s: None)
+
+
+def test_a_fund_in_a_trust_with_hundreds_of_funds_is_found_by_its_own_filing_list(funds_desk):
+    http = Trust()
+    assert nport(funds_desk, http, ["CLEAN"]) == {"ok": True, "funds": ["CLEAN"], "missing": [], "errors": []}
+    assert len(http.xml()) == 1 and not any("submissions" in u for u in http.calls)
+    assert funds_desk.execute("SELECT count(*) FROM fund_holdings WHERE fund='CLEAN'").fetchone()[0] == 3
+
+
+def test_without_that_list_each_run_gets_further_through_the_trust_until_the_fund_is_found(funds_desk):
+    http = Trust(series_list=False)
+    first = nport(funds_desk, http, ["CLEAN"])
+    assert first["missing"] == ["CLEAN"] and len(http.xml()) == lookthrough.NPORT_SCAN
+    second = nport(funds_desk, http, ["CLEAN"], now=NOW + timedelta(days=7))
+    assert second["funds"] == ["CLEAN"] and len(http.xml()) == 45
+
+
+def test_a_one_fund_trust_that_is_not_on_the_fund_list_is_read_from_its_own_filings(funds_desk):
+    http = Trust()
+    out = nport(funds_desk, http, ["TRUST"])
+    assert out["funds"] == ["TRUST"] and "stand_ins" not in out and len(http.xml()) == 1
+
+
+def test_a_fund_with_no_filing_of_its_own_is_read_through_a_fund_that_tracks_the_same_index(funds_desk, monkeypatch):
+    monkeypatch.setattr(lookthrough, "STAND_INS", {"TRUST": ("NOPE", "INDEX")})
+    http = Trust(own=False)
+    out = nport(funds_desk, http, ["TRUST", "LOST"])
+    assert out == {"ok": True, "funds": ["TRUST"], "missing": ["LOST"], "errors": [], "stand_ins": {"TRUST": "INDEX"}}
+    rows = funds_desk.execute("SELECT DISTINCT fund, accession FROM fund_holdings").fetchall()
+    assert [tuple(r) for r in rows] == [("TRUST", "0000999-26-000001")]
+    assert [r[0] for r in funds_desk.execute("SELECT symbol FROM api_calls WHERE provider='nport_miss'")] == ["LOST"]
+
+
+def test_the_health_line_stops_promising_a_fund_the_desk_looked_for_and_did_not_find(cfg, mirror, keys):
+    seed(mirror)
+    run_holdings(cfg)
+
+    def line():
+        run_core(cfg)
+        desk = connect(cfg.desk_db, readonly=True)
+        row = desk.execute("SELECT * FROM data_health WHERE check_name='lookthrough' ORDER BY as_of DESC LIMIT 1").fetchone()
+        desk.close()
+        return dict(row)
+
+    before = line()
+    assert before["status"] == "warn" and before["kind"] == "fixes_itself" and before["job"] == "engine-lookthrough"
+    assert before["say"] == "What FXAIX holds inside is not in yet. The desk fetches it by itself, within a week at most."
+
+    class NoFunds(Http):
+        def get(self, url, params=None, headers=None, timeout=None):
+            return (
+                Res(200, {"fields": MF["fields"], "data": [[777, "S9", "C9", "OTHRX"]]})
+                if url.endswith("company_tickers_mf.json")
+                else super().get(url, params)
+            )
+
+    assert run_lookthrough(cfg, NoFunds())["nport"]["missing"] == ["FXAIX"]
+    after = line()
+    assert after["status"] == "ok" and after["kind"] is None
+    assert after["say"].endswith("It found no public holdings list for FXAIX, so it counts as one holding.")
 
 
 # ---- Compare ----
