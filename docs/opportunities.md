@@ -57,7 +57,7 @@ A written case that says avoid drops the name from the rows and lists it under `
 | Day of the desk | `as_of` and `asof` come from `desk.engine.asof`, the same answer as `/api/asof`. The list never reads its own clock for the day |
 | Analysis day | `analysis_as_of`: the scanner hit's day for a hit or a written case, the record's day for a Scout idea, the price day for rows worked out on read. `since_analysis_pct` is the move since then |
 | `as_of_words` | One line for the row: "Priced at the Wed Nov 11 close, provisional until the official close lands. The written case is from Mon Nov 9; the price is 3.1% lower since." |
-| Older prices | Live quotes are only pulled for held names, SPY and the yardsticks. A row priced before the newest day gets `price_behind` and says so in `as_of_words`; `prices.older` lists them |
+| Older prices | Live quotes are only pulled for held names, SPY and the yardsticks. Other closes come from the hourly price backfill, which has a stock's or ETF's close the same evening and a mutual fund's later. A row priced before the newest day gets `price_behind` and says so in `as_of_words`; `prices.older` lists them |
 
 ## Worth buying, not in the queue
 

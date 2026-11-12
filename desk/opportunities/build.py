@@ -45,7 +45,8 @@ BUY_WORDS = {"cash": "Worth buying now", "deposit": "Worth buying with the next 
 SPLIT = "The latest price down to one monthly swing lower. Split the buy in two."
 BELOW = "One to two monthly swings under the latest price."
 KEEP_CLOSES = 80
-OLDER = "The desk has no newer price for it than {day}: live quotes cover what you hold, and its next close lands overnight."
+LATER_CLOSES = "live quotes cover what you hold, and other closes arrive the same evening, mutual funds later"
+OLDER = "The desk has no newer price for it than {day}: " + LATER_CLOSES + "."
 FUNDING_REASONS = ("A margin debit", "It needs $")
 HOLD_REASONS = ("A standing note says to hold off",)
 WINDOW_WORDS = "wash-sale window"
@@ -569,9 +570,7 @@ def _prices(rows: list[dict], book_day: str | None = None) -> dict:
         return {"day": day, "words": f"Every price here is from {desk_day.day_words(day)}.", "older": []}
     names = ", ".join(o["symbol"] for o in older)
     verb = "is" if len(older) == 1 else "are"
-    words = (
-        f"Prices run to {desk_day.day_words(day)}. {names} {verb} still at an earlier close: live quotes cover what you hold, and other closes land overnight."
-    )
+    words = f"Prices run to {desk_day.day_words(day)}. {names} {verb} still at an earlier close: {LATER_CLOSES}."
     return {"day": day, "words": words, "older": older}
 
 
