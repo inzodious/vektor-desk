@@ -2,8 +2,9 @@ import json
 import re
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
-from desk.agents import advisor, alerts, briefs, store, switches, wording
+from desk.agents import advisor, alerts, briefs, checks, store, switches, wording
 from desk.agents.adapter import Adapter
 from desk.agents.desks import Desk, get
 from desk.agents.runner import Outcome, run_desk
@@ -186,13 +187,16 @@ def held_off(p: dict, standing: list[dict]) -> str | None:
     return None
 
 
-def _standing(cfg: Config, decisions: Decisions, proposals: list[dict]) -> list[dict]:
+def _open(cfg: Config, decisions: Decisions) -> list[dict]:
     fn = getattr(decisions, "standing", None)
     try:
-        found = [dict(i) for i in fn(cfg)] if fn else []
+        return [dict(i) for i in fn(cfg)] if fn else []
     except NotReady:
-        found = []
-    return found + [p for p in proposals if p.get("kind") == "hold_off"]
+        return []
+
+
+def _standing(cfg: Config, decisions: Decisions, proposals: list[dict]) -> list[dict]:
+    return _open(cfg, decisions) + [p for p in proposals if p.get("kind") == "hold_off"]
 
 
 def no_buy_problem(p: dict, view: dict, today: str | None = None) -> str | None:
@@ -253,6 +257,7 @@ def prepare(
     extra, prep.symbol = _extra(cfg, name, prep.slice_, symbol, question, trigger_row, lab)
     if view is not None:
         extra["advisor"] = advisor.summary(view)
+        extra["standing"] = _open(cfg, decisions)
     if name == "research" and not prep.symbol:
         prep.skip = prep.skip or ("not_ready", "No holdings in the brief to research.")
     try:
@@ -306,9 +311,13 @@ def run_proposal_desk(
     idx = briefs.index(slice_)
     run_id = str(outcome.run_id)
     try:
-        standing = _standing(cfg, decisions, proposals)
+        waiting = _open(cfg, decisions)
+        standing = waiting + [p for p in proposals if p.get("kind") == "hold_off"]
+        steps = prep.view.get("plan_steps") or []
+        today = datetime.now(ZoneInfo(cfg.timezone)).date().isoformat()
         for p in proposals:
             held = no_buy_problem(p, prep.view) or funding_problem(p, idx) or held_off(p, standing)
+            held = held or checks.queue_problem(p, steps=steps, today=today, desk=name, standing=waiting)
             if held:
                 report.rejected.append(decisions.reject(cfg, p, name, held, run_id))
                 continue

@@ -302,6 +302,7 @@ Decisions Joshua makes are stored against the proposal: `approved`, `dismissed`,
 | One cash figure, no machinery talk ("the rule's own count reads 0", "no margin rate is set"), nothing raised twice | `prompts/common.md` Writing, `debrief.md`, `plans.md` |
 | Every proposal a desk files carries `subject` and `as_of` | `wording.stamp`: `subject` is stable and has no numbers (`next-deposit`, `margin`, `buy:SYM`, `sell:SYM`, `rebalance:SYM`, `hold_off:SYM`, `rule:<slug>`); `as_of` is the engine day of the brief |
 | A buy needs money that is really there | `pipeline.funding_problem` throws away a buy or deposit route that needs more than `cash.ready` (the account's own figure when the proposal names one), any buy while `margin.debit` is open unless the named account's own cash covers it, and a deposit route larger than the pending deposit less the debit. `pipeline.held_off` throws away a buy that an open `hold_off` covers (same symbol, the margin note, or a "no new buys" note), whichever desk wrote it, including one in the same answer |
+| Proposals agree with his plan | Advised desks get `advisor.upcoming_steps` (approved plan steps due in the next 60 days: symbol, kind, dates, status, purpose; no shares, accounts or lots) and `standing` (open queue items from every desk). `checks.queue_problem(proposal, steps=, today=, desk=, standing=)` is one function with no model call, used before the queue and callable on an open item: a sell or trim of a symbol with a planned sale still ahead is thrown away unless it names the window's first day ("Your plan already times this sale for Dec 7 to 15."); a sell that gives paying down margin as its reason is thrown away while a `repay` step is planned; a symbol-less margin hold-off is thrown away when another desk's is open (the Plan keeper's is the one kept). Any desk's symbol-less margin hold-off gets the subject `margin` |
 | What the record does with them | `desk.decisions` replaces an open proposal from the same desk on the same subject, expires stale ones, and logs `alert` and `memo` as notes instead of queue items (see `docs/concept.md`) |
 
 ## Guardrails
@@ -379,6 +380,7 @@ desk/agents/
   plans.py        stock plan drafts: queue by reason, draft or keep, level check, pinned steps, save
   portfolio.py    nightly portfolio pass: one analysis per holding, tries, status for the app
   wording.py      rounds prose he reads; gives each proposal its subject and as-of day
+  checks.py       queue_problem: a proposal against his plan steps and the open queue
   advisor.py      risk band, catalog, convictions and planned actions for every brief
   switches.py     Settings over desk.yaml over defaults
   prompts/        one system prompt per desk (Phase 5 on)

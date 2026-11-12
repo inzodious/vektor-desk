@@ -7,6 +7,8 @@ RISK_FIELDS = ("band", "equity_min_pct", "equity_max_pct", "speculative_max_pct"
 CATALOG_FIELDS = ("risk_rank", "worst_year_p10_pct", "p50_value_10y", "chance_fi", "sharpe", "max_drawdown_pct")
 CATALOG_LABELS = ("id", "name", "fit", "proxy_note")
 FAILS = (NotReady, ValueError, OSError, sqlite3.Error)
+STEPS_AHEAD_DAYS = 60
+STEP_FIELDS = ("symbol", "kind", "due", "until", "status", "purpose")
 
 
 def gather(cfg: Config, source: Advisor | None = None) -> dict:
@@ -23,6 +25,11 @@ def gather(cfg: Config, source: Advisor | None = None) -> dict:
         view["no_buy"] = dict(source.no_buy(cfg) or {}) if hasattr(source, "no_buy") else {}
     except FAILS:
         view["no_buy"] = {}
+    try:
+        rows = source.steps(cfg, STEPS_AHEAD_DAYS) if hasattr(source, "steps") else []
+        view["plan_steps"] = [{k: s.get(k) for k in STEP_FIELDS} for s in rows or () if isinstance(s, dict)]
+    except FAILS:
+        view["plan_steps"] = []
     return view
 
 
@@ -72,6 +79,7 @@ def summary(view: dict) -> dict:
         "catalog": [{k: r.get(k) for k in CATALOG_LABELS if k in r} for r in view.get("catalog") or ()],
         "convictions": view.get("convictions") or [],
         "planned_actions": view.get("planned_actions") or [],
+        "upcoming_steps": view.get("plan_steps") or [],
         "no_buy": view.get("no_buy") or {},
         "missing": view.get("missing") or [],
     }
