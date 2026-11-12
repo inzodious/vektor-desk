@@ -432,6 +432,28 @@ test('heads-up notes sit under the queue as reading matter, with nothing to pres
   await expect(page.getByTestId('notes')).toHaveCount(0);
 });
 
+test('what the desk cleared from the queue sits in a closed fold with each reason, and only when there is something', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/decisions');
+  const fold = page.getByTestId('cleared');
+  await expect(fold.locator('summary')).toContainText('Cleared overnight');
+  await expect(fold.locator('summary .chip')).toHaveText('2');
+  await expect(fold.locator('[data-cleared]').first()).toBeHidden();
+  await fold.locator('summary').click();
+  await expect(fold.locator('[data-cleared]')).toHaveCount(2);
+  const first = fold.locator('[data-cleared]').first();
+  await expect(first).toContainText('Sell ACME to harvest the loss');
+  await expect(first).toContainText('Your ACME plan already times this sale for Nov 13, so a second proposal would double it.');
+  await expect(first).toContainText('Tax desk · cleared Today, 8:10 AM ET');
+  await expect(fold.getByRole('button')).toHaveCount(0);
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  await page.goto('/decisions?scenario=fresh');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Decisions');
+  await expect(page.getByTestId('cleared')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 // ---------- every page ----------
 test('every page says what it is in one line and where to go next', async ({ page }) => {
   for (const r of ROUTES) {

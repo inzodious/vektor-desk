@@ -155,7 +155,7 @@
    "price_behind": true,
    "analysis_as_of": "2026-11-05",
    "since_analysis_pct": 2.3,
-   "as_of_words": "Priced at the Fri Nov 6 close. Scout’s idea is from Thu Nov 5; the price is 2.3% higher since. The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands overnight."
+   "as_of_words": "Priced at the Fri Nov 6 close. Scout’s idea is from Thu Nov 5; the price is 2.3% higher since. The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands this evening."
   },
   {
    "rank": 4,
@@ -262,7 +262,7 @@
  ],
  "prices": {
   "day": "2026-11-09",
-  "words": "Prices run to Mon Nov 9. NOVA is still at an earlier close: live quotes cover what you hold, and other closes land overnight.",
+  "words": "Prices run to Mon Nov 9. NOVA is still at an earlier close: live quotes cover what you hold, and other closes land this evening; fund prices can follow in the morning.",
   "older": [
    {
     "symbol": "NOVA",

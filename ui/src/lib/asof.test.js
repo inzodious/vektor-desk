@@ -38,10 +38,10 @@ describe('one clock', () => {
   });
 
   it('keeps the first sentence of the words and marks a provisional day', () => {
-    const v = asOfView({ ...FINAL, provisional: true, status: 'provisional', words: 'Wed Nov 11, 5:21 PM ET. Provisional until official closes land overnight.' }, NOW);
+    const v = asOfView({ ...FINAL, provisional: true, status: 'provisional', words: 'Wed Nov 11, 5:21 PM ET. Provisional until official closes land this evening; fund prices can follow in the morning.' }, NOW);
     expect(v.text).toBe('As of Wed Nov 11, 5:21 PM ET');
     expect(v.provisional).toBe(true);
-    expect(v.title).toContain('Provisional until official closes land overnight.');
+    expect(v.title).toContain('Provisional until official closes land this evening; fund prices can follow in the morning.');
   });
 
   it('prints the funds still waiting on a close, in the desk’s words, and drops them once live quotes lead', () => {

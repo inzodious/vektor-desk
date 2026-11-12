@@ -245,7 +245,7 @@ const OPPS = [
     price_behind: true,
     analysis_as_of: '2026-11-05',
     since_analysis_pct: 2.3,
-    as_of_words: 'Priced at the Fri Nov 6 close. Scout’s idea is from Thu Nov 5; the price is 2.3% higher since. The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands overnight.',
+    as_of_words: 'Priced at the Fri Nov 6 close. Scout’s idea is from Thu Nov 5; the price is 2.3% higher since. The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands this evening.',
     next_earnings: { date: '2026-11-18', days: 9 },
     score: 64,
   }),
@@ -303,7 +303,7 @@ const opportunities = {
   cash: { free_usd: 142, account: 'individual', next_deposit_usd: 500, next_deposit_on: '2026-11-18', note: 'Sizes come from free cash first, then the next deposit. Never from margin.' },
   method: METHOD,
   rows: OPPS,
-  prices: { day: '2026-11-09', words: 'Prices run to Mon Nov 9. NOVA is still at an earlier close: live quotes cover what you hold, and other closes land overnight.', older: [{ symbol: 'NOVA', price_as_of: '2026-11-06', held: false }] },
+  prices: { day: '2026-11-09', words: 'Prices run to Mon Nov 9. NOVA is still at an earlier close: live quotes cover what you hold, and other closes land this evening; fund prices can follow in the morning.', older: [{ symbol: 'NOVA', price_as_of: '2026-11-06', held: false }] },
   passed: [{ symbol: 'BND', name: 'Synthetic Total Bond ETF', reason: 'Written case says avoid: cheap for a reason that looks lasting.' }],
 };
 const DEBIT = 'Pay the margin debit first: $1,500 is open, so no buy goes to the queue.';
@@ -340,6 +340,18 @@ const notes = {
   ],
 };
 
+// ---------- cleared by the queue rule ----------
+const gone = (id, origin, kind, title, symbol, reason, check, when) => ({ id, created_at: at('05:10:00'), updated_at: at(when), origin, run_id: 'r-seed-7', kind, title, symbol, status: 'expired', status_reason: reason, decided_at: at(when), check, cleared_at: at(when) });
+const cleared = {
+  count: 2,
+  days: 2,
+  items: [
+    gone('d_20261109051000_cc01', 'tax', 'sell', 'Sell ACME to harvest the loss', 'ACME', 'Your ACME plan already times this sale for Nov 13, so a second proposal would double it.', 'plan', '13:10:00'),
+    gone('d_20261109051000_cc02', 'risk', 'memo', 'Hold off on new margin', null, 'The Plan keeper already has a margin hold-off waiting on you, so this one was a repeat.', 'plan', '08:40:00'),
+  ],
+};
+const clearedNone = { count: 0, days: 2, items: [] };
+
 // ---------- the night's run ----------
 const step = (id, title, state, o = {}) => ({ id, job: id, title, state, detail: null, ready: null, started_at: null, finished_at: null, ...o });
 const overnight = {
@@ -364,7 +376,7 @@ const overnight = {
 const overnightIdle = { ...overnight, night: '2026-11-09', state: 'idle', started_at: null, finished_at: null, build: null, summary: 'Tonight’s run starts at 23:30.', steps: overnight.steps.map((s) => step(s.id, s.title, 'waiting')), ready: [] };
 
 export function morningFixtures() {
-  return { 'lab.library': library(tested), 'lab.library.fresh': library(waiting), 'lab.library.never': library(waiting), 'agents.holdings': holdings, 'agents.holdings.fresh': holdingsFresh, 'agents.holdings.never': holdingsFresh, opportunities, 'opportunities.evening': opportunitiesDebit, 'opportunities.fresh': opportunitiesFresh, 'opportunities.never': opportunitiesFresh, overnight, 'overnight.fresh': overnightIdle, 'overnight.never': overnightIdle, 'decisions.notes': notes, 'decisions.notes.fresh': { count: 0, days: 7, items: [] }, 'decisions.notes.never': { count: 0, days: 7, items: [] }, 'decisions.notes.empty': { count: 0, days: 7, items: [] }, ...dossierFixtures() };
+  return { 'lab.library': library(tested), 'lab.library.fresh': library(waiting), 'lab.library.never': library(waiting), 'agents.holdings': holdings, 'agents.holdings.fresh': holdingsFresh, 'agents.holdings.never': holdingsFresh, opportunities, 'opportunities.evening': opportunitiesDebit, 'opportunities.fresh': opportunitiesFresh, 'opportunities.never': opportunitiesFresh, overnight, 'overnight.fresh': overnightIdle, 'overnight.never': overnightIdle, 'decisions.cleared': cleared, 'decisions.cleared.fresh': clearedNone, 'decisions.cleared.never': clearedNone, 'decisions.cleared.empty': clearedNone, 'decisions.notes': notes, 'decisions.notes.fresh': { count: 0, days: 7, items: [] }, 'decisions.notes.never': { count: 0, days: 7, items: [] }, 'decisions.notes.empty': { count: 0, days: 7, items: [] }, ...dossierFixtures() };
 }
 
 // ---------- write ----------

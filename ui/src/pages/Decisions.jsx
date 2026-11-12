@@ -11,6 +11,7 @@ import { postJson, useApi } from '../lib/api.js';
 import { dayWords } from '../lib/charts.js';
 import { DECISION_TABS, kindName, needsReason, oneLine, originName } from '../lib/decisions.js';
 import { usd } from '../lib/format.js';
+import { whenWords } from '../lib/morning.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 import { useGap } from '../start/context.js';
 
@@ -44,6 +45,44 @@ function Notes() {
       </div>
       <p className="empty-hint">The latest note from each desk, for the last {api.data.days || 7} days. Older ones are in the Journal.</p>
     </div>
+  );
+}
+
+// ---------- cleared by the desk ----------
+function Cleared() {
+  const api = useApi('/api/decisions/cleared?days=2', { every: 300000 });
+  const items = Array.isArray(api.data?.items) ? api.data.items : [];
+  if (!items.length) return null;
+  const days = api.data.days || 2;
+  return (
+    <details className="card fold-card" data-testid="cleared">
+      <summary>
+        <b>Cleared overnight</b>
+        <span className="chip">{items.length}</span>
+        <small>
+          Desk proposals taken off your queue in the last {days === 1 ? 'day' : `${days} days`}, each with its reason. Your own drafts are never cleared.
+        </small>
+      </summary>
+      <div className="rows">
+        {items.map((d) => {
+          const when = whenWords(d.cleared_at);
+          return (
+            <div className="row still note-row" key={d.id} data-cleared={d.id}>
+              <span className="l">
+                <span style={{ minWidth: 0 }}>
+                  <b>{d.title}</b>
+                  {d.status_reason ? <small className="wrap cleared-why">{d.status_reason}</small> : null}
+                  <small>
+                    {originName(d.origin)}
+                    {when ? ` · cleared ${when} ET` : ''}
+                  </small>
+                </span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </details>
   );
 }
 
@@ -217,6 +256,7 @@ export default function Decisions() {
           </div>
           <ToPlace items={toPlace} onPlaced={(d) => { setNote(`Marked placed: ${d.title}. The next mirror confirms the fill.`); placing.reload(); queue.reload(); }} />
           <Notes />
+          <Cleared />
         </div>
         <div className="c7 detail" ref={detailRef}>
           {cur ? (
