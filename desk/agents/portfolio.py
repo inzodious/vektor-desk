@@ -89,6 +89,7 @@ class PassReport:
     note: str | None = None
     run_id: int | None = None
     lines: list[str] = field(default_factory=list)
+    verdicts: dict[str, str] = field(default_factory=dict)
 
     @property
     def answer(self) -> str:
@@ -446,6 +447,7 @@ def run_pass(
         line = f"{item.symbol}: {dossier['verdict']}. {_text(answer.get('summary'), 200)}".strip()
         store.note_run(cfg, out.run_id, line)
         report.analysed.append(item.symbol)
+        report.verdicts[item.symbol] = dossier["verdict"]
         report.lines.append(line)
     return _tally(cfg, report, rows, clock())
 

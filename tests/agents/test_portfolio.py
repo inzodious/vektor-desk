@@ -279,9 +279,11 @@ def test_cli_prints_the_ready_line_last(cfg, monkeypatch, capsys):
     monkeypatch.setattr(portfolio, "closed", lambda *a: False)
     assert cli.main(["portfolio"]) == 0
     out = capsys.readouterr().out.strip().splitlines()
-    assert out[0].startswith("Portfolio pass: ok, 3 analysed, 0 failed of 3.") and json.loads(out[-1]) == {"ready": "All 3 holdings analysed"}
+    assert out[0].startswith("Portfolio pass: ok, 3 analysed, 0 failed of 3.")
+    assert json.loads(out[-1]) == {"ready": "All 3 holdings analysed", "detail": "3 analysed, 0 failed of 3 (3 hold)."}
     assert cli.main(["run", "research"]) == 0
-    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1]) == {"ready": "All 3 holdings analysed"}
+    again = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert again == {"ready": "All 3 holdings analysed", "detail": "Every holding's analysis is current."}
     assert cli.main(["dry-run", "research", "--trigger", "schedule", "--symbol", "TICKA"]) == 0
     assert "3 holdings, 1 due: TICKA (asked)." in capsys.readouterr().out
 
