@@ -511,9 +511,11 @@ def test_a_name_with_no_newer_price_says_so_on_its_row(cfg, rules):
     out = ob.build(cfg, now=LATER)
     r = row(out, "WTCH")
     assert r["price_as_of"] == AS_OF and r["price_behind"] is True
-    assert r["as_of_words"].endswith("The desk has no newer price for it than Fri Nov 6: live quotes cover what you hold, and its next close lands overnight.")
+    later = "live quotes cover what you hold, and other closes arrive the same evening, mutual funds later."
+    assert r["as_of_words"].endswith(f"The desk has no newer price for it than Fri Nov 6: {later}")
     assert {"symbol": "WTCH", "price_as_of": AS_OF, "held": False} in out["prices"]["older"]
-    assert out["prices"]["words"].startswith("Prices run to Mon Nov 9.") and "WTCH" in out["prices"]["words"]
+    assert out["prices"]["words"].startswith("Prices run to Mon Nov 9.") and "WTCH" in out["prices"]["words"] and out["prices"]["words"].endswith(later)
+    assert "overnight" not in out["prices"]["words"] + r["as_of_words"]
 
 
 def test_a_live_quote_marks_a_held_name_and_an_old_quote_changes_nothing(cfg, rules):
