@@ -259,6 +259,12 @@ def test_a_skip_code_picks_the_fix_and_the_words_are_only_the_fallback():
     assert jobrun.last_words(json.dumps({"ok": True, "skipped_code": "no_fred_key"}))["skipped_code"] is None
 
 
+def test_every_skip_code_the_engine_can_say_has_a_decided_fix():
+    from desk.engine import SKIPS
+
+    assert set(SKIPS) <= set(startrun.CODE_FIXES)
+
+
 def test_every_entry_point_imports_on_its_own():
     import subprocess
     import sys
