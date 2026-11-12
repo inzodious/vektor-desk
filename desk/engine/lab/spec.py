@@ -56,9 +56,10 @@ class Spec:
     taxable: bool
     model: str
     caveats: list[str] = field(default_factory=list)
-    filters: list[tuple[str, int, float | None, float | None]] = field(default_factory=list)
+    filters: list[tuple[str, int, float | None, float | None, str | None]] = field(default_factory=list)
     weights: dict[str, float] | None = None
     start: str | None = None
+    vol_target: float | None = None
 
     @property
     def hash(self) -> str:
@@ -174,7 +175,7 @@ def mix_start(data: LabData, weights: dict[str, float]) -> tuple[str | None, lis
     return start, [s for first, s in firsts if start and first > start]
 
 
-def _filters(raw, problems: list[str]) -> list[tuple[str, int, float | None, float | None]]:
+def _filters(raw, data: LabData | None, problems: list[str]) -> list[tuple[str, int, float | None, float | None, str | None]]:
     out = []
     for i, f in enumerate(raw or []):
         metric = f.get("metric_id") if isinstance(f, dict) else None
@@ -190,8 +191,45 @@ def _filters(raw, problems: list[str]) -> list[tuple[str, int, float | None, flo
         if lo is None and hi is None:
             problems.append(f"filter {i + 1}: give a min, a max or both")
             continue
-        out.append((metric, days, lo, hi))
+        market = str(f.get("symbol") or "").upper() or None
+        if market and data is not None and market not in data.series:
+            problems.append(f"filter {i + 1}: {market} has no price history in the lab yet")
+            continue
+        out.append((metric, days, lo, hi, market))
     return out
+
+
+def _vol_target(value, problems: list[str]) -> float | None:
+    raw = value.get("vol_target") if isinstance(value, dict) else None
+    if raw is None:
+        return None
+    try:
+        target = float(raw)
+    except (TypeError, ValueError):
+        target = 0.0
+    if not 0.02 <= target <= 1.0:
+        problems.append("sizing vol_target must be a yearly volatility between 0.02 and 1, for example 0.15")
+        return None
+    return target
+
+
+def cap_stocks(weights: dict[str, float], stocks: set[str], cap: float) -> tuple[dict[str, float], list[str]]:
+    out, capped = dict(weights), set()
+    for _ in out:
+        over = [s for s in out if s in stocks and s not in capped and out[s] > cap + 1e-12]
+        if not over:
+            break
+        capped |= set(over)
+        excess = sum(out[s] - cap for s in over)
+        for s in over:
+            out[s] = cap
+        free = [s for s in out if s not in capped]
+        room = sum(out[s] for s in free)
+        if not room:
+            break
+        for s in free:
+            out[s] += excess * out[s] / room
+    return out, sorted(capped)
 
 
 def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[str], weights: dict[str, float] | None = None) -> dict:
@@ -251,6 +289,19 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
     return {}
 
 
+def _cap_pct(value, problems: list[str]) -> float | None:
+    if value is None:
+        return None
+    try:
+        pct = float(value)
+    except (TypeError, ValueError):
+        pct = 0.0
+    if not 1 <= pct <= 100:
+        problems.append("universe cap_stocks_pct must be between 1 and 100")
+        return None
+    return pct / 100
+
+
 def local_only(raw: object, plan: bool = False) -> bool:
     if not isinstance(raw, dict):
         return False
@@ -296,7 +347,8 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
                 problems.append(f"signal {i + 1}: {e}")
         signals.append((metric, window, transform))
     weights = _weights(raw.get("sizing"), problems)
-    filters = _filters(raw.get("filters"), problems)
+    filters = _filters(raw.get("filters"), data, problems)
+    vol_target = _vol_target(raw.get("sizing"), problems)
     constraints = raw.get("constraints") or {}
     if constraints.get("margin") or constraints.get("long_only") is False:
         problems.append("the lab runs long only and never on margin")
@@ -307,6 +359,11 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
         if weights:
             total = sum(weights.values())
             weights = {s: w / total for s, w in weights.items()}
+        cap = _cap_pct((raw.get("universe") or {}).get("cap_stocks_pct"), problems)
+        if cap and mix and data is not None:
+            weights, trimmed = cap_stocks(weights, {s for s in weights if data.kinds.get(s, "unknown") not in FUND_KINDS}, cap)
+            if trimmed:
+                caveats.append(f"{', '.join(trimmed)} trimmed to {cap:.0%} each; the difference is spread across the other holdings in proportion.")
     if universe.get("set") == HELD_SET:
         caveats.append(HINDSIGHT)
         settings = data.settings if data is not None else {}
@@ -333,6 +390,8 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
             caveats.append(f"Uses prices from {start} on, the first day funds making up at least {MIN_LIVE:.0%} of the mix were trading.")
         if late:
             caveats.append(f"{', '.join(late)} started trading later; until each one lists, the rest of the mix carries its share.")
+    if vol_target:
+        caveats.append(f"Scaled down whenever its last three months ran hotter than {vol_target:.0%} a year; it never borrows to scale up.")
     fixed = weights is not None or bool(universe.get("members")) or universe.get("set") in MIX_SETS
     if not signals and not fixed:
         problems.append("at least one signal is required, unless the spec holds a fixed mix (sizing weights) or named French portfolios (members)")
@@ -373,6 +432,7 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
         filters=filters,
         weights=weights,
         start=start,
+        vol_target=vol_target,
     )
 
 

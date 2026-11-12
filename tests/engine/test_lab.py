@@ -433,7 +433,7 @@ def test_nothing_about_what_is_held_or_planned_is_in_the_file_a_worker_downloads
     columns = [c[1] for t in tables for c in out.execute(f"PRAGMA table_info({t})")]
     assert not any(word in name for word in ("held", "plan", "weight") for name in (*tables, *columns))
     symbols = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, kind, role FROM symbols")}
-    assert {symbols[s][1] for s in ("FXAIX", "ACME", "NEWCO", "VXUS")} == {"universe"}
+    assert {symbols[s][1] for s in ("FXAIX", "ACME", "NEWCO")} == {"universe"} and symbols["VXUS"] == ("fund", "benchmark")
     assert not {"held", "watch", "past", "plan"} & {role for _, role in symbols.values()}
     assert symbols["ACME"][0] == "stock" and symbols["FXAIX"][0] == "fund"
     words = " ".join(str(v) for t in tables if t != "bars" for r in out.execute(f"SELECT * FROM {t}") for v in r)
@@ -798,7 +798,7 @@ def test_the_offer_job_is_light_and_runs_through_the_lab_hours(cfg):
     assert entry == {"schedule": "* 1-5 * * *", "command": "python -m desk.engine lab-offer", "heavy": False, "title": "Lab work to the worker"}
     assert engine_main.run_lab_offer(cfg) == {
         "ok": True,
-        "library": {"queued": 39, "of": 39},
+        "library": {"queued": len(shelf.LIBRARY), "of": len(shelf.LIBRARY)},
         "offered": 0,
         "note": "No worker is online, so the lab runs its queue itself.",
     }

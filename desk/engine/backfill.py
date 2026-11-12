@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, timedelta
 
 from desk.engine import KEYS_AT
 from desk.engine.holdings import CASH_SYMBOLS
-from desk.engine.market import BENCHMARKS, QUALITY, ProviderError, last_trading_day, tiingo_daily, tiingo_key
+from desk.engine.market import BENCHMARKS, LIBRARY_FUNDS, QUALITY, ProviderError, last_trading_day, tiingo_daily, tiingo_key
 
 ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "past": 3, "universe": 3}
 TICKER = re.compile(r"^[A-Z]{1,5}$")
@@ -14,6 +14,8 @@ ROTATE_DAYS = 90
 NO_PRICES = "Tiingo has no daily prices"
 NO_ANSWER = "Tiingo did not answer"
 ASK_MINUTE = 13
+DAILY = (*QUALITY, *(s for s in LIBRARY_FUNDS if s not in QUALITY))
+LAST = frozenset(DAILY) - frozenset(QUALITY)
 PARK_DAYS = 7
 HELD_PARK_HOURS = 20
 ASK_WORDS = "every hour, day and night"
@@ -61,7 +63,7 @@ def traded_symbols(conn: sqlite3.Connection) -> list[str]:
 
 def sync_roles(conn: sqlite3.Connection, now: datetime | None = None) -> None:
     add_symbols(conn, BENCHMARKS, "benchmark")
-    add_symbols(conn, QUALITY, "universe")
+    add_symbols(conn, DAILY, "universe")
     add_symbols(conn, traded_symbols(conn), "past")
     day = conn.execute("SELECT max(date) FROM holdings_daily").fetchone()[0]
     if not day:
@@ -115,10 +117,11 @@ def due(conn: sqlite3.Connection, now: datetime) -> list[sqlite3.Row]:
     def stale(r: sqlite3.Row) -> bool:
         if r["last_bar"] is None:
             return True
-        if r["priority"] <= 2 or r["symbol"] in QUALITY:
+        if r["priority"] <= 2 or r["symbol"] in DAILY:
             return r["last_bar"] < target
         return r["fetched_at"] is not None and r["fetched_at"][:10] < rotate
 
+    rows.sort(key=lambda r: (r["priority"], r["last_bar"] is not None, r["symbol"] in LAST))
     return [r for r in rows if stale(r)]
 
 
@@ -236,7 +239,7 @@ def view(conn: sqlite3.Connection | None, *, now: datetime | None = None) -> dic
     asked = {r["symbol"] for r in due(conn, now)}
     for r in conn.execute("SELECT * FROM market_symbols ORDER BY priority, symbol"):
         until = parked_until(r)
-        daily = r["priority"] <= 2 or r["symbol"] in QUALITY
+        daily = r["priority"] <= 2 or r["symbol"] in DAILY
         out["symbols"].append(
             {
                 "symbol": r["symbol"],

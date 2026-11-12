@@ -12,9 +12,10 @@ from pathlib import Path
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine.market import BENCHMARKS
+from desk.engine.market import BENCHMARKS, LIBRARY_FUNDS
 
 SMALLCAP_BENCHMARK = "IWM"
+PUBLIC_FUNDS = frozenset((*BENCHMARKS, *LIBRARY_FUNDS, SMALLCAP_BENCHMARK))
 
 FUND_KINDS = ("fund", "etf")
 LISTED_FUNDS = ("IVV", "VOO", "FTEC", "SMH", "SCHD", "GRID", "ICLN", "NLR", "UFO", "DIA", "MDY")
@@ -106,8 +107,8 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
         spans = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, min(date), max(date) FROM bars GROUP BY symbol")}
         rows = []
         for sym, (first, last) in spans.items():
-            kind = kinds.get(sym) or ("fund" if sym in BENCHMARKS or sym == SMALLCAP_BENCHMARK else SMALLCAP_KIND if sym in small else "unknown")
-            rows.append((sym, kind, roles.get(sym), first, last))
+            kind = "fund" if sym in PUBLIC_FUNDS else kinds.get(sym) or (SMALLCAP_KIND if sym in small else "unknown")
+            rows.append((sym, kind, "benchmark" if sym in PUBLIC_FUNDS else roles.get(sym), first, last))
         out.executemany("INSERT INTO symbols VALUES (?, ?, ?, ?, ?)", rows)
         french_rows = 0
         if desk.execute("SELECT 1 FROM sqlite_master WHERE name='factors_daily'").fetchone():

@@ -39,12 +39,14 @@ def grammar() -> dict:
             + '. {"type": "french", "set": "industry_12"}. members: ["hi"] keeps only the portfolios whose name starts that way. '
             "Benchmark defaults to FF.MKT; a pass is research only, never paper",
         },
-        "filters": '[{"metric_id": "ma_gap", "window": "200d", "min": 0}]: a name is only eligible while each raw value sits inside min and max',
+        "filters": '[{"metric_id": "ma_gap", "window": "200d", "min": 0}]: a name is only eligible while each raw value sits inside min and max. '
+        'Add "symbol": "SPY" to read the value from that fund instead, a market-wide switch that sends the whole strategy to cash',
         "signals": "metric_id from features, window like 63d, 6m or 1y (or {param}d), transform: " + ", ".join(TRANSFORMS),
         "entry": '{"top_n": 3 or "param:top_n", "min_signal": 0} (min_signal applies to the first signal\'s raw value), or "top 3 by rank"',
         "exit": '"rebalance", or {"hold_rank": 5} to keep a holding while it ranks in the top 5',
         "rebalance": "weekly, monthly or quarterly; signals at the close, trades at the next open",
-        "sizing": 'equal, inverse_vol (63-day), rank, or a fixed mix {"weights": {"SPY": 60, "AGG": 40}} (funds only; needs no signal)',
+        "sizing": 'equal, inverse_vol (63-day), rank, or a fixed mix {"weights": {"SPY": 60, "AGG": 40}} (funds only; needs no signal). '
+        'In the object form, "vol_target": 0.15 scales the holdings down into cash while their 63-day volatility runs above 15% a year',
         "params": '{"top_n": {"min": 2, "max": 5, "default": 3}} or a list of allowed values; grid values must sit inside',
         "costs": "set by the lab: 5 bps funds and French portfolios, 15 bps stocks, 25 bps thin stocks",
         "factor_check": "automatic: alpha after the six French factors on the walk-forward record; alpha t of 2 or more passes",
@@ -52,7 +54,8 @@ def grammar() -> dict:
             "request": '{"request": "rule", "id": "band-test", "rule": "rebalance_band", "params": {"band_pts": [3, 5, 10]}, "horizons": [5, 10]}',
             "rules": {k: list(v) for k, v in RULES.items()},
             "optional": "mix (funds, defaults to the plan), deposit_monthly (default 1000), start_value (default 10000), account, date_range",
-            "notes": "margin needs rate_pct as one number; every rule runs against deposits split pro rata with no selling; grid cap 12",
+            "notes": "margin and paydown need rate_pct as one number (paydown also debit_pct, the starting debit as a share of the account); "
+            " every rule runs against deposits split pro rata with no selling; grid cap 12",
         },
     }
 

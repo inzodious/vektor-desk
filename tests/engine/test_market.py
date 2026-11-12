@@ -1,11 +1,11 @@
 from datetime import UTC, datetime
 
 from desk.db import connect
-from desk.engine import jobs, schema
+from desk.engine import backfill, jobs, schema
 from desk.engine.__main__ import run_holdings, run_market_backfill, run_quotes
-from desk.engine.backfill import ASK_MINUTE, ASK_WORDS, NO_PRICES, add_symbols, due, parked_until, usage
+from desk.engine.backfill import ASK_MINUTE, ASK_WORDS, DAILY, NO_PRICES, add_symbols, due, parked_until, usage
 from desk.engine.live import live_view
-from desk.engine.market import BENCHMARKS, QUALITY, last_trading_day, session
+from desk.engine.market import BENCHMARKS, LIBRARY_FUNDS, QUALITY, last_trading_day, session
 from tests.engine.helpers import closes_doc, position, snapshot
 
 IND = "individual-1111"
@@ -165,6 +165,7 @@ def test_backfill_fetches_history_then_tops_up_and_respects_caps(cfg, mirror, mo
 
 def test_the_scanners_names_are_refetched_daily_and_scanned_again(cfg, monkeypatch):
     monkeypatch.setenv("TIINGO_API_KEY", "k")
+    monkeypatch.setenv("DESK_TIINGO_HOURLY", "100")
     conn = connect(cfg.desk_db)
     schema.apply(conn)
     add_symbols(conn, ["NVDA", "OLDCO"], "past")
@@ -177,10 +178,10 @@ def test_the_scanners_names_are_refetched_daily_and_scanned_again(cfg, monkeypat
     http = FakeHttp(bars={"NVDA": [bar(d, 100.0) for d in ("2026-11-09", "2026-11-10", "2026-11-11")]})
     first = run_market_backfill(cfg, http)
     assert first["fetched"] == ["NVDA"] and first["discounts"]["ok"] is True
-    assert len(http.calls) == len(set(BENCHMARKS) | set(QUALITY)) <= 40
+    assert len(http.calls) == len(set(BENCHMARKS) | set(DAILY)) > 40
     row = conn.execute("SELECT role, priority, last_bar FROM market_symbols WHERE symbol='NVDA'").fetchone()
     assert row[:] == ("past", 3, "2026-11-11")
-    assert conn.execute("SELECT count(*) FROM market_symbols WHERE role='universe'").fetchone()[0] == len(set(QUALITY) - set(BENCHMARKS) - {"NVDA"})
+    assert conn.execute("SELECT count(*) FROM market_symbols WHERE role='universe'").fetchone()[0] == len(set(DAILY) - set(BENCHMARKS) - {"NVDA"})
     again = run_market_backfill(cfg, http)
     assert again["fetched"] == [] and "discounts" not in again
     conn.close()
@@ -209,11 +210,12 @@ def ledger(cfg, rows):
 
 
 def at(monkeypatch, now):
+    monkeypatch.setenv("DESK_TIINGO_HOURLY", "100")
     monkeypatch.setattr("desk.engine.backfill.datetime", type("D", (datetime,), {"now": staticmethod(lambda tz=None: now)}))
 
 
 def everything_else():
-    return {s: [bar(d, 100.0) for d in WEEK] for s in set(BENCHMARKS) | set(QUALITY)}
+    return {s: [bar(d, 100.0) for d in WEEK] for s in set(BENCHMARKS) | set(DAILY)}
 
 
 def test_only_a_name_tiingo_never_priced_is_parked_and_a_held_one_for_under_a_day(cfg, monkeypatch):
@@ -323,7 +325,7 @@ def test_the_backfill_view_shows_every_name_and_why_it_waits(cfg, app_client, mo
 def test_the_evening_run_fetches_that_days_closes_and_a_late_fund_follows_the_hour_it_lands(cfg, monkeypatch):
     conn = ledger(cfg, [("ETFA", "held", "2026-11-10", None, None), ("FUNDA", "held", "2026-11-10", None, None)])
     monkeypatch.setenv("TIINGO_API_KEY", "k")
-    http = FakeHttp(bars={s: [bar(d, 100.0) for d in WEEK[:2]] for s in {*BENCHMARKS, *QUALITY, "ETFA", "FUNDA"}})
+    http = FakeHttp(bars={s: [bar(d, 100.0) for d in WEEK[:2]] for s in {*BENCHMARKS, *DAILY, "ETFA", "FUNDA"}})
     at(monkeypatch, datetime(2026, 11, 11, 22, 13, tzinfo=UTC))
     afternoon = run_market_backfill(cfg, http)
     assert afternoon["target"] == "2026-11-10" and afternoon["behind"] == [] and afternoon["left"] == 0
@@ -342,6 +344,24 @@ def test_the_evening_run_fetches_that_days_closes_and_a_late_fund_follows_the_ho
     at(monkeypatch, datetime(2026, 11, 12, 5, 13, tzinfo=UTC))
     landed = run_market_backfill(cfg, http)
     assert landed["advanced"] == ["FUNDA"] and landed["detail"] == "Asked Tiingo for 1 name. New bars for FUNDA."
+    conn.close()
+
+
+def test_library_funds_are_fetched_once_at_once_and_then_daily_after_the_names_the_scan_needs(cfg):
+    conn = connect(cfg.desk_db)
+    schema.apply(conn)
+    backfill.sync_roles(conn, NOV_12)
+    roles = dict(conn.execute("SELECT symbol, role FROM market_symbols"))
+    assert all(roles[s] == "universe" for s in LIBRARY_FUNDS if s not in BENCHMARKS) and set(LIBRARY_FUNDS) <= set(DAILY)
+    with conn:
+        conn.execute(
+            "UPDATE market_symbols SET first_bar='2026-01-02', last_bar='2026-11-10', fetched_at='2026-11-11T06:10:00+00:00' WHERE symbol NOT IN ('GLD', 'TLT')"
+        )
+    order = [r["symbol"] for r in due(conn, NOV_12)]
+    scan = [s for s in order if s in QUALITY and s not in BENCHMARKS]
+    late = [s for s in order if s in LIBRARY_FUNDS and s not in QUALITY and s not in ("GLD", "TLT")]
+    assert order.index("GLD") < order.index(scan[0]) and order.index("TLT") < order.index(scan[0])
+    assert max(order.index(s) for s in scan) < min(order.index(s) for s in late) and len(late) == len(set(LIBRARY_FUNDS) - set(QUALITY)) - 2
     conn.close()
 
 
