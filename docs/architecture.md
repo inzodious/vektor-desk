@@ -199,7 +199,7 @@ The API never runs a command. `POST /api/jobs/{name}/run` drops a request file i
 | Call | Answer |
 |---|---|
 | `GET /api/jobs` | `{now, scheduler_alive, cooldown_seconds: 300, pickup_seconds: 5, stages: ["mirror", "engine", "review", "desks", "paper", "overnight"], low_memory: {on, why}, jobs: [...]}` |
-| One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `waiting`, `waiting_since` (its turn hasn't come: heavy jobs run one at a time in low-memory mode and during the overnight run), `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes), `stage` (its step in today's run, or `null`) |
+| One job | `name` (stable id, e.g. `mirror`, `engine-daily`), `title`, `package`, `schedules` (cron lines, Eastern), `running`, `running_since`, `queued`, `queued_at`, `waiting`, `waiting_since` (its turn hasn't come: heavy jobs run one at a time in low-memory mode and during the overnight run), `waiting_for` (`memory`, `night` or `null`), `last_run`, `cooldown_until`, `can_run`, `refreshes` (health check names the job fixes), `stage` (its step in today's run, or `null`) |
 | `last_run` | `null`, or `{trigger: schedule\|request\|start, request_id, started, finished, result: ok\|failed\|skipped\|null, exit_code, detail, note, error, oom: cap\|box\|null}`. `result` is `null` while it runs; `trigger` is also `memory` for the alert job after a kill |
 | `POST /api/jobs/{name}/run` | `202 {ok: true, job, request_id, requested_at, message}` |
 | Refusals | `{ok: false, error, message, ...}`: `404 unknown_job`; `409 running` (`since`); `409 queued` (`since`); `409 waiting` (`since`); `429 cooldown` (`cooldown_until`, `retry_after`, plus a `Retry-After` header); `503 scheduler_down` |
@@ -228,7 +228,7 @@ One tap runs everything a new or stale desk needs, in order. `POST /api/start` d
 | Call | Answer |
 |---|---|
 | `GET /api/start` | `{state: idle\|running\|done, needs_start, can_start, blocked, result: ok\|partial, summary, started_at, finished_at, last_ok_at, scheduler_alive, memory: {state, low_memory, killed, note}, steps}` |
-| One step | `{id, title, state: waiting\|running\|ok\|failed\|skipped, detail, fix: {label, to}\|null, job, started_at, finished_at, waiting}`. `waiting` is true while the step's job is held for its turn in low-memory mode |
+| One step | `{id, title, state: waiting\|running\|ok\|failed\|skipped, detail, fix: {label, to}\|null, job, started_at, finished_at, waiting}`. `waiting` is true while the step's job is held for its turn, in low-memory mode or behind tonight's run; `detail` says which |
 | `POST /api/start` | `202` with the same body and `ok: true`; `409 running`; `503 scheduler_down` |
 
 - A failed step is recorded and the chain goes on. `detail` is what the job said last, in its own words; `fix` names the screen that sorts it out.
@@ -282,7 +282,7 @@ The NAS has 16 GB, no swap and most of it held outside the desk, so the desk wat
 
 | Piece | What it does |
 |---|---|
-| `GET /api/memory` | `{state: ok\|tight\|unknown, total_mb, available_mb, swap_mb, cache_mb (ZFS file cache), scheduler: {limit_mb, used_mb}, low_memory, waiting: [{job, title, since}], killed: [{at, kind: job\|service\|outside, name, scope: cap\|box, words}], host_seen, note}`. The same block is `memory` in `/api/status` and `/api/box`; `/api/start` and `/api/readiness` carry the short form. `note` is the whole story in one or two sentences |
+| `GET /api/memory` | `{state: ok\|tight\|unknown, total_mb, available_mb, swap_mb, cache_mb (ZFS file cache), scheduler: {limit_mb, used_mb}, low_memory, waiting: [{job, title, since}], queued_for_night: [{job, title, since}], killed: [{at, kind: job\|service\|outside, name, scope: cap\|box, words}], host_seen, note}`. The same block is `memory` in `/api/status` and `/api/box`; `/api/start` and `/api/readiness` carry the short form. `note` is the whole story in one or two sentences. `waiting` holds only memory waits. While the overnight run is going, a held job waits for the night's order, not for memory, so it is listed under `queued_for_night` and stays out of `waiting` and `note` |
 | `low_memory` | `{on, mode: auto\|on\|off, why, since, paused: [], low_mb: 1500, roomy_mb: 4000}` |
 | `PUT /api/memory/low` | `{"mode": "auto"\|"on"\|"off"}`. Answers `{ok: true}` plus the memory block; `422 bad_mode`. Logged in `data/run/job-requests.log` |
 | Auto | The default. On only under real pressure: the box has under 1 GB available, or something was stopped for memory in the last 30 minutes. Off again at 1.5 GB, checked every 30 seconds. `DESK_LOW_MEMORY` sets the default before anyone picks |

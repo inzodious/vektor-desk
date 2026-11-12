@@ -374,12 +374,13 @@ def describe(cfg: Config, jobs: list, now: datetime | None = None, known: Facts 
         needs = not (known.accounts and known.numbers and known.reviews)
     keep = ("id", "title", "state", "detail", "fix", "job", "started_at", "finished_at")
     box = memory.status(cfg, now)
-    turns = {w["job"] for w in box["waiting"]}
+    turns = {w["job"]: "low-memory mode runs heavy jobs one at a time." for w in box["waiting"]}
+    turns |= {w["job"]: "tonight's run goes one heavy job at a time." for w in box["queued_for_night"]}
     steps = [{k: s.get(k) for k in keep} for s in chain["steps"]]
     for step in steps:
         step["waiting"] = step["state"] == "running" and step["job"] in turns
         if step["waiting"]:
-            step["detail"] = "Waiting for its turn: low-memory mode runs heavy jobs one at a time."
+            step["detail"] = f"Waiting for its turn: {turns[step['job']]}"
     return {
         "state": chain["state"],
         "needs_start": needs,

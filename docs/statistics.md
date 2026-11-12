@@ -119,7 +119,7 @@ Every non-ok detail ends with `Fix:` and the one step that clears it.
 
 **Dry run.** `python -m desk.engine daily --dry-run` (also `holdings`, `core`, `history`) runs on a throwaway copy of the data, sends no alerts, and prints the result plus `health_detail` for every check. Nothing in `/data` changes.
 
-A failed check marks the day `stale`, keeps the last good values on screen with their date, and writes the reason to `data_health`. Agents read `data_health` first and stop if it is not green. The Phase 1 exit test ("numbers match Fidelity to the cent on a test day") is this table passing.
+A failed check marks the day `stale`, keeps the last good values on screen with their date, and writes the reason to `data_health`. Stale wins over every other flag except `insufficient_history`: a `modelled` or `pro_forma` number from a failed run is stored as `stale`, so nothing acts on it. Agents read `data_health` first and stop if it is not green. The Phase 1 exit test ("numbers match Fidelity to the cent on a test day") is this table passing.
 
 ## Fidelity history
 
@@ -452,7 +452,7 @@ Code: `desk.engine.preflight.check_trade(cfg, trade, ticket_id=None)`; the trade
 | Concentration | A buy opens a new single stock, takes one past its band (default: the satellite cap), or takes all single stocks past `opportunity.satellite_cap_pct` | A sale leaves one past its band; a buy of a symbol whose kind is unknown |
 | Conviction hold | A buy of the symbol that ends above `band_max_pct`, or any margin-funded buy of it (also breaks the hold in Plan rules). The symbol is left out of the single-stock band and the satellite total | Nothing; inside or under the band is ok |
 | Drift after | | Largest drift grows past the drift limit |
-| Funding | A buy is margin-funded or cash runs short, with the monthly interest in dollars and the drop to a call | |
+| Funding | A buy is margin-funded or cash runs short, with the monthly interest in dollars and the drop to a call. Cash and debit come from the same `desk.engine.cash.picture` as `cash.ready` and `margin.debit`, so "Cash covers" is the account's ready cash. A cash buy with no account named is checked against the account holding the most ready cash | |
 | Wash sales | A buy within 30 days of a loss sale of that symbol; a loss sale within 30 days of a buy of it in any account | A scheduled deposit or dividend reinvest would buy it back; a possibly identical fund |
 | Lots and tax | | No lot export; lots cover fewer shares than the sale; a harvest that realizes a gain |
 | Plan rules | A buy breaks a rule that held before | A sale breaks one; a rule already off before and no worse |
@@ -536,7 +536,7 @@ Backtestable small-cap family: directors and officers buying their own stock on 
 | Bulk history | `insider_buys`, `insider_quarters` | SEC Insider Transactions data sets, one zip per quarter from 2016 Q1 (Alpaca bars start 2016), 8 quarters a night until caught up. Form 4 and 4/A, transaction code P, acquired, shares and price above 0, owner is a director or officer (10% owners alone are left out). One row per filing and owner: shares, dollars, latest trade date, filing date |
 | Live | `insider_buys` (`source` form4), `insider_form4_seen` | Form 4s in `filings_feed` (universe names) after the last bulk quarter: the raw XML, same rules, 200 a night. Bulk rows replace them when the quarter is published |
 | Known date | | The session after the filing date. Nothing counts before then |
-| Prices | `alpaca_bars`, `alpaca_history` | Names with any director or officer buy since 2016, cluster names (2+ insiders within 30 days) and IWM first: daily bars since 2016-01-01 (raw and adjusted), 300 names a night in batches of 25, each batch saved as it lands so a stopped run keeps its progress. Roughly 2,500 rows a name |
+| Prices | `alpaca_bars`, `alpaca_history` | Names with any director or officer buy since 2016, cluster names (2+ insiders within 30 days) and IWM first: daily bars since 2016-01-01 (raw and adjusted), 300 names a night in batches of 25, each batch saved as it lands so a stopped run keeps its progress. Roughly 2,500 rows a name. The job's five steps (clean, bulk files, live Form 4s, share counts, price history) fail one at a time: an SEC or Alpaca error or a dropped connection in one step is written to that step's `error`, the others still run, and the job exits 1 with every error in `error` |
 | Symbols | | `insider.clean_symbol`: quotes and exchange prefixes stripped, a ticker in brackets used, class shares written `BRK.B`; anything else (names, numbers, `--`) is dropped, at parse time and from stored rows at the start of each run. A batch Alpaca refuses is split until the one bad name is found; that name is skipped and listed in the job result with Alpaca's path and message |
 | Share counts | `sec_shares`, `sec_frames` | SEC `dei:EntityCommonStockSharesOutstanding` frames since late 2014, each quarter once (the last two refresh) |
 | Membership | `smallcap_months` | At each month's first session: shares from a period ending 45+ days earlier (under 400 days old) × raw close between $50M and $2B, and median dollar volume over the prior 20 sessions at least $500K. The whole month uses that answer |
@@ -699,7 +699,9 @@ Module `desk.engine.asof`. Every page reads one day and one time from `GET /api/
 | Provisional | A day is provisional while any of its prices come from `closes_provisional`. A symbol with no quote (mutual funds) carries its last close and is listed in `prices.carried` |
 | Restated | Mirror closes and Tiingo bars always win over a provisional close. `restate` reruns the day when they land and the provisional rows are dropped; rows older than 7 days are dropped anyway |
 | Quotes | Held symbols, SPY and every live catalog mix symbol, so the yardsticks move on the provisional day too. One extra fetch right after the close settles the closing price |
-| Catch-up | A book older than the last finished session moves by itself on the next daily or `restate` run, from stored quotes or bars |
+| Catch-up | `restate` checks every 5 minutes, at any hour (`2-57/5 * * * *`). A book older than the last finished session moves on that check, from stored closing quotes or bars, so the book is on today within minutes of the close. It takes the daily pass's lock and looks again once it has it, so it never runs on top of a daily pass; as a heavy job it waits its turn in low-memory mode and during the overnight run. A try that failed waits an hour before the same closes are tried again |
+| After a catch-up | The review runs in the same job, and the Debrief desk is asked for through the job request folder (`agents-run-debrief`); it writes only when the pack changed |
+| Dates | Every date a page shows is the desk's day in Eastern time (`market.et_day`, `market.session_day`), never the UTC date. The Race to live `as_of` is capped at the last session; a mix that enters tomorrow reads today. A brief is stored under the data day it was built from, not the run's timestamp |
 
 **`GET /api/asof`.** `{day, at, provisional, status (final, provisional, empty), words, previous_day, expected_day, behind (null or {sessions, reason}), prices {official, quoted, carried}, numbers {value, day_change, day_change_pct, cash_ready, cash_pending, cash_pending_days, margin_debit, margin_cost_month}, live, market {state, day}, review {day, computed_at}, debrief {day, written_at, stale}}`. `numbers` are the metric values at `day`. `live` is `{day, state, at, value, day_change, day_change_pct, words}` only while quotes belong to a later session than `day`; null means the book already covers it, so pages show `numbers`.
 
@@ -1050,7 +1052,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Nightly 23:50 ET | `earnings`: EPS facts and release times for 300 companies, then every surprise event |
 | Weekdays 08:45 and 16:45 ET | `paper`: lanes and catalog mixes rebuild; at 08:45 orders for every strategy on paper; both runs reconcile fills and mark the sub-ledgers |
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
-| Nightly 01:25 to 06:25 ET, hourly | `restate`: exits at once unless official closes landed for a provisional day or the book is behind the last finished session; then the daily pass and the review run again. Never twice on the same closes |
+| Every 5 minutes, any hour | `restate` ("Catch the book up"): exits at once unless official closes landed for a provisional day or the book is behind the last finished session; then the daily pass and the review run again and the debrief is asked for. Never twice on the same closes |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days before the 17:50 debrief; 08:35 finalises yesterday once late fund prices are in |
 | Nightly 00:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 

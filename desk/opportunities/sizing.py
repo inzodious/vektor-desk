@@ -13,6 +13,7 @@ FUND_SLICE_PCT = 2.5
 MIN_TICKET = 25.0
 CASH_NOTE = "Each size stands alone: together they can't be more than your free cash. Never from margin."
 CAP_LAMPS = ("concentration", "plan_rules")
+SHORT = "It needs more settled cash than the buying account holds today."
 FAILS = (pf.PreflightError, sqlite3.Error, ValueError, KeyError, TypeError, OSError, *PROFILE_ERRORS)
 
 
@@ -65,6 +66,7 @@ class Book:
     total: float
     account: str
     free: float
+    spendable: float
     debit: float
     deposit_usd: float | None
     deposit_on: str | None
@@ -91,7 +93,14 @@ def _no_buy(cfg: Config, now: datetime | None) -> dict:
         return {}
 
 
-def load(cfg: Config, mirror: sqlite3.Connection | None, conn: sqlite3.Connection, kinds: dict[str, str], *, now: datetime) -> Book | None:
+def _figure(numbers: dict | None, key: str) -> float | None:
+    v = (numbers or {}).get(key)
+    return float(v) if isinstance(v, int | float) and not isinstance(v, bool) else None
+
+
+def load(
+    cfg: Config, mirror: sqlite3.Connection | None, conn: sqlite3.Connection, kinds: dict[str, str], *, now: datetime, numbers: dict | None = None
+) -> Book | None:
     try:
         ctx = pf.load_context(cfg, mirror, conn, now=now)
     except FAILS:
@@ -102,7 +111,9 @@ def load(cfg: Config, mirror: sqlite3.Connection | None, conn: sqlite3.Connectio
     before = pf.picture(ctx.rows, ctx)
     account = pf.pick_account(None, ctx.rows, "", "buy")
     cash = sum(r["value"] for r in ctx.rows if r["is_cash"] and r["account"] == account)
-    debit = max(0.0, -cash)
+    ready, owed = _figure(numbers, "cash_ready"), _figure(numbers, "margin_debit")
+    debit = max(0.0, owed) if owed is not None else max(before["debit"], -cash, 0.0)
+    free = max(0.0, ready) if ready is not None else max(0.0, cash)
     amount, when = ctx.next_deposit
     mine = profile(cfg)
     rule_caps = [
@@ -113,7 +124,8 @@ def load(cfg: Config, mirror: sqlite3.Connection | None, conn: sqlite3.Connectio
         before=before,
         total=before["total"],
         account=account,
-        free=max(0.0, cash),
+        free=free,
+        spendable=0.0 if debit > 0 else free,
         debit=debit,
         deposit_usd=float(amount) if amount else None,
         deposit_on=when,
@@ -184,6 +196,8 @@ def _check(book: Book, symbol: str, amount: float, price: float | None, funding:
     except FAILS as e:
         return None, f"The checker could not confirm this size: {e}."
     lights = {x["id"]: x for x in result["lights"]}
+    if funding == "cash" and lights["funding"]["status"] == "act":
+        return SHORT, None
     for lamp in CAP_LAMPS:
         if lights[lamp]["status"] == "act":
             return lights[lamp]["detail"], None
@@ -209,11 +223,11 @@ def size(book: Book | None, symbol: str, kind: str, price: float | None) -> dict
     want = slice_usd if room_usd is None else min(slice_usd, room_usd)
     limited = "starter slice" if room_usd is None or slice_usd <= room_usd else cap_name
     base = f"A starter slice of {slice_pct:g}% of the portfolio" if limited == "starter slice" else f"Cut to the room left under {cap_name}"
-    if book.free >= MIN_TICKET:
-        amount, funding = min(want, book.free), "cash"
+    if book.spendable >= MIN_TICKET:
+        amount, funding = min(want, book.spendable), "cash"
         note = f"{base}, paid from free cash."
-        if book.free < want:
-            limited, note = "free cash", f"Cut to your free cash of {usd(book.free)}."
+        if book.spendable < want:
+            limited, note = "free cash", f"Cut to your free cash of {usd(book.spendable)}."
     elif book.usable_deposit >= MIN_TICKET:
         amount, funding = min(want, book.usable_deposit), "deposit"
         after = " after it clears the margin debit" if book.debit > 0 else ""
@@ -225,6 +239,8 @@ def size(book: Book | None, symbol: str, kind: str, price: float | None) -> dict
         ceiling = f"The caps leave room for {usd(room_usd)}" if room_usd is not None else f"A starter slice would be {usd(want)}"
         return _blank(f"No free cash today: {why}. {ceiling} once cash is free. Never on margin.", room_usd=room_usd, limited_by="free cash")
     blocked, warning = _check(book, symbol, amount, price, funding)
+    if blocked == SHORT:
+        return _blank(f"{SHORT} Never on margin.", room_usd=room_usd, limited_by="free cash")
     if blocked:
         return _blank(blocked, blocked=blocked, room_usd=room_usd, limited_by="plan rules")
     if warning:

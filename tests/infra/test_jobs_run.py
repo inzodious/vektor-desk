@@ -48,6 +48,7 @@ def test_get_jobs_lists_each_job_with_its_state(app_client, cfg):
         "queued_at": None,
         "waiting": False,
         "waiting_since": None,
+        "waiting_for": None,
         "last_run": None,
         "cooldown_until": None,
         "can_run": True,

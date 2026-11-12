@@ -23,7 +23,7 @@ def analysis(**over) -> dict:
         "what_it_is": "A company that sells subscriptions to small firms. It earns a fee each month per seat.",
         "thesis": "Recurring revenue is still growing and it funds itself.",
         "bear_case": "Growth is slowing and a bigger rival is cutting prices.",
-        "valuation_range": {"low": 34.0, "high": 52.0, "now": 41.2, "basis": "Price per share at 4 to 6 times next year's sales."},
+        "valuation_range": {"low": 34.0, "high": 52.0, "now": 41.2, "unit": "price", "basis": "Price per share at 4 to 6 times next year's sales."},
         "valuation_note": "About fair: it trades near the middle of its range.",
         "risks": ["A bigger rival is cutting prices.", "One customer is a fifth of sales."],
         "fit": "It sits inside its band and matches his plan to hold through earnings.",
@@ -142,9 +142,10 @@ def test_an_add_is_held_back_above_the_band_and_inside_a_no_buy_window(cfg):
     ],
 )
 def test_an_incomplete_answer_is_refused_and_said_plainly(cfg, over, why):
-    report, _ = go(cfg, analysis(**over), limit=1)
-    assert report.rejected == ["FUNDA"] and store.latest_dossier(cfg, "FUNDA") is None
-    row = status(cfg)["rows"][0]
+    stock = [fact("TICKB", kind="stock", band={"status": "over", "weight_pct": 12.5})]
+    report, _ = go(cfg, analysis(**over), held=stock)
+    assert report.rejected == ["TICKB"] and store.latest_dossier(cfg, "TICKB") is None
+    row = status(cfg, held=stock)["rows"][0]
     assert row["status"] == "failed" and why in row["status_line"] and row["attempt"]["status"] == "refused"
     assert report.ready == {"skipped": "No holding was analysed: 1 failed."}
 
@@ -306,3 +307,67 @@ def test_real_plan_facts_feed_the_pass(cfg, monkeypatch):
     assert [(r["symbol"], r["kind"], r["status"]) for r in board["rows"]] == [("IVV", "fund", "today"), ("ACME", "stock", "today"), ("SOLO", "stock", "today")]
     assert board["rows"][1]["name"] == "Acme Corp" and board["rows"][0]["weight_pct"] > board["rows"][1]["weight_pct"] > 0
     assert board["line"] == "All 3 holdings analysed today."
+
+
+# ---- Valuation unit, plain text, old dossiers, plan funds ----
+
+LONG_BASIS = (
+    "Forward P/E on the Nasdaq ADR (price / next-year consensus EPS). Low 22x = the recent trough reading; high 33x = the five-year average forward P/E. "
+    "Now 24.57x from a quote page at the Nov 11, 2026 close of $1,538.72."
+)
+
+
+def test_range_carries_a_unit_and_the_method_is_a_sentence(cfg):
+    span = {"low": 22, "high": 33, "now": 24.57, "unit": "multiple", "basis": LONG_BASIS}
+    go(cfg, analysis(valuation_range=span, valuation_note="", thesis="Margins of 52.8296% gross; you owe (-2182.12)."), limit=1)
+    got = saved(cfg, "FUNDA")
+    assert got["valuation_range"] == {"low": 22.0, "high": 33.0, "now": 24.57, "unit": "multiple", "basis": "Forward P/E on the Nasdaq ADR"}
+    assert got["valuation_note"].startswith("Forward P/E on the Nasdaq ADR (price / next-year consensus EPS). Low 22x") and "$1,539" in got["valuation_note"]
+    assert got["thesis"] == "Margins of 52.8% gross; you owe (-$2,182)."
+    go(cfg, analysis(valuation_range={"low": None, "high": None, "basis": "Not a single business", "unit": "furlongs"}), held=[fact("FUNDB", kind="fund")])
+    assert saved(cfg, "FUNDB")["valuation_range"] == {"low": None, "high": None, "now": None, "unit": None, "basis": "Not a single business"}
+    shape = portfolio.schema()["properties"]["dossier"]["properties"]["valuation_range"]
+    assert "unit" in shape["required"] and shape["properties"]["unit"] == {"enum": ["price", "multiple", "percent", None]}
+    assert shape["properties"]["basis"]["maxLength"] == 120
+
+
+def test_a_dossier_in_the_old_format_is_analysed_again_tonight(cfg):
+    old = {
+        "symbol": "TICKA",
+        "thesis": "Old thesis.",
+        "bear_case": "Old bear.",
+        "valuation_range": {"low": 22, "high": 33, "basis": LONG_BASIS},
+        "verdict": "hold",
+    }
+    run_id = store.start_run(cfg, "research", trigger="console", model="opus", effort="xhigh", status="ok")
+    store.save_dossier(cfg, "TICKA", run_id, json.dumps(old), (NIGHT - timedelta(hours=8)).isoformat())
+    board = status(cfg)
+    assert board["pass"]["due"] == 3 and next(r for r in board["rows"] if r["symbol"] == "TICKA")["verdict"] == "hold"
+    report, fake = go(cfg)
+    assert sorted(report.analysed) == ["FUNDA", "TICKA", "TICKB"] and report.ready == {"ready": "All 3 holdings analysed"}
+    payload = json.loads(fake.calls[-1]["prompt"].split("\n\n", 1)[1])
+    assert payload["holding"]["symbol"] == "TICKA" and payload["reasons"] == ["new"] and payload["previous_analysis"]["thesis"] == "Old thesis."
+    assert saved(cfg, "TICKA")["what_it_is"] and saved(cfg, "TICKA")["changes_since_last"] == "Guidance was raised."
+
+
+def test_a_plan_fund_known_only_by_its_id_still_gets_an_analysis(cfg):
+    funds = [
+        fact("31617E745", name=None, kind="fund", held=False, numbers={"value": 2400.0, "weight_pct": 6.0}, band={"status": "inside", "weight_pct": 6.0}),
+        fact("TICKA", kind="stock", band={"status": "inside", "weight_pct": 5.0}),
+        fact("WATCH", kind="stock", held=False, numbers={"price": 10.0}),
+    ]
+    report, fake = go(cfg, analysis(sources=[], verdict="watch", verdict_line="Watch. Check the fund's name and fee in the plan."), held=funds)
+    assert report.analysed == ["31617E745"] and report.rejected == ["TICKA"]
+    assert saved(cfg, "31617E745")["sources"] == [] and saved(cfg, "31617E745")["verdict"] == "watch"
+    assert "plan id" in fake.calls[0]["system"]
+
+
+def test_another_desk_over_its_cap_does_not_stop_the_pass(cfg):
+    from desk.agents.runner import run_desk
+
+    risk = get("risk")
+    for _ in range(risk.weekly_runs):
+        run_desk(risk, "s", "p", cfg=cfg, adapter=FakeAdapter())
+    assert run_desk(risk, "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "over_budget"
+    report, _ = go(cfg)
+    assert report.status == "ok" and len(report.analysed) == 3

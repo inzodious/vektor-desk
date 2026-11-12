@@ -1,4 +1,5 @@
 import json
+import re
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 
@@ -14,6 +15,8 @@ SKEPTIC_FOR = {"research", "scout"}
 SKEPTIC_KINDS = {"buy", "sell"}
 STALE_ENGINE_HOURS = 36
 ADVISED = {"plan_keeper", "tax", "risk", "research", "scout"}
+CASH_SLACK = 1.0
+NO_BUYS = re.compile(r"\bno (new )?buys?\b|\bno buying\b|\bpause (all )?buy")
 BUY_KINDS = {"buy", "deposit_route"}
 
 
@@ -132,6 +135,62 @@ def health_problem(slice_: dict, now: datetime | None = None) -> str | None:
     return None
 
 
+def _figure(idx: dict, key: str) -> float | None:
+    v = idx.get(key)
+    return float(v) if isinstance(v, int | float) and not isinstance(v, bool) else None
+
+
+def _is_buy(p: dict) -> bool:
+    ticket = p.get("order_ticket") if isinstance(p.get("order_ticket"), dict) else {}
+    return p.get("kind") in BUY_KINDS or ticket.get("action") == "buy"
+
+
+def funding_problem(p: dict, idx: dict) -> str | None:
+    if not _is_buy(p):
+        return None
+    amount = p.get("amount_usd")
+    amount = float(amount) if isinstance(amount, int | float) and not isinstance(amount, bool) else None
+    funding = str(p.get("funding") or "cash")
+    if funding == "margin":
+        return "It would be bought on margin, which the desk never proposes."
+    debit = _figure(idx, "margin.debit:all:now") or 0.0
+    own = _figure(idx, f"cash.ready:{p.get('account')}:now") if p.get("account") else None
+    if funding == "deposit":
+        pending = _figure(idx, "cash.pending:all:now")
+        if debit > 0 and (pending is None or amount is None or amount > pending - debit + CASH_SLACK):
+            return f"A margin debit of ${debit:,.0f} is open, and the next deposit pays that down first."
+        return None
+    ready = own if own is not None else _figure(idx, "cash.ready:all:now")
+    if debit > 0 and (own is None or amount is None or amount > own + CASH_SLACK):
+        return f"A margin debit of ${debit:,.0f} is open, so ready cash goes there first and no buy is proposed."
+    if ready is not None and amount is not None and amount > ready + CASH_SLACK:
+        return f"It needs ${amount:,.0f} of ready cash and there is ${ready:,.0f}."
+    return None
+
+
+def held_off(p: dict, standing: list[dict]) -> str | None:
+    if not _is_buy(p):
+        return None
+    symbol = str(p.get("symbol") or "").upper()
+    for item in standing:
+        if item.get("kind") != "hold_off":
+            continue
+        theirs = str(item.get("symbol") or "").upper()
+        words = str(item.get("title") or "").lower()
+        if (theirs and theirs == symbol) or (not theirs and (item.get("subject") == "margin" or NO_BUYS.search(words))):
+            return f"A standing note says to hold off: {item.get('title') or 'no buys for now'}."
+    return None
+
+
+def _standing(cfg: Config, decisions: Decisions, proposals: list[dict]) -> list[dict]:
+    fn = getattr(decisions, "standing", None)
+    try:
+        found = [dict(i) for i in fn(cfg)] if fn else []
+    except NotReady:
+        found = []
+    return found + [p for p in proposals if p.get("kind") == "hold_off"]
+
+
 def no_buy_problem(p: dict, view: dict, today: str | None = None) -> str | None:
     ticket = p.get("order_ticket") if isinstance(p.get("order_ticket"), dict) else {}
     if p.get("kind") not in BUY_KINDS and ticket.get("action") != "buy":
@@ -226,18 +285,20 @@ def run_proposal_desk(
     summary = wording.tidy(str(answer.get("summary") or ""))
     answer = answer | {"summary": summary}
     proposals = [p for p in answer.get("proposals") or () if isinstance(p, dict)]
-    store.save_brief(cfg, outcome.run_id, name, slice_.get("as_of"), digest, version, summary, json.dumps(answer, sort_keys=True))
+    store.save_brief(cfg, outcome.run_id, name, slice_.get("data_as_of") or slice_.get("as_of"), digest, version, summary, json.dumps(answer, sort_keys=True))
     if name == "research" and isinstance(answer.get("dossier"), dict):
-        dossier_symbol = answer["dossier"].get("symbol") or symbol
-        store.save_dossier(cfg, dossier_symbol, outcome.run_id, json.dumps(answer["dossier"], sort_keys=True))
+        dossier = {k: wording.tidy_all(v) for k, v in answer["dossier"].items()}
+        dossier_symbol = dossier.get("symbol") or symbol
+        store.save_dossier(cfg, dossier_symbol, outcome.run_id, json.dumps(dossier, sort_keys=True))
         if trigger == "schedule":
             alerts.dossier_ready(cfg, dossier_symbol, outcome.run_id, summary)
     report = Report(outcome, summary, symbol=symbol)
     idx = briefs.index(slice_)
     run_id = str(outcome.run_id)
     try:
+        standing = _standing(cfg, decisions, proposals)
         for p in proposals:
-            held = no_buy_problem(p, prep.view)
+            held = no_buy_problem(p, prep.view) or funding_problem(p, idx) or held_off(p, standing)
             if held:
                 report.rejected.append(decisions.reject(cfg, p, name, held, run_id))
                 continue

@@ -4,6 +4,7 @@ from datetime import UTC, date, datetime
 
 from desk.engine import backfill, gate
 from desk.engine.lane import drawdown_pct, entry_session
+from desk.engine.market import session_day
 
 BENCHMARK = "IVV"
 DIP_CASH = 0.20
@@ -296,7 +297,7 @@ def rebuild(conn: sqlite3.Connection, sleeve: float, px, *, now: datetime | None
     if not conn.execute("SELECT 1 FROM catalog_strategies LIMIT 1").fetchone():
         return []
     now = now or datetime.now(UTC)
-    today = now.date().isoformat()
+    today = session_day(now)
     bench = _closes(conn, BENCHMARK)
     out = []
     for r in conn.execute("SELECT * FROM catalog_strategies ORDER BY id, version").fetchall():
@@ -304,7 +305,7 @@ def rebuild(conn: sqlite3.Connection, sleeve: float, px, *, now: datetime | None
         mix = json.loads(r["mix"])
         started = entry_session(datetime.fromisoformat(r["registered_at"])).isoformat()
         ledger = conn.execute("SELECT date, value FROM paper_ledger_daily WHERE strategy_id=? AND version=? ORDER BY date", (sid, ver)).fetchall()
-        as_of = ledger[-1][0] if ledger else max(started, today)
+        as_of = ledger[-1][0] if ledger else today
         value = ledger[-1][1] if ledger else sleeve
         days = max(0, (date.fromisoformat(as_of) - date.fromisoformat(started)).days)
         own = (value / sleeve - 1) * 100 if sleeve else None
