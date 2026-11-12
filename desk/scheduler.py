@@ -22,7 +22,7 @@ LIGHT = frozenset({"engine-quotes", "engine-lots", "notify-ops", "decisions-sync
 ALERT_JOB = "notify-ops"
 MODE_EVERY = 30.0
 LINE_MAX = 20_000
-_LOW = {"on": False, "checked": None}
+_LOW = {"on": False, "checked": None, "sample_due": None}
 
 
 def _field(text: str, low: int, high: int) -> frozenset[int]:
@@ -287,6 +287,18 @@ def low(cfg: Config | None, every: float = MODE_EVERY) -> bool:
     return bool(_LOW["on"])
 
 
+def remember(jobs: list[Job], cfg: Config | None) -> None:
+    due = _LOW["sample_due"]
+    if cfg is None or (due is not None and time.monotonic() < due):
+        return
+    wrote = None
+    try:
+        wrote = memory.sample(cfg, low=bool(_LOW["on"]), running=sorted(j.name for j in jobs if j.proc is not None))
+    except Exception as e:  # noqa: BLE001
+        log(f"couldn't note the box's memory: {e!r}")
+    _LOW["sample_due"] = time.monotonic() + (memory.SAMPLE_EVERY.total_seconds() if wrote else MODE_EVERY)
+
+
 def _save_waiting(jobs: list[Job], cfg: Config) -> None:
     rows = {j.name: j.waiting for j in jobs if j.waiting is not None}
     try:
@@ -434,6 +446,7 @@ def main(argv: list[str] | None = None) -> int:
         jobrun.heartbeat(cfg)
         reap(jobs, cfg)
         low(cfg)
+        remember(jobs, cfg)
         drain(jobs, cfg)
         serve_requests(jobs, cfg)
         run_chain(jobs, cfg)

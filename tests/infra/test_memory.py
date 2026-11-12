@@ -67,6 +67,66 @@ def test_a_kill_is_the_services_cap_or_the_whole_box(tmp_path):
     assert memory.job_words("box") == "The box ran out of memory and stopped it."
 
 
+# ---- The last two days ----
+
+
+def test_a_memory_sample_is_kept_every_five_minutes_for_two_days_and_no_longer(cfg):
+    start = datetime(2026, 11, 10, 12, 0, tzinfo=UTC)
+    info, group = {"available_mb": 553, "cache_mb": 3100}, {"used_mb": 212}
+    first = memory.sample(cfg, start, low=True, running=["engine-lookthrough"], info=info, group=group)
+    assert first == {"at": "2026-11-10T12:00:00Z", "free_mb": 553, "cache_mb": 3100, "scheduler_mb": 212, "low": True, "running": ["engine-lookthrough"]}
+    assert memory.sample(cfg, start + timedelta(minutes=4), info=info, group=group) is None
+    assert memory.sample(cfg, start + timedelta(minutes=4, seconds=45), info=info, group=group)["running"] == []
+    for n in range(2, 700):
+        assert memory.sample(cfg, start + timedelta(minutes=5 * n), info={"available_mb": n}, group={}, running=[f"job-{i}" for i in range(20)])
+    end = start + timedelta(minutes=5 * 699)
+    rows = memory.history(cfg, end)
+    assert len(rows) == 576 and rows[-1]["free_mb"] == 699 and rows[-1]["scheduler_mb"] is None and len(rows[-1]["running"]) == 12
+    assert jobrun.parse_stamp(rows[0]["at"]) > end - timedelta(hours=48) and memory.history_file(cfg).stat().st_size < 200_000
+    assert memory.history(cfg, end + timedelta(hours=47, minutes=59)) == rows[-1:] and memory.history(cfg, end + timedelta(hours=49)) == []
+    assert memory.history(cfg, start) == [] and memory.sample(cfg, end + timedelta(days=3), info=info, group=group)["free_mb"] == 553
+    assert [r["free_mb"] for r in memory.history(cfg, end + timedelta(days=3))] == [553]
+    memory.history_file(cfg).write_text("not json")
+    assert memory.history(cfg, end) == [] and memory.sample(cfg, end, info=info, group=group)["at"] == jobrun.stamp(end)
+    memory.history_file(cfg).write_text(json.dumps({"samples": ["x", {"at": "never"}, {"free_mb": 1}]}))
+    assert memory.history(cfg, end) == []
+
+
+def test_the_scheduler_notes_memory_and_what_is_running_without_doing_it_twice(cfg, monkeypatch):
+    a = make_job("a", "0 0 1 1 *", ["sleep", "5"], name="engine-daily")
+    b = make_job("b", "0 0 1 1 *", ["true"], name="engine-review")
+    assert launch([a, b], a, cfg, "schedule") == "started"
+    try:
+        monkeypatch.setitem(scheduler._LOW, "on", True)
+        scheduler.remember([a, b], cfg)
+        (row,) = memory.history(cfg)
+        assert row["running"] == ["engine-daily"] and row["low"] is True and set(row) == {"at", "free_mb", "cache_mb", "scheduler_mb", "low", "running"}
+        due = scheduler._LOW["sample_due"]
+        scheduler.remember([a, b], cfg)
+        assert len(memory.history(cfg)) == 1 and scheduler._LOW["sample_due"] == due
+        monkeypatch.setitem(scheduler._LOW, "sample_due", None)
+        scheduler.remember([a, b], cfg)
+        assert len(memory.history(cfg)) == 1 and scheduler._LOW["sample_due"] - time.monotonic() <= scheduler.MODE_EVERY
+        monkeypatch.setitem(scheduler._LOW, "sample_due", None)
+        monkeypatch.setattr(memory, "sample", lambda *a, **k: 1 / 0)
+        scheduler.remember([a, b], cfg)
+        assert scheduler._LOW["sample_due"] is not None
+    finally:
+        a.proc.kill()
+        a.proc.wait()
+
+
+def test_the_memory_route_shows_the_record_only_when_asked(app_client, cfg):
+    client = app_client(packages=[])
+    now = jobrun.now_utc()
+    memory.sample(cfg, now - timedelta(minutes=10), running=["mirror"], info={"available_mb": 900, "cache_mb": None}, group={"used_mb": 100})
+    memory.sample(cfg, now - timedelta(minutes=5), info={"available_mb": 2400, "cache_mb": 5000}, group={"used_mb": 80})
+    assert "history" not in client.get("/api/memory").json() and "history" not in client.get("/api/status").json()["memory"]
+    body = client.get("/api/memory?history=1").json()
+    assert body["history"]["every_minutes"] == 5 and body["history"]["keeps_hours"] == 48 and body["state"] in ("ok", "tight", "unknown")
+    assert [(r["free_mb"], r["running"]) for r in body["history"]["samples"]] == [(900, ["mirror"]), (2400, [])]
+
+
 # ---- The mode ----
 
 
