@@ -17,6 +17,7 @@ CASES_WAIT = 900.0
 LATE = (time(5, 30), time(9, 0))
 COUNTED = ("ok", "failed", "timeout", "running")
 WAITING = ("busy", "deferred")
+CASE_STEPS = ("cases", "list_cases")
 STOPPED = ("disabled", "guarded", "over_budget", "busy", "deferred", "failed")
 QUIET = ("ok", "fresh", "current", "late", "disabled", "guarded", "over_budget", "not_ready", "unhealthy")
 
@@ -83,7 +84,7 @@ def cases_step(cfg: Config, cases: Callable | None = None, wait: float = LOCK_WA
     except Exception as e:  # noqa: BLE001
         return {"step": "cases", "status": "failed", "note": f"Discount cases did not finish: {e}"}
     written, failed = len(report.written), len(report.failed)
-    note = report.note or f"Wrote {written} of {report.pending} discount cases" + (f", {failed} failed." if failed else ".")
+    note = report.note or f"This run wrote {written} of {report.pending} discount cases" + (f", {failed} failed." if failed else ".")
     return {"step": "cases", "status": report.status, "note": note, "written": written, "pending": report.pending}
 
 
@@ -115,7 +116,7 @@ def list_cases_step(cfg: Config, cases: Callable | None = None, wait: float = LO
     except Exception as e:  # noqa: BLE001
         return {"step": step, "status": "failed", "note": f"Cases for the list did not finish: {e}"}
     written, failed = len(report.written), len(report.failed)
-    note = f"Wrote {written} of {len(hits)} cases for rows on sale" + (f", {failed} failed." if failed else ".")
+    note = f"This run wrote {written} of {len(hits)} cases for rows on sale" + (f", {failed} failed." if failed else ".")
     if report.note and not written:
         note = report.note
     return {"step": step, "status": report.status, "note": note, "written": written, "pending": len(hits)}
@@ -154,6 +155,35 @@ def scout_step(cfg: Config, scout: Callable | None = None, wait: float = LOCK_WA
 # ---- The night ----
 
 
+def _wrote(cfg: Config, now: datetime) -> int:
+    from desk.opportunities.cases import written_tonight
+
+    try:
+        return written_tonight(cfg, now)
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _line(cfg: Config, now: datetime) -> str | None:
+    from desk.opportunities import line
+
+    return line(cfg, now=now)
+
+
+def summary(steps: list[dict], wrote: int) -> str:
+    out, counted = [], False
+    for s in steps:
+        if s["step"] not in CASE_STEPS:
+            out.append(s.get("note"))
+            continue
+        if wrote and not counted:
+            out.append(f"{wrote} {'case' if wrote == 1 else 'cases'} written overnight.")
+            counted = True
+        if not wrote or s["status"] not in ("ok", "current"):
+            out.append(s.get("note"))
+    return " ".join(x for x in out if x)
+
+
 def run_night(
     cfg: Config,
     *,
@@ -170,12 +200,18 @@ def run_night(
     steps.append(scout_step(cfg, scout, wait, now))
     states = [s["status"] for s in steps]
     status = "waiting" if any(s in WAITING for s in states) else "ok" if all(s in QUIET for s in states) else "partial"
+    finished = now or datetime.now(UTC)
     night = {
         "started_at": _stamp(started),
-        "finished_at": _stamp(now or datetime.now(UTC)),
+        "finished_at": _stamp(finished),
         "status": status,
-        "summary": " ".join(s["note"] for s in steps if s.get("note")),
+        "cases_written": _wrote(cfg, finished),
+        "summary": "",
+        "ready": None,
         "steps": steps,
     }
+    night["summary"] = summary(steps, night["cases_written"])
+    _save(cfg, night)
+    night["ready"] = _line(cfg, finished)
     _save(cfg, night)
     return night
