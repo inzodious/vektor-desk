@@ -39,7 +39,7 @@ Escape Vektor's `priceCloses` only refresh when Joshua opens it, so they can lag
 
 A held symbol is fetched from Tiingo unless the mirror already has a close for the last trading day. Weekends and holidays resolve to the last trading day.
 
-**Price backfill** (`desk.engine.backfill`, job `backfill`, hourly 01:10 to 12:10 ET; `ASK_HOURS` and `ASK_WORDS` hold the window and a test ties them to the schedule). Tiingo publishes most closes by 17:30 ET and mutual fund prices after midnight, sometimes later, so the desk keeps asking through the morning.
+**Price backfill** (`desk.engine.backfill`, job `backfill`, every hour at 13 past; `ASK_MINUTE` and `ASK_WORDS` hold the schedule and a test ties them to it). Tiingo publishes most closes by 17:30 ET and mutual fund prices after midnight, sometimes the next afternoon, so the desk asks every hour. The day it asks for rolls at 00:00 UTC, so the 19:13 ET run (20:13 in summer) is the first to fetch that day's closes. Minute 13 keeps clear of the deploy check on the 5 minute marks and of `restate` at 2 past them.
 
 | Piece | Rule |
 |---|---|
@@ -686,7 +686,7 @@ Limits: leftover swings are drawn month by month and holding by holding, so a fu
 
 ## Discount-day scanner
 
-Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run. The `backfill` job (hourly 01:10 to 12:10 ET) scans again whenever a fetch brought a new bar, so a name priced from Tiingo is scored on its newest close before the morning.
+Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the close and the 17:20 engine run. The `backfill` job (every hour at 13 past) scans again whenever a fetch brought a new bar, so a name priced from Tiingo is scored on its newest close the same evening.
 
 | Piece | Rule |
 |---|---|
