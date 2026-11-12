@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 
 from desk.config import Config
 from desk.db import desk_conn
-from desk.decisions.schema import SCHEMA
+from desk.decisions.schema import SCHEMA, apply
 
 
 def now_iso(at: datetime | None = None) -> str:
@@ -34,6 +34,7 @@ def has_mirror(conn: sqlite3.Connection) -> bool:
 def open_db(cfg: Config) -> sqlite3.Connection:
     conn = desk_conn(cfg)
     conn.executescript(SCHEMA)
+    apply(conn)
     return conn
 
 

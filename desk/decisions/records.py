@@ -1,5 +1,6 @@
 import json
 import math
+import re
 import sqlite3
 from datetime import UTC, date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
@@ -16,11 +17,20 @@ KINDS = TRADE_KINDS + ADVICE_KINDS
 FUNDING = ("cash", "deposit", "sale_proceeds", "margin")
 ORIGINS = ("you", *DESKS)
 SELL_KINDS = ("sell", "trim", "harvest")
+BUY_KINDS = ("buy", "deposit_route")
+NOTE_KINDS = ("memo", "alert")
 OPEN = ("proposed", "snoozed")
+DRIFT_PCT = 10.0
+PRICE_GAP_DAYS = 5
+CASH_QUALITY = ("ok", "modelled")
+NOTE_DAYS = 7
+SUBJECT_MAX = 80
+REPLACED = "A newer proposal on the same subject replaced this one on {day}."
+NOTE_REASON = "A heads-up that needs no decision, so it is kept in the journal."
 EXPIRY_TRADING_DAYS = 5
 FILL_WINDOW_DAYS = 10
 UNMATCHED_DAYS = 90
-JSON_FIELDS = ("numbers_used", "sources", "order_ticket", "skeptic", "preflight", "tax_impact", "fill")
+JSON_FIELDS = ("numbers_used", "sources", "order_ticket", "skeptic", "preflight", "tax_impact", "fill", "valid")
 
 
 class DecisionError(Exception):
@@ -73,6 +83,14 @@ def local_day(stamp: str | None, tz: str) -> str | None:
     return datetime.fromisoformat(stamp).astimezone(ZoneInfo(tz)).date().isoformat()
 
 
+def day_words(stamp: str | None, tz: str) -> str:
+    day = local_day(stamp, tz)
+    if not day:
+        return "an earlier day"
+    d = date.fromisoformat(day)
+    return f"{d:%b} {d.day}"
+
+
 # ---- Shape ----
 
 
@@ -94,6 +112,54 @@ def _text(value) -> str | None:
     if value is None:
         return None
     out = str(value).strip()
+    return out or None
+
+
+def _slug(value, words: int = 6) -> str:
+    return "-".join(re.sub(r"[^a-z ]+", " ", str(value or "").lower()).split()[:words])
+
+
+def _subject(value) -> str | None:
+    text = " ".join(str(value or "").lower().split())
+    return text[:SUBJECT_MAX] or None
+
+
+def subject_of(d: dict) -> str:
+    given = _subject(d.get("subject"))
+    if given:
+        return given
+    kind, symbol = d["kind"], d.get("symbol")
+    head = "buy" if kind in BUY_KINDS else "sell" if kind in SELL_KINDS else "note" if kind in NOTE_KINDS else kind
+    if symbol:
+        return f"{head}:{str(symbol).upper()}"
+    if head != "note":
+        return f"{head}:general"
+    return f"note:{_slug(d.get('rule_served')) or _slug(d.get('title')) or 'general'}"[:SUBJECT_MAX]
+
+
+def _as_of(raw) -> str | None:
+    if raw in (None, ""):
+        return None
+    text = str(raw).strip()
+    try:
+        if len(text) == 10:
+            return date.fromisoformat(text).isoformat()
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as e:
+        raise DecisionError(f"as_of must be a date or a date and time, got {text!r}") from e
+    return now_iso(parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC))
+
+
+def _valid(p: dict) -> dict | None:
+    out = {}
+    for key in ("price_min", "price_max", "needs_cash_usd"):
+        value = _float(p.get(key), key)
+        if value is not None:
+            if value < 0:
+                raise DecisionError(f"{key} can't be negative")
+            out[key] = value
+    if "price_min" in out and "price_max" in out and out["price_min"] > out["price_max"]:
+        raise DecisionError("price_min can't be above price_max")
     return out or None
 
 
@@ -145,6 +211,9 @@ def clean(p: dict) -> dict:
         "sources": p.get("sources") or [],
         "order_ticket": ticket,
         "expires": p.get("expires"),
+        "subject": _subject(p.get("subject")),
+        "as_of": _as_of(p.get("as_of")),
+        "valid": _valid(p),
     }
 
 
@@ -174,6 +243,7 @@ def to_dict(row: sqlite3.Row, events: list[dict] | None = None) -> dict:
         out[key] = loads(out[key])
     out["override"] = bool(out["override"])
     out["decision"] = label(out)
+    out["as_of"] = out.get("as_of") or out["created_at"]
     if events is not None:
         out["events"] = events
     return out
@@ -208,6 +278,15 @@ def _update(conn: sqlite3.Connection, decision_id: str, at: str, **fields) -> No
     fields["updated_at"] = at
     sets = ", ".join(f"{k}=?" for k in fields)
     conn.execute(f"UPDATE decisions SET {sets} WHERE id=?", (*fields.values(), decision_id))
+
+
+def _close(conn: sqlite3.Connection, decision_id: str, at: str, event: str, reason: str, detail: dict | None = None, **fields) -> bool:
+    fields = {"status": "expired", "decided_at": at, "status_reason": reason, "updated_at": at, **fields}
+    sets = ", ".join(f"{k}=?" for k in fields)
+    done = conn.execute(f"UPDATE decisions SET {sets} WHERE id=? AND status IN ('proposed', 'snoozed')", (*fields.values(), decision_id)).rowcount == 1
+    if done:
+        log_event(conn, decision_id, event, reason=reason, detail=detail, at=at)
+    return done
 
 
 # ---- Preflight ----
@@ -285,6 +364,11 @@ def _insert(cfg: Config, conn: sqlite3.Connection, c: dict, *, origin: str, run_
     at = now_iso(now)
     did = new_id(now)
     expires = expiry(c["expires"], now, cfg.timezone) if status == "proposed" else None
+    valid = dict(c["valid"] or {})
+    if status == "proposed" and c["symbol"] and c["kind"] in TRADE_KINDS:
+        seen = _Facts(conn).latest(c["symbol"])
+        if seen:
+            valid["price_at"] = seen[0]
     record = {
         "id": did,
         "created_at": at,
@@ -313,11 +397,16 @@ def _insert(cfg: Config, conn: sqlite3.Connection, c: dict, *, origin: str, run_
         "status_reason": reason,
         "profile_version": profile.version,
         "rules_version": profile.rules_version,
-        "decided_at": at if status == "rejected" else None,
+        "decided_at": None if status == "proposed" else at,
+        "subject": subject_of(c),
+        "as_of": c["as_of"],
+        "valid": dumps(valid or None),
     }
     with conn:
         conn.execute(f"INSERT INTO decisions ({', '.join(record)}) VALUES ({', '.join('?' * len(record))})", tuple(record.values()))
-        log_event(conn, did, "rejected" if status == "rejected" else "proposed", reason=reason, at=at)
+        log_event(conn, did, status, reason=reason, at=at)
+        if status == "proposed" and origin != "you" and record["run_id"] is not None:
+            _replace(conn, record, at, cfg.timezone)
     if status == "proposed":
         d = to_dict(_get(conn, did))
         checked = run_preflight(cfg, conn, d, at)
@@ -328,6 +417,25 @@ def _insert(cfg: Config, conn: sqlite3.Connection, c: dict, *, origin: str, run_
     return to_dict(_get(conn, did))
 
 
+def _replace(conn: sqlite3.Connection, new: dict, at: str, tz: str) -> int:
+    rows = conn.execute(
+        "SELECT id, status, snoozed_until FROM decisions WHERE status IN ('proposed', 'snoozed') AND origin=? AND subject=? AND id != ? "
+        "AND (run_id IS NULL OR run_id != ?)",
+        (new["origin"], new["subject"], new["id"], new["run_id"]),
+    ).fetchall()
+    reason = REPLACED.format(day=day_words(new["created_at"], tz))
+    held = None
+    for r in rows:
+        if not _close(conn, r["id"], at, "replaced", reason, {"by": new["id"]}, replaced_by=new["id"]):
+            continue
+        if r["status"] == "snoozed" and r["snoozed_until"] and r["snoozed_until"] > at:
+            held = max(held or "", r["snoozed_until"])
+    if held and new["status"] == "proposed":
+        _update(conn, new["id"], at, status="snoozed", snoozed_until=held)
+        log_event(conn, new["id"], "snoozed", reason="Carried over from the proposal this one replaces.", detail={"until": held}, at=at)
+    return len(rows)
+
+
 def create_proposal(cfg: Config, proposal: dict, desk: str, run_id=None, skeptic: dict | None = None, *, now: datetime | None = None) -> dict:
     if desk not in DESKS:
         raise DecisionError(f"desk must be one of {', '.join(DESKS)}")
@@ -336,8 +444,9 @@ def create_proposal(cfg: Config, proposal: dict, desk: str, run_id=None, skeptic
     except DecisionError as e:
         return reject_proposal(cfg, proposal, desk, f"Malformed proposal: {e}", run_id, now=now)
     reason = rejection(c)
+    status = "rejected" if reason else "logged" if c["kind"] in NOTE_KINDS else "proposed"
     with session(cfg) as conn:
-        return _insert(cfg, conn, c, origin=desk, run_id=run_id, status="rejected" if reason else "proposed", reason=reason, now=_now(now), skeptic=skeptic)
+        return _insert(cfg, conn, c, origin=desk, run_id=run_id, status=status, reason=reason, now=_now(now), skeptic=skeptic)
 
 
 def reject_proposal(cfg: Config, proposal: dict, desk: str, reason: str, run_id=None, *, now: datetime | None = None) -> dict:
@@ -381,9 +490,10 @@ def _open(conn: sqlite3.Connection, decision_id: str, at: str) -> dict:
     d = to_dict(_get(conn, decision_id))
     if d["status"] == "proposed" or d["status"] == "snoozed":
         if d["expires_at"] and d["expires_at"] < at:
+            reason = "Its window closed before a decision was made."
             with conn:
-                _update(conn, decision_id, at, status="expired", decided_at=at)
-                log_event(conn, decision_id, "expired", at=at)
+                _update(conn, decision_id, at, status="expired", decided_at=at, status_reason=reason)
+                log_event(conn, decision_id, "expired", reason=reason, detail={"check": "window"}, at=at)
             raise DecisionError("This one expired, so it can't be approved. Draft a fresh one if it still makes sense.", 409)
         return d
     raise DecisionError(f"This decision is already {d['status']}.", 409)
@@ -491,19 +601,157 @@ def rerun_preflight(cfg: Config, decision_id: str, *, now: datetime | None = Non
 # ---- Queue and journal ----
 
 
-def expire_due(conn: sqlite3.Connection, at: str) -> int:
-    rows = conn.execute("SELECT id FROM decisions WHERE status IN ('proposed', 'snoozed') AND expires_at IS NOT NULL AND expires_at < ?", (at,)).fetchall()
+class _Facts:
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+        marks = ("quotes_live", "prices_daily", "metric_values")
+        self.tables = {r[0] for r in conn.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name IN ({','.join('?' * len(marks))})", marks)}
+        self._latest: dict[str, tuple[float, str] | None] = {}
+        self._cash: tuple | None = None
+
+    def latest(self, symbol: str) -> tuple[float, str] | None:
+        if symbol not in self._latest:
+            found = []
+            if "quotes_live" in self.tables:
+                q = self.conn.execute("SELECT price, at FROM quotes_live WHERE symbol=? ORDER BY fetched_at DESC LIMIT 1", (symbol,)).fetchone()
+                if q and q["price"]:
+                    found.append((str(q["at"])[:10], 1, float(q["price"])))
+            if "prices_daily" in self.tables:
+                c = self.conn.execute("SELECT close, date FROM prices_daily WHERE symbol=? ORDER BY date DESC LIMIT 1", (symbol,)).fetchone()
+                if c and c["close"]:
+                    found.append((str(c["date"])[:10], 0, float(c["close"])))
+            best = max(found) if found else None
+            self._latest[symbol] = (best[2], best[0]) if best else None
+        return self._latest[symbol]
+
+    def close_on(self, symbol: str, day: str) -> float | None:
+        if "prices_daily" not in self.tables:
+            return None
+        r = self.conn.execute("SELECT close, date FROM prices_daily WHERE symbol=? AND date<=? ORDER BY date DESC LIMIT 1", (symbol, day)).fetchone()
+        if not r or not r["close"] or (date.fromisoformat(day) - date.fromisoformat(str(r["date"])[:10])).days > PRICE_GAP_DAYS:
+            return None
+        return float(r["close"])
+
+    def cash(self) -> tuple[float, str, str] | None:
+        if self._cash is None:
+            row = None
+            if "metric_values" in self.tables:
+                row = self.conn.execute(
+                    "SELECT value, as_of, quality FROM metric_values WHERE metric_id='cash.ready' AND scope='portfolio' AND window='now' "
+                    "ORDER BY as_of DESC LIMIT 1"
+                ).fetchone()
+            ok = row is not None and row["value"] is not None and row["quality"] in CASH_QUALITY
+            self._cash = ((float(row["value"]), str(row["as_of"])[:10], row["quality"]),) if ok else (None,)
+        return self._cash[0]
+
+
+def _money(value: float) -> str:
+    return f"${value:,.2f}"
+
+
+def _usd(value: float) -> str:
+    return f"${value:,.0f}"
+
+
+def _price_reason(d: dict, facts: _Facts, tz: str) -> str | None:
+    symbol = d["symbol"]
+    seen = facts.latest(symbol) if symbol else None
+    if not seen:
+        return None
+    price, day = seen
+    born = local_day(d["as_of"], tz)
+    if day < born:
+        return None
+    v = d["valid"] or {}
+    low, high = v.get("price_min"), v.get("price_max")
+    if low is not None or high is not None:
+        zone = (
+            f"{_money(low)} to {_money(high)} zone"
+            if low is not None and high is not None
+            else f"{_money(low)} floor"
+            if high is None
+            else f"{_money(high)} ceiling"
+        )
+        if low is not None and price < low:
+            return f"{symbol} is at {_money(price)}, below the {zone} this was written for."
+        if high is not None and price > high:
+            return f"{symbol} is at {_money(price)}, above the {zone} this was written for."
+        return None
+    if d["origin"] == "you" or d["kind"] not in TRADE_KINDS:
+        return None
+    base = v.get("price_at") or facts.close_on(symbol, born)
+    if not base or (day == born and not v.get("price_at")):
+        return None
+    moved = (price / base - 1) * 100
+    if abs(moved) <= DRIFT_PCT:
+        return None
+    way = "up" if moved > 0 else "down"
+    return (
+        f"{symbol} is {way} {abs(moved):.0f}% since this was written on {day_words(d['as_of'], tz)} "
+        f"({_money(base)} then, {_money(price)} now), so its numbers no longer hold."
+    )
+
+
+def _cash_reason(d: dict, facts: _Facts, tz: str) -> str | None:
+    needs = (d["valid"] or {}).get("needs_cash_usd")
+    if needs is None and d["origin"] != "you" and d["kind"] in BUY_KINDS and d["funding"] == "cash":
+        needs = d["amount_usd"]
+    seen = facts.cash() if needs else None
+    if not seen:
+        return None
+    ready, day, quality = seen
+    if day <= local_day(d["as_of"], tz) or ready >= needs - 0.005:
+        return None
+    rough = " (estimated)" if quality != "ok" else ""
+    return f"Ready cash is {_usd(max(ready, 0.0))} as of {day_words(day, tz)}{rough}, less than the {_usd(needs)} this needs."
+
+
+def stale_reason(d: dict, facts: _Facts, at: str, tz: str) -> tuple[str, str] | None:
+    if d["expires_at"] and d["expires_at"] < at:
+        return "window", f"Its window closed on {day_words(d['expires_at'], tz)}."
+    reason = _price_reason(d, facts, tz)
+    if reason:
+        return "price", reason
+    reason = _cash_reason(d, facts, tz)
+    return ("cash", reason) if reason else None
+
+
+def tidy(cfg: Config, conn: sqlite3.Connection, at: str) -> dict:
+    tz = cfg.timezone
+    out = {"notes": 0, "replaced": 0, "expired": 0}
+    rows = [to_dict(r) for r in conn.execute("SELECT * FROM decisions WHERE status IN ('proposed', 'snoozed') ORDER BY created_at, rowid")]
+    if not rows:
+        return out
+    facts = _Facts(conn)
+    newest: dict[tuple[str, str], dict] = {}
     with conn:
-        for r in rows:
-            _update(conn, r["id"], at, status="expired", decided_at=at)
-            log_event(conn, r["id"], "expired", at=at)
-    return len(rows)
+        for d in rows:
+            if not d["subject"]:
+                d["subject"] = subject_of(d)
+                conn.execute("UPDATE decisions SET subject=? WHERE id=?", (d["subject"], d["id"]))
+            if d["origin"] != "you" and d["kind"] in NOTE_KINDS:
+                out["notes"] += _close(conn, d["id"], at, "logged", NOTE_REASON, status="logged", expires_at=None)
+                d["status"] = "logged"
+            elif d["origin"] != "you":
+                newest[(d["origin"], d["subject"])] = d
+        for d in rows:
+            if d["status"] not in OPEN:
+                continue
+            top = newest.get((d["origin"], d["subject"]))
+            if top and top["id"] != d["id"] and d["run_id"] != top["run_id"]:
+                reason = REPLACED.format(day=day_words(top["created_at"], tz))
+                out["replaced"] += _close(conn, d["id"], at, "replaced", reason, {"by": top["id"]}, replaced_by=top["id"])
+                continue
+            found = stale_reason(d, facts, at, tz)
+            if found:
+                out["expired"] += _close(conn, d["id"], at, "expired", found[1], {"check": found[0]})
+    return out
 
 
 def queue(cfg: Config, *, now: datetime | None = None) -> dict:
     at = now_iso(_now(now))
     with session(cfg) as conn:
-        expire_due(conn, at)
+        tidy(cfg, conn, at)
         rows = conn.execute(
             "SELECT * FROM decisions WHERE status='proposed' OR (status='snoozed' AND snoozed_until <= ?) "
             "ORDER BY expires_at IS NULL, expires_at, created_at DESC",
@@ -513,6 +761,36 @@ def queue(cfg: Config, *, now: datetime | None = None) -> dict:
         waiting = conn.execute("SELECT COUNT(*) FROM decisions WHERE status='approved'").fetchone()[0]
     items = [to_dict(r) for r in rows]
     return {"count": len(items), "snoozed": snoozed, "to_place": waiting, "items": items}
+
+
+def notes(cfg: Config, *, days: int = NOTE_DAYS, now: datetime | None = None) -> dict:
+    moment = _now(now)
+    since = now_iso(moment - timedelta(days=max(1, min(int(days), 90))))
+    marks = ",".join("?" * len(NOTE_KINDS))
+    with session(cfg) as conn:
+        tidy(cfg, conn, now_iso(moment))
+        rows = conn.execute(
+            f"SELECT * FROM decisions WHERE status='logged' AND origin != 'you' AND kind IN ({marks}) AND created_at >= ? ORDER BY created_at DESC, rowid DESC",
+            (*NOTE_KINDS, since),
+        ).fetchall()
+    seen: set[tuple[str, str]] = set()
+    items = []
+    for r in rows:
+        d = to_dict(r)
+        key = (d["origin"], d["subject"] or subject_of(d))
+        if key in seen:
+            continue
+        seen.add(key)
+        items.append(d)
+    return {"count": len(items), "days": days, "items": items}
+
+
+def tidy_now(cfg: Config, *, now: datetime | None = None) -> dict:
+    at = now_iso(_now(now))
+    with session(cfg) as conn:
+        moved = tidy(cfg, conn, at)
+        waiting = conn.execute("SELECT COUNT(*) FROM decisions WHERE status='proposed' OR (status='snoozed' AND snoozed_until <= ?)", (at,)).fetchone()[0]
+    return {**moved, "waiting": waiting}
 
 
 def _scores(conn: sqlite3.Connection, ids: list[str]) -> dict[str, dict]:
@@ -557,7 +835,7 @@ def journal(
         args.append(until)
     limit = max(1, min(int(limit), 500))
     with session(cfg) as conn:
-        expire_due(conn, now_iso(_now(now)))
+        tidy(cfg, conn, now_iso(_now(now)))
         rows = conn.execute(f"SELECT * FROM decisions WHERE {' AND '.join(where)} ORDER BY {stamp} DESC, rowid DESC LIMIT ?", (*args, limit)).fetchall()
         items = [to_dict(r) for r in rows]
         scores = _scores(conn, [d["id"] for d in items])
@@ -797,7 +1075,7 @@ def summary(cfg: Config, *, now: datetime | None = None) -> dict:
     since = (today - timedelta(days=UNMATCHED_DAYS)).isoformat()
     loose = unmatched(cfg, now=moment)
     with session(cfg) as conn:
-        expire_due(conn, at)
+        tidy(cfg, conn, at)
         waiting = conn.execute("SELECT COUNT(*) FROM decisions WHERE status='proposed' OR (status='snoozed' AND snoozed_until <= ?)", (at,)).fetchone()[0]
         approved = conn.execute(
             "SELECT override, COUNT(*) n FROM decisions WHERE status IN ('approved', 'placed', 'filled', 'done') GROUP BY override"
