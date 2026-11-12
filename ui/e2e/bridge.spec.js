@@ -230,3 +230,17 @@ test('against the safe mix the Mix button and its gauge stay neutral', async ({ 
   await expect(drawer.locator('.drift-row.over')).toHaveCount(0);
   await expect(drawer.locator('.drift-band')).toHaveCount(0);
 });
+
+test('the brief’s “as of” reads as a day whatever shape the desk sends, and hides when it has none', async ({ page }) => {
+  const { readFileSync } = await import('node:fs');
+  const BRIEF = JSON.parse(readFileSync(new URL('../src/fixtures/agents.brief.json', import.meta.url), 'utf8'));
+  let asOf = '2026-11-07T01:20:00Z';
+  await page.route(/\/api\/agents\/brief(\?.*)?$/, (route) => route.fulfill({ json: { ...BRIEF, as_of: asOf } }));
+  await page.goto('/');
+  await expect(page.getByTestId('brief-foot')).toHaveText('Built from engine numbers as of Nov 6');
+  asOf = 'not a day';
+  await page.reload();
+  await expect(page.getByTestId('brief')).toContainText('What changed');
+  await expect(page.getByTestId('brief-foot')).toHaveCount(0);
+  await expect(page.getByTestId('brief')).not.toContainText('NaN');
+});

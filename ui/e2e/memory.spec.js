@@ -153,7 +153,8 @@ test('the Bridge carries one line about memory that opens the card and can be hi
   await page.goto('/?scenario=low');
   const strip = page.getByTestId('memory-strip');
   await expect(strip).toHaveAttribute('data-tone', 'watch');
-  await expect(strip).toContainText('Low-memory mode is on, so heavy jobs run one at a time. 3 things were stopped for memory in the last two days.');
+  await expect(strip).toContainText('The box ran short on memory. 3 things were stopped for memory in the last two days.');
+  await expect(strip).not.toContainText('Low-memory mode');
   const o = await overflow(page);
   expect(o.scroll).toBeLessThanOrEqual(o.view);
   await strip.getByTestId('memory-strip-hide').click();
@@ -165,10 +166,26 @@ test('the Bridge carries one line about memory that opens the card and can be hi
 });
 
 test('the strip comes back when something new is stopped', async ({ page }) => {
-  await page.addInitScript(() => window.localStorage.setItem('desk.memory.hidden', '1:2'));
+  await page.addInitScript(() => window.localStorage.setItem('desk.memory.hidden', '0:2'));
   await page.goto('/?scenario=low');
   await page.getByTestId('memory-strip-open').click();
   await expect(page).toHaveURL(/\/settings\/box#memory$/);
+});
+
+test('low-memory mode alone puts no strip on the Bridge, until a job has really waited', async ({ page }) => {
+  const START = JSON.parse(readFileSync(new URL('../src/fixtures/start.low.json', import.meta.url), 'utf8'));
+  const MEMORY = JSON.parse(readFileSync(new URL('../src/fixtures/memory.low.json', import.meta.url), 'utf8'));
+  let since = null;
+  await page.route(/\/api\/start(\?.*)?$/, (route) => route.fulfill({ json: { ...START, memory: { ...START.memory, killed: 0 } } }));
+  await page.route(/\/api\/memory(\?.*)?$/, (route) => route.fulfill({ json: { ...MEMORY, killed: [], waiting: since ? [{ job: 'engine-review', title: 'Engine review', since }] : [] } }));
+  await page.goto('/?scenario=low');
+  await expect(page.getByTestId('today-run')).toBeVisible();
+  await expect(page.getByTestId('memory-strip')).toHaveCount(0);
+  since = '2026-11-09T16:30:00Z';
+  await page.reload();
+  const strip = page.getByTestId('memory-strip');
+  await expect(strip).toHaveAttribute('data-tone', 'info');
+  await expect(strip).toContainText('A job is waiting on memory. Results review has waited 12 minutes for its turn.');
 });
 
 test('the strip stays off other pages and off a calm box', async ({ page }) => {
