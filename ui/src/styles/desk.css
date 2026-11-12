@@ -842,21 +842,16 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
 .health-banner .hb-body { flex: 1; min-width: 0; }
 .health-banner p { margin: 0; }
 .health-banner p b { font-weight: 800; }
-.health-banner summary { cursor: pointer; font-size: 12px; font-weight: 700; color: var(--ink-2); margin-top: 4px; width: fit-content; }
-.health-banner ul { margin: 6px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink-2); }
-.health-banner .link { flex: none; font-size: 12px; }
-.health-banner .hb-acts { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex: none; max-width: 260px; }
-.health-banner .hb-acts .btn svg { width: 14px; height: 14px; }
-.health-banner .hb-acts .chip { white-space: normal; }
-.hb-note { font-size: 12px; font-weight: 600; text-align: right; color: var(--ink-2); }
-.hb-note.done { color: var(--ok); }
+.health-banner .chip { flex: none; }
+.check-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
+.check-list li { display: grid; gap: 2px; padding-left: 10px; border-left: 3px solid var(--mustard); }
+.check-list li[data-status='fail'] { border-left-color: var(--coral); }
+.check-list li span { color: var(--ink-2); overflow-wrap: anywhere; }
+.check-fine { margin: 8px 0 0; font-size: 12px; }
 @media (max-width: 860px) {
   .health-banner { flex-wrap: wrap; }
   .health-banner .hb-body { flex-basis: calc(100% - 32px); }
-  .health-banner .link { margin-left: 28px; }
-  .health-banner .hb-acts { flex-direction: row; flex-wrap: wrap; align-items: center; margin-left: 28px; max-width: none; }
-  .health-banner .hb-acts .link { margin-left: 0; }
-  .hb-note { text-align: left; }
+  .health-banner .chip { margin-left: 28px; }
 }
 
 /* ---------- desk profile ---------- */

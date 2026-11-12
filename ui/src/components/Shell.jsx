@@ -1,6 +1,6 @@
 import { Fragment, useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { HealthBanner } from './HealthBanner.jsx';
+import { HealthWatch } from './HealthWatch.jsx';
 import { MemoryStrip } from './MemoryStrip.jsx';
 import { WorkerStrip } from './WorkerStrip.jsx';
 import { Icon } from './Icon.jsx';
@@ -159,7 +159,7 @@ export function Shell({ badges }) {
         <StartBanner />
         {pathname === '/' ? <MemoryStrip /> : null}
         {pathname === '/' ? <WorkerStrip data={workers} /> : null}
-        {starting ? null : <HealthBanner />}
+        {starting ? null : <HealthWatch />}
         <Fragment key={epoch}>
           <Outlet />
         </Fragment>

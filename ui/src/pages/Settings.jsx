@@ -9,6 +9,7 @@ import { Workers } from '../settings/Workers.jsx';
 import { Services } from '../settings/Services.jsx';
 import { Inbox } from '../settings/Inbox.jsx';
 import { Keys } from '../settings/Keys.jsx';
+import { Checks } from '../settings/Checks.jsx';
 import { ProfileEditor } from '../settings/ProfileEditor.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Combo } from '../components/Combo.jsx';
@@ -539,6 +540,7 @@ export default function Settings({ tab = 'desk' }) {
             <Jobs />
             <Box />
             <Services containers={s.containers} />
+            <Checks />
             <Token token={s.claude_token} />
           </>
         ) : null}
