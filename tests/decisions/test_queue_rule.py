@@ -4,7 +4,7 @@ from datetime import timedelta
 import pytest
 
 from desk.decisions import cleared, create_proposal, desk_history, draft, get, journal, notes, queue, snooze, summary
-from desk.decisions.__main__ import main, night
+from desk.decisions.__main__ import main, night, sync
 from desk.decisions.plans import save_plan
 from desk.decisions.records import subject_of
 from desk.decisions.schema import SCHEMA
@@ -296,3 +296,15 @@ def test_a_plain_read_does_not_run_the_plan_check_and_a_broken_check_clears_noth
     assert night(cfg) == {"ready": "1 decision waiting, all current"}
     monkeypatch.setattr("desk.decisions.records._desk_check", lambda: None)
     assert night(cfg) == {"ready": "1 decision waiting, all current"}
+
+
+def test_the_sync_job_runs_the_plan_check_too(cfg, preflight, now, proposal, monkeypatch):
+    save_plan(cfg, "ABCD", PLAN, approve=True, now=now)
+    trim = create_proposal(cfg, proposal(kind="trim", shares=10, amount_usd=None, expires="2099-01-01"), "risk", run_id="k1", now=now)
+    keep = create_proposal(cfg, proposal(symbol="WXYZ", funding="deposit", expires="2099-01-01"), "scout", run_id="s1", now=now)
+    monkeypatch.setattr("desk.decisions.records._now", lambda _=None: now)
+    result = sync(cfg)
+    assert result["cleared"] == 1 and result["expired"] == 0
+    assert reason(cfg, trim) == "Your plan already times this sale for Dec 7 to 15."
+    assert [d["id"] for d in queue(cfg, now=now)["items"]] == [keep["id"]]
+    assert sync(cfg)["cleared"] == 0
