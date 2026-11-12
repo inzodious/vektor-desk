@@ -21,12 +21,12 @@ test('bridge shows live value, four KPI tiles, what changed and the steps due', 
   expect(errors).toEqual([]);
 });
 
-test('the Bridge fits one desktop screen and two phone screens', async ({ page }) => {
+test('the Bridge fits one desktop screen, and two phone screens plus the as-of line', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByTestId('steps-due').locator('.sp-step').first()).toBeVisible();
   await expect(page.getByTestId('today-run').locator('.run-stage')).toHaveCount(5);
   const { height, wide } = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, wide: window.innerWidth }));
-  expect(height).toBeLessThanOrEqual(wide < 600 ? 844 * 2 : 1000);
+  expect(height).toBeLessThanOrEqual(wide < 600 ? 844 * 2 + 40 : 1000);
 });
 
 test('the holdings drawer shows the departures board and links to Portfolio', async ({ page }) => {

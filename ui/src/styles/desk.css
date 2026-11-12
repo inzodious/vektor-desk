@@ -1616,3 +1616,11 @@ a.chip { text-decoration: none; }
 .build-start { margin-top: 0; }
 .build-start[open] { display: grid; gap: 8px; justify-items: start; }
 .build-start .wk-code { width: 100%; box-sizing: border-box; }
+
+/* ---------- one clock ---------- */
+.ph-asof { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 3px 12px; font-size: 12px; color: var(--ink-2); }
+.ph-asof b { font-weight: 700; color: var(--ink); }
+.ph-asof em { font-style: normal; font-weight: 700; color: var(--ink); }
+.ph-asof em.up { color: var(--ok); }
+.ph-asof em.dn { color: var(--watch); }
+.ph-asof.watch b { color: var(--watch); }

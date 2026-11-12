@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { PORTFOLIO_TABS } from '../lib/areas.js';
 import { useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
+import { dayStamp, useAsOf } from '../lib/asof.js';
 import { plural, usd } from '../lib/format.js';
 import { useMetrics, val } from '../lib/metrics.js';
 import { mergeWindows, todayEt } from '../lib/tax.js';
@@ -22,12 +23,13 @@ const CELLS = [
 // ---------- page ----------
 export default function Tax() {
   const m = useMetrics('tax.*');
+  const clock = useAsOf();
   const calendar = useApi('/api/decisions/calendar');
   const wash = useApi('/api/engine/wash');
   const tabs = <Subtabs label="Portfolio views" tabs={PORTFOLIO_TABS} />;
   const harvest = m.get('tax.harvestable');
   const harvestV = val(harvest);
-  const engineAsOf = m.asOf ? `engine ${dayLabel(m.asOf)}` : null;
+  const engineAsOf = dayStamp(m.asOf, clock);
   const events = (calendar.data?.events || []).filter((e) => !e.kind || e.kind === 'tax');
   const windows = wash.data?.windows || [];
   const open = mergeWindows(windows).length;

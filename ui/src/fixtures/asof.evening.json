@@ -1,0 +1,41 @@
+{
+ "day": "2026-11-09",
+ "at": "2026-11-09T22:21:40+00:00",
+ "provisional": true,
+ "status": "provisional",
+ "words": "Mon Nov 9, 5:21 PM ET. Provisional until official closes land overnight.",
+ "previous_day": "2026-11-06",
+ "expected_day": "2026-11-09",
+ "behind": null,
+ "prices": {
+  "official": 0,
+  "quoted": 4,
+  "carried": [
+   "FXAIX"
+  ]
+ },
+ "numbers": {
+  "value": 16480.12,
+  "day_change": 86.63,
+  "day_change_pct": 0.5284,
+  "cash_ready": 142,
+  "cash_pending": 500,
+  "cash_pending_days": 22,
+  "margin_debit": 1500,
+  "margin_cost_month": 15.09
+ },
+ "live": null,
+ "market": {
+  "state": "after",
+  "day": "2026-11-09"
+ },
+ "review": {
+  "day": "2026-11-09",
+  "computed_at": "2026-11-09T22:35:12+00:00"
+ },
+ "debrief": {
+  "day": "2026-11-09",
+  "written_at": "2026-11-09T22:50:03+00:00",
+  "stale": false
+ }
+}
