@@ -27,6 +27,7 @@ import Strategy from './pages/Strategy.jsx';
 import { LiveProvider } from './live/LiveProvider.jsx';
 import { SymbolProvider } from './live/SymbolProvider.jsx';
 import { StartProvider } from './start/StartProvider.jsx';
+import { AsOfProvider } from './asof/AsOfProvider.jsx';
 import NotFound from './pages/NotFound.jsx';
 import { movedPath } from './lib/areas.js';
 import { useTitle } from './lib/useTitle.js';
@@ -45,6 +46,7 @@ export default function App() {
       <ConsoleProvider>
         <SymbolProvider>
           <StartProvider>
+            <AsOfProvider>
             <Routes>
               <Route element={<Shell />}>
                 <Route index element={<Bridge />} />
@@ -84,6 +86,7 @@ export default function App() {
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
+            </AsOfProvider>
           </StartProvider>
         </SymbolProvider>
       </ConsoleProvider>

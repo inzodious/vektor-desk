@@ -1,0 +1,42 @@
+{
+ "day": "2026-11-06",
+ "at": "2026-11-09T22:21:40+00:00",
+ "provisional": false,
+ "status": "final",
+ "words": "Fri Nov 6, at the close.",
+ "previous_day": "2026-11-05",
+ "expected_day": "2026-11-09",
+ "behind": {
+  "sessions": 1,
+  "reason": "No closing quotes or official closes for Mon Nov 9 yet. The next engine run picks them up."
+ },
+ "prices": {
+  "official": 5,
+  "quoted": 0,
+  "carried": []
+ },
+ "numbers": {
+  "value": 16393.49,
+  "day_change": 52.54,
+  "day_change_pct": 0.3143,
+  "cash_ready": 142,
+  "cash_pending": 500,
+  "cash_pending_days": 25,
+  "margin_debit": 0,
+  "margin_cost_month": 0
+ },
+ "live": null,
+ "market": {
+  "state": "closed",
+  "day": "2026-11-09"
+ },
+ "review": {
+  "day": "2026-11-06",
+  "computed_at": "2026-11-06T22:36:00+00:00"
+ },
+ "debrief": {
+  "day": "2026-11-06",
+  "written_at": "2026-11-06T22:52:00+00:00",
+  "stale": false
+ }
+}

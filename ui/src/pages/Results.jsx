@@ -3,6 +3,8 @@ import { Hero } from '../components/Hero.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { Subtabs } from '../components/Subtabs.jsx';
 import { useApi } from '../lib/api.js';
+import { useAsOf } from '../lib/asof.js';
+import { dayWords } from '../lib/charts.js';
 import { QUALITY } from '../lib/quality.js';
 import { KINDS, RESULT_TABS, changeText, firstRunNote, gainLine, periodPath, stateChip, stepper } from '../lib/results.js';
 import { Accounts, Debrief, DecisionsCard, Events, Ledger, Movers, NextSteps, Numbers, PaperCard, RiskCard, Versus } from '../results/cards.jsx';
@@ -50,6 +52,7 @@ export default function Results() {
   const [params] = useSearchParams();
   const end = params.get('end');
   const ok = KINDS.includes(kind);
+  const clock = useAsOf();
   const index = useApi(ok ? '/api/engine/reviews/index' : null);
   const api = useApi(ok ? `/api/engine/reviews?kind=${kind}${end ? `&end=${encodeURIComponent(end)}` : ''}` : null);
   if (!ok) return <Navigate to="/results/day" replace />;
@@ -128,6 +131,11 @@ export default function Results() {
         }
       />
       {end ? null : <GapNote k={`results.${kind}`} onFilled={api.reload} />}
+      {kind === 'day' && !end && clock && d.end < clock.day ? (
+        <p className="note rs-cover" role="note" data-testid="rs-behind">
+          This is the review for {dayWords(d.end)}. The one for {clock.dayWords} is not in yet; it follows the next numbers run.
+        </p>
+      ) : null}
       {pack.coverage && !pack.coverage.full ? (
         <p className="note rs-cover" role="note" data-testid="rs-cover">
           {pack.coverage.note || 'The desk’s history starts inside this period, so this covers what there is.'}

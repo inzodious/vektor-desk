@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon.jsx';
-import { dayLabel } from '../lib/charts.js';
+import { dayLabel, dayWords } from '../lib/charts.js';
 import { etStamp, usd } from '../lib/format.js';
 import { statusWord } from '../lib/convictions.js';
 import { accountName, bandLine, debriefState, decisionRows, diffText, eventWord, kpis, ledger, moverLine, moverRows, riskFacts, scoreLine, versusLine, versusRows, versusScale } from '../lib/results.js';
@@ -41,7 +41,14 @@ export function Debrief({ review }) {
     <div className="card rs-debrief" data-testid="rs-debrief" data-state={st.state}>
       <div className="card-head">
         <span className="tag coral">Debrief</span>
-        <span className="acts">{d?.written_at ? <span className="chip">Written {etStamp(d.written_at)}</span> : null}</span>
+        <span className="acts">
+          {d?.written_at ? (
+            <span className="chip" data-testid="rs-written">
+              {review.kind === 'day' && dayWords(review.end) ? `About ${dayWords(review.end)} · written ` : 'Written '}
+              {etStamp(d.written_at)}
+            </span>
+          ) : null}
+        </span>
       </div>
       {d ? (
         <>

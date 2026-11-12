@@ -1,0 +1,322 @@
+{
+ "as_of": "2026-11-09",
+ "kinds": {
+  "day": [
+   {
+    "start": "2026-11-09",
+    "end": "2026-11-09",
+    "as_of": "2026-11-09",
+    "label": "Mon Nov 9, 2026",
+    "closed": true,
+    "final": false,
+    "change_usd": 86.63,
+    "change_pct": 0.5284,
+    "has_debrief": true
+   },
+   {
+    "start": "2026-11-06",
+    "end": "2026-11-06",
+    "as_of": "2026-11-06",
+    "label": "Fri Nov 6, 2026",
+    "closed": true,
+    "final": false,
+    "change_usd": 52.54,
+    "change_pct": 0.3143,
+    "has_debrief": true
+   },
+   {
+    "start": "2026-11-05",
+    "end": "2026-11-05",
+    "as_of": "2026-11-05",
+    "label": "Thu Nov 5, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 55.42,
+    "change_pct": 0.3326,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-11-04",
+    "end": "2026-11-04",
+    "as_of": "2026-11-04",
+    "label": "Wed Nov 4, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 60.07,
+    "change_pct": 0.3619,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-11-03",
+    "end": "2026-11-03",
+    "as_of": "2026-11-03",
+    "label": "Tue Nov 3, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -86.6,
+    "change_pct": -0.5189,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-11-02",
+    "end": "2026-11-02",
+    "as_of": "2026-11-02",
+    "label": "Mon Nov 2, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 852,
+    "change_pct": 1.5912,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-10-30",
+    "end": "2026-10-30",
+    "as_of": "2026-10-30",
+    "label": "Fri Oct 30, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -0.03,
+    "change_pct": -0.0002,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-10-29",
+    "end": "2026-10-29",
+    "as_of": "2026-10-29",
+    "label": "Thu Oct 29, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 113.83,
+    "change_pct": 0.724,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-10-28",
+    "end": "2026-10-28",
+    "as_of": "2026-10-28",
+    "label": "Wed Oct 28, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 43.26,
+    "change_pct": 0.2759,
+    "has_debrief": false
+   }
+  ],
+  "week": [
+   {
+    "start": "2026-11-02",
+    "end": "2026-11-06",
+    "as_of": "2026-11-06",
+    "label": "Week of Nov 2, 2026",
+    "closed": true,
+    "final": false,
+    "change_usd": 933.43,
+    "change_pct": 2.087,
+    "has_debrief": true
+   },
+   {
+    "start": "2026-10-26",
+    "end": "2026-10-30",
+    "as_of": "2026-10-30",
+    "label": "Week of Oct 26, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -56.36,
+    "change_pct": -0.3546,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-10-19",
+    "end": "2026-10-23",
+    "as_of": "2026-10-23",
+    "label": "Week of Oct 19, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -152.8,
+    "change_pct": -0.9523,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-10-12",
+    "end": "2026-10-16",
+    "as_of": "2026-10-16",
+    "label": "Week of Oct 12, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -56.44,
+    "change_pct": -0.3505,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-10-05",
+    "end": "2026-10-09",
+    "as_of": "2026-10-09",
+    "label": "Week of Oct 5, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 26.2,
+    "change_pct": 0.163,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-09-28",
+    "end": "2026-10-02",
+    "as_of": "2026-10-02",
+    "label": "Week of Sep 28, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 316.72,
+    "change_pct": -1.7726,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-09-21",
+    "end": "2026-09-25",
+    "as_of": "2026-09-25",
+    "label": "Week of Sep 21, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -469.9,
+    "change_pct": -2.8955,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-09-14",
+    "end": "2026-09-18",
+    "as_of": "2026-09-18",
+    "label": "Week of Sep 14, 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -57.03,
+    "change_pct": -0.3502,
+    "has_debrief": false
+   }
+  ],
+  "month": [
+   {
+    "start": "2026-11-02",
+    "end": "2026-11-30",
+    "as_of": "2026-11-06",
+    "label": "November 2026",
+    "closed": false,
+    "final": false,
+    "change_usd": 933.43,
+    "change_pct": 2.087,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-10-01",
+    "end": "2026-10-30",
+    "as_of": "2026-10-30",
+    "label": "October 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 280.19,
+    "change_pct": -1.9734,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-09-01",
+    "end": "2026-09-30",
+    "as_of": "2026-09-30",
+    "label": "September 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -732.67,
+    "change_pct": -7.9024,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-08-03",
+    "end": "2026-08-31",
+    "as_of": "2026-08-31",
+    "label": "August 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": -192.96,
+    "change_pct": -4.6739,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-07-01",
+    "end": "2026-07-31",
+    "as_of": "2026-07-31",
+    "label": "July 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 377.7,
+    "change_pct": -1.3054,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-06-01",
+    "end": "2026-06-30",
+    "as_of": "2026-06-30",
+    "label": "June 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 1871.36,
+    "change_pct": 8.636,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-05-01",
+    "end": "2026-05-29",
+    "as_of": "2026-05-29",
+    "label": "May 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 642.01,
+    "change_pct": 0.2608,
+    "has_debrief": false
+   },
+   {
+    "start": "2026-04-01",
+    "end": "2026-04-30",
+    "as_of": "2026-04-30",
+    "label": "April 2026",
+    "closed": true,
+    "final": true,
+    "change_usd": 911.69,
+    "change_pct": 2.3381,
+    "has_debrief": false
+   }
+  ],
+  "year": [
+   {
+    "start": "2026-01-02",
+    "end": "2026-12-31",
+    "as_of": "2026-11-06",
+    "label": "2026",
+    "closed": false,
+    "final": false,
+    "change_usd": 6776.27,
+    "change_pct": 4.1874,
+    "has_debrief": true
+   },
+   {
+    "start": "2025-01-01",
+    "end": "2025-12-31",
+    "as_of": "2025-12-31",
+    "label": "2025",
+    "closed": true,
+    "final": true,
+    "change_usd": 8097.21,
+    "change_pct": 7.6744,
+    "has_debrief": false
+   },
+   {
+    "start": "2024-01-01",
+    "end": "2024-12-31",
+    "as_of": "2024-12-31",
+    "label": "2024",
+    "closed": true,
+    "final": true,
+    "change_usd": 1296.32,
+    "change_pct": -10.7745,
+    "has_debrief": false
+   }
+  ]
+ },
+ "note": null
+}
