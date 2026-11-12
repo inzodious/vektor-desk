@@ -68,7 +68,7 @@ def subject_for(desk: str, p: dict) -> str:
     kind = str(p.get("kind") or "memo")
     symbol = str(p.get("symbol") or "").strip().upper()
     words = f"{p.get('title') or ''} {p.get('rule_served') or ''}".lower()
-    if desk == "plan_keeper" and kind == "hold_off" and "margin" in words:
+    if kind == "hold_off" and "margin" in words and (desk == "plan_keeper" or not symbol):
         return "margin"
     if desk == "plan_keeper" and kind == "deposit_route":
         return "next-deposit"
