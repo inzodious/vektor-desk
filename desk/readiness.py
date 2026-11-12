@@ -342,7 +342,7 @@ def build(cfg: Config, jobs: list, bodies: dict[str, object], now: datetime | No
         if ran and s.quiet == "ready":
             return _row(s.key, "ready")
         if run.get("result") == "ok" and run.get("note"):
-            fix = startrun.fix_for(run["note"])
+            fix = startrun.fix_for(run["note"], run.get("skipped_code"))
             link = {"kind": "link", "to": fix["to"], "label": fix["label"]} if fix else None
             return _row(s.key, "blocked" if link else "empty", run["note"], link or action, None if link else due, now, zone)
         return _row(s.key, "empty", said or (s.quiet if ran and s.quiet else s.empty), action, due, now, zone)

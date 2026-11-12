@@ -20,7 +20,8 @@ SECRETISH = re.compile(r"[A-Za-z0-9_\-+/=]{32,}")
 SAID_MAX = 300
 KEEP_RUNS = 10
 FIELD_MAX = 80
-SPOKEN = ("skipped", "error", "ready", "detail")
+SPOKEN = ("skipped", "skipped_code", "error", "ready", "detail")
+CODE = re.compile(r"^[a-z0-9][a-z0-9_]{0,39}$")
 
 REFRESHES = {
     "mirror": ["freshness", "holdings", "value"],
@@ -125,9 +126,10 @@ def last_words(line: str) -> dict:
         return {"error": whole, "detail": whole, "said": whole} if whole else {}
     if not isinstance(said, dict):
         return {"said": _short(said)}
-    skipped = said.get("skipped")
+    skipped = said.get("skipped") if isinstance(said.get("skipped"), str) else None
+    code = said.get("skipped_code")
     words = {key: plain(said.get(key)) for key in ("error", "ready", "detail")}
-    return {"skipped": plain(skipped) if isinstance(skipped, str) else None, **words, "said": fields(said)}
+    return {"skipped": plain(skipped), "skipped_code": code if skipped and isinstance(code, str) and CODE.match(code) else None, **words, "said": fields(said)}
 
 
 def state_dir(cfg: Config) -> Path:

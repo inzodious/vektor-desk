@@ -53,6 +53,13 @@ FIXES = (
     ("Switched off", {"label": "Switch it on", "to": CREW}),
     ("guard", {"label": "Lift the guard", "to": CREW}),
 )
+CODE_FIXES = {
+    "no_alpaca_keys": {"label": "Add the Alpaca paper keys", "to": DATA},
+    "no_finnhub_key": {"label": "Add the Finnhub key", "to": DATA},
+    "no_fred_key": {"label": "Add the FRED key", "to": DATA},
+    "no_sec_contact": {"label": "Add the SEC contact", "to": DATA},
+    "no_small_companies": None,
+}
 DESK_FAILED = ("failed", "timeout")
 
 
@@ -205,7 +212,9 @@ def skip_reason(step: Step, f: Facts) -> tuple[str, dict | None] | None:
     return None
 
 
-def fix_for(text: str | None) -> dict | None:
+def fix_for(text: str | None, code: str | None = None) -> dict | None:
+    if code in CODE_FIXES:
+        return CODE_FIXES[code]
     return next((fix for word, fix in FIXES if word.lower() in (text or "").lower()), None)
 
 
@@ -219,7 +228,7 @@ def outcome(step: Step, run: dict | None, f: Facts, since: datetime | None) -> t
         words = f"It stopped: {said}" if said else "It stopped with an error. Settings, Box, Export logs shows why."
         return "failed", words, fix_for(said) or {"label": "Open Box", "to": BOX}
     if run.get("note"):
-        return "skipped", run["note"], fix_for(run["note"])
+        return "skipped", run["note"], fix_for(run["note"], run.get("skipped_code"))
     last = (_crew_row(f, step.desk) or {}).get("last_run") if step.desk else None
     began = review_health.parse((last or {}).get("started_at"))
     if last and began is not None and since is not None and began >= since - ADOPT_SLACK and last.get("status") not in (None, "ok", "running"):

@@ -10,6 +10,7 @@ from desk.scheduler import make_job, reap, start
 from desk.startrun import Facts
 
 NOW = datetime(2026, 11, 11, 14, 0, tzinfo=UTC)
+NO_ALPACA = "The Alpaca paper keys are not set. Add them in Settings, Data, Keys."
 ALL = (
     "mirror",
     "engine-backfill",
@@ -60,7 +61,7 @@ def test_one_tap_runs_every_step_in_order_and_says_why_some_stopped(cfg, tmp_pat
         tmp_path,
         {
             "engine-discounts": """echo '{"ok": false, "error": "no universe yet"}' >&2; exit 1""",
-            "engine-paper": """echo '{"ok": true, "skipped": "ALPACA_API_KEY_ID and ALPACA_API_SECRET_KEY are not set"}'""",
+            "engine-paper": f"""echo '{{"ok": true, "skipped": "{NO_ALPACA}", "skipped_code": "no_alpaca_keys"}}'""",
         },
     )
     code, body = ask(cfg, jobs)
@@ -82,7 +83,8 @@ def test_one_tap_runs_every_step_in_order_and_says_why_some_stopped(cfg, tmp_pat
     assert got["prices"]["detail"] == "Price history is already complete." and got["prices"]["fix"] is None
     assert got["discounts"]["detail"] == "It stopped: no universe yet" and got["discounts"]["fix"] == {"label": "Open Box", "to": "/settings/box"}
     assert got["debrief"]["detail"] == "The Debrief desk is switched off." and got["debrief"]["fix"] == {"label": "Switch it on", "to": "/settings/crew"}
-    assert "ALPACA_API_KEY_ID" in got["paper"]["detail"] and got["paper"]["fix"] == {"label": "Add the Alpaca paper keys", "to": "/settings/data"}
+    assert got["paper"]["detail"] == NO_ALPACA and got["paper"]["fix"] == {"label": "Add the Alpaca paper keys", "to": "/settings/data"}
+    assert jobrun.last_run(cfg, "engine-paper")["skipped_code"] == "no_alpaca_keys" and jobrun.last_run(cfg, "mirror")["skipped_code"] is None
     assert view["state"] == "done" and view["result"] == "partial" and view["summary"] == "6 of 9 steps done. 3 need you."
     assert chain["last_ok_at"] is None and jobrun.last_run(cfg, "mirror")["trigger"] == "start"
     assert set(view["steps"][0]) == {"id", "title", "state", "detail", "fix", "job", "started_at", "finished_at", "waiting"}
@@ -231,12 +233,30 @@ def test_the_scheduler_keeps_what_a_job_said_last_without_secrets(cfg):
         "exit_code": 0,
         "detail": None,
         "note": None,
+        "skipped_code": None,
         "error": None,
         "oom": None,
         "ready": None,
         "did": None,
         "said": None,
     }
+
+
+def test_a_skip_code_picks_the_fix_and_the_words_are_only_the_fallback():
+    keys = {"to": "/settings/data"}
+    assert startrun.fix_for("Anything at all.", "no_fred_key") == keys | {"label": "Add the FRED key"}
+    assert startrun.fix_for("Anything at all.", "no_sec_contact") == keys | {"label": "Add the SEC contact"}
+    assert startrun.fix_for("Reworded since.", "no_alpaca_keys") == keys | {"label": "Add the Alpaca paper keys"}
+    assert startrun.fix_for("Reworded since.", "no_finnhub_key") == keys | {"label": "Add the Finnhub key"}
+    assert startrun.fix_for("The list of small companies is not built yet. Alpaca supplies it.", "no_small_companies") is None
+    assert startrun.fix_for("The Alpaca paper keys are not set.", "a_code_from_a_newer_build") == keys | {"label": "Add the Alpaca paper keys"}
+    assert startrun.fix_for(NO_ALPACA) == keys | {"label": "Add the Alpaca paper keys"} and startrun.fix_for("Nothing to do.") is None
+    line = {"ok": True, "skipped": "The FRED key is not set. Add it in Settings, Data, Keys.", "skipped_code": "no_fred_key", "asked": 3}
+    said = jobrun.last_words(json.dumps(line))
+    assert said["skipped"] == line["skipped"] and said["skipped_code"] == "no_fred_key" and said["said"] == "ok: true; asked: 3"
+    for odd in ("No Fred Key", "x" * 41, 7, None, ""):
+        assert jobrun.last_words(json.dumps(line | {"skipped_code": odd}))["skipped_code"] is None
+    assert jobrun.last_words(json.dumps({"ok": True, "skipped_code": "no_fred_key"}))["skipped_code"] is None
 
 
 def test_every_entry_point_imports_on_its_own():
