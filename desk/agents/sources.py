@@ -207,6 +207,16 @@ class RealAdvisor:
     def no_buy(self, cfg: Config) -> dict:
         return {str(k).upper(): dict(v) for k, v in dict(_guarded("desk.decisions.plans", "no_buy", cfg)).items()}
 
+    def steps(self, cfg: Config, days: int) -> list[dict]:
+        fn = _fn("desk.decisions.plans", "open_steps")
+        not_ready = getattr(_module("desk.decisions.plans"), "NotReady", NotReady)
+        try:
+            rows = fn(cfg, days=days)
+        except not_ready as e:
+            raise NotReady(str(e) or "stock plans not ready") from None
+        keys = ("symbol", "kind", "due", "until", "status")
+        return [{k: s.get(k) for k in keys} | {"purpose": s.get("text") or s.get("note")} for s in rows]
+
 
 class Discounts(Protocol):
     def pending(self, cfg: Config, limit: int) -> list[dict]: ...

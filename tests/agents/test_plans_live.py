@@ -114,3 +114,17 @@ def test_runs_on_the_engines_real_plan_facts(cfg, monkeypatch):
     assert again.note == "No plans to draft or refresh today." and len(fake.calls) == 3
     asked = plans.run_plan_desk(cfg, triggers=FakeTriggers(), today=WED, symbols=("wtch",), **kw)
     assert asked.note == "WTCH isn't a holding in today's plan facts."
+
+
+def test_upcoming_steps_reach_the_desks_as_dates_and_purposes_only(cfg, monkeypatch):
+    console.ask(cfg, "plans", json.dumps(PINS), symbol="TICKA")
+    run(cfg, draft())
+    record.approve_plan(cfg, "TICKA", now=NOW)
+    real = record.open_steps
+    monkeypatch.setattr(record, "open_steps", lambda cfg, days=0, now=None: real(cfg, days=days, now=NOW))
+    steps = RealAdvisor().steps(cfg, advisor.STEPS_AHEAD_DAYS)
+    sale = next(s for s in steps if s["kind"] == "harvest")
+    assert (sale["symbol"], sale["due"], sale["until"], sale["status"]) == ("TICKA", "2026-12-07", "2026-12-15", "upcoming") and sale["purpose"]
+    assert all(set(s) == {"symbol", "kind", "due", "until", "status", "purpose"} for s in steps)
+    view = advisor.gather(cfg, RealAdvisor())
+    assert advisor.summary(view)["upcoming_steps"] == view["plan_steps"]
