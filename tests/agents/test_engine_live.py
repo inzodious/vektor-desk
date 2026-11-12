@@ -33,8 +33,8 @@ def test_plan_keeper_cites_real_engine_keys(cfg, engine):
 
     def keeper(prompt):
         cash = brief_value(prompt, "cash.ready:all:now")
-        good = proposal(numbers_used=[{"field": "cash.ready:all:now", "value": cash}])
-        bad = proposal(title="Wrong", numbers_used=[{"field": "cash.ready:all:now", "value": cash + 500}])
+        good = proposal(amount_usd=cash, numbers_used=[{"field": "cash.ready:all:now", "value": cash}])
+        bad = proposal(amount_usd=cash, title="Wrong", numbers_used=[{"field": "cash.ready:all:now", "value": cash + 500}])
         return {"summary": "Cash is ready.", "proposals": [good, bad]}
 
     decisions = FakeDecisions()

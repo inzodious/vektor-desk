@@ -36,6 +36,7 @@ DOSSIER = {
                 "high": {"type": ["number", "null"]},
                 "now": {"type": ["number", "null"]},
                 "basis": {"type": "string"},
+                "unit": {"enum": ["price", "multiple", "percent", None]},
             },
         },
         "verdict": {"enum": ["add", "hold", "trim", "avoid", "watch", None]},
