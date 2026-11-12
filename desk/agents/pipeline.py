@@ -11,6 +11,9 @@ from desk.agents.sources import Advisor, Decisions, Engine, Lab, NotReady, RealD
 from desk.config import Config
 
 SKIP_UNCHANGED = {"plan_keeper"}
+ONCE_A_DAY = {"plan_keeper"}
+DAILY_TRIGGERS = ("schedule", "retry")
+FREE_GAP_HOURS = 3
 SKEPTIC_FOR = {"research", "scout"}
 SKEPTIC_KINDS = {"buy", "sell"}
 STALE_ENGINE_HOURS = 36
@@ -116,6 +119,7 @@ class Prepared:
     schema: dict = field(default_factory=dict)
     skip: tuple[str, str] | None = None
     view: dict = field(default_factory=dict)
+    capped: bool = True
 
 
 def health_problem(slice_: dict, now: datetime | None = None) -> str | None:
@@ -240,6 +244,12 @@ def prepare(
     prep.digest = briefs.digest(prep.slice_ | {"plan_steps": (view or {}).get("planned_actions") or []})
     if name in SKIP_UNCHANGED and trigger == "schedule" and store.last_digest(cfg, name) == prep.digest:
         prep.skip = prep.skip or ("unchanged", "Nothing in the brief changed since the last run.")
+    if name in ONCE_A_DAY and trigger in DAILY_TRIGGERS:
+        day, last = prep.slice_.get("data_as_of"), store.latest_brief(cfg, name)
+        if day and last and last.get("as_of") == day:
+            prep.skip = prep.skip or ("unchanged", f"Already checked against the numbers for {day}. One check a day.")
+        elif day and not store.runs_since(cfg, name, FREE_GAP_HOURS):
+            prep.capped = False
     extra, prep.symbol = _extra(cfg, name, prep.slice_, symbol, question, trigger_row, lab)
     if view is not None:
         extra["advisor"] = advisor.summary(view)
@@ -278,7 +288,7 @@ def run_proposal_desk(
         report.symbol = prep.symbol
         return report
     desk, version, slice_, digest, symbol, prompt, schema = prep.desk, prep.version, prep.slice_, prep.digest, prep.symbol, prep.prompt, prep.schema
-    outcome = run_desk(desk, briefs.system_prompt(name), prompt, cfg=cfg, schema=schema, adapter=adapter, trigger=trigger, wait=wait)
+    outcome = run_desk(desk, briefs.system_prompt(name), prompt, cfg=cfg, schema=schema, adapter=adapter, trigger=trigger, wait=wait, capped=prep.capped)
     if not outcome.ok:
         return Report(outcome, note=outcome.note, symbol=symbol)
     answer = outcome.result.structured or {}

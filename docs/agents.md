@@ -84,7 +84,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 
 **Usage impact.** Opus at high and extra-high effort draws down the 5-hour and weekly limits much faster than a smaller model would, and these runs share those limits with his interactive Claude Code and the cloud build threads. The plan keeps the model and controls frequency instead:
 
-- The plan keeper skips its daily run when nothing in its brief changed since the last one (no drift change past a threshold, no new cash, no trigger).
+- The plan keeper checks once per book day. A scheduled run or retry is skipped when a brief already exists for the engine's day (`data_as_of`) or nothing in the brief changed, so a night that restarts makes no second call. Console and trigger runs are not skipped.
 - One desk at a time behind the run lock; overnight window; per-desk turn caps.
 - Strategy runs are capped per week, and each lab result costs one interpretation run, not a loop.
 - When the weekly budget is spent, lower-priority desks wait for the next week rather than switching model. If limits bite in practice, the first lever is fewer research and strategy runs, then `high` instead of `xhigh`.
@@ -334,7 +334,9 @@ Agent runs share the subscription's 5-hour and weekly limits with Joshua's inter
 - **Overnight by default.** Scheduled runs sit between 01:00 and 06:00 ET, except the plan keeper's short daily run.
 - **Priority when the budget is tight:** plan keeper, then tax desk (first in December), risk desk, research desk, scout, strategy desk, filings desk. The filings desk's volume is the main usage lever: lower `usage.filings_per_night` first. The scheduler skips lower-priority runs rather than squeezing them in.
 - **Metered.** Each run logs turns, tokens and wall time. The status page shows usage per desk per week. Start with a small weekly budget and set the real one after two weeks of logs.
-- **Weekly caps** count scheduled, trigger, retry and lab runs. Console questions are his own asks and bypass the cap; Skeptic runs ride on the run that asked for them.
+- **Weekly caps** count scheduled, trigger, retry and lab runs over a rolling seven days. Console questions are his own asks and bypass the cap; Skeptic runs ride on the run that asked for them.
+- **The plan keeper's daily check is always allowed**: the first scheduled run for a new book day runs even when the week is spent, unless the desk made any call in the last three hours. Trigger runs still wait for the cap.
+- **Settings** (`GET /api/agents/status`): each desk's `week` has `runs`, `cap`, a `line` in plain words and `parts`. Research shows the holdings pass (its own allowance, two per holding plus six) apart from runs on request, and `cap` is the two added together.
 - **Rate limits.** If a run fails on a usage or rate limit, it is marked `deferred` and retried once in the next window. No retry loops.
 - **Token health.** The `setup-token` token lasts a year. The status page shows the date it was created and warns 30 days before it expires. An authentication failure pauses every desk and shows a banner instead of failing silently each night.
 

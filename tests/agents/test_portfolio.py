@@ -485,3 +485,32 @@ def test_another_desk_over_its_cap_does_not_stop_the_pass(cfg):
     assert run_desk(risk, "s", "p", cfg=cfg, adapter=FakeAdapter()).status == "over_budget"
     report, _ = go(cfg)
     assert report.status == "ok" and len(report.analysed) == 3
+
+
+# ---- Settings: the pass has its own allowance ----
+
+
+def test_settings_counts_the_pass_apart_from_research_on_request(cfg):
+    from desk.agents.runner import run_desk
+    from desk.agents.status import crew
+
+    go(cfg)
+    run_desk(get("research"), "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="console")
+    tile = next(d for d in crew(cfg, facts=FakeFacts(rows()))["desks"] if d["desk"] == "research")
+    assert (tile["week"]["runs"], tile["week"]["cap"]) == (4, 16) and tile["week"]["runs"] <= tile["week"]["cap"]
+    assert tile["week"]["line"] == "Holdings pass 3 of 12 this week, one per holding. On request 1 of 4."
+    assert tile["week"]["parts"] == [{"name": "Holdings pass", "runs": 3, "cap": 12}, {"name": "On request", "runs": 1, "cap": 4}]
+    bare = next(d for d in crew(cfg, facts=FakeFacts(ready=False))["desks"] if d["desk"] == "research")
+    assert (bare["week"]["runs"], bare["week"]["cap"]) == (4, 7) and bare["week"]["line"].startswith("Holdings pass 3 of 3 this week")
+    assert store.week_usage(cfg, "research")["runs"] == 4 and store.week_usage(cfg, "research", lane="pass")["runs"] == 3
+
+
+def test_settings_says_the_daily_check_still_runs_when_the_plan_keeper_is_over(cfg):
+    from desk.agents.runner import run_desk
+    from desk.agents.status import crew
+
+    for _ in range(10):
+        run_desk(get("plan_keeper"), "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="console")
+    tiles = {d["desk"]: d for d in crew(cfg, facts=FakeFacts(rows()))["desks"]}
+    assert tiles["plan_keeper"]["week"]["line"] == "Over this week's allowance, so extra runs wait. The daily check still runs once a day."
+    assert tiles["tax"]["week"]["line"] is None and tiles["tax"]["week"]["parts"] == []
