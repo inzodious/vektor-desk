@@ -162,6 +162,18 @@ export function refreshPlan(health, jobs = []) {
   return REFRESH_ORDER.filter((n) => hits.includes(n));
 }
 
+export const AUTO_EVERY_MS = 2 * 60 * 60 * 1000;
+
+export function autoPlan(health, jobs = [], stamps = {}, now = Date.now()) {
+  const byName = Object.fromEntries((jobs || []).map((j) => [j.name, j]));
+  return refreshPlan(health, jobs).filter((name) => {
+    const j = byName[name];
+    if (!j || j.can_run === false || j.running || j.queued || j.waiting) return false;
+    const last = Number(stamps?.[name]);
+    return !(last > 0) || now - last >= AUTO_EVERY_MS;
+  });
+}
+
 export function refusalText(err) {
   const body = err?.body || {};
   if (body.error === 'cooldown') return `Asked for a moment ago. ${body.cooldown_until ? `Try again at ${when(body.cooldown_until)}.` : 'Try again in a few minutes.'}`;

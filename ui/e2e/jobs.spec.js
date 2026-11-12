@@ -136,25 +136,37 @@ test('with the scheduler off, run now is off and says why', async ({ page }) => 
   await expect(card.locator('.job-list').first().getByRole('button', { disabled: false })).toHaveCount(0);
 });
 
-// ---------- health banner ----------
-test('refresh data runs accounts, then daily numbers, from the banner', async ({ page }) => {
+// ---------- refresh by itself ----------
+test('stale data is refreshed by the app itself, once, with nothing to press', async ({ page }) => {
   const asked = fakeScheduler(page);
   await page.goto('/?scenario=fail');
   const b = page.getByTestId('health-banner');
-  const btn = b.getByTestId('refresh-data');
-  await expect(btn).toHaveAttribute('title', 'Runs accounts, then daily numbers');
-  await btn.click();
-  await expect(b.getByTestId('refresh-status')).toContainText('Refreshing accounts…');
-  await expect(b.getByTestId('refresh-status')).toContainText('Refreshing daily numbers…', { timeout: 15000 });
-  await expect(b.getByTestId('refresh-status')).toContainText('Fresh data is in.', { timeout: 15000 });
-  expect(asked).toEqual(['mirror', 'engine-daily']);
+  await expect(b.getByRole('button')).toHaveCount(0);
+  await expect(b.getByTestId('refresh-status')).toContainText('Refreshing daily numbers…');
+  await expect(b.getByTestId('refresh-status')).toHaveCount(0, { timeout: 15000 });
+  expect(asked).toEqual(['engine-daily']);
+  await page.goto('/portfolio?scenario=fail');
+  await expect(page.getByTestId('health-banner')).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  expect(asked).toEqual(['engine-daily']);
 });
 
-test('no refresh button when no job fixes the check', async ({ page }) => {
+test('a check worth a read is refreshed quietly: no banner, the fixing job asked for once', async ({ page }) => {
+  const asked = fakeScheduler(page);
+  await page.goto('/research?scenario=warn');
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect.poll(() => asked).toEqual(['engine-lots']);
+  await expect(page.getByTestId('health-banner')).toHaveCount(0);
+});
+
+test('nothing is asked for when no job fixes the check, or the scheduler is off', async ({ page }) => {
+  const asked = fakeScheduler(page);
   await page.route(/\/api\/engine\/health/, (route) =>
     route.fulfill({ json: { status: 'warn', as_of: '2026-11-09', checks: [{ check_name: 'marginal_rate', status: 'warn', detail: 'No marginal tax rate yet.' }] } }),
   );
   await page.goto('/research');
-  await expect(page.getByTestId('health-banner')).toBeVisible();
-  await expect(page.getByTestId('refresh-data')).toHaveCount(0);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await page.waitForLoadState('networkidle');
+  await expect(page.getByTestId('health-banner')).toHaveCount(0);
+  expect(asked).toEqual([]);
 });
