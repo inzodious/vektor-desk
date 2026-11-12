@@ -21,8 +21,10 @@ NOTE = (
 )
 N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
+REFRESH_AFTER = timedelta(days=30)
+REV = 2
+OUTDATED = "were measured before the lab's latest fix and are run again tonight; until then their numbers lean a little."
 YARDSTICK = "lib-buy-hold-sp500"
-SAME_PTS = 0.1
 PLAIN = (
     (("no plan mix",), "No plan of your own is loaded on the desk yet, so there is no plan mix to test. The Safe mix row is the built-in stand-in."),
     (("small-cap history",), "Small-company price history is still loading. This runs once that finishes."),
@@ -53,19 +55,30 @@ def _mix(weights: dict, **more) -> dict:
     return {"universe": {"type": "fund_list", "symbols": list(weights)}, "sizing": {"method": "fixed", "weights": weights}, **more}
 
 
-def _exp(sid, kind, family, title, description, benchmark, spec, grid=None, **request) -> dict:
+def _exp(sid, kind, family, title, description, benchmark, spec, grid=None, rev=REV, **request) -> dict:
     spec = {"rebalance": "monthly", "sizing": "equal", "exit": "rebalance", **spec}
     return {"id": sid, "kind": kind, "family": family, "title": title, "description": description, "benchmark": benchmark, "type": "experiment"} | {
         "spec": spec,
         "grid": grid or {},
         "request": request,
+        "rev": rev,
     }
 
 
-def _rule(sid, kind, family, title, description, rule, params, mix=None, **more) -> dict:
+def _rule(sid, kind, family, title, description, rule, params, mix=None, rev=REV, **more) -> dict:
     body = {"rule": rule, "params": params, "horizons": [5, 10], **({"mix": mix} if mix else {}), **more}
     benchmark = {"spread": "Investing it all on day one", "margin": "The same deposits, never borrowing"}.get(rule, "The same deposits, invested plainly")
-    return {"id": sid, "kind": kind, "family": family, "title": title, "description": description, "benchmark": benchmark, "type": "rule", "body": body}
+    return {
+        "id": sid,
+        "kind": kind,
+        "family": family,
+        "title": title,
+        "description": description,
+        "benchmark": benchmark,
+        "type": "rule",
+        "body": body,
+        "rev": rev,
+    }
 
 
 TOP = {"top_n": {"min": 1, "max": 5, "default": 3}}
@@ -494,7 +507,7 @@ IDS = frozenset(e["id"] for e in LIBRARY)
 
 def request(entry: dict, written_at: str) -> dict:
     if entry["type"] == "rule":
-        return {"request": "rule", "id": entry["id"], "version": 1, "written_at": written_at, **entry["body"]}
+        return {"request": "rule", "id": entry["id"], "version": 1, "written_at": written_at, "library_rev": entry["rev"], **entry["body"]}
     spec = {
         "id": entry["id"],
         "version": 1,
@@ -506,7 +519,7 @@ def request(entry: dict, written_at: str) -> dict:
         **entry["spec"],
     }
     body = {"request": "experiment", "spec": spec, "grid": entry["grid"], "seed": 7, "trial_budget": 12, "analyses": ["turnover_cost"], "model": "library"}
-    return body | entry["request"] | {"written_at": written_at}
+    return body | entry["request"] | {"written_at": written_at, "library_rev": entry["rev"]}
 
 
 def _latest(cfg: Config, bodies: bool = True) -> tuple[dict[str, dict], set[str], int]:
@@ -516,7 +529,9 @@ def _latest(cfg: Config, bodies: bool = True) -> tuple[dict[str, dict], set[str]
     conn = connect(path, readonly=True)
     try:
         body = "body" if bodies else "CASE WHEN kind='rejected' THEN body END AS body"
-        rows = conn.execute(f"SELECT strategy_id, kind, result_at, {body} FROM lab_results ORDER BY result_at").fetchall()
+        rows = conn.execute(
+            f"SELECT strategy_id, kind, result_at, json_extract(body, '$.library_rev') AS rev, {body} FROM lab_results ORDER BY result_at"
+        ).fetchall()
         done = {r[0] for r in conn.execute("SELECT file FROM queue_done")}
         trials = conn.execute(
             "SELECT count(*) FROM (SELECT DISTINCT strategy_id, version, params FROM strategy_trials WHERE kind='full' AND strategy_id IN "
@@ -527,7 +542,9 @@ def _latest(cfg: Config, bodies: bool = True) -> tuple[dict[str, dict], set[str]
         return {}, set(), 0
     finally:
         conn.close()
-    latest = {r["strategy_id"]: {"kind": r["kind"], "result_at": r["result_at"], "body": r["body"]} for r in rows if r["strategy_id"] in IDS}
+    latest = {
+        r["strategy_id"]: {"kind": r["kind"], "result_at": r["result_at"], "rev": r["rev"] or 1, "body": r["body"]} for r in rows if r["strategy_id"] in IDS
+    }
     return latest, done, trials
 
 
@@ -541,14 +558,19 @@ def _queued(cfg: Config, done: set[str]) -> set[str]:
     return out
 
 
-def _retry(seen: dict, now: datetime) -> bool:
+def _outdated(entry: dict, seen: dict) -> bool:
+    return seen["kind"] != "rejected" and seen["rev"] < entry["rev"]
+
+
+def _due(entry: dict, seen: dict, now: datetime) -> bool:
+    age = now - datetime.fromisoformat(seen["result_at"])
     if seen["kind"] != "rejected":
-        return False
+        return age >= (RETRY_AFTER if _outdated(entry, seen) else REFRESH_AFTER)
     try:
         build = json.loads(seen["body"] or "{}").get("lab_build")
     except ValueError:
         build = None
-    return build != lab_build() or now - datetime.fromisoformat(seen["result_at"]) >= RETRY_AFTER
+    return build != lab_build() or age >= RETRY_AFTER
 
 
 def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
@@ -562,7 +584,7 @@ def queue_missing(cfg: Config, *, now: datetime | None = None) -> dict:
         ordered = sorted(LIBRARY, key=lambda e: e["type"] == "rule")
         for i, entry in enumerate(ordered):
             seen = latest.get(entry["id"])
-            if entry["id"] in waiting or (seen and not _retry(seen, now)):
+            if entry["id"] in waiting or (seen and not _due(entry, seen, now)):
                 continue
             final = folder / f"{stamp}-{i:02d}-{entry['id']}-v1-{entry['type']}.json"
             tmp = folder / f".{final.name}.tmp"
@@ -588,7 +610,7 @@ def _years(a: str | None, b: str | None) -> float | None:
     return round((datetime.fromisoformat(b) - datetime.fromisoformat(a)).days / 365.25, 1)
 
 
-def _experiment(entry: dict, body: dict, trials: int, alone: bool = False, lean: float | None = None) -> dict:
+def _experiment(entry: dict, body: dict, trials: int, alone: bool = False) -> dict:
     wf = body.get("walk_forward") or {}
     if not wf.get("days") or wf.get("excess_pts") is None:
         return {"verdict": "inconclusive", "line": "No variant produced an out-of-sample record to judge."}
@@ -605,12 +627,8 @@ def _experiment(entry: dict, body: dict, trials: int, alone: bool = False, lean:
     span = f"over {years:g} years out of sample" if years else "out of sample"
     bench = entry["benchmark"]
     overfit = body.get("pbo") is not None and body["pbo"] >= PBO_BAR
-    if x <= 0 and lean is not None and lean < x:
-        verdict = "within_noise"
-        line = (
-            f"Trailed {bench} by {abs(x):.1f} points a year {span}, less than the {abs(lean):.1f} points a year a row loses "
-            "by starting each test year in cash, so it is inside the noise."
-        )
+    if not round(x, 1):
+        verdict, line = "within_noise", f"Level with {bench} {span}."
     elif x <= 0:
         verdict, line = "fell_short", f"Trailed {bench} by {abs(x):.1f} points a year {span}."
     elif band is None:
@@ -619,12 +637,6 @@ def _experiment(entry: dict, body: dict, trials: int, alone: bool = False, lean:
         verdict, line = "within_noise", f"Ahead of {bench} by {x:.1f} points a year {span}, but luck alone allows {band:.1f} across the {k} variants tried."
     elif overfit:
         verdict, line = "within_noise", f"Ahead of {bench} by {x:.1f} points a year {span}, but its best settings look fitted to the past."
-    elif lean is not None and lean > 0 and x - lean < band:
-        verdict = "within_noise"
-        line = (
-            f"Ahead of {bench} by {x:.1f} points a year {span}, but about {lean:.1f} of that comes from starting each test year in cash, "
-            f"which leaves it inside the {band:.1f} luck allows."
-        )
     else:
         verdict = "held_up"
         line = f"Beat {bench} by {x:.1f} points a year {span}, more than the {band:.1f} luck allows across the {k} variants tried."
@@ -640,43 +652,13 @@ def _experiment(entry: dict, body: dict, trials: int, alone: bool = False, lean:
 
 
 def _yardstick(wf: dict) -> dict:
-    x = wf["excess_pts"]
-    gap = ""
-    if abs(x) >= SAME_PTS:
-        gap = (
-            f" The {abs(x):.1f} points a year it {'trails' if x < 0 else 'leads'} itself by comes mostly from each test year starting in cash "
-            "until its first monthly rebalance; most rows carry a similar gap."
-        )
     return {
         "verdict": None,
         "yardstick": True,
-        "gap_pts": x,
-        "line": f"The yardstick most rows here are measured against. No plan of your own is loaded, so it is measured against itself.{gap}",
+        "gap_pts": wf["excess_pts"],
+        "line": "The yardstick most rows here are measured against. No plan of your own is loaded, so it is measured against itself.",
         "out_of_sample": {key: wf.get(key) for key in ("start", "end", "ann_return_pct", "sharpe", "mdd_pct")} | {"excess_pts": None},
     }
-
-
-def _lean(latest: dict[str, dict]) -> float | None:
-    seen = latest.get(YARDSTICK)
-    if seen is None or seen["kind"] != "experiment":
-        return None
-    x = (json.loads(seen["body"]).get("walk_forward") or {}).get("excess_pts")
-    return x if isinstance(x, int | float) and abs(x) >= SAME_PTS else None
-
-
-def _lean_note(lean: float | None) -> str:
-    start = "Every row except the deposit rules starts each test year in cash until its first rebalance."
-    if lean is None:
-        return f"{start} That leans the results a little. A corrected run is planned for tonight."
-    if lean < 0:
-        return (
-            f"{start} That costs roughly the {abs(lean):.1f} points a year the S&P 500 row shows against itself, "
-            "so a row that trails by less than that is shown as inside the noise, not as fell short. A corrected run is planned for tonight."
-        )
-    return (
-        f"{start} That adds roughly the {lean:.1f} points a year the S&P 500 row shows against itself, "
-        "so a row needs to clear its luck band by more than that to count as held up. A corrected run is planned for tonight."
-    )
 
 
 def _no_plan(cfg: Config) -> bool:
@@ -744,12 +726,11 @@ def view(cfg: Config) -> dict:
     latest, done, trials = _latest(cfg)
     waiting = _queued(cfg, done)
     alone = _no_plan(cfg)
-    lean = _lean(latest) if alone else None
     rows = []
     for entry in LIBRARY:
         row = {k: entry[k] for k in ("id", "title", "kind", "family", "description", "benchmark", "type")}
         row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
-        row |= {"yardstick": False, "gap_pts": None}
+        row |= {"yardstick": False, "gap_pts": None, "outdated": False}
         row |= {
             "research_only": (entry.get("spec") or {}).get("universe", {}).get("type") == "french",
             "caveats": [],
@@ -764,8 +745,8 @@ def view(cfg: Config) -> dict:
             if seen["kind"] == "rejected":
                 row |= {"status": "not_run", "reason": plain(body.get("problems") or [])}
             else:
-                row |= {"status": "tested", "reason": None, "caveats": body.get("caveats") or []}
-                row |= _rule_row(entry, body) if seen["kind"] == "rule" else _experiment(entry, body, trials, alone, lean)
+                row |= {"status": "tested", "reason": None, "caveats": body.get("caveats") or [], "outdated": _outdated(entry, seen)}
+                row |= _rule_row(entry, body) if seen["kind"] == "rule" else _experiment(entry, body, trials, alone)
         rows.append(row)
     kinds = [k for k, _ in KINDS]
     rows.sort(
@@ -781,11 +762,13 @@ def view(cfg: Config) -> dict:
     counts |= {v: sum(r["verdict"] == v for r in rows) for v in ("held_up", "within_noise", "fell_short", "inconclusive")}
     counts |= {s: sum(r["status"] == s for r in rows) for s in ("waiting", "not_run")}
     counts["yardstick"] = sum(r["yardstick"] for r in rows)
+    counts["outdated"] = old = sum(r["outdated"] for r in rows)
+    several = "All of these" if old == counts["tested"] else "Some of these"
     stamps = [r["tested_at"] for r in rows if r["status"] == "tested"]
     return {
         "as_of": max(stamps) if stamps else None,
         "trials": trials,
-        "note": f"{NOTE} {_lean_note(lean)}",
+        "note": f"{NOTE} {several} {OUTDATED}" if old else NOTE,
         "counts": counts,
         "kinds": [{"key": k, "title": t} for k, t in KINDS],
         "rows": rows,

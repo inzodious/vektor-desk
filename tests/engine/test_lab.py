@@ -173,8 +173,18 @@ def test_simulator_trades_next_open_with_costs_taxes_and_delisting(cfg):
     spec = parse(SPEC | {"exit": "rebalance"}, data)
     res = simulate(data, spec, resolve(spec, {"top_n": 3, "lookback": 63}), "2014-01-02", "2018-12-31")
     first = res.trades[0]
-    signal_day = max(d for d in data.calendar if d < first[0])
-    assert signal_day[:7] != first[0][:7] and first[5] == pytest.approx(first[3] * first[4] * 5 / 10_000, abs=1e-4)
+    assert first[0] == res.days[0] == "2014-01-02" and first[4] == pytest.approx(
+        data.series[first[1]].open_adj[data.series[first[1]].index[first[0]]], abs=1e-4
+    )
+    assert first[5] == pytest.approx(first[3] * first[4] * 5 / 10_000, abs=1e-4)
+    bought = sum(t[3] * t[4] for t in res.trades if t[0] == res.days[0])
+    assert bought == pytest.approx(10_000, rel=0.01) and res.values[0] == pytest.approx(10_000, rel=0.05)
+    waits = simulate(data, spec, resolve(spec, {"top_n": 3, "lookback": 63}), "2014-01-02", "2018-12-31", enter=False)
+    signal_day = max(d for d in data.calendar if d < waits.trades[0][0])
+    assert signal_day[:7] != waits.trades[0][0][:7] and waits.values[5] == pytest.approx(10_000, rel=1e-3)
+    assert res.rebalances == waits.rebalances + 1
+    early = simulate(data, spec, resolve(spec, {"top_n": 3, "lookback": 63}), data.calendar[0], data.calendar[40])
+    assert early.trades == [] or early.trades[0][0] > data.calendar[0]
     assert res.costs > 0 and res.taxes > 0 and res.rebalances > 40
     late = simulate(data, spec, resolve(spec, {"top_n": 11, "lookback": 21}), "2022-06-01", "2024-12-31")
     assert "XLE" in late.delisted
