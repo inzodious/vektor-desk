@@ -12,7 +12,7 @@ from desk.engine.jobs import JOBS
 from desk.engine.lab import rulebook, runner, shelf, simcache
 from desk.engine.lab.data import EXPORT_SCHEMA, data_path, load
 from desk.engine.lab.runner import process_queue
-from desk.engine.lab.sim import pick
+from desk.engine.lab.sim import pick, simulate
 from desk.engine.lab.spec import SETS, SpecError, parse, resolve, variants
 from desk.worker import store
 
@@ -258,7 +258,11 @@ def test_the_library_is_queued_once_run_and_reported_out_of_sample_only(stocked,
             assert r["rule"]["share_better"] + r["rule"]["share_worse"] <= 1.0001 and "worse" not in r["line"]
             continue
         x, band = r["out_of_sample"]["excess_pts"], r["noise"]["band_pts"]
-        assert r["noise"]["trials"] == view["trials"] and band > 0 and 0 <= r["noise"]["luck"] <= 1
+        assert r["noise"]["trials"] == view["trials"] and band >= 0 and 0 <= r["noise"]["luck"] <= 1 and r["outdated"] is False
+        if not round(x, 1):
+            assert r["verdict"] == "within_noise" and r["line"].startswith("Level with ")
+            continue
+        assert band > 0
         assert r["verdict"] == ("fell_short" if x <= 0 else "held_up" if x >= band and (r["pbo"] is None or r["pbo"] < runner.PBO_BAR) else "within_noise")
     assert next(r for r in view["rows"] if r["id"] == "lib-size-small")["research_only"] is True
     assert shelf.ready(cfg) == f"8 strategies tested, {view['counts']['held_up']} held up out of sample"
@@ -338,29 +342,42 @@ def test_the_sp500_row_reads_as_the_yardstick_when_there_is_no_plan_to_compare_i
     view = shelf.view(cfg)
     first, other = view["rows"]
     assert first["id"] == "lib-buy-hold-sp500" and first["status"] == "tested" and first["yardstick"] and first["verdict"] is None
-    assert first["line"].startswith("The yardstick most rows here are measured against. No plan of your own is loaded, so it is measured against itself.")
-    assert "Your plan's mix" not in first["line"] and "starting in cash" in first["line"]
+    assert first["line"] == "The yardstick most rows here are measured against. No plan of your own is loaded, so it is measured against itself."
     assert first["out_of_sample"]["excess_pts"] is None and first["out_of_sample"]["ann_return_pct"] is not None
     assert view["counts"]["tested"] == 2 and view["counts"]["yardstick"] == 1 and view["counts"]["fell_short"] == (other["verdict"] == "fell_short")
-    assert other["yardstick"] is False and isinstance(first["gap_pts"], float)
-    assert "starts each test year in cash until its first rebalance" in view["note"] and "A corrected run is planned for tonight." in view["note"]
-    assert f"{abs(first['gap_pts']):.1f} points a year the S&P 500 row shows against itself" in view["note"]
+    assert other["yardstick"] is False and abs(first["gap_pts"]) < 0.05
+    assert view["note"] == shelf.NOTE and "cash" not in view["note"] and view["self_check"] == {"gap_pts": first["gap_pts"], "level": True}
+    ledger = sqlite3.connect(runner.ledger_path(cfg))
+    ledger.execute("UPDATE lab_results SET body = json_set(body, '$.walk_forward.excess_pts', 0.6) WHERE strategy_id='lib-buy-hold-sp500'")
+    ledger.commit()
+    ledger.close()
+    off = shelf.view(cfg)
+    assert off["self_check"] == {"gap_pts": 0.6, "level": False} and off["rows"][0]["verdict"] is None
+    assert off["note"].startswith(shelf.NOTE) and "should read level, but it is off by 0.6 points a year" in off["note"]
 
 
-def test_a_row_inside_the_cash_start_gap_is_not_called_fell_short_or_held_up():
+def test_a_strategy_is_invested_from_the_first_day_of_every_test_year(stocked):
+    data = load(data_path(stocked))
+    spec = parse(spec_of("lib-buy-hold-sp500"), data)
+    year = simulate(data, spec, resolve(spec, {}), "2016-01-04", "2016-12-30")
+    spy = data.series["SPY"]
+    own = year.values[-1] / year.values[0]
+    assert year.trades[0][0] == year.days[0] and own == pytest.approx(spy.adj[spy.index[year.days[-1]]] / spy.adj[spy.index[year.days[0]]], abs=2e-4)
+    late = simulate(data, spec, resolve(spec, {}), "2016-01-04", "2016-12-30", enter=False)
+    assert late.trades[0][0] > "2016-01-29" and late.values[10] == pytest.approx(late.values[0], rel=1e-3)
+
+
+def test_a_row_level_with_its_benchmark_is_not_called_fell_short():
     entry = next(e for e in shelf.LIBRARY if e["id"] == "lib-60-40")
 
-    def row(x, lean):
+    def row(x):
         wf = {"days": 2520, "excess_pts": x, "start": "2015-01-02", "end": "2024-12-31"}
-        return shelf._experiment(entry, {"walk_forward": wf, "noise": {"tracking_error_pct": 2.0, "obs": 2520}}, 1, lean=lean)
+        return shelf._experiment(entry, {"walk_forward": wf, "noise": {"tracking_error_pct": 2.0, "obs": 2520}}, 1)
 
-    assert row(-0.5, None)["verdict"] == "fell_short" and row(-1.5, -0.9)["verdict"] == "fell_short"
-    inside = row(-0.5, -0.9)
-    assert inside["verdict"] == "within_noise" and "less than the 0.9 points a year" in inside["line"] and "inside the noise" in inside["line"]
-    assert row(1.2, None)["verdict"] == "held_up" and row(1.2, -0.9)["verdict"] == "held_up"
-    helped = row(1.2, 0.8)
-    assert helped["verdict"] == "within_noise" and "about 0.8 of that comes from starting each test year in cash" in helped["line"]
-    assert row(3.0, 0.8)["verdict"] == "held_up"
+    assert row(-0.5)["verdict"] == "fell_short" and row(1.2)["verdict"] == "held_up" and row(0.3)["verdict"] == "within_noise"
+    for x in (-0.04, 0.0, 0.04):
+        level = row(x)
+        assert level["verdict"] == "within_noise" and level["line"] == "Level with S&P 500 (SPY) over 10 years out of sample."
 
 
 def test_with_a_plan_the_sp500_row_is_judged_against_it(stocked, monkeypatch):
@@ -372,7 +389,55 @@ def test_with_a_plan_the_sp500_row_is_judged_against_it(stocked, monkeypatch):
     view = shelf.view(cfg)
     row = next(r for r in view["rows"] if r["id"] == "lib-buy-hold-sp500")
     assert row["verdict"] in ("held_up", "within_noise", "fell_short") and not row["yardstick"] and "Your plan's mix" in row["line"]
-    assert view["counts"]["yardstick"] == 0 and "That leans the results a little." in view["note"]
+    assert view["counts"]["yardstick"] == 0 and view["counts"]["outdated"] == 0 and view["note"] == shelf.NOTE
+
+
+def test_a_result_from_an_older_revision_is_flagged_and_run_again(stocked, monkeypatch):
+    cfg = stocked
+    ids = ("lib-60-40", "lib-dip-reserve")
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
+    monkeypatch.setattr(shelf, "IDS", frozenset(ids))
+    assert shelf.queue_missing(cfg, now=NOW) == {"queued": 2, "of": 2}
+    process_queue(cfg, now=NOW)
+    ledger = sqlite3.connect(runner.ledger_path(cfg))
+    assert [r[0] for r in ledger.execute("SELECT json_extract(body, '$.library_rev') FROM lab_results")] == [shelf.REV, shelf.REV]
+    trials = ledger.execute("SELECT count(*) FROM strategy_trials").fetchone()[0]
+    ledger.execute("UPDATE lab_results SET body = json_remove(body, '$.library_rev')")
+    ledger.commit()
+    before = shelf.view(cfg)
+    assert before["counts"]["outdated"] == 2 and all(r["outdated"] and r["status"] == "tested" for r in before["rows"])
+    assert before["note"] == f"{shelf.NOTE} All of these {shelf.OUTDATED}"
+    later = NOW + timedelta(minutes=5)
+    assert shelf.queue_missing(cfg, now=later) == {"queued": 2, "of": 2}
+    assert shelf.queue_missing(cfg, now=later + timedelta(minutes=1))["queued"] == 0
+    waiting = shelf.view(cfg)
+    assert all(r["status"] == "tested" and r["reason"] is None and r["outdated"] for r in waiting["rows"])
+    process_queue(cfg, now=later)
+    after = shelf.view(cfg)
+    assert after["counts"]["outdated"] == 0 and after["note"] == shelf.NOTE and after["as_of"] == later.isoformat(timespec="seconds")
+    assert after["trials"] == before["trials"] and after["self_check"] is None
+    assert ledger.execute("SELECT count(DISTINCT strategy_id || params || window || kind) FROM strategy_trials").fetchone()[0] == trials
+    ledger.close()
+    assert shelf.queue_missing(cfg, now=later + timedelta(days=29))["queued"] == 0
+    assert shelf.queue_missing(cfg, now=later + timedelta(days=31)) == {"queued": 2, "of": 2}
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e | {"rev": e["rev"] + (e["id"] == "lib-60-40")} for e in shelf.LIBRARY))
+    bumped = {r["id"]: r["outdated"] for r in shelf.view(cfg)["rows"]}
+    assert bumped == {"lib-60-40": True, "lib-dip-reserve": False}
+    assert shelf.view(cfg)["note"] == f"{shelf.NOTE} Some of these {shelf.OUTDATED}"
+
+
+def test_an_outdated_row_whose_rerun_left_no_result_waits_before_another_try():
+    entry = {"id": "lib-60-40", "rev": 2}
+    seen = {"kind": "experiment", "rev": 1, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
+    now = datetime(2026, 11, 12, 9, 0, tzinfo=UTC)
+    made = "20261112T055500Z-03-lib-60-40-v1-experiment.json"
+    tried = "20261112T084500Z-03-lib-60-40-v1-experiment.json"
+    other = "20261112T084500Z-04-lib-60-40-plus-v1-experiment.json"
+    assert shelf._due(entry, seen, now, set()) and shelf._due(entry, seen, now, {made}) and shelf._due(entry, seen, now, {made, other})
+    assert not shelf._due(entry, seen, now, {made, tried})
+    assert shelf._due(entry, seen, now + timedelta(hours=12), {made, tried})
+    current = seen | {"rev": 2}
+    assert not shelf._due(entry, current, now, {made}) and shelf._due(entry, current, now + timedelta(days=31), {made})
 
 
 def test_every_fund_in_a_built_in_mix_is_known_to_the_lab():

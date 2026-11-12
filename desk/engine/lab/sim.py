@@ -1,3 +1,4 @@
+from bisect import bisect_left
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -194,11 +195,21 @@ def _index(data: LabData, weights: dict[str, float], cal: list[str]) -> list[flo
 
 
 def simulate(
-    data: LabData, spec: Spec, v: Variant, start: str, end: str, *, cost_mult: float = 1.0, rate: float | None = None, delist_haircut: float = DELIST_HAIRCUT
+    data: LabData,
+    spec: Spec,
+    v: Variant,
+    start: str,
+    end: str,
+    *,
+    cost_mult: float = 1.0,
+    rate: float | None = None,
+    delist_haircut: float = DELIST_HAIRCUT,
+    enter: bool = True,
 ) -> Result:
     kind = spec.universe.get("kind")
     last_day = data.end_for(kind)
-    cal = [d for d in data.calendar_for(kind) if start <= d <= end]
+    every = data.calendar_for(kind)
+    cal = [d for d in every if start <= d <= end]
     if len(cal) < 2:
         return Result(cal, [START_CASH] * len(cal), [None] * len(cal), [None] * len(cal))
     rate = rate if rate is not None else float(data.settings.get("marginal_rate_pct") or DEFAULT_RATE * 100) / 100
@@ -209,6 +220,9 @@ def simulate(
     carry = 0.0
     out = Result(cal, [], [], [])
     pending: dict[str, float] | None = None
+    before = bisect_left(every, cal[0])
+    if enter and before:
+        pending = pick(data, spec, v, every[before - 1], set()) or None
     traded = 0.0
     for k, day in enumerate(cal):
         for sym in list(shares):

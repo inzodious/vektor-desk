@@ -58,7 +58,7 @@ def run(cfg: Config, desk: sqlite3.Connection, *, now: datetime | None = None) -
         except SpecError:
             continue
         start = fin["paper_start"]
-        res = simulate(data, spec, resolve(spec, fin["params"]), start, data.end)
+        res = simulate(data, spec, resolve(spec, fin["params"]), start, data.end, enter=False)
         summary = stats.summary(res)
         days = (date.fromisoformat(data.end) - date.fromisoformat(start)).days
         bench_ret = (res.bench[-1] - 1) * 100 if res.bench and res.bench[-1] else None

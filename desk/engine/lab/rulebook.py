@@ -551,6 +551,8 @@ def run(conn, data: LabData, request: dict, *, now: datetime) -> dict:
             conn.execute("INSERT OR REPLACE INTO lab_results VALUES (?, ?, 'rejected', ?, ?)", (rid, version, stamp, json.dumps(body)))
         return body
     body = {"strategy_id": rid, "version": version, "kind": "rule", "result_at": stamp, "request": raw, **body}
+    if raw.get("library_rev"):
+        body["library_rev"] = int(raw["library_rev"])
     with conn:
         conn.execute("INSERT OR REPLACE INTO lab_results VALUES (?, ?, 'rule', ?, ?)", (rid, version, stamp, json.dumps(body)))
         for v in body["variants"]:
