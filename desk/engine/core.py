@@ -1032,13 +1032,17 @@ def _value_check(rows, day: str, series=None) -> Check:
             heal.BLOCKS,
             heal.ACCOUNTS,
         )
-    bad, gaps = [], []
+    bad, gaps, owed = [], [], []
     for acct in sorted({h["account"] for h in rows}):
         mine = [h for h in rows if h["account"] == acct]
         calc = sum(h["value"] for h in mine)
         rep = sum(h["reported_value"] or 0 for h in mine)
-        if abs(calc - rep) > max(1.0, abs(rep) * 0.0005):
-            bad.append(f"{acct} {calc:,.2f} vs {rep:,.2f}")
+        room = max(1.0, abs(rep) * 0.0005)
+        if abs(calc - rep) > room:
+            bad.append(f"{acct} desk {calc:,.2f} vs broker {rep:,.2f}")
+            debt = sum((h["reported_value"] or 0) - h["value"] for h in mine if h["is_cash"] and h["quality"] == "modelled")
+            if abs(calc + debt - rep) <= room:
+                owed.append(f"{acct} {debt:,.2f}")
             for h in mine:
                 if not h["is_cash"] and h["shares"] and h["reported_value"] is not None and h["close"]:
                     broker = h["reported_value"] / h["shares"]
@@ -1046,6 +1050,16 @@ def _value_check(rows, day: str, series=None) -> Check:
                         gaps.append((abs(h["value"] - h["reported_value"]), f"{h['symbol']} {h['close']:,.2f} vs {broker:,.2f}"))
     if not bad:
         return Check("value", "ok", f"Values match the broker on {day}.", f"Values match your broker for {heal.plain_day(day)}.")
+    if len(owed) == len(bad):
+        return Check(
+            "value",
+            "warn",
+            f"{'; '.join(bad)}. Every price matches; the desk counts buys the broker has not yet taken out of cash as owed: {'; '.join(owed)}. "
+            "Fix: nothing to do; it clears when the broker's cash shows those buys.",
+            "Your broker has not yet taken recent buys out of cash. The desk already counts them as money owed, so its totals sit below your broker's "
+            "by that much. It clears when the broker's cash catches up.",
+            heal.FIXES,
+        )
     top = ", ".join(g for _, g in sorted(gaps, reverse=True)[:3])
     why = f" Biggest price gaps (close vs broker): {top}." if top else ""
     age = _snapshot_age(rows, day, series or {})
