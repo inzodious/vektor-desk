@@ -6,9 +6,10 @@ from datetime import UTC, date, datetime, timedelta
 
 from desk.engine import KEYS_AT
 from desk.engine.holdings import CASH_SYMBOLS
-from desk.engine.market import BENCHMARKS, LIBRARY_FUNDS, QUALITY, ProviderError, last_trading_day, tiingo_daily, tiingo_key
+from desk.engine.market import BENCHMARKS, ET, LIBRARY_FUNDS, QUALITY, ProviderError, last_trading_day, tiingo_daily, tiingo_key
 
-ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "past": 3, "universe": 3}
+PUBLIC = "public"
+ROLE_PRIORITY = {"held": 0, "benchmark": 1, "plan": 1, "watch": 2, "past": 3, "universe": 3, PUBLIC: 4}
 TICKER = re.compile(r"^[A-Z]{1,5}$")
 ROTATE_DAYS = 90
 NO_PRICES = "Tiingo has no daily prices"
@@ -19,6 +20,8 @@ LAST = frozenset(DAILY) - frozenset(QUALITY)
 PARK_DAYS = 7
 HELD_PARK_HOURS = 20
 ASK_WORDS = "every hour, day and night"
+TOP_UP_DAYS = 7
+QUIET_FROM, QUIET_TO = 16, 1
 
 
 def _int_env(name: str, default: int) -> int:
@@ -61,10 +64,23 @@ def traded_symbols(conn: sqlite3.Connection) -> list[str]:
     return sorted(r[0] for r in rows if TICKER.match(r[0]) and r[0] not in CASH_SYMBOLS)
 
 
+def public_names(conn: sqlite3.Connection) -> dict[str, bool]:
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE name='public_stocks'").fetchone() is None:
+        return {}
+    rows = conn.execute("SELECT symbol, trading FROM public_stocks WHERE state='priced' AND symbol IS NOT NULL ORDER BY rank")
+    return {r[0]: bool(r[1]) for r in rows}
+
+
+def quiet(now: datetime) -> bool:
+    hour = now.astimezone(ET).hour
+    return hour >= QUIET_FROM or hour < QUIET_TO
+
+
 def sync_roles(conn: sqlite3.Connection, now: datetime | None = None) -> None:
     add_symbols(conn, BENCHMARKS, "benchmark")
     add_symbols(conn, DAILY, "universe")
     add_symbols(conn, traded_symbols(conn), "past")
+    add_symbols(conn, public_names(conn), PUBLIC)
     day = conn.execute("SELECT max(date) FROM holdings_daily").fetchone()[0]
     if not day:
         return
@@ -112,13 +128,21 @@ def parked_until(row) -> datetime | None:
 def due(conn: sqlite3.Connection, now: datetime) -> list[sqlite3.Row]:
     target = last_trading_day(now.date() - timedelta(days=1)).isoformat()
     rotate = (now.date() - timedelta(days=ROTATE_DAYS)).isoformat()
+    week = (now - timedelta(days=TOP_UP_DAYS)).isoformat(timespec="seconds")
+    weekly, hush = public_names(conn), quiet(now)
     rows = [r for r in conn.execute("SELECT * FROM market_symbols ORDER BY priority, (last_bar IS NULL) DESC, symbol") if (parked_until(r) or now) <= now]
 
     def stale(r: sqlite3.Row) -> bool:
+        if r["priority"] <= 2 or r["symbol"] in DAILY:
+            return r["last_bar"] is None or r["last_bar"] < target
+        if r["symbol"] in weekly:
+            if hush:
+                return False
+            if r["last_bar"] is None:
+                return True
+            return weekly[r["symbol"]] and r["fetched_at"] is not None and r["fetched_at"] < week
         if r["last_bar"] is None:
             return True
-        if r["priority"] <= 2 or r["symbol"] in DAILY:
-            return r["last_bar"] < target
         return r["fetched_at"] is not None and r["fetched_at"][:10] < rotate
 
     rows.sort(key=lambda r: (r["priority"], r["last_bar"] is not None, (r["symbol"] in LAST) == (r["last_bar"] is not None)))

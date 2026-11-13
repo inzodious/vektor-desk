@@ -5,7 +5,7 @@ import re
 from dataclasses import dataclass, field
 
 from desk.engine.french import PORTFOLIO_FILES
-from desk.engine.lab.data import FRENCH_KIND, FRENCH_MARKET, FUND_KINDS, SMALL_CAPS, SMALLCAP_BENCHMARK, LabData
+from desk.engine.lab.data import FRENCH_KIND, FRENCH_MARKET, FUND_KINDS, PUBLIC_COVERAGE, SCREEN_KIND, SMALL_CAPS, SMALLCAP_BENCHMARK, LabData
 from desk.engine.lab.library import FEATURES, TRANSFORMS, window_days
 from desk.engine.market import BENCHMARKS
 
@@ -149,6 +149,29 @@ def _sizing(value) -> str:
 
 
 SCREEN_HINDSIGHT = "Tested on a small set of stocks that includes names you hold or held, so it leans on hindsight."
+NO_PUBLIC = "the public stock list has no prices in the lab yet; the engine's public stock list job and the price backfill load it"
+PUBLIC_LOADING = "the public stock list is still loading its prices: {priced} of {listed} are in and {loading} are on the way"
+THIN = "That is under 90%, so this stays research only."
+PUBLIC_EXITS = (
+    "A company that stopped trading leaves at its last price, as in a buyout. It is counted at 30% less only when that price was under half its one-year high."
+)
+
+
+def public_words(cov: dict) -> str:
+    listed, priced, loading = int(cov["listed"]), int(cov["priced"]), int(cov.get("loading") or 0)
+    rest = listed - priced - loading
+    head = f"Tested on the {listed} largest US companies of mid-{str(cov['as_of'])[:4]}, a list that owes nothing to what you hold."
+    if priced >= listed:
+        return f"{head} All {listed} have prices."
+    parts = [f"{head} {priced} of them have prices."]
+    if loading:
+        parts.append(f"{loading} more are still loading.")
+    if rest:
+        were = "was most likely" if rest == 1 else "were mostly"
+        parts.append(f"The {rest} without {were} bought or failed, so the result still leans to survivors by that much.")
+    if not cov.get("enough"):
+        parts.append(THIN)
+    return " ".join(parts)
 
 
 def _weights(value, problems: list[str]) -> dict[str, float] | None:
@@ -277,10 +300,17 @@ def _universe(u: dict, data: LabData | None, problems: list[str], caveats: list[
             return {}
         caveats.append("French portfolios are value-weighted research portfolios, not funds you can buy; a pass here is research and never goes to paper.")
         return {"kind": FRENCH_KIND, "set": name} | ({"members": members} if members else {})
-    if kind == "screen":
-        caveats.append("Screens run over today's backfill list, which skips companies that vanished before the backfill: survivorship bias.")
-        caveats.append(SCREEN_HINDSIGHT)
-        return {"kind": "screen", "min_history_days": int(u.get("min_history_days") or 252), "min_price": float(u.get("min_price") or 5.0)}
+    if kind == SCREEN_KIND:
+        cov = data.coverage(PUBLIC_COVERAGE) if data is not None else None
+        if data is not None and not (cov and cov.get("priced")):
+            problems.append(NO_PUBLIC)
+            return {}
+        if cov and not cov.get("enough") and cov.get("loading"):
+            problems.append(PUBLIC_LOADING.format(**cov))
+            return {}
+        if cov:
+            caveats += [public_words(cov), PUBLIC_EXITS]
+        return {"kind": SCREEN_KIND, "min_history_days": int(u.get("min_history_days") or 252), "min_price": float(u.get("min_price") or 5.0)}
     if kind in SMALLCAP_TYPES:
         if data is not None and not data.smallcap:
             problems.append("small-cap history is not in the lab yet; the engine's insider job builds it")
@@ -394,6 +424,8 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
             caveats.append(f"Uses prices from {start} on, the first day funds making up at least {MIN_LIVE:.0%} of the mix were trading.")
         if late:
             caveats.append(f"{', '.join(late)} started trading later; until each one lists, the rest of the mix carries its share.")
+    if universe.get("kind") == SCREEN_KIND and data is not None:
+        start = (data.coverage(PUBLIC_COVERAGE) or {}).get("tests_from")
     if vol_target:
         caveats.append(f"Scaled down whenever its last three months ran hotter than {vol_target:.0%} a year; it never borrows to scale up.")
     fixed = weights is not None or bool(universe.get("members")) or universe.get("set") in MIX_SETS

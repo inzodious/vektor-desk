@@ -44,6 +44,7 @@ A held symbol is fetched from Tiingo unless the mirror already has a close for t
 | Piece | Rule |
 |---|---|
 | Who is asked | Held, benchmark, plan and watched names and the scanner's quality list while their newest bar is older than the last trading day; never-fetched names once; the rest every 90 days |
+| Public stock list | Role `public`, last in the order. Full history once, then a top-up when a name's last ask is 7 days old, only while Tiingo still lists it as trading. Never asked from 16:00 to 01:00 ET, so the evening run is held, benchmark, plan, watched, quality and library names only. A list name he also holds keeps its own role and its daily refresh |
 | Order | By role (held first), never-fetched first inside a role, so a history backlog never delays a held name |
 | Nothing behind | The run makes no call and says so |
 | An error | Asked again next run; a rate limit or no answer also ends the run. A name is parked only when Tiingo says "no prices" and has never had a bar for it: 7 days, or 20 hours for a held name |
@@ -597,7 +598,7 @@ Backtestable small-cap family: directors and officers buying their own stock on 
 | `insider.buyers` | Distinct insiders with a buy known in the window's sessions up to d |
 | `insider.buy_usd` | Dollars of those buys |
 
-A cluster rule is `{"metric_id": "insider.buyers", "window": "21d", "transform": "raw"}` with `{"min_signal": 1}` (two or more buyers). Names come from SEC filings, not today's listings, so companies that later vanished stay in; a delisted name sells at its last close less the lab's haircut. Before the first history load a `small_caps` spec is refused with "the engine's insider job builds it". `desk.engine.lab.universe_ready(cfg, kind)` answers the same question without a spec: true once the lab data holds rows for that universe (`small_caps`, `french`, `fund_list`, `screen`).
+A cluster rule is `{"metric_id": "insider.buyers", "window": "21d", "transform": "raw"}` with `{"min_signal": 1}` (two or more buyers). Names come from SEC filings, not today's listings, so companies that later vanished stay in; a name whose bars stop more than 10 sessions before the data ends sells at its last close less the lab's haircut. Before the first history load a `small_caps` spec is refused with "the engine's insider job builds it". `desk.engine.lab.universe_ready(cfg, kind)` answers the same question without a spec: true once the lab data holds rows for that universe (`small_caps`, `french`, `fund_list`; for `screen`, a symbol with role `public`).
 
 **Survivorship.** Free bars can miss names that died. `lab-export` writes `insider.coverage(conn)` into the lab settings: cluster names that are priced, unpriced (history fetched but no bars within a week of the first cluster), still pending, and priced names that stopped trading within a year. Finalize on a `small_caps` spec adds two bars and a `survivorship` block with the counts:
 
@@ -926,17 +927,19 @@ Daily prices and public filings are the most-mined data in the world. Strategies
 | `lab/data/lab.db` | Engine `lab-export` job (00:55 nightly), atomic replace | `bars` (price bars plus mirror closes), `symbols` (kind, role, first and last day), `macro`, `settings` (marginal rate), `factors` and `french` (phase 9b). SQLite in rollback-journal mode, never WAL, so it opens read-only on the lab's read-only mount |
 | `lab/data/held.json` | Engine `lab-export`, beside `lab.db` | Today's holdings as weights only (`as_of`, `covered`, `weights`). Box only |
 | `lab/data/plan.json` | Engine `lab-export`, beside `lab.db` | The plan's target weights (`weights`), removed when no plan is loaded. Box only |
+| `lab/data/own.db` | Engine `lab-export`, beside `lab.db` | `bars` and `symbols` for his own single stocks: every stock that is not on the public stock list, the quality list or the small-cap list. `load` merges it when it is there. Box only |
 
 **What a worker can read.** A worker is served `lab.db` and nothing else, because holdings and the plan never leave the box (project plan, 2026-11-11). A test opens the file a worker is served to check each row below.
 
 | In `lab.db` | Rule |
 |---|---|
 | Mixes | No held mix and no plan mix, in any table or column |
-| `symbols.role` | `universe` for held, watched, past and plan names alike; only `benchmark` and `small_cap` differ, and both are public lists. Every fund in `data.PUBLIC_FUNDS` (benchmarks, library funds, IWM) is `benchmark` whether he holds it or not |
-| `symbols.kind` | A public fact: a stock in the plan stays a stock. A plan name nothing public can classify is a fund |
-| What is left | The file still has bars for every name the desk follows, so which mutual funds it carries can be guessed to be his. `settings.marginal_rate_pct` is the one personal figure a worker sees |
+| `symbols.role` | `universe` for held, watched, past and plan funds alike; `benchmark`, `small_cap` and `public` differ, and all three are public lists. Every fund in `data.PUBLIC_FUNDS` (benchmarks, library funds, IWM) is `benchmark` and every priced name on the public stock list is `public` and kind `stock`, whether he holds it or not |
+| `symbols.kind` | A public fact. A plan name nothing public can classify is a fund |
+| Single stocks | Only public lists: the public stock list, the scanner's quality list (in the file whether he holds one or not) and the small caps. Any other stock, which is one he holds, held, watches or plans, goes to `own.db` and is not in `lab.db` at all |
+| What is left | The file still has bars for the funds the desk follows, so which mutual funds it carries can be guessed to be his. `settings.marginal_rate_pct` is the one personal figure a worker sees |
 
-Because a role no longer marks a name as his, a stock screen takes any stock with enough history, past holdings and plan stocks included, and a plan stock pays stock costs. `shelf.SCREEN_REV` reruns the five screen rows for that.
+Nothing a worker runs needs `own.db`: a screen reads only role `public`, a hand-picked list takes funds only, and the as-held and plan-mix rows already stay on the box. The box still needs it for those two rows and for the paper replay.
 | `lab/queue/*.json` | Strategy desk runner | Experiment and finalize requests |
 | `lab/runs/ledger.db` | Lab only | `strategies` (status `lab`, `paper`, `research`, `failed`, `inconclusive`), `strategy_trials` (kinds `train`, `test`, `full`, `holdout`, `rule`; never pruned), `lab_results` (`experiment`, `finalize`, `rejected`, `rule` bodies), `queue_done`. Older ledgers migrate in place |
 | `desk.db` | Engine `lab-export` job | `paper_portfolios`, `paper_positions`, `paper_trades` |
@@ -945,7 +948,7 @@ Because a role no longer marks a name as his, a stock screen takes any stock wit
 
 | Field | Accepted |
 |---|---|
-| `universe` | `{"type": "fund_list", "set": "sector_etfs" \| "core_etfs" \| "benchmarks"}`, `{"type": "fund_list", "symbols": [funds only]}`, a `rule` naming a set, or `{"type": "screen", "min_history_days", "min_price"}` for single stocks (survivorship caveat), or `{"type": "small_caps", "min_price"}` (default 2) for point-in-time small caps, benchmark IWM. A hand-picked stock list is rejected |
+| `universe` | `{"type": "fund_list", "set": "sector_etfs" \| "core_etfs" \| "benchmarks"}`, `{"type": "fund_list", "symbols": [funds only]}`, a `rule` naming a set, or `{"type": "screen", "min_history_days", "min_price"}` for single stocks from the public stock list (coverage sentence; see "Stock screens run on the public stock list"), or `{"type": "small_caps", "min_price"}` (default 2) for point-in-time small caps, benchmark IWM. A hand-picked stock list is rejected |
 | `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `ma_cross` (the 50-day average against the window's average; a 200-day window above zero is a golden cross), `range_52w`, `dd`, `insider.buyers`, `insider.buy_usd`, `earnings.surprise`, `earnings.days_since`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
 | `entry` | `{"top_n": 3 \| "param:top_n", "min_signal": 0}` or "top 3 by rank". `min_signal` applies to the first signal's raw value; slots it leaves empty stay in cash |
 | `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
@@ -971,7 +974,7 @@ Because a role no longer marks a name as his, a stock screen takes any stock wit
 
 **What the desk sees** (`desk_view`): folds, the walk-forward summary, the start-month distribution per horizon (walk-forward when long enough, else the full range flagged `in_sample`), deflated Sharpe (trials = every distinct full-range run in the family: ids sharing a family key `insider-`, `drift-` or `filings-`, plus any `parent_id` chain, across versions and nights; Sharpe variance is the larger of this run's variants and the whole family's; a family id registered without a `parent_id` gets the family's first id), PBO by combinatorial cross-validation over 10 blocks, the factor check, the analyses it asked for (`param_sensitivity`, `regime_split` bull/bear and high/low rates, `turnover_cost` at 1×, 2×, 4×, `factor_regression`), caveats, and rejection reasons. A changed spec under the same version, or any spec after finalize, is rejected.
 
-**Finalize** runs the last fold's parameters on the holdout and on the days after the writing model's cutoff (`DESK_LAB_MODEL_CUTOFFS`, a JSON map of model to date, default 2026-06-30), then checks the bars: start-month 5th percentile above zero on the longest horizon, deflated Sharpe over 0.95, PBO under 0.2, holdout excess positive and at least half the walk-forward excess, and the spec's own `excess_vs_plan_pts`, `max_drawdown_pct`, `min_trades`. Any failed bar is `fail`; all computed bars passing is `pass`; anything missing is `inconclusive`. The factor bar is alpha t of 2 or more; it is `null`, and does not block, only when the factors are missing or overlap fewer than 252 days. A pass moves a fund, screen or small-cap strategy to `paper` and a French one to `research`. A spec with nothing to tune has one variant with empty parameters and is judged like any other; only a spec where no variant met the constraints in any fold is closed as `failed` without bars.
+**Finalize** runs the last fold's parameters on the holdout and on the days after the writing model's cutoff (`DESK_LAB_MODEL_CUTOFFS`, a JSON map of model to date, default 2026-06-30), then checks the bars: start-month 5th percentile above zero on the longest horizon, deflated Sharpe over 0.95, PBO under 0.2, holdout excess positive and at least half the walk-forward excess, and the spec's own `excess_vs_plan_pts`, `max_drawdown_pct`, `min_trades`. Any failed bar is `fail`; all computed bars passing is `pass`; anything missing is `inconclusive`. The factor bar is alpha t of 2 or more; it is `null`, and does not block, only when the factors are missing or overlap fewer than 252 days. A pass moves a fund, screen or small-cap strategy to `paper` and a French one to `research`. A spec with nothing to tune has one variant with empty parameters and is judged like any other; only a spec where no variant met the constraints in any fold is closed as `failed` without bars. A screen that passed on a public stock list under 90% priced is `research` too.
 
 **Paper.** Each night the engine replays a paper strategy with its finalized parameters from the finalize day to the newest bar on fresh data, so it can never be tuned after the fact. Its status comes from the paper gate (above): a stored verdict at day 182 and every 91 days after, `eligible` only when the lead clears the noise band with 30 buys. `desk.engine.lab.eligible` lists the eligible ones for Scout, with the chance the lead is luck.
 
@@ -1129,7 +1132,7 @@ Every slice also carries `triggers` for its day. A proposal's `numbers_used[].fi
 | Weekdays 17:40 ET | `discounts`: scan held names, the watchlist and the quality list for discount days |
 | Every 5 minutes, any hour | `restate` ("Catch the book up"): exits at once unless official closes landed for a provisional day or the book is behind the last finished session; then the daily pass and the review run again and the debrief is asked for. Never twice on the same closes |
 | Weekdays 08:35, 17:35 and 17:45 ET | `review`: day, week, month and year packs. 17:35 follows the engine run; 17:45 picks up that evening's discount days; the 17:46 debrief waits while `engine-daily` or `engine-review` is running, so it follows this run directly; 08:35 finalises yesterday once late fund prices are in |
-| Daily 10:30 and 14:30 ET | `public`: the public stock list dry run; fetches only when the stored list is over 6 days old or incomplete |
+| Daily 10:30 and 14:30 ET | `public`: the public stock list; fetches only when the stored list is over 6 days old or incomplete |
 | Nightly 00:30 | `french` (a file is fetched only when its rows are missing or it is over 25 days old): daily and monthly factors and portfolios from the Ken French library. The Monte Carlo and factor exposure refresh with each core run |
 
 ### When a run skips
@@ -1218,9 +1221,23 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Where it runs | On the box in the night lab pass only; `lab-offer` skips it and a worker refuses it |
 | Not run | No held mix exported yet, or the holdings have not all traded long enough before the holdout (see "A fund that had not started trading") |
 
-**Stock screens lean on hindsight.** The screen universe is the stocks the desk has bars for: a few large quality names plus names he holds, watches or has held. So every screen spec carries the caveat `spec.SCREEN_HINDSIGHT`, and the six screen rows have `leans_on_hindsight: true`, that caveat first, and a `line` that ends "Leans on hindsight: the stock list is small and includes names you hold or held." The view adds both to a result stored before the caveat existed. A screen row that would read held up is shown as within noise instead ("Ahead, but it leans on hindsight: ...") and is not in `counts.held_up`. A public stock list is the fix; its dry run is built, the switch is not.
+**Stock screens run on the public stock list.** A screen picks only from symbols with role `public`: the priced names of the list below. Nothing he holds, held, watches or plans is in it unless the rule put it there.
 
-**Public stock list (dry run).** `public.py`, job `public` ("Public stock list"), `GET /api/engine/public-stocks`. It only counts; no screen reads it yet and no price is fetched.
+| Piece | Rule |
+|---|---|
+| Start | `spec.start` is the list's `tests_from` (the first session of 2012), so the list is never used on a date before it was knowable |
+| Coverage | `lab-export` writes `settings.public_coverage`: `as_of`, `tests_from`, `listed`, `priced` (bars in the file), `loading` (priced at Tiingo, never asked for yet), `missing`, `stopped`, `pct`, `enough` (90% or more). An experiment result keeps a copy as `public_coverage` |
+| Caveat | First on every screen: "Tested on the 200 largest US companies of mid-2011, a list that owes nothing to what you hold. 187 of them have prices. The 13 without were mostly bought or failed, so the result still leans to survivors by that much." |
+| Still loading | Under 90% with names still loading, a screen is refused ("still loading its prices"), the row reads "The public stock list is still loading its prices. This runs once that finishes." and the library asks again. A result that ran over 90% with some still loading is run again after 20 hours |
+| Thin list | Under 90% with nothing left to load: the caveat ends "That is under 90%, so this stays research only.", the row has `thin_coverage: true` and `research_only: true`, a row that would read held up is shown as within noise ("Ahead, but too little of the stock list has prices: ..."), and a finalize pass is `research`, never `paper` |
+| Where prices end | Public names top up weekly, so `LabData.calendar_for("screen")` stops at the oldest last bar among the public names within 10 sessions of the list's usual last bar (the median, which is the latest weekly top-up while most of the list still trades). Screen tests, holdouts and paper replays end there. If the top-ups stall, screens end earlier; no name is sold for it |
+| Stopped trading | Any holding, in any universe, is gone once its last bar is more than 10 sessions (`data.GONE_SESSIONS`) behind the end of its calendar. Before, one missing day counted |
+| What a gone name pays | A public name leaves at its last price, since most large companies leave by being bought. If that price is under half its one-year high it leaves at 30% less (`sim.COLLAPSED`). Every other name still leaves at 30% less (`sim.DELIST_HAIRCUT`); the small-cap stress test still counts each as a total loss |
+| Said on the row | Second caveat on every screen (`spec.PUBLIC_EXITS`): "A company that stopped trading leaves at its last price, as in a buyout. It is counted at 30% less only when that price was under half its one-year high." |
+| Known limit | A screen strategy that reaches paper sees prices up to a week old, because the list tops up weekly. Daily top-ups once a screen is on paper are not built |
+| Library | `shelf.SCREEN_REV` is 5, so the six screen rows run again. A result stored before the switch has no `public_coverage`; it keeps `leans_on_hindsight: true` and the old words until its rerun lands |
+
+**Public stock list.** `public.py`, job `public` ("Public stock list"), `GET /api/engine/public-stocks`. The job builds the list and says which names Tiingo can price; the price backfill fetches them.
 
 | Step | Rule |
 |---|---|
@@ -1229,6 +1246,8 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Sanity check | The float is typed by hand on the cover page and 2011 filings are full of scale mistakes (thousands typed as dollars). A figure counts only if a second figure agrees: the same company's float a year or more apart within ten times, or float divided by shares outstanding between $1 and $2,000. It must also be no more than 15 times total assets and no more than $450B (Exxon, the largest, was about $400B). `public.doubt` |
 | Stand-in | When the figure nearest mid-2011 fails, the company's next nearest figure is tried, so a giant with one typo keeps its place on the year-before float |
 | Left out | Companies whose raw figure would have made the list but failed the check: `left_out` (first 15, with the raw size and why), `left_out_count`, and `left_out_names` on the route. Stored beside the list with state `misfiled`; nothing else reads them |
+| Funds and trusts | A filer whose ticker Tiingo lists only as a fund (ETF or mutual fund) over the first session of 2012, such as a gold trust, is not a company. It is left out, named in `funds` and in `left_out_names`, and the next largest company takes its place (the 20 next largest are kept in reserve), so the list still has 200. A ticker a fund took over later does not count |
+| Share classes | `public.SHARE_CLASS`: a ticker whose history sits under another class of the same company is read through that class. Google's GOOG dates from the 2014 split, so it is priced as GOOGL |
 | Built by | Each stored list is marked with `public.RULE` in `api_calls`. A list without the current mark is built again on the next run, whatever its age |
 | Ticker | Today's SEC ticker list first. If none of those is priced, the 2011 filing: the trading symbol on its cover page (`R1.htm`), then the prefix of its data file |
 | Priced | Tiingo's public ticker file lists the ticker as a US-dollar stock with history that covers the first session of 2012. `state` is `priced`, `late` (history starts later, often a reused ticker), `missing` (not at Tiingo), `no_ticker` or `unasked` (the SEC stopped answering; tried again next run). A name already priced keeps its ticker when a later run's ask goes unanswered |
@@ -1238,9 +1257,9 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Tiingo room | `tiingo.left` is this month's new-name allowance left, `new_names` what the list would use, `size` 200 or 150 when fewer than 220 are left |
 | Cost | Eighteen SEC frames (ten for floats, four each for shares outstanding and total assets), one Tiingo file (no key, no quota), and up to two small SEC requests per company not on today's list. Kept 6 days; runs at 10:30 and 14:30 ET and exits at once while the list is fresh |
 
-The job's `detail` and the route's `detail` are the same sentence, for example "Of the 200 largest US companies of mid-2011, 191 have a ticker and Tiingo prices 183 of them from January 2012 (91.5%). The largest are Exxon Mobil Corp, Apple Inc and International Business Machines Corp. 41 companies were left out because the size they reported looks mistyped." `top` is the first 25 names in order, for a check by eye.
+The job's `detail` and the route's `detail` are the same sentence, for example "Of the 200 largest US companies of mid-2011, 191 have a ticker and Tiingo prices 183 of them from January 2012 (91.5%). The largest are Exxon Mobil Corp, Apple Inc and International Business Machines Corp. 41 companies were left out because the size they reported looks mistyped. 1 fund or trust was left out because it is not a company." `top` is the first 25 names in order, for a check by eye.
 
-**Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the five stock screens (see "What a worker can read").
+**Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the six stock screens (see "Stock screens run on the public stock list").
 
 **Rule rows.** A deposit rule is compared with its baseline for every start month. `share_better` and `share_worse` count the start months that ended ahead and behind; the rest ended the same, which happens when the rule never had cause to act. The row's line says ahead, behind and no different, and never counts a tie as worse. A result stored before `share_worse` existed states only what its numbers support. When the 5th, 50th and 95th percentile all round to 0.0 points the row reads "No difference" and is `within_noise` whatever the stored verdict.
 
@@ -1249,7 +1268,7 @@ The job's `detail` and the route's `detail` are the same sentence, for example "
 | Library funds | Rule |
 |---|---|
 | Price backfill | `backfill.DAILY` is the quality list plus the library funds. `sync_roles` registers them; a fund with no bars is asked for at once (after held, benchmark, plan and watched names, before any other name never fetched), then every day. Once it has history it sorts after the quality names, so the scanner's names are refreshed first when the hourly cap bites |
-| Why daily | The simulator sells a holding whose bars stop early at its last price less 30%, so a library fund left to the 90-day rotation would poison its rows |
+| Why daily | The simulator sells a holding whose bars stop more than 10 sessions early at its last price less 30%, so a library fund left to the 90-day rotation would poison its rows |
 | In `lab.db` | `data.PUBLIC_FUNDS` (benchmarks, library funds, IWM) export as kind `fund` and role `benchmark` whatever he holds, so a held benchmark fund no longer reads `universe` |
 | Short histories | UFO starts in 2019, so the two theme rows test from then; a fixed mix starts once 90% of it is trading |
 

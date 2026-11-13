@@ -12,18 +12,22 @@ from pathlib import Path
 
 from desk.config import Config
 from desk.db import connect
-from desk.engine.market import BENCHMARKS, LIBRARY_FUNDS
+from desk.engine.market import BENCHMARKS, LIBRARY_FUNDS, QUALITY
 
 SMALLCAP_BENCHMARK = "IWM"
 PUBLIC_FUNDS = frozenset((*BENCHMARKS, *LIBRARY_FUNDS, SMALLCAP_BENCHMARK))
 
 FUND_KINDS = ("fund", "etf")
 LISTED_FUNDS = ("IVV", "VOO", "FTEC", "SMH", "SCHD", "GRID", "ICLN", "NLR", "UFO", "DIA", "MDY")
-EXPORT_SCHEMA = """
+BARS_SCHEMA = """
 CREATE TABLE bars (
   symbol TEXT NOT NULL, date TEXT NOT NULL, open REAL, close REAL NOT NULL, adj_close REAL, volume REAL, PRIMARY KEY (symbol, date)
 ) WITHOUT ROWID;
 CREATE TABLE symbols (symbol TEXT PRIMARY KEY, kind TEXT NOT NULL, role TEXT, first TEXT, last TEXT) WITHOUT ROWID;
+"""
+EXPORT_SCHEMA = (
+    BARS_SCHEMA
+    + """
 CREATE TABLE macro (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
 CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT) WITHOUT ROWID;
 CREATE TABLE factors (series TEXT NOT NULL, date TEXT NOT NULL, value REAL NOT NULL, PRIMARY KEY (series, date)) WITHOUT ROWID;
@@ -32,14 +36,20 @@ CREATE TABLE insider (symbol TEXT NOT NULL, known TEXT NOT NULL, owner INTEGER N
 CREATE TABLE smallcap (symbol TEXT NOT NULL, month TEXT NOT NULL, PRIMARY KEY (symbol, month)) WITHOUT ROWID;
 CREATE TABLE earnings (symbol TEXT NOT NULL, known TEXT NOT NULL, surprise REAL NOT NULL);
 """
+)
 HELD_FILE = "held.json"
 PLAN_FILE = "plan.json"
+OWN_FILE = "own.db"
+PUBLIC_ROLE = "public"
+PUBLIC_COVERAGE = "public_coverage"
+GONE_SESSIONS = 10
 WORKER_ROLES = dict.fromkeys(("held", "watch", "past", "plan"), "universe")
 SMALLCAP_KIND = "stock"
 SMALL_CAPS = "small_caps"
 SMALLCAP_ROLE = "small_cap"
 FRENCH_KIND = "french"
 FRENCH_MARKET = "FF.MKT"
+SCREEN_KIND = "screen"
 
 
 def french_symbol(set_name: str, name: str) -> str:
@@ -64,6 +74,10 @@ def held_path(cfg: Config) -> Path:
 
 def plan_path(cfg: Config) -> Path:
     return data_path(cfg).with_name(PLAN_FILE)
+
+
+def own_path(cfg: Config) -> Path:
+    return data_path(cfg).with_name(OWN_FILE)
 
 
 def ledger_path(cfg: Config) -> Path:
@@ -92,24 +106,45 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
     try:
         out.executescript(EXPORT_SCHEMA)
         add = "INSERT OR IGNORE INTO bars VALUES (?, ?, ?, ?, ?, ?)"
-        out.executemany(add, (tuple(r) for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM price_bars")))
-        out.executemany(add, ((r[0], r[1], None, r[2], r[3], None) for r in desk.execute("SELECT symbol, date, close, adj_close FROM prices_daily")))
         small = _small_caps(desk, out)
+        kinds = _public_kinds(desk, kinds, targets)
+        public, cover = _public(desk)
+        shared = PUBLIC_FUNDS | frozenset(QUALITY) | public | small
+        mine: dict[str, bool] = {}
+        kept: list[tuple] = []
+
+        def for_workers(rows):
+            for r in rows:
+                sym = r[0]
+                if sym not in mine:
+                    mine[sym] = sym not in shared and kinds.get(sym, "unknown") not in FUND_KINDS
+                if mine[sym]:
+                    kept.append(r)
+                else:
+                    yield r
+
+        out.executemany(add, for_workers(tuple(r) for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM price_bars")))
+        daily = ((r[0], r[1], None, r[2], r[3], None) for r in desk.execute("SELECT symbol, date, close, adj_close FROM prices_daily"))
+        out.executemany(add, for_workers(daily))
         if _has(desk, "alpaca_bars"):
             for sym in sorted(small | {SMALLCAP_BENCHMARK}):
                 out.executemany(
                     add, (tuple(r) for r in desk.execute("SELECT symbol, date, open, close, adj_close, volume FROM alpaca_bars WHERE symbol=?", (sym,)))
                 )
         bars = out.execute("SELECT count(*) FROM bars").fetchone()[0]
-        kinds = _public_kinds(desk, kinds, targets)
         roles = {r["symbol"]: WORKER_ROLES.get(r["role"], r["role"]) for r in desk.execute("SELECT symbol, role FROM market_symbols")}
         roles |= {sym: roles.get(sym) or SMALLCAP_ROLE for sym in small}
         spans = {r[0]: (r[1], r[2]) for r in out.execute("SELECT symbol, min(date), max(date) FROM bars GROUP BY symbol")}
         rows = []
         for sym, (first, last) in spans.items():
-            kind = "fund" if sym in PUBLIC_FUNDS else kinds.get(sym) or (SMALLCAP_KIND if sym in small else "unknown")
-            rows.append((sym, kind, "benchmark" if sym in PUBLIC_FUNDS else roles.get(sym), first, last))
+            if sym in PUBLIC_FUNDS:
+                rows.append((sym, "fund", "benchmark", first, last))
+            elif sym in public:
+                rows.append((sym, "stock", PUBLIC_ROLE, first, last))
+            else:
+                rows.append((sym, kinds.get(sym) or (SMALLCAP_KIND if sym in small else "unknown"), roles.get(sym), first, last))
         out.executemany("INSERT INTO symbols VALUES (?, ?, ?, ?, ?)", rows)
+        own = _write_own(final.with_name(OWN_FILE), kept, kinds, roles)
         french_rows = 0
         if desk.execute("SELECT 1 FROM sqlite_master WHERE name='factors_daily'").fetchone():
             out.executemany("INSERT INTO factors VALUES (?, ?, ?)", (tuple(r) for r in desk.execute("SELECT series, date, value FROM factors_daily")))
@@ -121,7 +156,10 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
             "SELECT value FROM metric_values WHERE metric_id='tax.marginal_rate' AND scope='portfolio' AND value IS NOT NULL ORDER BY as_of DESC LIMIT 1"
         ).fetchone()
         settings = {"exported_at": now.isoformat(timespec="seconds"), "marginal_rate_pct": str(rate[0]) if rate else None}
-        held, covered, held_day = _held_mix(desk, spans)
+        held, covered, held_day = _held_mix(desk, spans | own)
+        listed = cover({s for s in public if s in spans})
+        if listed:
+            settings[PUBLIC_COVERAGE] = json.dumps(listed)
         if small and _has(desk, "insider_buys"):
             from desk.engine.insider import coverage
 
@@ -138,7 +176,43 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
     os.replace(tmp, final)
     _write_box(final.with_name(HELD_FILE), {"as_of": held_day, "covered": covered, "weights": held})
     _write_box(final.with_name(PLAN_FILE), {"weights": {s: w for s, w in targets.items() if w > 0}})
-    return {"ok": True, "path": str(final), "symbols": len(spans), "bars": bars, "french_rows": french_rows, "small_caps": len(small), "held_mix": len(held)}
+    return {
+        "ok": True,
+        "path": str(final),
+        "symbols": len(spans),
+        "bars": bars,
+        "french_rows": french_rows,
+        "small_caps": len(small),
+        "held_mix": len(held),
+        "public_stocks": (listed or {}).get("priced", 0),
+        "kept_on_box": len(own),
+    }
+
+
+def _public(desk: sqlite3.Connection):
+    from desk.engine import public
+
+    priced = frozenset(r["symbol"] for r in public.names(desk) if r["state"] == public.PRICED and r["symbol"])
+    return priced, lambda loaded: public.coverage(desk, loaded)
+
+
+def _write_own(path: Path, rows: list[tuple], kinds: dict[str, str], roles: dict[str, str | None]) -> dict[str, tuple[str, str]]:
+    if not rows:
+        path.unlink(missing_ok=True)
+        return {}
+    tmp = path.with_name(f".{path.name}.tmp")
+    tmp.unlink(missing_ok=True)
+    conn = sqlite3.connect(tmp)
+    try:
+        conn.executescript(BARS_SCHEMA)
+        conn.executemany("INSERT OR IGNORE INTO bars VALUES (?, ?, ?, ?, ?, ?)", rows)
+        spans = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT symbol, min(date), max(date) FROM bars GROUP BY symbol")}
+        conn.executemany("INSERT INTO symbols VALUES (?, ?, ?, ?, ?)", [(s, kinds.get(s) or "unknown", roles.get(s), a, b) for s, (a, b) in spans.items()])
+        conn.commit()
+    finally:
+        conn.close()
+    os.replace(tmp, path)
+    return spans
 
 
 def _write_box(path: Path, body: dict) -> None:
@@ -269,6 +343,7 @@ class LabData:
     settings: dict[str, str | None]
     calendar: list[str]
     factors: dict[str, dict[str, float]] = field(default_factory=dict)
+    screen_days: list[str] | None = None
     path: Path | None = None
     french_sets: dict[str, list[str]] = field(default_factory=dict)
     insider: dict[str, tuple[list[str], list[int], list[float]]] = field(default_factory=dict)
@@ -291,6 +366,8 @@ class LabData:
         if kind == FRENCH_KIND:
             s = self.series.get(FRENCH_MARKET)
             return s.dates if s else []
+        if kind == SCREEN_KIND and self.screen_days:
+            return self.screen_days
         return self.calendar
 
     def end_for(self, kind: str) -> str:
@@ -341,6 +418,19 @@ class LabData:
         return values[i - 1] if i else None
 
 
+def gone_before(calendar: list[str]) -> str:
+    return calendar[max(0, len(calendar) - 1 - GONE_SESSIONS)] if calendar else ""
+
+
+def _screen_days(calendar: list[str], lasts: list[str]) -> list[str] | None:
+    if not lasts:
+        return None
+    usual = min(sorted(lasts)[len(lasts) // 2], calendar[-1])
+    floor = gone_before(calendar[: bisect_right(calendar, usual)])
+    through = min(d for d in lasts if d >= floor)
+    return calendar[: bisect_right(calendar, min(through, calendar[-1]))] or None
+
+
 def _levels(dates: list[str], pcts: Sequence[float], index: dict[str, int], volume: list) -> Series:
     level, adj = 100.0, array("d")
     for x in pcts:
@@ -361,29 +451,30 @@ def load(path: Path) -> LabData:
     if not path.exists():
         raise NotReady("No lab data yet; the engine's lab-export job writes it nightly.")
     conn = connect(path, readonly=True)
+    side = path.with_name(OWN_FILE)
+    own = connect(side, readonly=True) if side.exists() else None
+    files = [c for c in (own, conn) if c is not None]
     try:
         series: dict[str, Series] = {}
-        pos = {r[0]: i for i, r in enumerate(conn.execute("SELECT DISTINCT date FROM bars ORDER BY date"))}
+        pos = {d: i for i, d in enumerate(sorted({r[0] for c in files for r in c.execute("SELECT DISTINCT date FROM bars")}))}
         days = {d: d for d in pos}
-        cur, dates, adj, opens, volume = None, [], array("d"), array("d"), array("d")
-
-        def flush():
+        kinds, roles, last = {}, {}, {}
+        for c in files:
+            cur, dates, adj, opens, volume = None, [], array("d"), array("d"), array("d")
+            for sym, day, close, adjusted, opened, vol in c.execute("SELECT symbol, date, close, adj_close, open, volume FROM bars ORDER BY symbol, date"):
+                if sym != cur:
+                    if cur and dates:
+                        series[cur] = Series(dates, adj, opens, volume, DayIndex(pos, dates))
+                    cur, dates, adj, opens, volume = sym, [], array("d"), array("d"), array("d")
+                a = adjusted if adjusted else close
+                dates.append(days[day])
+                adj.append(a)
+                opens.append((opened * (adjusted / close) if adjusted and close else opened) if opened else a)
+                volume.append(vol or 0.0)
             if cur and dates:
                 series[cur] = Series(dates, adj, opens, volume, DayIndex(pos, dates))
-
-        for sym, day, close, adjusted, opened, vol in conn.execute("SELECT symbol, date, close, adj_close, open, volume FROM bars ORDER BY symbol, date"):
-            if sym != cur:
-                flush()
-                cur, dates, adj, opens, volume = sym, [], array("d"), array("d"), array("d")
-            a = adjusted if adjusted else close
-            dates.append(days[day])
-            adj.append(a)
-            opens.append((opened * (adjusted / close) if adjusted and close else opened) if opened else a)
-            volume.append(vol or 0.0)
-        flush()
-        kinds, roles, last = {}, {}, {}
-        for r in conn.execute("SELECT symbol, kind, role, last FROM symbols"):
-            kinds[r[0]], roles[r[0]], last[r[0]] = r[1], r[2], r[3]
+            for r in c.execute("SELECT symbol, kind, role, last FROM symbols"):
+                kinds[r[0]], roles[r[0]], last[r[0]] = r[1], r[2], r[3]
         for sym in LISTED_FUNDS:
             if sym in kinds and kinds[sym] not in FUND_KINDS:
                 kinds[sym] = "etf"
@@ -414,7 +505,8 @@ def load(path: Path) -> LabData:
                 d.append(r[1])
                 v.append(r[2])
     finally:
-        conn.close()
+        for c in files:
+            c.close()
     ref = next((s for s in ("SPY", "VTI", "FXAIX") if s in series), None) or max(series, key=lambda s: len(series[s].dates), default=None)
     market = _french_market(factors)
     if market is not None:
@@ -426,6 +518,7 @@ def load(path: Path) -> LabData:
     held = read_held(path.with_name(HELD_FILE))
     if held:
         settings |= {"held_mix_as_of": held["as_of"], "held_mix_covered": str(held["covered"]) if held["covered"] is not None else None}
+    calendar = list(series[ref].dates)
     return LabData(
         series,
         kinds,
@@ -434,8 +527,9 @@ def load(path: Path) -> LabData:
         macro,
         read_plan(path.with_name(PLAN_FILE)),
         settings,
-        list(series[ref].dates),
+        calendar,
         factors,
+        _screen_days(calendar, [series[s].dates[-1] for s, role in roles.items() if role == PUBLIC_ROLE and s in series]),
         path,
         insider=insider,
         smallcap=smallcap,

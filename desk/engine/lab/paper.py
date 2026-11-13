@@ -57,10 +57,10 @@ def run(cfg: Config, desk: sqlite3.Connection, *, now: datetime | None = None) -
             spec = parse(json.loads(row["spec"]), data, model=row["model"] or "")
         except SpecError:
             continue
-        start = fin["paper_start"]
-        res = simulate(data, spec, resolve(spec, fin["params"]), start, data.end, enter=False)
+        start, end = fin["paper_start"], data.end_for(spec.universe.get("kind"))
+        res = simulate(data, spec, resolve(spec, fin["params"]), start, end, enter=False)
         summary = stats.summary(res)
-        days = (date.fromisoformat(data.end) - date.fromisoformat(start)).days
+        days = (date.fromisoformat(end) - date.fromisoformat(start)).days
         bench_ret = (res.bench[-1] - 1) * 100 if res.bench and res.bench[-1] else None
         own_ret = (res.values[-1] / res.values[0] - 1) * 100 if res.values else None
         excess = own_ret - bench_ret if own_ret is not None and bench_ret is not None else None
@@ -87,7 +87,7 @@ def run(cfg: Config, desk: sqlite3.Connection, *, now: datetime | None = None) -
             desk.execute("DELETE FROM paper_positions WHERE strategy_id=? AND version=?", (spec.id, spec.version))
             desk.executemany(
                 "INSERT INTO paper_positions VALUES (?, ?, ?, ?, ?, ?)",
-                [(spec.id, spec.version, data.end, s, n, round(n * data.series[s].adj[-1], 2)) for s, n in holdings.items()],
+                [(spec.id, spec.version, end, s, n, round(n * data.series[s].adj[-1], 2)) for s, n in holdings.items()],
             )
             desk.execute(
                 "INSERT OR REPLACE INTO paper_portfolios VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -96,7 +96,7 @@ def run(cfg: Config, desk: sqlite3.Connection, *, now: datetime | None = None) -
                     spec.version,
                     spec.title,
                     start,
-                    data.end,
+                    end,
                     days,
                     round(res.values[-1], 2) if res.values else None,
                     round(own_ret, 4) if own_ret is not None else None,

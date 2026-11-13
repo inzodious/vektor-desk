@@ -402,6 +402,46 @@ def test_library_funds_are_fetched_once_at_once_and_then_daily_after_the_names_t
     conn.close()
 
 
+def test_the_public_stock_list_is_asked_last_in_the_daytime_and_topped_up_weekly_while_it_trades(cfg):
+    conn = connect(cfg.desk_db)
+    schema.apply(conn)
+    listed = "INSERT INTO public_stocks VALUES (?, ?, ?, 5e10, '2011-06-30', '', ?, 'sec_list', '2005-01-03', '2026-11-11', ?, ?, '2026-11-12T15:30:00+00:00')"
+    rows = [(1, 11, "Big Co", "BIG", "priced", 1), (2, 12, "Dead Co", "DEAD", "priced", 0), (3, 13, "Lost Co", "LOST", "missing", 0)]
+    rows += [(4, 14, "Apple", "AAPL", "priced", 1), (5, 15, "Old Co", "OLD", "priced", 1)]
+    with conn:
+        conn.executemany(listed, rows)
+    add_symbols(conn, ["OLD"], "past")
+    morning, evening, midnight, small_hours = (datetime(2026, 11, d, h, 13, tzinfo=UTC) for d, h in ((12, 15), (12, 21), (13, 5), (13, 6)))
+    backfill.sync_roles(conn, morning)
+    roles = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT symbol, role, priority FROM market_symbols")}
+    assert roles["BIG"] == roles["DEAD"] == ("public", 4) and "LOST" not in roles and roles["AAPL"] == ("universe", 3) and roles["OLD"] == ("past", 3)
+    assert backfill.public_names(conn) == {"BIG": True, "DEAD": False, "AAPL": True, "OLD": True}
+    order = [r["symbol"] for r in due(conn, morning)]
+    assert order[-2:] == ["BIG", "DEAD"] and "OLD" in order and "AAPL" in order
+    assert [backfill.quiet(t) for t in (morning, evening, midnight, small_hours)] == [False, True, True, False]
+    for late in (evening, midnight):
+        asked = [r["symbol"] for r in due(conn, late)]
+        assert not {"BIG", "DEAD", "OLD"} & set(asked) and "AAPL" in asked and "SPY" in asked
+    assert {"BIG", "DEAD", "OLD"} <= {r["symbol"] for r in due(conn, small_hours)}
+
+    def fetched(days_ago: int) -> set[str]:
+        stamp = datetime(2026, 11, 12 - days_ago, 15, 0, tzinfo=UTC).isoformat(timespec="seconds")
+        with conn:
+            conn.execute(
+                "UPDATE market_symbols SET first_bar='2005-01-03', last_bar='2026-11-02', fetched_at=? WHERE symbol IN ('BIG', 'DEAD', 'OLD')", (stamp,)
+            )
+        return {r["symbol"] for r in due(conn, morning)} & {"BIG", "DEAD", "OLD"}
+
+    assert fetched(2) == set() and fetched(6) == set() and fetched(8) == {"BIG", "OLD"}
+    assert not {"BIG", "OLD"} & {r["symbol"] for r in due(conn, evening)}
+    view = {r["symbol"]: r for r in backfill.view(conn, now=morning)["symbols"]}
+    assert view["BIG"]["role"] == "public" and view["BIG"]["due"] and not view["BIG"]["behind"] and not view["DEAD"]["due"]
+    add_symbols(conn, ["BIG"], "held")
+    assert conn.execute("SELECT role, priority FROM market_symbols WHERE symbol='BIG'").fetchone()[:] == ("held", 0)
+    assert [r["symbol"] for r in due(conn, evening)][0] == "BIG"
+    conn.close()
+
+
 def test_the_backfill_schedule_matches_the_words_health_uses():
     lines = [j if isinstance(j, tuple) else (j["schedule"], j["command"]) for j in jobs.JOBS]
     schedule = next(s for s, command in lines if command.endswith(" backfill"))

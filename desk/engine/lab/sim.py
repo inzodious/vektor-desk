@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from desk.engine.lab import library as features
-from desk.engine.lab.data import FRENCH_KIND, FUND_KINDS, SMALL_CAPS, LabData
+from desk.engine.lab.data import FRENCH_KIND, FUND_KINDS, PUBLIC_ROLE, SMALL_CAPS, LabData, gone_before
 from desk.engine.lab.spec import Spec, Variant, french_members
 
 START_CASH = 10_000.0
@@ -13,6 +13,8 @@ STOCK_BPS = 15.0
 THIN_BPS = 25.0
 THIN_DOLLARS = 20_000_000.0
 DELIST_HAIRCUT = 0.30
+COLLAPSED = 0.5
+COLLAPSE_DAYS = 252
 LTCG = 0.15
 DEFAULT_RATE = 0.24
 VOL_WINDOW = 63
@@ -68,14 +70,21 @@ def universe(data: LabData, spec: Spec, day: str) -> list[str]:
         return sorted(out)
     out = []
     for sym, s in data.series.items():
-        if data.kinds.get(sym) in FUND_KINDS:
-            continue
-        if data.roles.get(sym) not in ("universe", "held", "watch"):
+        if data.roles.get(sym) != PUBLIC_ROLE or data.kinds.get(sym) in FUND_KINDS:
             continue
         i = s.index.get(day)
         if i is not None and i >= u["min_history_days"] and s.adj[i] >= u["min_price"]:
             out.append(sym)
     return out
+
+
+def exit_haircut(data: LabData, sym: str, flat: float | None = None) -> float:
+    if flat is not None:
+        return flat
+    if data.roles.get(sym) != PUBLIC_ROLE:
+        return DELIST_HAIRCUT
+    adj = data.series[sym].adj
+    return DELIST_HAIRCUT if adj[-1] < COLLAPSED * max(adj[-COLLAPSE_DAYS:]) else 0.0
 
 
 def _bps(data: LabData, sym: str, i: int) -> float:
@@ -240,12 +249,12 @@ def simulate(
     *,
     cost_mult: float = 1.0,
     rate: float | None = None,
-    delist_haircut: float = DELIST_HAIRCUT,
+    delist_haircut: float | None = None,
     enter: bool = True,
 ) -> Result:
     kind = spec.universe.get("kind")
-    last_day = data.end_for(kind)
     every = data.calendar_for(kind)
+    gone = gone_before(every)
     cal = [d for d in every if start <= d <= end]
     if len(cal) < 2:
         return Result(cal, [START_CASH] * len(cal), [None] * len(cal), [None] * len(cal))
@@ -264,8 +273,8 @@ def simulate(
     for k, day in enumerate(cal):
         for sym in list(shares):
             s = data.series[sym]
-            if s.dates[-1] < day and s.dates[-1] < last_day:
-                px = s.adj[-1] * (1 - delist_haircut)
+            if s.dates[-1] < day and s.dates[-1] < gone:
+                px = s.adj[-1] * (1 - exit_haircut(data, sym, delist_haircut))
                 cash += _sell(lots, sym, shares.pop(sym), px, day, realized)
                 out.delisted.append(sym)
         if pending is not None:
