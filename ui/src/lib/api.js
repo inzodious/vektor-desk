@@ -69,7 +69,7 @@ export function useApi(path, { every } = {}) {
 export async function postJson(path, body = {}, { method = 'POST' } = {}) {
   let res;
   try {
-    res = await fetch(path, { method, headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    res = await fetch(path, { method, headers: { Accept: 'application/json', 'Content-Type': 'application/json' }, body: body === null ? undefined : JSON.stringify(body) });
   } catch {
     throw new ApiError(0, "The desk API didn't answer. Try again in a moment.");
   }

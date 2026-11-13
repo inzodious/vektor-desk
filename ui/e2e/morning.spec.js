@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
-import { MONDAY_MIDDAY, ROUTES, overflow, watchErrors } from './helpers.js';
+import { MONDAY_MIDDAY, ROUTES, overflow, record, watchErrors } from './helpers.js';
 
 const NIGHT = JSON.parse(readFileSync(new URL('../src/fixtures/overnight.json', import.meta.url), 'utf8'));
 
@@ -499,10 +499,10 @@ test('a replaced proposal says what became of it, and the open one is a tap away
   const live = fold.locator('[data-cleared="d_20261109051000_cc03"]');
   await expect(live).toContainText('A newer proposal on the same subject replaced this one on Nov 9.');
   await expect(live.getByTestId('cleared-next')).toHaveAttribute('data-open', 'yes');
-  await expect(live.getByTestId('cleared-next')).toContainText('The latest one, “Buy $400 ACME”, is waiting in your queue.');
+  await expect(live.getByTestId('cleared-next')).toContainText('It became “Buy $400 ACME”. Waiting in your queue.');
   const ended = fold.locator('[data-cleared="d_20261109051000_cc04"]');
   await expect(ended.getByTestId('cleared-next')).toHaveAttribute('data-open', 'no');
-  await expect(ended.getByTestId('cleared-next')).toHaveText('The latest one, “Buy $300 ACME”, has left the queue too. ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.');
+  await expect(ended.getByTestId('cleared-next')).toHaveText('It became “Buy $300 ACME”. ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.');
   await expect(ended.getByRole('link')).toHaveCount(0);
   await page.locator('.prop', { hasText: 'Trim $150 FTEC' }).first().click();
   await expect(page.getByTestId('detail').getByRole('heading', { level: 2 })).toHaveText('Trim $150 FTEC');
@@ -541,6 +541,121 @@ test('snoozed proposals stay in sight in a closed fold that the chip opens', asy
   await expect(page.getByTestId('snoozed')).toHaveCount(0);
   await expect(page.getByTestId('snoozed-chip')).toHaveCount(0);
   expect(errors).toEqual([]);
+});
+
+test('Decisions leads with one dated list of next steps, each with why, where it comes from and what would change it', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/decisions');
+  const card = page.getByTestId('next-steps');
+  await expect(card.locator('.card-head .chip')).toHaveText('3 dated');
+  const dated = card.getByTestId('ns-dated').locator('[data-step]');
+  await expect(dated).toHaveCount(3);
+  const first = dated.first();
+  await expect(first.locator('.stamp-day')).toHaveText('Nov 13');
+  await expect(first.locator('summary')).toContainText('Sell 40 ACME to harvest the loss');
+  await expect(first.locator('summary')).toContainText('Any day to Nov 20');
+  await expect(first.getByTestId('ns-backed')).toHaveText('The lab’s test backs this.');
+  await expect(first.locator('.ns-more')).toBeHidden();
+  await first.locator('summary').click();
+  await expect(first.locator('.ns-more')).toContainText('A sale below your cost books the loss against this year’s taxes.');
+  await expect(first.locator('.ns-more')).toContainText('Your ACME plan, version 2, approved Nov 6.');
+  await expect(first.locator('.ns-more')).toContainText('No longer worth doing if ACME is back above your cost.');
+  await expect(first.getByTestId('ns-test')).toContainText('Tax-loss harvesting. Helped: ahead in 70% of 120 start months.');
+  await expect(first.getByRole('link', { name: 'See the test' })).toHaveAttribute('href', '/strategies/lib-harvest');
+  await expect(first.getByRole('link', { name: 'Open it in the queue' })).toHaveCount(0);
+  await expect(first.getByRole('button')).toHaveCount(0);
+  const standing = card.getByTestId('ns-standing');
+  await expect(standing.locator('> summary')).toContainText('Standing');
+  await expect(standing.locator('> summary .chip')).toHaveText('5');
+  await expect(standing.locator('[data-step]').first()).toBeHidden();
+  await standing.locator('> summary').click();
+  await expect(standing.locator('[data-step]')).toHaveCount(5);
+  const unbacked = standing.locator('[data-step^="agreed:"]');
+  await expect(unbacked.getByTestId('ns-backed')).toHaveText('The lab’s test does not back this.');
+  await expect(unbacked.getByTestId('ns-backed')).toHaveClass(/watch/);
+  await expect(standing.locator('[data-step="plan:ACME:add"] summary')).toContainText('On a pullback below $2.60');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  const mine = dated.nth(1);
+  await mine.locator('summary').click();
+  await mine.getByRole('link', { name: 'Open it in the queue' }).click();
+  await expect(page).toHaveURL(/d=d_20261109130500_168372/);
+  await expect(page.getByTestId('detail').getByRole('heading', { level: 2 })).toHaveText('Route deposit to $180 VXUS');
+  await page.goto('/decisions?scenario=fresh');
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Decisions');
+  await expect(page.getByTestId('next-steps')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
+test('his own pass reason sits in the list in his words, with how its date was read and a way to take it off', async ({ page }) => {
+  const errors = watchErrors(page);
+  const { readFileSync } = await import('node:fs');
+  const list = JSON.parse(readFileSync(new URL('../src/fixtures/decisions.next-steps.json', import.meta.url), 'utf8'));
+  let removed = null;
+  await page.route('**/api/decisions/next-steps?*', (route) => route.fulfill({ json: removed ? { ...list, count: 2, items: list.items.filter((s) => !s.id.endsWith(removed)) } : list }));
+  await page.route('**/api/decisions/next-steps/*', async (route) => {
+    expect(route.request().method()).toBe('DELETE');
+    expect(route.request().postData()).toBeNull();
+    removed = route.request().url().split('/').pop();
+    await route.fulfill({ json: { removed } });
+  });
+  await page.goto('/decisions');
+  const card = page.getByTestId('next-steps');
+  const mine = card.locator('[data-step="you:s_20261109150000_32032d_4835"]');
+  await expect(mine.locator('.stamp-day')).toHaveText('Dec 7');
+  await expect(mine.locator('summary')).toContainText('I’ll trim FTEC after Dec 6, once the year’s gains are clear.');
+  await expect(mine.locator('summary')).toContainText('Your words · read as Dec 7 to Dec 31, from “after Dec 6”');
+  await expect(mine.getByTestId('ns-backed')).toHaveCount(0);
+  await mine.locator('summary').click();
+  await expect(mine.locator('.ns-more')).toContainText('Your words on Nov 9, when you passed on “Trim $90 FTEC”.');
+  await expect(mine.getByTestId('ns-test')).toHaveCount(0);
+  await mine.getByTestId('ns-undo').click();
+  await expect(card.getByTestId('ns-msg')).toHaveText('Taken off your next steps.');
+  await expect(mine).toHaveCount(0);
+  await expect(card.locator('.card-head .chip')).toHaveText('2 dated');
+  expect(removed).toBe('s_20261109150000_32032d_4835');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  expect(errors).toEqual([]);
+});
+
+test('a pass whose reason became a step says so, and Undo takes it back', async ({ page }) => {
+  const { readFileSync } = await import('node:fs');
+  const list = JSON.parse(readFileSync(new URL('../src/fixtures/decisions.next-steps.json', import.meta.url), 'utf8'));
+  const step = list.items.find((s) => s.source === 'you');
+  let undone = 0;
+  await page.route('**/api/decisions/*/pass', (route) => route.fulfill({ json: { ...record({ status: 'passed', title: 'Buy $400 ACME' }), step } }));
+  await page.route('**/api/decisions/next-steps/*', async (route) => {
+    undone += 1;
+    await route.fulfill({ json: { removed: 's_20261109150000_32032d_4835' } });
+  });
+  await page.goto('/decisions');
+  await page.getByRole('textbox', { name: 'One-line reason' }).fill('I’ll trim FTEC after Dec 6, once the year’s gains are clear.');
+  await page.getByRole('button', { name: 'Pass and log it' }).click();
+  await expect(page.locator('.act-note').first()).toContainText('Passed and logged');
+  const added = page.getByTestId('step-added');
+  await expect(added).toContainText('Added to your next steps: “I’ll trim FTEC after Dec 6, once the year’s gains are clear.”, read as Dec 7 to Dec 31, from “after Dec 6”.');
+  await added.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.getByTestId('step-added')).toHaveCount(0);
+  await expect(page.locator('.act-note').first()).toContainText('Taken off your next steps.');
+  expect(undone).toBe(1);
+});
+
+test('a pass that became no step says nothing more, and a step that already left is said plainly', async ({ page }) => {
+  await page.route('**/api/decisions/*/pass', (route) => route.fulfill({ json: record({ status: 'passed', title: 'Buy $400 ACME' }) }));
+  await page.route('**/api/decisions/next-steps/*', (route) => route.fulfill({ status: 409, json: { detail: 'That step already left the list.' } }));
+  await page.goto('/decisions');
+  await page.getByRole('textbox', { name: 'One-line reason' }).fill('Not on margin');
+  await page.getByRole('button', { name: 'Pass and log it' }).click();
+  await expect(page.locator('.act-note').first()).toContainText('Passed and logged');
+  await expect(page.getByTestId('step-added')).toHaveCount(0);
+  const card = page.getByTestId('next-steps');
+  await card.getByTestId('ns-standing').locator('> summary').click();
+  const mine = card.locator('[data-step="you:s_20261109150000_632595_d3af"]');
+  await expect(mine.locator('summary')).toContainText('Your words');
+  await mine.locator('summary').click();
+  await mine.getByTestId('ns-undo').click();
+  await expect(card.getByTestId('ns-msg')).toHaveText('It had already left your next steps.');
 });
 
 // ---------- every page ----------

@@ -22,7 +22,9 @@
     "title": "Buy $400 ACME",
     "status": "proposed",
     "status_reason": null,
-    "open": true
+    "decided_at": null,
+    "open": true,
+    "outcome": "Waiting in your queue."
    }
   },
   {
@@ -62,7 +64,9 @@
     "title": "Buy $300 ACME",
     "status": "expired",
     "status_reason": "ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.",
-    "open": false
+    "decided_at": "2026-11-09T11:30:00+00:00",
+    "open": false,
+    "outcome": "ACME is at $23.50, above the $18.00 to $22.00 zone this was written for."
    }
   },
   {

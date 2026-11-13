@@ -145,6 +145,7 @@ const SHOTS = [
   { name: 'morning-decisions', path: '/decisions', fixtures: true, clock: MONDAY },
   { name: 'morning-decisions-cleared', path: '/decisions', fixtures: true, clock: MONDAY, full: true, act: async (p) => p.getByTestId('cleared').locator('summary').click() },
   { name: 'decisions-snoozed', path: '/decisions?scenario=snoozed', fixtures: true, clock: MONDAY, full: true, act: async (p) => p.getByTestId('snoozed-chip').click() },
+  { name: 'decisions-next-steps', path: '/decisions', fixtures: true, clock: MONDAY, full: true, act: async (p) => { await p.locator('[data-step="plan:ACME:harvest"] summary').click(); await p.getByTestId('ns-standing').locator('> summary').click(); } },
   { name: 'decisions-snoozed-closed', path: '/decisions?scenario=snoozed', fixtures: true, clock: MONDAY, full: true },
   { name: 'builds-jobs-offer', path: '/settings/box', fixtures: true, clock: MONDAY, el: 'jobs', act: async (p) => p.getByTestId('jobs').getByText(/Agents and housekeeping/).click() },
   { name: 'stale-mixes', path: '/strategies/mixes?scenario=loose', fixtures: true, clock: MONDAY },
