@@ -397,14 +397,14 @@ const notes = {
 
 // ---------- cleared by the queue rule ----------
 const REPLACED = 'A newer proposal on the same subject replaced this one on Nov 9.';
-const gone = (id, origin, kind, title, symbol, reason, check, when, successor = null) => ({ id, created_at: at('05:10:00'), updated_at: at(when), origin, run_id: 'r-seed-7', kind, title, symbol, status: 'expired', status_reason: reason, replaced_by: successor ? successor.via || successor.id : null, decided_at: at(when), check, cleared_at: at(when), successor: successor ? { id: successor.id, title: successor.title, status: successor.status, status_reason: successor.status_reason, open: successor.open } : null });
+const gone = (id, origin, kind, title, symbol, reason, check, when, successor = null) => ({ id, created_at: at('05:10:00'), updated_at: at(when), origin, run_id: 'r-seed-7', kind, title, symbol, status: 'expired', status_reason: reason, replaced_by: successor ? successor.via || successor.id : null, decided_at: at(when), check, cleared_at: at(when), successor: successor ? { id: successor.id, title: successor.title, status: successor.status, status_reason: successor.status_reason, decided_at: successor.decided_at || null, open: successor.open, outcome: successor.outcome } : null });
 const cleared = {
   count: 4,
   days: 2,
   items: [
-    gone('d_20261109051000_cc03', 'research', 'buy', 'Buy $350 ACME', 'ACME', REPLACED, 'replaced', '14:05:00', { id: 'd_20261109140500_9747d0', title: 'Buy $400 ACME', status: 'proposed', status_reason: null, open: true }),
+    gone('d_20261109051000_cc03', 'research', 'buy', 'Buy $350 ACME', 'ACME', REPLACED, 'replaced', '14:05:00', { id: 'd_20261109140500_9747d0', title: 'Buy $400 ACME', status: 'proposed', status_reason: null, open: true, outcome: 'Waiting in your queue.' }),
     gone('d_20261109051000_cc01', 'tax', 'sell', 'Sell ACME to harvest the loss', 'ACME', 'Your ACME plan already times this sale for Nov 13, so a second proposal would double it.', 'plan', '13:10:00'),
-    gone('d_20261109051000_cc04', 'scout', 'buy', 'Buy $200 ACME', 'ACME', REPLACED, 'replaced', '09:15:00', { id: 'd_20261109091500_cc05', title: 'Buy $300 ACME', status: 'expired', status_reason: 'ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.', open: false }),
+    gone('d_20261109051000_cc04', 'scout', 'buy', 'Buy $200 ACME', 'ACME', REPLACED, 'replaced', '09:15:00', { id: 'd_20261109091500_cc05', title: 'Buy $300 ACME', status: 'expired', status_reason: 'ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.', decided_at: at('11:30:00'), open: false, outcome: 'ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.' }),
     gone('d_20261109051000_cc02', 'risk', 'memo', 'Hold off on new margin', null, 'The Plan keeper already has a margin hold-off waiting on you, so this one was a repeat.', 'plan', '08:40:00'),
   ],
 };
@@ -451,6 +451,95 @@ const awake = queue.items.filter((d) => !SNOOZED.some((z) => z.id === d.id));
 write('decisions.queue', { ...queue, snoozed_items: queue.snoozed_items || [] });
 write('decisions.queue.snoozed', { ...queue, count: awake.length, snoozed: asleep.length, items: awake, snoozed_items: asleep });
 for (const z of asleep) write(`decisions.${z.id}.snoozed`, { ...read(`decisions.${z.id}`), status: 'snoozed', status_reason: z.status_reason, snoozed_until: z.snoozed_until });
+
+// ---------- next steps ----------
+const READINGS = { yes: 'The lab’s test backs this.', no_edge: 'The lab’s test shows no clear edge either way.', no: 'The lab’s test does not back this.', untested: 'The lab has not judged this yet.' };
+const labTest = (row, title, sentence, verdict, stance, reading) => ({ row, title, sentence, verdict, tested_at: at('05:00:00', '2026-11-08'), stance, reading, words: READINGS[reading] });
+const todo = (id, text, source, o = {}) => ({ id, symbol: null, date: null, until: null, text, detail: null, why: null, basis: null, changes_if: null, source, ref: null, status: null, completes: null, when: null, read: null, undo: null, evidence: [], backed: null, ...o });
+const mine = (sid) => ({ method: 'DELETE', path: `/api/decisions/next-steps/${sid}` });
+const PLAN_BASIS = 'Your ACME plan, version 2, approved Nov 6.';
+const nextSteps = {
+  as_of: '2026-11-09',
+  days: 90,
+  count: 3,
+  items: [
+    todo('plan:ACME:harvest', 'Sell 40 ACME to harvest the loss', 'plan', {
+      symbol: 'ACME',
+      date: '2026-11-13',
+      until: '2026-11-20',
+      detail: 'From Individual. Lots: Specific Shares, highest-cost lots.',
+      why: 'A sale below your cost books the loss against this year’s taxes.',
+      basis: PLAN_BASIS,
+      changes_if: 'No longer worth doing if ACME is back above your cost.',
+      ref: { symbol: 'ACME', version: 2, step_id: 'harvest', kind: 'harvest' },
+      status: 'upcoming',
+      completes: 'broker',
+      evidence: [labTest('lib-harvest', 'Tax-loss harvesting', 'Helped: ahead in 70% of 120 start months.', 'held_up', 'for', 'yes')],
+      backed: 'yes',
+    }),
+    todo('deposit:payday:2026-11-18', 'Deposit of $500 lands. Its route is waiting in your queue', 'deposit', {
+      date: '2026-11-18',
+      detail: 'Into Individual.',
+      why: 'VXUS is the most under target, so the deposit closes that gap first.',
+      basis: 'The Plan keeper’s deposit route from Nov 9, not approved yet.',
+      changes_if: 'Follows whatever route you approve before the deposit lands.',
+      ref: { deposit_id: 'payday', decision_id: 'd_20261109130500_168372' },
+      status: 'upcoming',
+      completes: 'you',
+      evidence: [labTest('lib-deposit-to-drift', 'Send deposits to the most underweight fund', 'About even: ahead in 52% of 120 start months.', 'within_noise', 'for', 'no_edge')],
+      backed: 'no_edge',
+    }),
+    todo('you:s_20261109150000_32032d_4835', 'I’ll trim FTEC after Dec 6, once the year’s gains are clear.', 'you', {
+      symbol: 'FTEC',
+      date: '2026-12-07',
+      until: '2026-12-31',
+      basis: 'Your words on Nov 9, when you passed on “Trim $90 FTEC”.',
+      changes_if: 'Completes itself when the broker shows the sale, and leaves the list after Dec 31 if there is none. Yours to take off the list.',
+      ref: { step_id: 's_20261109150000_32032d_4835', decision_id: 'd_20261109150000_32032d', kind: 'trim' },
+      status: 'upcoming',
+      completes: 'broker',
+      read: { date: '2026-12-07', until: '2026-12-31', phrase: 'after Dec 6' },
+      undo: mine('s_20261109150000_32032d_4835'),
+      evidence: [labTest('lib-trim-winners', 'Trim what has run ahead', null, null, 'for', 'untested')],
+      backed: 'untested',
+    }),
+  ],
+  standing: [
+    todo('you:s_20261109150000_632595_d3af', 'I’ll wait for earnings first', 'you', {
+      symbol: 'NOVA',
+      basis: 'Your words on Nov 9, when you passed on “Buy $200 NOVA”.',
+      changes_if: 'Yours to take off the list.',
+      ref: { step_id: 's_20261109150000_632595_d3af', decision_id: 'd_20261109150000_632595', kind: 'add' },
+      completes: 'broker',
+      undo: mine('s_20261109150000_632595_d3af'),
+    }),
+    todo('nobuy:ACME', 'No ACME buys in any account until 31 days after the sale', 'plan', { symbol: 'ACME', why: 'A buy within 31 days of a loss sale cancels the tax loss (the wash-sale rule).', basis: PLAN_BASIS, changes_if: 'Ends by itself.', ref: { symbol: 'ACME', version: 2, step_id: 'harvest' }, completes: 'desk' }),
+    todo('agreed:d_20261107150000_e09ae0', 'Hold off on new BND until the rate decision', 'agreed', {
+      symbol: 'BND',
+      until: '2026-12-09',
+      why: 'Bond prices can move sharply on the day of a rate decision.',
+      basis: 'You agreed to this Risk desk note on Nov 7.',
+      changes_if: 'The rate decision is out.',
+      ref: { decision_id: 'd_20261107150000_e09ae0' },
+      completes: 'desk',
+      evidence: [labTest('lib-wait-for-rates', 'Wait for a rate decision before buying bonds', 'Hurt: behind in 61% of 120 start months.', 'fell_short', 'for', 'no')],
+      backed: 'no',
+    }),
+    todo('rule:no-margin-buys', 'No new buys on margin', 'rule', {
+      why: 'Borrowed money costs about 12% a year whether or not the buy works out.',
+      basis: 'One of your rules.',
+      changes_if: 'Changes only when you edit your rules in Settings.',
+      ref: { rule_id: 'no-margin-buys', rules_version: 1 },
+      evidence: [labTest('lib-margin-dip', 'Borrow on margin to buy a dip', 'Hurt: behind in 80% of 120 start months.', 'fell_short', 'against', 'yes')],
+      backed: 'yes',
+    }),
+    todo('plan:ACME:add', 'Add on a pullback', 'plan', { symbol: 'ACME', why: 'The plan adds only at a better price than today’s.', basis: PLAN_BASIS, changes_if: 'Changes when you approve a new version of the ACME plan.', ref: { symbol: 'ACME', version: 2, step_id: 'add', kind: 'add' }, status: 'waiting', completes: 'broker', when: 'On a pullback below $2.60' }),
+  ],
+  readings: READINGS,
+};
+const nextStepsNone = { as_of: null, days: 90, count: 0, items: [], standing: [], readings: READINGS };
+write('decisions.next-steps', nextSteps);
+for (const name of ['fresh', 'never', 'empty']) write(`decisions.next-steps.${name}`, nextStepsNone);
 
 // ---------- what a finished job did ----------
 const jobs = read('jobs');

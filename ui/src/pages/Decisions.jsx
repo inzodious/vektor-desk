@@ -6,12 +6,14 @@ import { Combo } from '../components/Combo.jsx';
 import { Subtabs } from '../components/Subtabs.jsx';
 import { ProposalCard } from '../decisions/ProposalCard.jsx';
 import { Detail } from '../decisions/Detail.jsx';
+import { NextSteps } from '../decisions/NextSteps.jsx';
 import { accountLabel } from '../live/context.js';
 import { postJson, useApi } from '../lib/api.js';
 import { dayWords } from '../lib/charts.js';
 import { DECISION_TABS, kindName, needsReason, oneLine, originName } from '../lib/decisions.js';
 import { usd } from '../lib/format.js';
 import { whenWords } from '../lib/morning.js';
+import { addedStep, undoStep } from '../lib/nextsteps.js';
 import { snoozedRows, successorLine } from '../lib/queue.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 import { useGap } from '../start/context.js';
@@ -188,6 +190,8 @@ export default function Decisions() {
   const [params, setParams] = useSearchParams();
   const queue = useApi('/api/decisions/queue', { every: 60000 });
   const placing = useApi('/api/decisions/journal?status=approved&limit=20');
+  const steps = useApi('/api/decisions/next-steps?days=90', { every: 300000 });
+  const [added, setAdded] = useState(null);
   const [desk, setDesk] = useState('all');
   const [note, setNote] = useState(null);
   const [showSnoozed, setShowSnoozed] = useState(false);
@@ -210,6 +214,7 @@ export default function Decisions() {
       return n;
     }, { replace: true });
     setNote(null);
+    setAdded(null);
     if (window.matchMedia?.('(max-width: 860px)').matches) requestAnimationFrame(() => detailRef.current?.scrollIntoView({ block: 'start' }));
   };
 
@@ -222,8 +227,22 @@ export default function Decisions() {
       else n.delete('d');
       return n;
     }, { replace: true });
+    setAdded(addedStep(out));
     queue.reload();
     placing.reload();
+    steps.reload();
+  };
+
+  const undoAdded = async () => {
+    const path = added?.undo;
+    setAdded(null);
+    if (!path) return;
+    try {
+      setNote(await undoStep(path));
+    } catch (e) {
+      setNote(e.message);
+    }
+    steps.reload();
   };
 
   const openSnoozed = () => {
@@ -282,6 +301,7 @@ export default function Decisions() {
           </>
         }
       />
+      <NextSteps api={steps} />
       <section className="grid">
         <div className="c5">
           <div className="card" style={{ '--i': 1 }}>
@@ -293,6 +313,18 @@ export default function Decisions() {
               <p className="act-note" role="status">
                 <Icon name="check" />
                 {note}
+              </p>
+            ) : null}
+            {added ? (
+              <p className="act-note step-added" role="status" data-testid="step-added">
+                <span>
+                  Added to your next steps: “{added.text}”{added.read ? `, ${added.read}` : ''}.
+                </span>
+                {added.undo ? (
+                  <button className="link" type="button" onClick={undoAdded}>
+                    Undo
+                  </button>
+                ) : null}
               </p>
             ) : null}
             {items.length ? (

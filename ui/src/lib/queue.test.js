@@ -30,16 +30,16 @@ describe('what became of a replaced proposal', () => {
 
   it('points at the one that is still open', () => {
     const open = cleared.items.find((d) => d.successor?.open);
-    expect(successorLine(open)).toEqual({ open: true, id: open.successor.id, text: 'The latest one, “Buy $400 ACME”, is waiting in your queue.' });
-    expect(successorLine({ successor: { id: 'b', title: 'Trim FTEC', status: 'snoozed', open: true } }).text).toBe('The latest one, “Trim FTEC”, is snoozed.');
-    expect(successorLine({ successor: { id: 'b', status: 'proposed', open: true } }).text).toBe('The latest one is waiting in your queue.');
+    expect(successorLine(open)).toEqual({ open: true, id: open.successor.id, text: 'It became “Buy $400 ACME”. Waiting in your queue.' });
+    expect(successorLine({ successor: { id: 'b', title: 'Trim FTEC', status: 'snoozed', open: true, outcome: 'Snoozed until Nov 12.' } }).text).toBe('It became “Trim FTEC”. Snoozed until Nov 12.');
+    expect(successorLine({ successor: { id: 'b', status: 'proposed', open: true, outcome: 'Waiting in your queue.' } }).text).toBe('Waiting in your queue.');
   });
 
-  it('says why when the chain ended with nothing', () => {
+  it('prints the desk’s sentence when the chain ended', () => {
     const gone = cleared.items.find((d) => d.successor && !d.successor.open);
-    expect(successorLine(gone)).toEqual({ open: false, id: gone.successor.id, text: 'The latest one, “Buy $300 ACME”, has left the queue too. ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.' });
-    expect(successorLine({ successor: { title: 'Buy $50 BND', status: 'approved', status_reason: 'fine', open: false } }).text).toBe('You approved the latest one, “Buy $50 BND”.');
-    expect(successorLine({ successor: { title: 'Buy $50 BND', status: 'passed', open: false } }).text).toBe('You passed on the latest one, “Buy $50 BND”.');
-    expect(successorLine({ successor: { status: 'expired', status_reason: '{"raw":1}', open: false } }).text).toBe('The latest one has left the queue too.');
+    expect(successorLine(gone)).toEqual({ open: false, id: gone.successor.id, text: 'It became “Buy $300 ACME”. ACME is at $23.50, above the $18.00 to $22.00 zone this was written for.' });
+    expect(successorLine({ successor: { title: 'Buy $50 BND', status: 'passed', open: false, outcome: 'You passed on it on Nov 9. Your reason: Not on margin.' } }).text).toBe('It became “Buy $50 BND”. You passed on it on Nov 9. Your reason: Not on margin.');
+    expect(successorLine({ successor: { title: 'Buy $50 BND', status: 'expired', open: false, outcome: '{"raw":1}' } }).text).toBe('It became “Buy $50 BND”.');
+    expect(successorLine({ successor: { status: 'expired', open: false } })).toBeNull();
   });
 });

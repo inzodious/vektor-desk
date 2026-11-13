@@ -1,0 +1,13 @@
+{
+ "as_of": null,
+ "days": 90,
+ "count": 0,
+ "items": [],
+ "standing": [],
+ "readings": {
+  "yes": "The lab’s test backs this.",
+  "no_edge": "The lab’s test shows no clear edge either way.",
+  "no": "The lab’s test does not back this.",
+  "untested": "The lab has not judged this yet."
+ }
+}

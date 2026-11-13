@@ -1,0 +1,270 @@
+{
+ "as_of": "2026-11-09",
+ "days": 90,
+ "count": 3,
+ "items": [
+  {
+   "id": "plan:ACME:harvest",
+   "symbol": "ACME",
+   "date": "2026-11-13",
+   "until": "2026-11-20",
+   "text": "Sell 40 ACME to harvest the loss",
+   "detail": "From Individual. Lots: Specific Shares, highest-cost lots.",
+   "why": "A sale below your cost books the loss against this year’s taxes.",
+   "basis": "Your ACME plan, version 2, approved Nov 6.",
+   "changes_if": "No longer worth doing if ACME is back above your cost.",
+   "source": "plan",
+   "ref": {
+    "symbol": "ACME",
+    "version": 2,
+    "step_id": "harvest",
+    "kind": "harvest"
+   },
+   "status": "upcoming",
+   "completes": "broker",
+   "when": null,
+   "read": null,
+   "undo": null,
+   "evidence": [
+    {
+     "row": "lib-harvest",
+     "title": "Tax-loss harvesting",
+     "sentence": "Helped: ahead in 70% of 120 start months.",
+     "verdict": "held_up",
+     "tested_at": "2026-11-08T05:00:00+00:00",
+     "stance": "for",
+     "reading": "yes",
+     "words": "The lab’s test backs this."
+    }
+   ],
+   "backed": "yes"
+  },
+  {
+   "id": "deposit:payday:2026-11-18",
+   "symbol": null,
+   "date": "2026-11-18",
+   "until": null,
+   "text": "Deposit of $500 lands. Its route is waiting in your queue",
+   "detail": "Into Individual.",
+   "why": "VXUS is the most under target, so the deposit closes that gap first.",
+   "basis": "The Plan keeper’s deposit route from Nov 9, not approved yet.",
+   "changes_if": "Follows whatever route you approve before the deposit lands.",
+   "source": "deposit",
+   "ref": {
+    "deposit_id": "payday",
+    "decision_id": "d_20261109130500_168372"
+   },
+   "status": "upcoming",
+   "completes": "you",
+   "when": null,
+   "read": null,
+   "undo": null,
+   "evidence": [
+    {
+     "row": "lib-deposit-to-drift",
+     "title": "Send deposits to the most underweight fund",
+     "sentence": "About even: ahead in 52% of 120 start months.",
+     "verdict": "within_noise",
+     "tested_at": "2026-11-08T05:00:00+00:00",
+     "stance": "for",
+     "reading": "no_edge",
+     "words": "The lab’s test shows no clear edge either way."
+    }
+   ],
+   "backed": "no_edge"
+  },
+  {
+   "id": "you:s_20261109150000_32032d_4835",
+   "symbol": "FTEC",
+   "date": "2026-12-07",
+   "until": "2026-12-31",
+   "text": "I’ll trim FTEC after Dec 6, once the year’s gains are clear.",
+   "detail": null,
+   "why": null,
+   "basis": "Your words on Nov 9, when you passed on “Trim $90 FTEC”.",
+   "changes_if": "Completes itself when the broker shows the sale, and leaves the list after Dec 31 if there is none. Yours to take off the list.",
+   "source": "you",
+   "ref": {
+    "step_id": "s_20261109150000_32032d_4835",
+    "decision_id": "d_20261109150000_32032d",
+    "kind": "trim"
+   },
+   "status": "upcoming",
+   "completes": "broker",
+   "when": null,
+   "read": {
+    "date": "2026-12-07",
+    "until": "2026-12-31",
+    "phrase": "after Dec 6"
+   },
+   "undo": {
+    "method": "DELETE",
+    "path": "/api/decisions/next-steps/s_20261109150000_32032d_4835"
+   },
+   "evidence": [
+    {
+     "row": "lib-trim-winners",
+     "title": "Trim what has run ahead",
+     "sentence": null,
+     "verdict": null,
+     "tested_at": "2026-11-08T05:00:00+00:00",
+     "stance": "for",
+     "reading": "untested",
+     "words": "The lab has not judged this yet."
+    }
+   ],
+   "backed": "untested"
+  }
+ ],
+ "standing": [
+  {
+   "id": "you:s_20261109150000_632595_d3af",
+   "symbol": "NOVA",
+   "date": null,
+   "until": null,
+   "text": "I’ll wait for earnings first",
+   "detail": null,
+   "why": null,
+   "basis": "Your words on Nov 9, when you passed on “Buy $200 NOVA”.",
+   "changes_if": "Yours to take off the list.",
+   "source": "you",
+   "ref": {
+    "step_id": "s_20261109150000_632595_d3af",
+    "decision_id": "d_20261109150000_632595",
+    "kind": "add"
+   },
+   "status": null,
+   "completes": "broker",
+   "when": null,
+   "read": null,
+   "undo": {
+    "method": "DELETE",
+    "path": "/api/decisions/next-steps/s_20261109150000_632595_d3af"
+   },
+   "evidence": [],
+   "backed": null
+  },
+  {
+   "id": "nobuy:ACME",
+   "symbol": "ACME",
+   "date": null,
+   "until": null,
+   "text": "No ACME buys in any account until 31 days after the sale",
+   "detail": null,
+   "why": "A buy within 31 days of a loss sale cancels the tax loss (the wash-sale rule).",
+   "basis": "Your ACME plan, version 2, approved Nov 6.",
+   "changes_if": "Ends by itself.",
+   "source": "plan",
+   "ref": {
+    "symbol": "ACME",
+    "version": 2,
+    "step_id": "harvest"
+   },
+   "status": null,
+   "completes": "desk",
+   "when": null,
+   "read": null,
+   "undo": null,
+   "evidence": [],
+   "backed": null
+  },
+  {
+   "id": "agreed:d_20261107150000_e09ae0",
+   "symbol": "BND",
+   "date": null,
+   "until": "2026-12-09",
+   "text": "Hold off on new BND until the rate decision",
+   "detail": null,
+   "why": "Bond prices can move sharply on the day of a rate decision.",
+   "basis": "You agreed to this Risk desk note on Nov 7.",
+   "changes_if": "The rate decision is out.",
+   "source": "agreed",
+   "ref": {
+    "decision_id": "d_20261107150000_e09ae0"
+   },
+   "status": null,
+   "completes": "desk",
+   "when": null,
+   "read": null,
+   "undo": null,
+   "evidence": [
+    {
+     "row": "lib-wait-for-rates",
+     "title": "Wait for a rate decision before buying bonds",
+     "sentence": "Hurt: behind in 61% of 120 start months.",
+     "verdict": "fell_short",
+     "tested_at": "2026-11-08T05:00:00+00:00",
+     "stance": "for",
+     "reading": "no",
+     "words": "The lab’s test does not back this."
+    }
+   ],
+   "backed": "no"
+  },
+  {
+   "id": "rule:no-margin-buys",
+   "symbol": null,
+   "date": null,
+   "until": null,
+   "text": "No new buys on margin",
+   "detail": null,
+   "why": "Borrowed money costs about 12% a year whether or not the buy works out.",
+   "basis": "One of your rules.",
+   "changes_if": "Changes only when you edit your rules in Settings.",
+   "source": "rule",
+   "ref": {
+    "rule_id": "no-margin-buys",
+    "rules_version": 1
+   },
+   "status": null,
+   "completes": null,
+   "when": null,
+   "read": null,
+   "undo": null,
+   "evidence": [
+    {
+     "row": "lib-margin-dip",
+     "title": "Borrow on margin to buy a dip",
+     "sentence": "Hurt: behind in 80% of 120 start months.",
+     "verdict": "fell_short",
+     "tested_at": "2026-11-08T05:00:00+00:00",
+     "stance": "against",
+     "reading": "yes",
+     "words": "The lab’s test backs this."
+    }
+   ],
+   "backed": "yes"
+  },
+  {
+   "id": "plan:ACME:add",
+   "symbol": "ACME",
+   "date": null,
+   "until": null,
+   "text": "Add on a pullback",
+   "detail": null,
+   "why": "The plan adds only at a better price than today’s.",
+   "basis": "Your ACME plan, version 2, approved Nov 6.",
+   "changes_if": "Changes when you approve a new version of the ACME plan.",
+   "source": "plan",
+   "ref": {
+    "symbol": "ACME",
+    "version": 2,
+    "step_id": "add",
+    "kind": "add"
+   },
+   "status": "waiting",
+   "completes": "broker",
+   "when": "On a pullback below $2.60",
+   "read": null,
+   "undo": null,
+   "evidence": [],
+   "backed": null
+  }
+ ],
+ "readings": {
+  "yes": "The lab’s test backs this.",
+  "no_edge": "The lab’s test shows no clear edge either way.",
+  "no": "The lab’s test does not back this.",
+  "untested": "The lab has not judged this yet."
+ }
+}
