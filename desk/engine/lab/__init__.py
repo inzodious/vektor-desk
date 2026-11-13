@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from desk.config import Config
 from desk.db import connect
 from desk.engine.french import PORTFOLIO_FILES
+from desk.engine.lab import listrules
 from desk.engine.lab.data import PUBLIC_ROLE, SCREEN_KIND, NotReady, data_path, ledger_path
 from desk.engine.lab.library import TRANSFORMS, catalog
 from desk.engine.lab.rulebook import RULES
@@ -61,6 +62,7 @@ def grammar() -> dict:
             "notes": "margin and paydown need rate_pct as one number (paydown also debit_pct, the starting debit as a share of the account); "
             " every rule runs against deposits split pro rata with no selling; grid cap 12",
         },
+        "list_rule": listrules.describe(),
     }
 
 
