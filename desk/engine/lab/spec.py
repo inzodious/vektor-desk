@@ -5,8 +5,8 @@ import re
 from dataclasses import dataclass, field
 
 from desk.engine.french import PORTFOLIO_FILES
-from desk.engine.lab.data import FRENCH_KIND, FRENCH_MARKET, FUND_KINDS, PUBLIC_COVERAGE, SCREEN_KIND, SMALL_CAPS, SMALLCAP_BENCHMARK, LabData
-from desk.engine.lab.library import FEATURES, TRANSFORMS, window_days
+from desk.engine.lab.data import FRENCH_KIND, FRENCH_MARKET, FUND_KINDS, PUBLIC_COVERAGE, PUBLIC_SIZES, SCREEN_KIND, SMALL_CAPS, SMALLCAP_BENCHMARK, LabData
+from desk.engine.lab.library import FEATURES, SIZE, TRANSFORMS, window_days
 from desk.engine.market import BENCHMARKS
 
 SETS = {
@@ -15,7 +15,10 @@ SETS = {
     "benchmarks": BENCHMARKS,
 }
 SET_WORDS = (("sector", "sector_etfs"), ("core", "core_etfs"), ("broad", "core_etfs"), ("benchmark", "benchmarks"))
-REBALANCE = {"weekly": "W", "monthly": "M", "quarterly": "Q", "w": "W", "m": "M", "q": "Q"}
+REBALANCE = {"weekly": "W", "monthly": "M", "quarterly": "Q", "yearly": "Y", "annual": "Y", "w": "W", "m": "M", "q": "Q", "y": "Y"}
+HOLD_DAYS = (21, 1260)
+NO_SIZES = "company sizes are not in the lab's data yet; the next lab export adds them"
+SIZE_WORDS = "Size is each company's public float when the list was drawn, moved by its share price since, so buybacks and new shares are not counted."
 SIZING = (("fixed", "fixed"), ("inverse", "inverse_vol"), ("volatility", "inverse_vol"), ("risk parity", "inverse_vol"), ("rank", "rank"), ("equal", "equal"))
 MIN_WEIGHT_PRESENT = 0.5
 MIN_LIVE = 0.9
@@ -60,6 +63,7 @@ class Spec:
     weights: dict[str, float] | None = None
     start: str | None = None
     vol_target: float | None = None
+    idle: str | None = None
 
     @property
     def hash(self) -> str:
@@ -73,6 +77,7 @@ class Variant:
     min_signal: float | None
     hold_rank: int | None
     windows: list[int]
+    hold_days: int | None = None
 
     @property
     def key(self) -> str:
@@ -122,14 +127,18 @@ def _entry(entry, params, problems) -> dict:
 def _exit(exit_, params, problems) -> dict:
     if isinstance(exit_, dict):
         rank = exit_.get("hold_rank", exit_.get("rank_above"))
-        return {"hold_rank": _expr(rank, params, problems, "exit.hold_rank") if rank is not None else None}
+        days = exit_.get("hold_days")
+        if days is not None and (rank is not None or isinstance(days, bool) or not isinstance(days, int) or not HOLD_DAYS[0] <= days <= HOLD_DAYS[1]):
+            problems.append(f"exit hold_days must be a whole number of trading days from {HOLD_DAYS[0]} to {HOLD_DAYS[1]}, and cannot go with hold_rank")
+            days = None
+        return {"hold_rank": _expr(rank, params, problems, "exit.hold_rank") if rank is not None else None, "hold_days": days}
     text = str(exit_ or "").lower()
     m = re.search(r"top\s+(\{?[a-z0-9_]+\}?)", text)
     if m:
-        return {"hold_rank": _expr(m.group(1), params, problems, "exit")}
+        return {"hold_rank": _expr(m.group(1), params, problems, "exit"), "hold_days": None}
     if text and "rebalance" not in text and "drops" not in text and "falls out" not in text:
-        problems.append('exit must be "rebalance" or keep a holding while it stays in the top N, for example {"hold_rank": 5}')
-    return {"hold_rank": None}
+        problems.append('exit must be "rebalance", keep a holding while it stays in the top N ({"hold_rank": 5}) or keep it a fixed time ({"hold_days": 252})')
+    return {"hold_rank": None, "hold_days": None}
 
 
 def _rebalance(value, problems) -> str:
@@ -137,7 +146,7 @@ def _rebalance(value, problems) -> str:
     for word, code in REBALANCE.items():
         if text == word or text.startswith(word) and len(word) > 1:
             return code
-    problems.append("rebalance must be weekly, monthly or quarterly")
+    problems.append("rebalance must be weekly, monthly, quarterly or yearly")
     return "M"
 
 
@@ -239,6 +248,17 @@ def _vol_target(value, problems: list[str]) -> float | None:
     return target
 
 
+def _idle(value, data: LabData | None, problems: list[str]) -> str | None:
+    raw = value.get("idle") if isinstance(value, dict) else None
+    if not raw:
+        return None
+    sym = str(raw).upper()
+    if data is not None and (sym not in data.series or (data.kinds.get(sym, "unknown") not in FUND_KINDS and sym not in BENCHMARKS)):
+        problems.append(f"sizing idle must be a fund with price history in the lab; {sym} is not")
+        return None
+    return sym
+
+
 def cap_stocks(weights: dict[str, float], stocks: set[str], cap: float) -> tuple[dict[str, float], list[str]]:
     out, capped = dict(weights), set()
     for _ in out:
@@ -336,6 +356,11 @@ def _cap_pct(value, problems: list[str]) -> float | None:
     return pct / 100
 
 
+def exit_days(exit_) -> int | None:
+    days = exit_.get("hold_days") if isinstance(exit_, dict) else None
+    return days if isinstance(days, int) and not isinstance(days, bool) else None
+
+
 def local_only(raw: object, plan: bool = False) -> bool:
     if not isinstance(raw, dict):
         return False
@@ -383,6 +408,7 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
     weights = _weights(raw.get("sizing"), problems)
     filters = _filters(raw.get("filters"), data, problems)
     vol_target = _vol_target(raw.get("sizing"), problems)
+    idle = _idle(raw.get("sizing"), data, problems)
     constraints = raw.get("constraints") or {}
     if constraints.get("margin") or constraints.get("long_only") is False:
         problems.append("the lab runs long only and never on margin")
@@ -426,6 +452,16 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
             caveats.append(f"{', '.join(late)} started trading later; until each one lists, the rest of the mix carries its share.")
     if universe.get("kind") == SCREEN_KIND and data is not None:
         start = (data.coverage(PUBLIC_COVERAGE) or {}).get("tests_from")
+    if SIZE in {m for m, _, _ in signals} | {f[0] for f in filters}:
+        if universe.get("kind") != SCREEN_KIND:
+            problems.append("the size feature needs a screen universe")
+        elif data is not None and not data.coverage(PUBLIC_SIZES):
+            problems.append(NO_SIZES)
+        caveats.append(SIZE_WORDS)
+    if idle and weights is not None:
+        problems.append("sizing idle cannot be combined with fixed weights")
+    if exit_days(raw.get("exit")) and (weights is not None or universe.get("members")):
+        problems.append("exit hold_days needs signals to pick from, not a fixed mix")
     if vol_target:
         caveats.append(f"Scaled down whenever its last three months ran hotter than {vol_target:.0%} a year; it never borrows to scale up.")
     fixed = weights is not None or bool(universe.get("members")) or universe.get("set") in MIX_SETS
@@ -469,6 +505,7 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
         weights=weights,
         start=start,
         vol_target=vol_target,
+        idle=idle,
     )
 
 
@@ -506,7 +543,8 @@ def resolve(spec: Spec, params: dict) -> Variant:
     top_n = int(get(spec.entry["top_n"]))
     hold = get(spec.exit["hold_rank"])
     minimum = get(spec.entry["min_signal"])
-    return Variant(dict(params), max(1, top_n), float(minimum) if minimum is not None else None, max(top_n, int(hold)) if hold is not None else None, windows)
+    floor = float(minimum) if minimum is not None else None
+    return Variant(dict(params), max(1, top_n), floor, max(top_n, int(hold)) if hold is not None else None, windows, spec.exit.get("hold_days"))
 
 
 def variants(spec: Spec, grid: dict | None, budget: int, seed: int) -> list[Variant]:

@@ -45,10 +45,12 @@ def grammar() -> dict:
         'Add "symbol": "SPY" to read the value from that fund instead, a market-wide switch that sends the whole strategy to cash',
         "signals": "metric_id from features, window like 63d, 6m or 1y (or {param}d), transform: " + ", ".join(TRANSFORMS),
         "entry": '{"top_n": 3 or "param:top_n", "min_signal": 0} (min_signal applies to the first signal\'s raw value), or "top 3 by rank"',
-        "exit": '"rebalance", or {"hold_rank": 5} to keep a holding while it ranks in the top 5',
-        "rebalance": "weekly, monthly or quarterly; signals at the close, trades at the next open",
+        "exit": '"rebalance", {"hold_rank": 5} to keep a holding while it ranks in the top 5, or {"hold_days": 252} to leave a holding untouched '
+        "for that many trading days after it is bought, whatever its rank, then drop it unless it still qualifies",
+        "rebalance": "weekly, monthly, quarterly or yearly (every 252 trading days from the start of the test); signals at the close, trades at the next open",
         "sizing": 'equal, inverse_vol (63-day), rank, or a fixed mix {"weights": {"SPY": 60, "AGG": 40}} (funds only; needs no signal). '
-        'In the object form, "vol_target": 0.15 scales the holdings down into cash while their 63-day volatility runs above 15% a year',
+        'In the object form, "vol_target": 0.15 scales the holdings down into cash while their 63-day volatility runs above 15% a year, '
+        'and "idle": "SPY" keeps whatever the picks do not use in that fund instead of cash',
         "params": '{"top_n": {"min": 2, "max": 5, "default": 3}} or a list of allowed values; grid values must sit inside',
         "costs": "set by the lab: 5 bps funds and French portfolios, 15 bps stocks, 25 bps thin stocks",
         "factor_check": "automatic: alpha after the six French factors on the walk-forward record; alpha t of 2 or more passes",

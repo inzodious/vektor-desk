@@ -42,6 +42,7 @@ PLAN_FILE = "plan.json"
 OWN_FILE = "own.db"
 PUBLIC_ROLE = "public"
 PUBLIC_COVERAGE = "public_coverage"
+PUBLIC_SIZES = "public_sizes"
 GONE_SESSIONS = 10
 WORKER_ROLES = dict.fromkeys(("held", "watch", "past", "plan"), "universe")
 SMALLCAP_KIND = "stock"
@@ -108,7 +109,7 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
         add = "INSERT OR IGNORE INTO bars VALUES (?, ?, ?, ?, ?, ?)"
         small = _small_caps(desk, out)
         kinds = _public_kinds(desk, kinds, targets)
-        public, cover = _public(desk)
+        public, cover, sizes = _public(desk)
         shared = PUBLIC_FUNDS | frozenset(QUALITY) | public | small
         mine: dict[str, bool] = {}
         kept: list[tuple] = []
@@ -160,6 +161,7 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
         listed = cover({s for s in public if s in spans})
         if listed:
             settings[PUBLIC_COVERAGE] = json.dumps(listed)
+            settings[PUBLIC_SIZES] = json.dumps({s: sizes[s] for s in sorted(sizes) if s in spans})
         if small and _has(desk, "insider_buys"):
             from desk.engine.insider import coverage
 
@@ -192,8 +194,8 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
 def _public(desk: sqlite3.Connection):
     from desk.engine import public
 
-    priced = frozenset(r["symbol"] for r in public.names(desk) if r["state"] == public.PRICED and r["symbol"])
-    return priced, lambda loaded: public.coverage(desk, loaded)
+    rows = [r for r in public.names(desk) if r["state"] == public.PRICED and r["symbol"]]
+    return frozenset(r["symbol"] for r in rows), lambda loaded: public.coverage(desk, loaded), {r["symbol"]: [r["float_usd"], r["float_at"]] for r in rows}
 
 
 def _write_own(path: Path, rows: list[tuple], kinds: dict[str, str], roles: dict[str, str | None]) -> dict[str, tuple[str, str]]:
@@ -350,6 +352,7 @@ class LabData:
     smallcap: dict[str, set[str]] = field(default_factory=dict)
     earnings: dict[str, tuple[list[str], list[float]]] = field(default_factory=dict)
     held_mix: dict[str, float] = field(default_factory=dict)
+    sizes: dict[str, tuple[float, str]] | None = None
 
     def coverage(self, key: str = "insider_coverage") -> dict | None:
         raw = self.settings.get(key)
@@ -357,6 +360,11 @@ class LabData:
             return json.loads(raw) if raw else None
         except ValueError:
             return None
+
+    def size_base(self, sym: str) -> tuple[float, str] | None:
+        if self.sizes is None:
+            self.sizes = {str(k): (float(v[0]), str(v[1])) for k, v in (self.coverage(PUBLIC_SIZES) or {}).items() if v and v[0]}
+        return self.sizes.get(sym)
 
     @property
     def end(self) -> str:

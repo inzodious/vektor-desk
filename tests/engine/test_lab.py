@@ -595,6 +595,8 @@ def test_nothing_about_what_is_held_or_planned_is_in_the_file_a_worker_downloads
         "pct": 66.7,
         "enough": False,
     }
+    sizes = json.loads(out.execute("SELECT value FROM settings WHERE key='public_sizes'").fetchone()[0])
+    assert sizes == {"BIGCO": [5e10, "2011-06-30"], "OTHERCO": [5e10, "2011-06-30"]}
     words = " ".join(str(v) for t in tables if t != "bars" for r in out.execute(f"SELECT * FROM {t}") for v in r)
     out.close()
     assert not any(word in words for word in ("held", "plan", "individual", "0.8333", "0.1667", "0.6125", "0.3875"))

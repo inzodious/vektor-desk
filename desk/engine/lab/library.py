@@ -14,11 +14,14 @@ FEATURES = {
     "ma_cross": "Distance of the 50-day moving average from the moving average over the window; above zero with a 200-day window is a golden cross",
     "range_52w": "Position between the window's low (0) and high (1); 252 days is the 52-week range",
     "dd": "Drawdown from the window's high",
+    "size": "Company size: its public float when the stock list was drawn, moved by its total return since, or since its first price if that came later "
+    "(stock screens only; buybacks and new shares are not counted; the window is not used)",
     "insider.buyers": "Distinct directors and officers with open-market Form 4 purchases known inside the window (small caps; known the session after filing)",
     "insider.buy_usd": "Dollars of open-market Form 4 purchases by directors and officers known inside the window",
     "earnings.surprise": "Latest quarterly EPS minus the same quarter a year earlier, over the close before the news; only if the news is inside the window",
     "earnings.days_since": "Sessions since the latest earnings news, if it is inside the window",
 }
+SIZE = "size"
 EVENT_FEATURES = {"insider.buyers", "insider.buy_usd"}
 EARNINGS_FEATURES = {"earnings.surprise", "earnings.days_since"}
 TRANSFORMS = {
@@ -88,6 +91,12 @@ def value(metric_id: str, s: Series, i: int, days: int, events=None) -> float | 
         lo = s.dates[max(0, i - days + 1)]
         owners, usd = events_in(events, lo, s.dates[i])
         return float(len(set(owners))) if metric_id == "insider.buyers" else float(sum(usd))
+    if metric_id == SIZE:
+        if not events:
+            return None
+        usd, day = events
+        j = s.at(day) or 0
+        return usd * s.adj[i] / s.adj[j] if j <= i and s.adj[j] else None
     need = lookback(metric_id, days)
     if i < need:
         return None

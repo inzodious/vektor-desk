@@ -19,6 +19,7 @@ LTCG = 0.15
 DEFAULT_RATE = 0.24
 VOL_WINDOW = 63
 SP500 = ("SPY", "FXAIX", "VOO", "IVV")
+YEAR = 252
 
 
 @dataclass
@@ -50,6 +51,8 @@ def _period(day: str, code: str) -> tuple:
 
 
 def signal_days(cal: list[str], code: str) -> set[str]:
+    if code == "Y":
+        return set(cal[YEAR - 1 :: YEAR])
     return {a for a, b in zip(cal, cal[1:], strict=False) if _period(a, code) != _period(b, code)}
 
 
@@ -111,6 +114,8 @@ def _price(data: LabData, sym: str, day: str, field_: str = "adj") -> float | No
 
 
 def _events(data: LabData, metric: str, sym: str):
+    if metric == features.SIZE:
+        return data.size_base(sym)
     if metric in features.EARNINGS_FEATURES:
         return data.earnings.get(sym)
     return data.insider.get(sym)
@@ -134,7 +139,18 @@ def _listed(data: LabData, sym: str, day: str) -> bool:
     return bool(s) and s.dates[0] <= day
 
 
-def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dict[str, float]:
+def _staying(data: LabData, v: Variant, day: str, held: set[str], since: dict[str, str] | None) -> list[str]:
+    out = []
+    for sym in sorted(held) if v.hold_days and since else []:
+        s = data.series.get(sym)
+        i = s.index.get(day) if s else None
+        j = s.at(since[sym]) if s and sym in since else None
+        if i is not None and j is not None and i - j < v.hold_days:
+            out.append(sym)
+    return out
+
+
+def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str], since: dict[str, str] | None = None) -> dict[str, float | None]:
     raw: dict[str, list[float]] = {}
     members = universe(data, spec, day)
     for sym in members:
@@ -146,7 +162,8 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         if any(x is None for x in vals) or not _passes(data, spec, sym, s, i):
             continue
         raw[sym] = vals
-    if not raw:
+    staying = _staying(data, v, day, held, since)
+    if not raw and not staying:
         return {}
     score = {sym: 0.0 for sym in raw}
     for j, (_, _, t) in enumerate(spec.signals):
@@ -156,6 +173,8 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
     eligible = [s for s in ranked if v.min_signal is None or not raw[s] or raw[s][0] > v.min_signal]
     rank = {s: i + 1 for i, s in enumerate(ranked)}
     keep = [s for s in ranked if s in held and s in eligible and v.hold_rank and rank[s] <= v.hold_rank][: v.top_n]
+    if v.hold_days:
+        keep = staying[: v.top_n]
     chosen = keep + [s for s in eligible if s not in keep][: v.top_n - len(keep)]
     if not chosen:
         return {}
@@ -184,7 +203,10 @@ def pick(data: LabData, spec: Spec, v: Variant, day: str, held: set[str]) -> dic
         slots = max(1, min(slots, sum(_listed(data, s, day) for s in members)))
     fill = len(chosen) / slots
     cap = spec.constraints["max_position_pct"] / 100
-    return _to_target(data, spec, {s: min(x * fill, cap) for s, x in w.items() if x > 0}, day)
+    target = _to_target(data, spec, {s: min(x * fill, cap) for s, x in w.items() if x > 0}, day)
+    if v.hold_days:
+        return {s: None for s in keep} | {s: x for s, x in target.items() if s not in keep}
+    return target
 
 
 def _to_target(data: LabData, spec: Spec, weights: dict[str, float], day: str) -> dict[str, float]:
@@ -265,10 +287,11 @@ def simulate(
     realized = {"st": 0.0, "lt": 0.0}
     carry = 0.0
     out = Result(cal, [], [], [])
-    pending: dict[str, float] | None = None
+    pending: dict[str, float | None] | None = None
+    since: dict[str, str] = {}
     before = bisect_left(every, cal[0])
     if enter and before:
-        pending = pick(data, spec, v, every[before - 1], set()) or None
+        pending = pick(data, spec, v, every[before - 1], set()) or ({} if spec.idle else None)
     traded = 0.0
     for k, day in enumerate(cal):
         for sym in list(shares):
@@ -280,11 +303,19 @@ def simulate(
         if pending is not None:
             value = cash + sum(n * (_price(data, s, day, "open") or 0.0) for s, n in shares.items())
             orders = []
-            for sym in set(shares) | set(pending):
+            as_is = {s for s, w in pending.items() if w is None}
+            target = {s: w * value for s, w in pending.items() if w is not None}
+            kept = sum(shares.get(s, 0.0) * (_price(data, s, day, "open") or 0.0) for s in as_is)
+            asked = sum(target.values())
+            if as_is and asked > max(0.0, value - kept):
+                target = {s: x * max(0.0, value - kept) / asked for s, x in target.items()}
+            if spec.idle:
+                target[spec.idle] = max(0.0, value - kept - sum(target.values()))
+            for sym in (set(shares) | set(target)) - as_is:
                 px = _price(data, sym, day, "open")
                 if not px:
                     continue
-                want = pending.get(sym, 0.0) * value / px
+                want = target.get(sym, 0.0) / px
                 delta = want - shares.get(sym, 0.0)
                 if abs(delta * px) >= 1.0:
                     orders.append((delta, sym, px))
@@ -305,6 +336,8 @@ def simulate(
                 out.costs += fee
                 traded += gross
                 out.trades.append((day, sym, "buy" if delta > 0 else "sell", round(abs(delta), 6), round(px, 4), round(fee, 4)))
+            if v.hold_days:
+                since = {s: day if pending.get(s) is not None else since.get(s, day) for s in shares if s != spec.idle}
             out.turnover += traded / value if value > 0 else 0.0
             traded = 0.0
             pending = None
@@ -327,7 +360,7 @@ def simulate(
             realized = {"st": 0.0, "lt": 0.0}
         out.values.append(value)
         if day in signals and k < len(cal) - 1:
-            pending = pick(data, spec, v, day, set(shares))
+            pending = pick(data, spec, v, day, set(shares), since)
     bench = _benchmark(data, spec)
     out.bench = _index(data, bench, cal)
     sp = next((s for s in SP500 if s in data.series), None)
