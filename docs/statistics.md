@@ -949,10 +949,10 @@ Nothing a worker runs needs `own.db`: a screen reads only role `public`, a hand-
 | Field | Accepted |
 |---|---|
 | `universe` | `{"type": "fund_list", "set": "sector_etfs" \| "core_etfs" \| "benchmarks"}`, `{"type": "fund_list", "symbols": [funds only]}`, a `rule` naming a set, or `{"type": "screen", "min_history_days", "min_price"}` for single stocks from the public stock list (coverage sentence; see "Stock screens run on the public stock list"), or `{"type": "small_caps", "min_price"}` (default 2) for point-in-time small caps, benchmark IWM. A hand-picked stock list is rejected |
-| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `ma_cross` (the 50-day average against the window's average; a 200-day window above zero is a golden cross), `range_52w`, `dd`, `insider.buyers`, `insider.buy_usd`, `earnings.surprise`, `earnings.days_since`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
+| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `ma_cross` (the 50-day average against the window's average; a 200-day window above zero is a golden cross), `range_52w`, `dd`, `size` (stock screens only: a company's public float when the list was drawn, moved by its total return since; buybacks and new shares are not counted, and a caveat says so), `insider.buyers`, `insider.buy_usd`, `earnings.surprise`, `earnings.days_since`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
 | `entry` | `{"top_n": 3 \| "param:top_n", "min_signal": 0}` or "top 3 by rank". `min_signal` applies to the first signal's raw value; slots it leaves empty stay in cash |
-| `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5 |
-| `rebalance`, `sizing` | Weekly, monthly or quarterly; `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash. `"vol_target": 0.15` in `sizing` scales every weight down by target over the portfolio's own 63-day volatility whenever that ran hotter; it never scales up |
+| `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5, or `{"hold_days": 252}` (21 to 1260 trading days; not with `hold_rank`, not on a fixed mix): a holding is left untouched, neither topped up nor trimmed, until it has been held that long, then it is judged again like any other name and its clock restarts if it is picked again. New picks take only the slots and the money the held names leave |
+| `rebalance`, `sizing` | Weekly, monthly, quarterly or yearly (every 252 trading days counted from the start of the test, not each January, so a one-year test window is bought once and held); `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash, or goes into one fund with `"sizing": {"method": "equal", "idle": "SPY"}` (a fund with bars in the lab; not with fixed weights). With `idle`, a day when nothing qualifies holds the fund alone. `"vol_target": 0.15` in `sizing` scales every weight down by target over the portfolio's own 63-day volatility whenever that ran hotter; it never scales up |
 | `filters` | `[{"metric_id": "ma_gap", "window": "200d", "min": 0}]`: a name is eligible only while each raw value sits inside `min` and `max`; slots left empty stay in cash. A filter with `"symbol": "SPY"` reads that one fund instead of each holding, so it switches the whole strategy to cash; the symbol must have bars in the lab |
 | Fixed mixes | `"sizing": {"weights": {"SPY": 60, "AGG": 40}}` holds funds at fixed weights and needs no signal; `{"type": "fund_list", "set": "plan_mix"}` is the plan at its target weights; `"set": "held_mix"` is today's holdings at today's weights, single stocks included, read from `held.json` on the box, always with a hindsight caveat; a pass on it is research only, never paper. A spec that uses either mix is never offered to a worker (`spec.local_only`), and with a plan loaded neither is an experiment with no `benchmark` of its own, since it is judged against the plan; the box's own lab computes those. A fund with no history in the lab is dropped and the rest scaled up, with a caveat; under half the mix present is refused |
 | Named French portfolios | `{"type": "french", "set": "size_deciles", "members": ["lo"]}` keeps the portfolios whose name starts that way and needs no signal |
@@ -1156,16 +1156,16 @@ A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/sh
 | Kind | Entries | Examples |
 |---|---|---|
 | Old and tested | 31 | Buy and hold, 60/40, three-fund, permanent portfolio, all-weather style mix, risk parity, 200-day trend, 10-month trend across five asset classes, golden cross, volatility cap, dual momentum, asset-class momentum, 12-1 momentum (sectors, stocks, industries), sector rotation, equal-weight sectors and S&P 500, dividend growers, small value, value plus momentum, small-cap reversal, low volatility, and size, momentum, value, profitability and quality tilts from the French portfolios |
-| Practical | 17 | The plan's mix, safe mix, aggressive tech tilt, core and satellite, theme funds at equal weight, today's holdings (as held, and with single stocks capped at 10%), dip-only, beaten-down sectors, deposits held back for a dip, margin dip-buy, margin debit paid first, lump sum spread over months, deposit steering, rebalance bands, tax-loss harvesting |
+| Practical | 21 | The plan's mix, safe mix, aggressive tech tilt, core and satellite, theme funds at equal weight, today's holdings (as held, and with single stocks capped at 10%), dip-only, beaten-down sectors, deposits held back for a dip, margin dip-buy, margin debit paid first, lump sum spread over months, deposit steering, rebalance bands, tax-loss harvesting, large companies 30% under their high held a year, core plus five stock picks, the ten largest companies, the ten most beaten-down large companies |
 | Novel and creative | 14 | Trend-filtered dip-buy, sector momentum in uptrends only, sector momentum that stands down in rough markets, calm winners, 52-week-high breakout with a volatility cap, drawdown stop, buy after a 5% down week, canary rule, credit canary, tech tilt at a volatility target, discount-day entries (plain and in an uptrend only), insider cluster with a momentum filter, earnings drift where insiders also bought |
 
-62 entries: 54 experiments and 8 deposit rules. The two as-held rows are hindsight, shown but never judged (see "Hindsight rows").
+66 entries: 58 experiments and 8 deposit rules. The two as-held rows are hindsight, shown but never judged (see "Hindsight rows").
 
 **What a row is measured against.** Every row carries `benchmark` (a short label) and `benchmark_words` (one plain sentence); the payload's `benchmarks` lists each `{name, words, rows}`, most used first.
 
 | `benchmark` | `benchmark_words` | Rows |
 |---|---|---|
-| S&P 500 (SPY) | The S&P 500 index fund SPY, bought and held with dividends reinvested. | 43 |
+| S&P 500 (SPY) | The S&P 500 index fund SPY, bought and held with dividends reinvested. | 47 |
 | US stock market (French) | Every US stock weighted by size, from Ken French's research data. | 7 |
 | Small caps (IWM) | The small-company index fund IWM, bought and held with dividends reinvested. | 3 |
 | Your plan's mix | The funds in your plan at their target weights. With no plan loaded this is the S&P 500. | 1 |
@@ -1179,6 +1179,7 @@ A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/sh
 | Quality and momentum together in single stocks | The lab has no point-in-time fundamentals for single stocks. The quality tilt runs on the French portfolios; the credit canary takes the slot |
 | Small value and short-term reversal from French files | Those files are not among the sets the desk fetches. Small value is a fund row (VBR); reversal runs on the point-in-time small caps |
 | Canary that moves into bonds | Filters send a strategy to cash, not to another fund. The row holds the S&P 500 only while emerging markets and US bonds are both up over six months |
+| Profitability and cheapness (earnings yield) screens on the public stock list | They need each company's earnings as known on each date from 2012 on. The desk does not hold SEC company facts for the 200 names, and using them means a large download, share-split handling and a coverage check before any number could be trusted. `lib-profitability-tilt` and `lib-value-tilt` already answer both questions on the whole US market from 1990 |
 
 | Step | When | What happens |
 |---|---|---|
@@ -1235,7 +1236,22 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | What a gone name pays | A public name leaves at its last price, since most large companies leave by being bought. If that price is under half its one-year high it leaves at 30% less (`sim.COLLAPSED`). Every other name still leaves at 30% less (`sim.DELIST_HAIRCUT`); the small-cap stress test still counts each as a total loss |
 | Said on the row | Second caveat on every screen (`spec.PUBLIC_EXITS`): "A company that stopped trading leaves at its last price, as in a buyout. It is counted at 30% less only when that price was under half its one-year high." |
 | Known limit | A screen strategy that reaches paper sees prices up to a week old, because the list tops up weekly. Daily top-ups once a screen is on paper are not built |
-| Library | `shelf.SCREEN_REV` is 5, so the six screen rows run again. A result stored before the switch has no `public_coverage`; it keeps `leans_on_hindsight: true` and the old words until its rerun lands |
+| Library | `shelf.SCREEN_REV` is 5, so the six screen rows of the time ran again; the four added since carry it too. A result stored before the switch has no `public_coverage`; it keeps `leans_on_hindsight: true` and the old words until its rerun lands |
+
+**Rules a person follows, as stock screens.** Four Practical rows on the public stock list, each against the S&P 500, each with nothing to tune (one variant, so each adds one to the library's trial count).
+
+| Row | Rule | Built from |
+|---|---|---|
+| `lib-stock-dip-hold` | Each month, any large company 30% or more under its one-year high is bought at 5% of the portfolio (up to 20 names, deepest first) and left alone for 252 trading days. Everything else sits in SPY | `dd` filter at -0.30, `exit.hold_days` 252, `sizing.idle` SPY |
+| `lib-core-stock-picks` | 80% SPY, 4% in each of the five companies with the best 12-1 momentum, monthly | `ret_skip`, `max_position_pct` 4, `sizing.idle` SPY |
+| `lib-ten-largest` | The ten largest companies in equal parts, refreshed yearly | `size`, yearly |
+| `lib-ten-beaten` | The ten companies furthest under their one-year high, in equal parts, refreshed yearly | `dd` inverse rank, yearly |
+
+| Limit | What it means |
+|---|---|
+| One threshold | The dip row tests 30% only, the Opportunities page's own rule. A filter bound cannot be searched, and a grid of thresholds would add trials to the luck bar for little |
+| Test years start fresh | Each walk-forward test year opens with nothing held. A name bought late in a test year is held to the end of that year, not a full 252 days, and the yearly rows are bought once at the start of each test year. "Yearly" is therefore the start of each test year, which is not always January |
+| Size | The float is the one figure per company from its annual report nearest mid-2011 (`lab.db` setting `public_sizes`: symbol, dollars, date). It is moved by total return from that date, or from the first bar when prices start later. Buybacks, new shares and mergers are not counted, so the ranking drifts from true size over the years. A lab file exported before this build has no sizes; `lib-ten-largest` is then refused with a plain reason and runs the night after the next export |
 
 **Public stock list.** `public.py`, job `public` ("Public stock list"), `GET /api/engine/public-stocks`. The job builds the list and says which names Tiingo can price; the price backfill fetches them.
 
@@ -1272,7 +1288,7 @@ The job's `detail` and the route's `detail` are the same sentence, for example "
 
 `GET /api/lab/library` rows carry the same `backs`, so the Lab page and any page citing a row read it the same way.
 
-**Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the six stock screens (see "Stock screens run on the public stock list").
+**Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the ten stock screens (see "Stock screens run on the public stock list").
 
 **Rule rows.** A deposit rule is compared with its baseline for every start month. `share_better` and `share_worse` count the start months that ended ahead and behind; the rest ended the same, which happens when the rule never had cause to act. The row's line says ahead, behind and no different, and never counts a tie as worse. A result stored before `share_worse` existed states only what its numbers support. When the 5th, 50th and 95th percentile all round to 0.0 points the row reads "No difference" and is `within_noise` whatever the stored verdict.
 

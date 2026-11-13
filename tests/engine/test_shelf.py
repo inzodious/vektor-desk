@@ -10,10 +10,10 @@ from desk.api.app import create_app
 from desk.engine import kinds, lab
 from desk.engine.jobs import JOBS
 from desk.engine.lab import rulebook, runner, shelf, sim, simcache
-from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, PUBLIC_COVERAGE, PUBLIC_ROLE, data_path, held_path, load, plan_path
+from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, PUBLIC_COVERAGE, PUBLIC_ROLE, PUBLIC_SIZES, data_path, held_path, load, plan_path
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
-from desk.engine.lab.spec import HINDSIGHT, PUBLIC_EXITS, SCREEN_HINDSIGHT, SETS, SpecError, local_only, parse, resolve, variants
+from desk.engine.lab.spec import HINDSIGHT, PUBLIC_EXITS, SCREEN_HINDSIGHT, SETS, SIZE_WORDS, SpecError, local_only, parse, resolve, variants
 from desk.engine.market import LIBRARY_FUNDS
 from desk.worker import store
 
@@ -33,6 +33,8 @@ FRENCH = (
 )
 COVERED = {"as_of": "2013-06-28", "tests_from": "2014-01-02", "listed": 8, "priced": 8, "loading": 0, "missing": 0, "stopped": 0, "pct": 100.0, "enough": True}
 ON_THE_LIST = "Tested on the 8 largest US companies of mid-2013, a list that owes nothing to what you hold. All 8 have prices."
+SIZES = {s: [1e9 * (i + 1), "2013-06-28"] for i, s in enumerate(STOCKS)}
+NEW_SCREENS = ("lib-stock-dip-hold", "lib-core-stock-picks", "lib-ten-largest", "lib-ten-beaten")
 SUBSET = ("lib-60-40", "lib-vol-cap", "lib-size-small", "lib-trend-dip", "lib-plan-mix", "insider-momentum-filter", "lib-dip-reserve", "lib-lump-sum-spread")
 
 
@@ -75,6 +77,7 @@ def lab_file(tmp_path_factory):
     path.with_name(PLAN_FILE).write_text(json.dumps({"weights": {"SPY": 0.6, "VXUS": 0.2, "AGG": 0.2}}))
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
     conn.execute("INSERT INTO settings VALUES (?, ?)", (PUBLIC_COVERAGE, json.dumps(COVERED)))
+    conn.execute("INSERT INTO settings VALUES (?, ?)", (PUBLIC_SIZES, json.dumps(SIZES)))
     conn.commit()
     conn.close()
     return path
@@ -355,11 +358,12 @@ PUBLISHED = (
     "lib-credit-canary",
     "lib-tech-tilt-vol-target",
     "lib-discount-day-uptrend",
+    *NEW_SCREENS,
 )
 
 
 def test_a_row_id_once_published_is_never_dropped_or_renamed():
-    assert len(PUBLISHED) == len(set(PUBLISHED)) == 62 and not set(PUBLISHED) - shelf.IDS
+    assert len(PUBLISHED) == len(set(PUBLISHED)) == 66 and not set(PUBLISHED) - shelf.IDS
     assert len(shelf.IDS) == len(shelf.LIBRARY)
 
 
@@ -675,6 +679,111 @@ def test_single_stocks_over_the_cap_are_trimmed_and_the_rest_carries_the_differe
         parse(raw | {"universe": raw["universe"] | {"cap_stocks_pct": 0}}, data)
 
 
+def test_a_yearly_refresh_falls_every_252_sessions_from_the_start_of_the_test(stocked):
+    data = load(data_path(stocked))
+    cal = data.calendar[320:1120]
+    assert sorted(sim.signal_days(cal, "Y")) == [cal[251], cal[503], cal[755]]
+    for sid in ("lib-ten-beaten", "lib-ten-largest"):
+        spec = parse(spec_of(sid), data)
+        res = simulate(data, spec, resolve(spec, {}), cal[0], cal[-1])
+        assert spec.rebalance == "Y" and sorted({t[0] for t in res.trades}) == [cal[0], cal[252], cal[504], cal[756]] and res.rebalances == 4
+    with pytest.raises(SpecError, match="weekly, monthly, quarterly or yearly"):
+        parse(spec_of("lib-ten-beaten") | {"rebalance": "daily"}, data)
+
+
+def test_company_size_is_the_list_float_moved_by_price_and_the_largest_are_picked(stocked):
+    data = load(data_path(stocked))
+    s = data.series["STK3"]
+    value = sim.features.value
+    assert data.size_base("STK3") == (4e9, "2013-06-28") and data.size_base("SPY") is None
+    assert value("size", s, 500, 252, data.size_base("STK3")) == pytest.approx(4e9 * s.adj[500] / s.adj[0])
+    assert value("size", s, 500, 252, (4e9, s.dates[100])) == pytest.approx(4e9 * s.adj[500] / s.adj[100])
+    assert value("size", s, 50, 252, (4e9, s.dates[100])) is None and value("size", s, 500, 252, None) is None
+    spec = parse(spec_of("lib-ten-largest") | {"entry": {"top_n": 3}}, data)
+    assert spec.caveats == [ON_THE_LIST, PUBLIC_EXITS, SIZE_WORDS]
+    day = data.calendar[700]
+    size = {sym: SIZES[sym][0] * data.series[sym].adj[data.series[sym].index[day]] / data.series[sym].adj[0] for sym in STOCKS}
+    assert pick(data, spec, resolve(spec, {}), day, set()) == {sym: pytest.approx(1 / 3) for sym in sorted(size, key=size.get)[-3:]}
+    with pytest.raises(SpecError, match="size feature needs a screen universe"):
+        parse(spec_of("lib-sector-momentum-12-1") | {"signals": [{"metric_id": "size", "window": "252d", "transform": "rank"}]}, data)
+    del data.settings[PUBLIC_SIZES]
+    with pytest.raises(SpecError, match="company sizes are not in the lab's data yet") as refused:
+        parse(spec_of("lib-ten-largest"), data)
+    assert shelf.plain([str(refused.value)]) == "Company sizes have not reached the lab yet. This runs the night after the next lab export."
+    assert parse(spec_of("lib-ten-beaten"), data).rebalance == "Y"
+
+
+def test_money_not_in_a_pick_waits_in_the_named_fund(stocked):
+    data = load(data_path(stocked))
+    raw = spec_of("lib-core-stock-picks")
+    spec = parse(raw, data)
+    v = resolve(spec, {})
+    cal = data.calendar[600:800]
+    picks = pick(data, spec, v, data.calendar[599], set())
+    assert spec.idle == "SPY" and len(picks) == 5 and set(picks.values()) == {0.04}
+    res = simulate(data, spec, v, cal[0], cal[-1])
+    first = {t[1]: round(t[3] * t[4] / sim.START_CASH, 6) for t in res.trades if t[0] == cal[0]}
+    assert first == {"SPY": 0.8} | dict.fromkeys(picks, 0.04)
+    assert all(t[1] == "SPY" or t[1] in STOCKS for t in res.trades) and len({t[0] for t in res.trades}) == res.rebalances > 5
+    never = raw | {"filters": [{"metric_id": "dd", "window": "252d", "max": -0.99}]}
+    spec = parse(never, data)
+    res = simulate(data, spec, resolve(spec, {}), cal[0], cal[-1])
+    assert (res.trades[0][1], res.trades[0][2], round(res.trades[0][3] * res.trades[0][4] / sim.START_CASH, 6)) == ("SPY", "buy", 1.0)
+    assert {t[1] for t in res.trades} == {"SPY"} and sum(t[3] * t[4] for t in res.trades[1:]) < 0.001 * sim.START_CASH
+    spec = parse(never | {"sizing": "equal"}, data)
+    assert spec.idle is None and simulate(data, spec, resolve(spec, {}), cal[0], cal[-1]).trades == []
+    with pytest.raises(SpecError, match="sizing idle must be a fund with price history in the lab; STK1 is not"):
+        parse(raw | {"sizing": {"method": "equal", "idle": "STK1"}}, data)
+    mix = spec_of("lib-60-40")
+    with pytest.raises(SpecError, match="idle cannot be combined with fixed weights"):
+        parse(mix | {"sizing": mix["sizing"] | {"idle": "SPY"}}, data)
+
+
+def test_a_holding_bought_for_a_fixed_time_is_left_alone_until_the_time_is_up(stocked):
+    data = load(data_path(stocked))
+    raw = spec_of("lib-stock-dip-hold") | {"filters": [{"metric_id": "dd", "window": "252d", "max": -0.15}]}
+    spec = parse(raw, data)
+    v = resolve(spec, {})
+    cal = data.calendar[520:1800]
+    assert v.hold_days == 252 and spec.exit == {"hold_rank": None, "hold_days": 252}
+    res = simulate(data, spec, v, cal[0], cal[-1])
+    at = {d: i for i, d in enumerate(cal)}
+    by = {sym: [(at[t[0]], t[2]) for t in res.trades if t[1] == sym] for sym in STOCKS}
+    buys = [(i, later) for moves in by.values() for n, (i, side) in enumerate(moves) if side == "buy" for later, _ in moves[n + 1 : n + 2]]
+    assert buys and all(later - i >= 252 for i, later in buys)
+    assert any(side == "sell" for moves in by.values() for _, side in moves) and any(i > 0 for moves in by.values() for i, _ in moves)
+    assert {t[1] for t in res.trades} - set(STOCKS) == {"SPY"}
+    held = pick(data, spec, v, cal[300], {"STK1", "SPY"}, {"STK1": cal[100]})
+    assert held["STK1"] is None and "SPY" not in held
+    assert pick(data, spec, v, cal[400], {"STK1", "SPY"}, {"STK1": cal[100]}).get("STK1", 0.0) is not None
+    tight = parse(raw | {"entry": {"top_n": 2}, "sizing": "equal", "account": "ira"}, data)
+    res = simulate(data, tight, resolve(tight, {}), cal[0], cal[-1])
+    assert len(res.trades) > 4 and res.cash >= -res.costs - 1 and res.taxes == 0
+    for exit_, words in (
+        ({"hold_days": 252, "hold_rank": 5}, "cannot go with hold_rank"),
+        ({"hold_days": 5}, "from 21 to 1260"),
+        ({"hold_days": True}, "whole number of trading days"),
+    ):
+        with pytest.raises(SpecError, match=words):
+            parse(raw | {"exit": exit_}, data)
+    with pytest.raises(SpecError, match="hold_days needs signals to pick from"):
+        parse(spec_of("lib-60-40") | {"exit": {"hold_days": 252}}, data)
+
+
+def test_the_four_new_screens_run_on_the_public_stock_list_and_report_against_the_sp500(stocked, monkeypatch):
+    cfg = stocked
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in NEW_SCREENS))
+    monkeypatch.setattr(shelf, "IDS", frozenset(NEW_SCREENS))
+    shelf.queue_missing(cfg, now=NOW)
+    process_queue(cfg, now=NOW)
+    rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    assert set(rows) == set(NEW_SCREENS)
+    for row in rows.values():
+        assert row["status"] == "tested" and row["kind"] == "practical" and row["benchmark"] == shelf.SPY and row["caveats"][:2] == [ON_THE_LIST, PUBLIC_EXITS]
+        assert row["verdict"] in ("held_up", "within_noise", "fell_short") and "S&P 500 (SPY)" in row["line"] and not row["leans_on_hindsight"]
+    assert SIZE_WORDS in rows["lib-ten-largest"]["caveats"] and SIZE_WORDS not in rows["lib-ten-beaten"]["caveats"]
+
+
 def test_every_row_says_what_it_is_measured_against_and_the_note_says_how_the_luck_bar_counts(stocked, monkeypatch):
     cfg = stocked
     view = shelf.view(cfg)
@@ -712,7 +821,7 @@ def test_stock_screen_rows_say_what_list_they_ran_on_and_only_a_result_from_befo
     cfg = stocked
     data = load(data_path(cfg))
     screens = [e["id"] for e in shelf.LIBRARY if (e.get("spec") or {}).get("universe", {}).get("type") == "screen"]
-    assert len(screens) == 6
+    assert len(screens) == 10
     for sid in screens:
         spec = parse(spec_of(sid), data)
         assert spec.caveats[:2] == [ON_THE_LIST, PUBLIC_EXITS] and SCREEN_HINDSIGHT not in spec.caveats and "survivorship" not in " ".join(spec.caveats)
@@ -813,11 +922,11 @@ def test_a_screen_waits_while_the_list_loads_and_a_result_from_mid_load_runs_aga
 
 def test_the_library_grew_and_each_kind_names_its_new_rows():
     by = {e["id"]: e for e in shelf.LIBRARY}
-    assert len(shelf.LIBRARY) == 62 and len(by) == 62
+    assert len(shelf.LIBRARY) == 66 and len(by) == 66
     new = {
         "classic": ("lib-three-fund", "lib-permanent", "lib-all-weather", "lib-trend-five", "lib-golden-cross", "lib-asset-momentum")
         + ("lib-equal-sectors", "lib-equal-weight-500", "lib-dividend-growers", "lib-small-value-fund", "lib-value-momentum", "lib-small-reversal"),
-        "practical": ("lib-core-satellite", "lib-themes-equal", "lib-as-held-capped", "lib-margin-paydown"),
+        "practical": ("lib-core-satellite", "lib-themes-equal", "lib-as-held-capped", "lib-margin-paydown", *NEW_SCREENS),
         "novel": ("lib-momentum-calm", "lib-drawdown-stop", "lib-down-week", "lib-canary", "lib-credit-canary", "lib-tech-tilt-vol-target")
         + ("lib-discount-day-uptrend",),
     }
@@ -844,7 +953,7 @@ def test_a_stock_in_the_plan_is_screened_and_costed_like_any_other_so_a_worker_a
 def test_stock_screens_are_run_again_on_the_public_stock_list():
     screens = {e["id"] for e in shelf.LIBRARY if e["rev"] == shelf.SCREEN_REV}
     assert screens == {e["id"] for e in shelf.LIBRARY if e["type"] == "experiment" and e["spec"]["universe"].get("type") == "screen"}
-    assert len(screens) == 6 and shelf.SCREEN_REV == 5 > shelf.MIX_REV
+    assert len(screens) == 10 and shelf.SCREEN_REV == 5 > shelf.MIX_REV
     for rev in (shelf.MIX_REV, 4):
         seen = {"kind": "experiment", "rev": rev, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
         assert all(shelf._outdated(e, seen) == (e["id"] in screens) for e in shelf.LIBRARY)
