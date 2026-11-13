@@ -68,6 +68,7 @@ def case_for(answer: dict, hit: dict, model: str, run_id: int, now: datetime | N
         "confidence": answer.get("confidence"),
         "horizon_days": answer.get("horizon_days"),
         "numbers_cited": numbers,
+        "buy_if": answer.get("buy_if"),
         "model": model,
         "written_at": (now or datetime.now(UTC)).isoformat(timespec="seconds"),
         "run_id": run_id,
