@@ -51,6 +51,19 @@ FUNDING_REASONS = ("A margin debit", "It needs $")
 HOLD_REASONS = ("A standing note says to hold off",)
 WINDOW_WORDS = "wash-sale window"
 ANALYSIS_WORDS = {"case": "The written case is", "scout": "Scout's idea is", "scanner": "The scanner hit is", "research": "Your research note is"}
+LAB_ROWS = ("lib-stock-dip-hold", "lib-average-down")
+PUT_OFF = ("busy", "deferred", "over_budget", "late", "failed")
+SWITCHED_OFF = ("disabled", "guarded")
+NIGHT_STALE_HOURS = 30
+WAITING = {
+    "put_off": "Waiting to be written: last night's case writing was put off.",
+    "off": "Waiting to be written: case writing is switched off right now.",
+    None: "No written case yet.",
+}
+PLACES = ("next", "second", "third", "fourth", "fifth", "sixth")
+SKEPTIC = "Skeptic disagreed with Scout's idea. It moves up only if a later Scout idea gets past Skeptic; no price changes that."
+AGAIN = "It tripped the scanner again on {day}, so a fresh case is due tonight. Until then the older case says {verdict}."
+CASE_DECIDES = "When that happens the desk writes a fresh case that night; the case decides, not the price."
 NUMBER_KEYS = ("price", "day_move_pct", "drop_from_high_pct", "high_52w", "ret_1y_pct", "sigma_month_pct", "vs_sma_200_pct")
 
 
@@ -79,7 +92,7 @@ def _signals(conn: sqlite3.Connection) -> tuple[dict, dict[str, dict]]:
         if seen is None:
             latest[row["symbol"]] = dict(row)
         elif seen.get("case") is None and row.get("case"):
-            seen["case"] = row["case"]
+            seen |= {"case": row["case"], "case_due": True}
     return view, latest
 
 
@@ -208,6 +221,13 @@ def _research(cfg: Config) -> dict[str, dict]:
             "written_at": row.get("created_at"),
         }
     return out
+
+
+def _newest(a: dict | None, b: dict | None) -> dict | None:
+    if not a or not b:
+        return a or b
+    at = [own_cases.parse(x.get("written_at")) for x in (a, b)]
+    return b if at[1] is not None and (at[0] is None or at[1] > at[0]) else a
 
 
 def _earnings(conn: sqlite3.Connection, symbol: str, as_of: str) -> dict | None:
@@ -464,6 +484,137 @@ def timing(m: dict, c: dict, book_day: str) -> dict:
     }
 
 
+# ---- What the desk is watching for ----
+
+
+def _weekday(d: date) -> date:
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+    return d
+
+
+def reread_on(c: dict) -> str | None:
+    case, hit = c["case"], c.get("hit")
+    scanned = bool(hit) and hit.get("case") is case
+    base, days = (hit["as_of"], discounts.PENDING_DAYS) if scanned else (case.get("as_of"), own_cases.FRESH_DAYS)
+    try:
+        return _weekday(date.fromisoformat(str(base)[:10]) + timedelta(days=days + 1)).isoformat()
+    except ValueError:
+        return None
+
+
+def sale_under(m: dict) -> float | None:
+    high, sigma = m.get("high_52w"), m.get("sigma_month_pct")
+    if not high or not sigma:
+        return None
+    return round(high * (1 - max(abs(ON_SALE_DROP), ON_SALE_SWINGS * sigma) / 100), 2)
+
+
+def next_step(m: dict) -> tuple[float, int] | None:
+    high, drop = m.get("high_52w"), m.get("drop_from_high_pct")
+    if not high or drop is None:
+        return None
+    step = next((s for s in sorted(discounts.STEPS, reverse=True) if s < drop), None)
+    return (round(high * (1 + step / 100), 2), abs(int(step))) if step is not None else None
+
+
+def condition(m: dict, c: dict) -> dict | None:
+    cond = own_cases.buy_if((c.get("case") or {}).get("buy_if"))
+    if not cond:
+        return None
+    price, day = m.get("price"), str(m.get("price_as_of") or "")
+    seen = analysis_day(m, c)[0] or day
+    kind, met = cond["kind"], False
+    if kind == "after_earnings":
+        cond["date"] = (c.get("case_earnings") or {}).get("date")
+        met = bool(cond["date"]) and day > cond["date"]
+    elif kind == "after_date":
+        met = day >= cond["date"]
+    elif price:
+        met = price < cond["value"] if kind == "price_below" else price > cond["value"]
+    return cond | {"met": met and seen < day}
+
+
+def condition_words(cond: dict) -> str:
+    kind = cond["kind"]
+    if kind == "price_below":
+        lead = f"The case says wait for a close under {_money(cond['value'])}."
+    elif kind == "price_above":
+        lead = f"The case says wait for a close above {_money(cond['value'])}."
+    elif kind == "after_date":
+        lead = f"The case says wait until {day_words(cond['date'])}."
+    else:
+        lead = f"The case says wait for earnings on {day_words(cond['date'])}." if cond["date"] else "The case says wait for its next earnings report."
+    more = cond.get("words")
+    if more:
+        lead += " " + (more if more.endswith((".", "!", "?")) else more + ".")
+    return lead
+
+
+def reread_words(m: dict, c: dict, when: str | None, level: float | None, step: tuple[float, int] | None) -> str:
+    sale, price = on_sale(m), m.get("price")
+    sooner = f"it closes under {_money(step[0])}, {step[1]}% under its high" if step else None
+    if not when:
+        return f"The desk writes a fresh case if {sooner}." if sooner else ""
+    if level and price and price <= level:
+        still = f" if it is still under {_money(level)}"
+    elif sale or not level:
+        still = " if it is still on sale"
+    else:
+        still = f" only if it has fallen under {_money(level)} by then"
+    out = f"The desk re-reads it on {day_words(when)}{still}"
+    out += f", and writes a fresh case sooner if {sooner}." if sooner else "."
+    soon = c.get("next_earnings")
+    if soon and soon["date"] <= when:
+        out += f" Earnings on {day_words(soon['date'])} come first."
+    return out
+
+
+def trigger(m: dict, c: dict, grp: str) -> tuple[str | None, dict | None]:
+    if grp != "could":
+        return None, None
+    case, idea, hit = c.get("case"), c.get("scout"), c.get("hit")
+    soon = c.get("next_earnings")
+    out = {"kind": "case_due", "on": None, "price_below": None, "step_pct": None, "on_sale_under": None, "earnings": (soon or {}).get("date")}
+    out |= {"queue": None, "buy_if": None, "met": False, "waiting": None}
+    if not case:
+        if idea:
+            return SKEPTIC, out | {"kind": "skeptic"}
+        return WAITING[None], out
+    step = next_step(m)
+    if step:
+        out |= {"price_below": step[0], "step_pct": step[1]}
+    if (hit or {}).get("case_due"):
+        return AGAIN.format(day=day_words(hit["as_of"]), verdict=case["verdict"]), out
+    cond = condition(m, c)
+    out |= {"kind": "reread", "on": reread_on(c), "on_sale_under": sale_under(m)}
+    if cond:
+        out |= {"buy_if": {k: cond[k] for k in ("kind", "value", "date", "words")}, "met": cond["met"]}
+        if cond["met"]:
+            return f"{condition_words(cond)} That has now happened, so the desk writes a fresh case tonight; the case decides, not the price.", out
+        lead = f"{condition_words(cond)} {CASE_DECIDES}"
+    else:
+        lead = f"The written case says {case['verdict']}."
+    return " ".join(w for w in (lead, reread_words(m, c, out["on"], out["on_sale_under"], step)) if w), out
+
+
+def waiting_words(place: int, why: str | None) -> str:
+    cap = own_cases.CAP
+    if place <= min(cap, len(PLACES)):
+        return f"{WAITING[why]} It is {PLACES[place - 1]} in line tonight; the desk writes up to {cap} a night."
+    return f"{WAITING[why]} It is number {place} in line and the desk writes {cap} a night, so its case comes tomorrow night at the earliest."
+
+
+def held_back(fresh: dict, now: datetime) -> str | None:
+    ran = own_cases.parse(fresh.get("night_run_at"))
+    if ran is None or now - ran > timedelta(hours=NIGHT_STALE_HOURS):
+        return None
+    states = [s.get("status") for s in fresh.get("night_steps") or () if s.get("step") in ("cases", "list_cases")]
+    if any(s in SWITCHED_OFF for s in states):
+        return "off"
+    return "put_off" if any(s in PUT_OFF for s in states) else None
+
+
 def not_queued(c: dict, label: str, book: sizing.Book | None) -> str | None:
     idea = c.get("scout")
     back = (idea or {}).get("turned_back")
@@ -501,7 +652,7 @@ def stance(c: dict) -> tuple[str, str]:
     note = c.get("research")
     if case:
         if case["verdict"] != "buy":
-            return "watch", "Watch: the written case says wait"
+            return "watch", f"Watch: the written case says {case['verdict']}"
         if note and note["verdict"] != "add":
             return "watch", f"Watch: the case says buy, but your research note says {note['verdict']}"
         return "buy", BUY_WORDS[c["size"]["funding"]]
@@ -524,7 +675,7 @@ def group(c: dict, label: str) -> str:
     note, back = c.get("research"), (c.get("scout") or {}).get("turned_back")
     if c["size"].get("blocked") or c["tier"] == "near" or (back and back["kind"] != "funding") or (note and note["verdict"] != "add"):
         return "not_now"
-    return "could"
+    return "not_now" if (c.get("case") or {}).get("verdict") == "avoid" else "could"
 
 
 def source_label(sources: list[str]) -> str:
@@ -609,8 +760,22 @@ def _freshness(cfg: Config, conn: sqlite3.Connection | None, view: dict | None) 
     }
 
 
+def evidence(cfg: Config) -> list[dict]:
+    try:
+        from desk.engine.lab import shelf
+
+        rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    except Exception:  # noqa: BLE001
+        return []
+    found = [rows[i] for i in LAB_ROWS if i in rows and rows[i].get("status") == "tested" and rows[i].get("line")]
+    return [{k: r.get(k) for k in ("id", "title", "line", "verdict", "tested_at", "outdated")} for r in found]
+
+
 def build(cfg: Config, *, now: datetime | None = None) -> dict:
-    now = now or datetime.now(UTC)
+    return _list(cfg, now or datetime.now(UTC)) | {"evidence": evidence(cfg)}
+
+
+def _list(cfg: Config, now: datetime) -> dict:
     profile = sizing.profile(cfg)
     if not cfg.desk_db.exists():
         return _empty(now, NO_ENGINE, profile, sizing.cash_view(None), _freshness(cfg, None, None))
@@ -654,7 +819,7 @@ def _build(cfg: Config, conn: sqlite3.Connection, mirror: sqlite3.Connection | N
     for sym in symbols:
         m = measures.get(sym) or {}
         hit, idea = signals.get(sym), ideas.get(sym)
-        case = (hit or {}).get("case") or written.get(sym)
+        case = _newest((hit or {}).get("case"), written.get(sym))
         note = notes.get(sym) if sym in held else None
         name = titles.get(sym) or (hit or {}).get("name")
         if case and case["verdict"] == "avoid" and not idea:
@@ -680,6 +845,8 @@ def _build(cfg: Config, conn: sqlite3.Connection, mirror: sqlite3.Connection | N
             "research": note,
             "research_verdict": note["verdict"] if note else None,
         }
+        seen, kind = analysis_day(m, c)
+        c["case_earnings"] = _earnings(conn, sym, seen) if case and kind == "case" and seen else None
         c["entry"] = entry(m, tier)
         c["size"] = sizing.size(book, sym, c["kind"], m.get("price"))
         c["score"] = score(m, c)
@@ -692,6 +859,13 @@ def _build(cfg: Config, conn: sqlite3.Connection, mirror: sqlite3.Connection | N
     rows = rows[:MAX_ROWS]
     for i, r in enumerate(rows, 1):
         r["rank"] = i
+    fresh = _freshness(cfg, conn, view)
+    why = held_back(fresh, now)
+    for place, r in enumerate(own_cases.queue(rows), 1):
+        r["trigger"] |= {"queue": place}
+        if r["stance"] == "screen":
+            r["trigger"]["waiting"] = why
+            r["becomes_buy"] = waiting_words(place, why)
     counts = {
         "total": len(rows),
         **{k: sum(r["stance"] == k for r in rows) for k in ("buy", "watch", "screen")},
@@ -702,7 +876,6 @@ def _build(cfg: Config, conn: sqlite3.Connection, mirror: sqlite3.Connection | N
         "written": sum(r["case"] is not None or r["decision_id"] is not None or r["research"] is not None for r in rows),
     }
     note = None if rows else NOTHING
-    fresh = _freshness(cfg, conn, view)
     if counts["screen"]:
         n = counts["screen"]
         fresh["note"] = f"{n} of these {'has' if n == 1 else 'have'} no written case yet. The numbers stand on their own; the cases are written overnight."
@@ -729,6 +902,8 @@ def _row(c: dict, book_day: str, book: sizing.Book | None) -> dict:
     label, words = stance(c)
     wrong, floor = wrong_if(m, c)
     when = timing(m, c, book_day)
+    grp = group(c, label)
+    becomes, watching = trigger(m, c, grp)
     return {
         "rank": 0,
         "symbol": c["symbol"],
@@ -740,8 +915,10 @@ def _row(c: dict, book_day: str, book: sizing.Book | None) -> dict:
         "source_label": source_label(c["sources"]),
         "stance": label,
         "stance_label": words,
-        "group": group(c, label),
-        "group_label": GROUP_WORDS[group(c, label)],
+        "group": grp,
+        "group_label": GROUP_WORDS[grp],
+        "becomes_buy": becomes,
+        "trigger": watching,
         "why_now": why_now(m, c),
         "facts": facts(m, c),
         "entry": c["entry"],

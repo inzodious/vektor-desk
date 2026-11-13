@@ -8,7 +8,7 @@ from desk.agents import store
 from desk.db import apply_schemas, connect
 from desk.opportunities import build as ob
 from desk.opportunities import cases as own_cases
-from desk.opportunities import ready, sizing
+from desk.opportunities import night, ready, sizing
 
 NOW = datetime(2026, 11, 7, 3, 0, tzinfo=UTC)
 AS_OF = "2026-11-06"
@@ -313,6 +313,104 @@ def test_the_drop_is_one_figure_and_says_so_when_the_case_was_written_at_another
 # ---- Cases for rows the scanner did not flag ----
 
 
+def test_a_wait_case_says_when_the_desk_looks_again_and_never_reads_as_a_buy_signal(cfg, rules):
+    conn = seed(cfg)
+    signal(conn, "QUAL", case="wait")
+    r = row(ob.build(cfg, now=NOW), "QUAL")
+    t = r["trigger"]
+    assert r["group"] == "could" and t["kind"] == "reread" and t["on"] == "2026-11-12" and t["step_pct"] == 20 and not t["met"]
+    assert t["price_below"] == round(r["numbers"]["high_52w"] * 0.8, 2) < r["numbers"]["price"] <= t["on_sale_under"]
+    assert r["becomes_buy"] == (
+        f"The written case says wait. The desk re-reads it on Nov 12 if it is still under ${t['on_sale_under']:,.2f}, "
+        f"and writes a fresh case sooner if it closes under ${t['price_below']:,.2f}, 20% under its high."
+    )
+    signal(conn, "QUAL", day="2026-11-09", reason="big_down_day")
+    again = row(ob.build(cfg, now=LATER), "QUAL")
+    assert again["trigger"]["kind"] == "case_due" and again["becomes_buy"].startswith("It tripped the scanner again on Nov 9, so a fresh case is due tonight.")
+
+
+def test_a_row_with_no_case_says_its_place_in_line_and_that_it_waits_when_the_night_was_put_off(cfg, rules):
+    seed(cfg)
+    out = ob.build(cfg, now=NOW)
+    assert [(r["symbol"], r["trigger"]["queue"]) for r in out["rows"] if r["stance"] == "screen"] == [("QUAL", 1), ("ACME", 2), ("WTCH", 3)]
+    assert row(out, "QUAL")["becomes_buy"] == "No written case yet. It is next in line tonight; the desk writes up to 6 a night."
+    assert row(out, "WTCH")["becomes_buy"].startswith("No written case yet. It is third in line tonight")
+    assert all(r["becomes_buy"] is None and r["trigger"] is None for r in out["rows"] if r["group"] != "could")
+    night._save(cfg, {"finished_at": "2026-11-07T02:40:00Z", "status": "waiting", "steps": [{"step": "cases", "status": "deferred"}]})
+    out = ob.build(cfg, now=NOW)
+    assert row(out, "QUAL")["becomes_buy"].startswith("Waiting to be written: last night's case writing was put off. It is next in line tonight")
+    assert row(out, "QUAL")["trigger"]["waiting"] == "put_off"
+    assert row(ob.build(cfg, now=NOW + timedelta(days=3)), "QUAL")["trigger"]["waiting"] is None
+    assert ob.waiting_words(8, None).endswith("number 8 in line and the desk writes 6 a night, so its case comes tomorrow night at the earliest.")
+
+
+def test_the_case_s_own_condition_is_shown_and_when_met_it_jumps_the_queue_without_becoming_a_buy(cfg, rules):
+    conn = seed(cfg)
+    hits = [h for h in own_cases.wanted(ob.build(cfg, now=NOW)) if h["symbol"] == "WTCH"]
+    case = {"verdict": "wait", "case": "Sales are still falling.", "risks": "A buyer may appear.", "confidence": 0.6, "horizon_days": 60}
+    case |= {"numbers_cited": ["price"], "model": "opus", "written_at": "2026-11-07T06:00:00+00:00", "run_id": 4}
+    case |= {"buy_if": {"kind": "price_above", "value": 10.05, "words": "Buyers would be coming back"}}
+    own_cases.ListSource(hits).record(cfg, hits[0]["signal_id"], case)
+    r = row(ob.build(cfg, now=NOW), "WTCH")
+    assert r["trigger"]["buy_if"] == {"kind": "price_above", "value": 10.05, "date": None, "words": "Buyers would be coming back"}
+    assert not r["trigger"]["met"] and r["trigger"]["queue"] is None
+    assert r["becomes_buy"].startswith("The case says wait for a close above $10.05. Buyers would be coming back. When that happens the desk writes")
+    assert "The desk re-reads it on Nov 16" in r["becomes_buy"]
+    with conn:
+        conn.execute("INSERT INTO price_bars (symbol, date, close, adj_close) VALUES ('WTCH', ?, 10.2, 10.2)", (NEXT,))
+    out = ob.build(cfg, now=LATER)
+    r = row(out, "WTCH")
+    assert r["stance"] == "watch" and r["group"] == "could" and r["trigger"]["met"] and r["trigger"]["queue"] == 1
+    assert r["becomes_buy"].endswith("That has now happened, so the desk writes a fresh case tonight; the case decides, not the price.")
+    assert own_cases.wanted(out)[0]["symbol"] == "WTCH"
+
+
+def test_a_condition_that_was_already_true_or_malformed_is_dropped_and_the_paid_case_is_kept(cfg, rules):
+    seed(cfg)
+    assert own_cases.buy_if({"kind": "price_below", "value": 12.0}, 10.0, AS_OF) is None
+    assert own_cases.buy_if({"kind": "after_date", "date": AS_OF}, 10.0, AS_OF) is None
+    assert own_cases.buy_if({"kind": "sell everything"}) is None and own_cases.buy_if("not json") is None and own_cases.buy_if({"kind": "none"}) is None
+    assert own_cases.buy_if('{"kind": "after_earnings", "words": "  Guidance   is due  "}') == {
+        "kind": "after_earnings",
+        "value": None,
+        "date": None,
+        "words": "Guidance is due",
+    }
+    assert own_cases.buy_if({"kind": "after_date", "date": "2026-12-01T00:00:00"}, 10.0, AS_OF)["date"] == "2026-12-01"
+    hits = [h for h in own_cases.wanted(ob.build(cfg, now=NOW)) if h["symbol"] == "WTCH"]
+    case = {"verdict": "wait", "case": "Sales are still falling.", "risks": "A buyer may appear.", "confidence": 0.6, "horizon_days": 60}
+    case |= {"numbers_cited": [], "model": "opus", "written_at": "2026-11-07T06:00:00+00:00", "buy_if": {"kind": "price_below", "value": 99.0}}
+    assert own_cases.ListSource(hits).record(cfg, hits[0]["signal_id"], case) is True
+    r = row(ob.build(cfg, now=NOW), "WTCH")
+    assert own_cases.load(cfg)["WTCH"]["buy_if"] is None and r["trigger"]["buy_if"] is None and r["becomes_buy"].startswith("The written case says wait.")
+
+
+def test_a_skeptic_flag_says_no_price_changes_it_and_an_avoid_case_is_not_for_now(cfg, rules):
+    conn = seed(cfg)
+    scout_idea(cfg, "MSFT", flag=True)
+    r = row(ob.build(cfg, now=NOW), "MSFT")
+    assert r["group"] == "could" and r["trigger"]["kind"] == "skeptic" and r["becomes_buy"].startswith("Skeptic disagreed with Scout's idea.")
+    signal(conn, "MSFT", case="avoid")
+    r = row(ob.build(cfg, now=NOW), "MSFT")
+    assert r["stance_label"] == "Watch: the written case says avoid" and r["group"] == "not_now" and r["becomes_buy"] is None
+
+
+def test_the_page_quotes_the_lab_s_own_line_for_its_rule_and_shows_nothing_until_it_is_tested(cfg, rules, monkeypatch):
+    seed(cfg)
+    assert ob.build(cfg, now=NOW)["evidence"] == []
+    tested = {"id": "lib-stock-dip-hold", "title": "Buy the 30% dip", "status": "tested", "verdict": "fell_short", "outdated": False}
+    tested |= {"line": "Trailed the S&P 500 out of sample.", "tested_at": "2026-11-14T06:00:00Z", "out_of_sample": {"excess_pts": -1.0}}
+    waiting = {"id": "lib-average-down", "title": "Average down", "status": "waiting", "verdict": None, "line": None, "tested_at": None}
+    other = tested | {"id": "lib-something-else"}
+    monkeypatch.setattr("desk.engine.lab.shelf.view", lambda cfg: {"rows": [other, waiting, tested]})
+    assert ob.build(cfg, now=NOW)["evidence"] == [
+        {"id": "lib-stock-dip-hold", "title": "Buy the 30% dip", "line": "Trailed the S&P 500 out of sample.", "verdict": "fell_short"}
+        | {"tested_at": "2026-11-14T06:00:00Z", "outdated": False}
+    ]
+    monkeypatch.setattr("desk.engine.lab.shelf.view", lambda cfg: 1 / 0)
+    assert ob.build(cfg, now=NOW)["evidence"] == []
+
+
 def test_only_rows_with_no_written_analysis_ask_for_a_case_and_the_hit_is_in_the_scanner_s_shape(cfg, rules):
     seed(cfg)
     note(cfg, "ACME", "hold")
@@ -608,8 +706,8 @@ def test_the_endpoint_returns_the_list(cfg, rules, app_client):
     body = res.json()
     assert body["rows"][0]["symbol"] == "QUAL" and body["counts"]["total"] == len(body["rows"])
     top = {"as_of", "asof", "prices", "built_at", "advice_only", "freshness", "headline", "counts", "note", "profile", "cash", "method", "rows", "passed"}
-    assert set(body) == top
-    assert {"research", "numbers"} <= set(body["rows"][0]) and "written" in body["counts"]
+    assert set(body) == top | {"evidence"}
+    assert {"research", "numbers", "becomes_buy", "trigger"} <= set(body["rows"][0]) and "written" in body["counts"]
     timing = {"price_as_of", "price_source", "price_at", "price_behind", "analysis_as_of", "since_analysis_pct", "as_of_words", "queued", "not_queued"}
     assert timing <= set(body["rows"][0])
     assert set(body["asof"]) == {"day", "words", "status", "provisional", "expected_day", "behind"}
