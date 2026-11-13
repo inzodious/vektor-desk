@@ -117,6 +117,21 @@ CREATE TABLE IF NOT EXISTS stock_plans (
   approved_at TEXT,
   PRIMARY KEY (symbol, version)
 );
+CREATE TABLE IF NOT EXISTS loose_steps (
+  id TEXT PRIMARY KEY,
+  decision_id TEXT UNIQUE,
+  symbol TEXT,
+  kind TEXT NOT NULL,
+  said TEXT NOT NULL,
+  phrase TEXT,
+  due TEXT,
+  until TEXT,
+  status TEXT NOT NULL CHECK (status IN ('open', 'standing', 'skipped', 'removed', 'done', 'retired')),
+  status_reason TEXT,
+  said_on TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS plan_step_state (
   symbol TEXT NOT NULL,
   step_id TEXT NOT NULL,

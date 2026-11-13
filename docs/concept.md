@@ -136,6 +136,7 @@ The plan desk writes through `desk.decisions.plans.save_draft`. It never changes
   | Expected deposit | The next one says what it does: it pays the margin debit (a plan repay step, which then has no row of its own, or a margin note he agreed to), follows an approved deposit route, points at a route waiting in the queue, or says nothing is planned yet. A deposit that is late is never listed |
   | Desk note he agreed to | In `standing` for 30 days. A margin note ends when the debit reads zero |
   | Rule | `no_margin_buys` and `no_new_single_stocks`, in `standing` |
+  | His own words | A reason he types when he passes on a proposal. See the table below |
   | No-buy window | One `standing` row per symbol while a harvest step holds buys back |
 
   | Field | Holds |
@@ -145,6 +146,7 @@ The plan desk writes through `desk.decisions.plans.save_draft`. It never changes
   | `changes_if` | What would change or retire it |
   | `evidence`, `backed` | The strategy library row it leans on: `{row, title, sentence, verdict, tested_at, stance, reading, words}`. Only the row id is fixed in code; the rest is read from the lab each time. `backed` is the reading, or null with no evidence |
   | `source`, `ref` | `plan`, `deposit`, `agreed` or `rule`, with the ids behind it |
+  | `read`, `undo` | Only on a row from his own words: the date read from them (`{date, until, phrase}`), shown beside his sentence so a wrong reading is visible, and the call that takes the row off the list |
   | `status`, `completes` | `open`, `partial`, `upcoming` or `waiting`; who can tell it is done: `broker` (a fill), `desk` (a figure) or `you` |
 
   | Lab result | `reading` | `words` |
@@ -153,6 +155,15 @@ The plan desk writes through `desk.decisions.plans.save_draft`. It never changes
   | Inside the noise | `no_edge` | The lab's test shows no clear edge either way. |
   | Fell short, or behind in most start months | `no` | The lab's test does not back this. |
   | Not run yet, could not be judged, or measured before a lab fix | `untested` | The lab has not judged this yet. |
+
+  | His words when he passes | What happens |
+  |---|---|
+  | A date ("after Dec 6", "on Nov 18", "by Dec 15", "in January", "next week") | A step is written at once with `source` `you`: his sentence unchanged, the symbol and kind of the proposal he passed (a sale whose reason mentions harvesting or tax losses is a harvest), and the date read by plain parsing. No model call. "After Dec 6" opens Dec 7. With no end given the window is 30 days, or to year end for a harvest. The pass response carries the row as `step` |
+  | No date, but intent ("I'll wait for earnings") | An undated row in `standing` with his sentence |
+  | Anything else, a date already past, or a bare fraction such as 1/2 | Nothing. The reason stays in the journal |
+  | Passes from the last 60 days | Read the same way on the next read of the list, once per record |
+  | Afterwards | A fill at the broker completes it. A window that ends without one retires it. Both are written on the proposal he passed (`step_done`, `step_retired`). An approved plan step for the same symbol and side hides it. `DELETE /api/decisions/next-steps/{id}` takes it off for good |
+  | For the desks | His dated steps are part of `open_steps`, so a desk proposal that pulls against one is cleared by the same plan check |
 
   A row with `stance` `against` cites a test of the opposite (borrowing to buy a dip, for the no-margin rule), so its reading is flipped. A step the lab does not back stays on the list and says so; it is his to change.
 - FI projection: the path to the FI number at current contributions, with scenarios (contribution changes, return assumptions, a drawdown at a bad time). Lines and bars only, no area fills.
