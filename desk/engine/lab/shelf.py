@@ -807,16 +807,18 @@ def request(entry: dict, written_at: str) -> dict:
     return body | entry["request"] | {"written_at": written_at, "library_rev": entry["rev"]}
 
 
-def _latest(cfg: Config, bodies: bool = True) -> tuple[dict[str, dict], set[str], int]:
+def _latest(cfg: Config, bodies: bool = True, only: list[str] | None = None) -> tuple[dict[str, dict], set[str], int]:
     path = ledger_path(cfg)
     if not path.exists():
         return {}, set(), 0
     conn = connect(path, readonly=True)
     try:
         body = "body" if bodies else "CASE WHEN kind='rejected' THEN body END AS body"
+        which = "" if only is None else f"WHERE strategy_id IN ({', '.join('?' * len(only))}) "
         rows = conn.execute(
             f"SELECT strategy_id, kind, result_at, json_extract(body, '$.library_rev') AS rev, "
-            f"json_extract(body, '$.{PUBLIC_COVERAGE}.loading') AS loading, {body} FROM lab_results ORDER BY result_at"
+            f"json_extract(body, '$.{PUBLIC_COVERAGE}.loading') AS loading, {body} FROM lab_results {which}ORDER BY result_at",
+            only or (),
         ).fetchall()
         done = {r[0] for r in conn.execute("SELECT file FROM queue_done")}
         trials = conn.execute(
@@ -1037,46 +1039,77 @@ def _barred(row: dict, ahead: str, barred: str, words: str) -> dict:
     return {"line": f"{row['line']} {words}"} if row["line"] else {}
 
 
+BACKS = {"held_up": "yes", "within_noise": "no_edge", "fell_short": "no"}
+LOOKUP = ("id", "title", "kind", "type", "status", "verdict", "line", "tested_at", "outdated", "rule", "backs")
+
+
+def _backs(row: dict) -> str | None:
+    if row["status"] != "tested" or row["outdated"] or row["thin_coverage"] or row["leans_on_hindsight"] or row["hindsight"] or row["yardstick"]:
+        return None
+    rule = row.get("rule")
+    if rule and row["verdict"] == "within_noise" and any(_tenth(rule[k] or 0.0) for k in ("p5_pts", "p50_pts", "p95_pts")):
+        if (rule.get("share_better") or 0.0) > 0.5:
+            return "yes"
+        if (rule.get("share_worse") or 0.0) > 0.5:
+            return "no"
+    return BACKS.get(row["verdict"])
+
+
+def _row(entry: dict, seen: dict | None, waiting: set[str], trials: int, alone: bool) -> dict:
+    row = {k: entry[k] for k in ("id", "title", "kind", "family", "description", "benchmark", "type")}
+    row["benchmark_words"] = BENCH_WORDS[entry["benchmark"]]
+    row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
+    row |= {"yardstick": False, "gap_pts": None, "outdated": False, "hindsight": bool(entry.get("hindsight"))}
+    screen = (entry.get("spec") or {}).get("universe", {}).get("type") == "screen"
+    row |= {
+        "leans_on_hindsight": False,
+        "thin_coverage": False,
+        "research_only": (entry.get("spec") or {}).get("universe", {}).get("type") == "french",
+        "caveats": [],
+        "detail": f"/api/lab/strategies/{entry['id']}",
+    }
+    if seen is None or entry["id"] in waiting:
+        row["reason"] = "Queued for tonight's lab run." if entry["id"] in waiting else "Joins the queue at tonight's lab export, just before 1 AM."
+    if seen is not None and (entry["id"] not in waiting or seen["kind"] != "rejected"):
+        body = json.loads(seen["body"])
+        row["tested_at"] = seen["result_at"]
+        if seen["kind"] == "rejected":
+            row |= {"status": "not_run", "reason": plain(body.get("problems") or [])}
+        else:
+            row |= {"status": "tested", "reason": None, "caveats": body.get("caveats") or [], "outdated": _outdated(entry, seen)}
+            if seen["kind"] == "rule":
+                row |= _rule_row(entry, body)
+            else:
+                row |= _hindsight(entry, body) if row["hindsight"] else _experiment(entry, body, trials, alone)
+            cover = body.get(PUBLIC_COVERAGE)
+            if screen and cover is None:
+                row["leans_on_hindsight"] = True
+                row["caveats"] = [SCREEN_HINDSIGHT, *(c for c in row["caveats"] if c != SCREEN_HINDSIGHT)]
+                row |= _barred(row, LEAN_AHEAD, LEAN_BARRED, LEAN_WORDS)
+            elif screen and not cover.get("enough"):
+                row |= {"thin_coverage": True, "research_only": True} | _barred(row, THIN_AHEAD, THIN_BARRED, THIN_WORDS)
+    return row | {"backs": _backs(row)}
+
+
+def rows(cfg: Config, ids) -> dict[str, dict]:
+    wanted = list(dict.fromkeys(str(i) for i in ids))
+    known = {e["id"]: e for e in LIBRARY}
+    latest, done, trials = _latest(cfg, only=[i for i in wanted if i in known])
+    waiting = _queued(cfg, done)
+    alone = _no_plan(cfg)
+    blank = {k: None for k in LOOKUP} | {"status": "not_run", "outdated": False}
+    out = {}
+    for sid in wanted:
+        row = _row(known[sid], latest.get(sid), waiting, trials, alone) if sid in known else {"id": sid}
+        out[sid] = blank | {k: row[k] for k in LOOKUP if k in row}
+    return out
+
+
 def view(cfg: Config) -> dict:
     latest, done, trials = _latest(cfg)
     waiting = _queued(cfg, done)
     alone = _no_plan(cfg)
-    rows = []
-    for entry in LIBRARY:
-        row = {k: entry[k] for k in ("id", "title", "kind", "family", "description", "benchmark", "type")}
-        row["benchmark_words"] = BENCH_WORDS[entry["benchmark"]]
-        row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
-        row |= {"yardstick": False, "gap_pts": None, "outdated": False, "hindsight": bool(entry.get("hindsight"))}
-        screen = (entry.get("spec") or {}).get("universe", {}).get("type") == "screen"
-        row |= {
-            "leans_on_hindsight": False,
-            "thin_coverage": False,
-            "research_only": (entry.get("spec") or {}).get("universe", {}).get("type") == "french",
-            "caveats": [],
-            "detail": f"/api/lab/strategies/{entry['id']}",
-        }
-        seen = latest.get(entry["id"])
-        if seen is None or entry["id"] in waiting:
-            row["reason"] = "Queued for tonight's lab run." if entry["id"] in waiting else "Joins the queue at tonight's lab export, just before 1 AM."
-        if seen is not None and (entry["id"] not in waiting or seen["kind"] != "rejected"):
-            body = json.loads(seen["body"])
-            row["tested_at"] = seen["result_at"]
-            if seen["kind"] == "rejected":
-                row |= {"status": "not_run", "reason": plain(body.get("problems") or [])}
-            else:
-                row |= {"status": "tested", "reason": None, "caveats": body.get("caveats") or [], "outdated": _outdated(entry, seen)}
-                if seen["kind"] == "rule":
-                    row |= _rule_row(entry, body)
-                else:
-                    row |= _hindsight(entry, body) if row["hindsight"] else _experiment(entry, body, trials, alone)
-                cover = body.get(PUBLIC_COVERAGE)
-                if screen and cover is None:
-                    row["leans_on_hindsight"] = True
-                    row["caveats"] = [SCREEN_HINDSIGHT, *(c for c in row["caveats"] if c != SCREEN_HINDSIGHT)]
-                    row |= _barred(row, LEAN_AHEAD, LEAN_BARRED, LEAN_WORDS)
-                elif screen and not cover.get("enough"):
-                    row |= {"thin_coverage": True, "research_only": True} | _barred(row, THIN_AHEAD, THIN_BARRED, THIN_WORDS)
-        rows.append(row)
+    rows = [_row(entry, latest.get(entry["id"]), waiting, trials, alone) for entry in LIBRARY]
     kinds = [k for k, _ in KINDS]
     rows.sort(
         key=lambda r: (

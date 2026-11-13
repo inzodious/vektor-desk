@@ -140,7 +140,27 @@ def test_scan_stores_hits_and_feeds_the_case_writers(cfg, app_client):
         row["case"]["verdict"] == "wait"
         and row["case"]["case"].startswith("A fund-level")
         and row["case"]["numbers_cited"] == ["day_move_pct", "drop_from_high_pct"]
+        and row["case"]["buy_if"] is None
     )
+
+
+def test_a_case_keeps_its_buy_condition_as_the_desk_sent_it_and_an_older_table_gains_the_column(cfg, app_client):
+    conn = seeded(cfg)
+    discounts.scan(conn, now=NOW)
+    with conn:
+        conn.execute("ALTER TABLE discount_cases DROP COLUMN buy_if")
+    schema.apply(conn)
+    assert "buy_if" in {r[1] for r in conn.execute("PRAGMA table_info(discount_cases)")}
+    conn.close()
+    first, second, third = (h["signal_id"] for h in discounts.pending(cfg, 10))
+    case = {"verdict": "wait", "case": "Wait for a better price.", "risks": "Could keep falling.", "confidence": 0.6, "horizon_days": 20}
+    case |= {"numbers_cited": ["day_move_pct"], "model": "test-model", "written_at": "2026-11-06T23:00:00Z"}
+    below = {"kind": "price_below", "value": 41.5, "date": None, "words": "Buy under $41.50."}
+    odd = {"kind": "whenever", "value": "soon"}
+    assert discounts.record(cfg, first, case | {"buy_if": below}) and discounts.record(cfg, second, case | {"buy_if": odd})
+    assert discounts.record(cfg, third, case)
+    rows = {r["signal_id"]: r["case"] for r in app_client(packages=["engine"]).get("/api/engine/discounts").json()["rows"]}
+    assert (rows[first]["buy_if"], rows[second]["buy_if"], rows[third]["buy_if"]) == (below, odd, None)
 
 
 def test_discounts_endpoint_before_a_scan_and_the_job(cfg, app_client):
