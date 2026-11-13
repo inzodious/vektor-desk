@@ -6,6 +6,7 @@ from desk.decisions.plans import BUYS, LOT_TEXT, SELLS, approved_plans
 from desk.decisions.profile import active_profile, margin_rate
 from desk.decisions.records import _now, day_words, local_day, now_iso, tidy, to_dict
 from desk.decisions.rules import active_rules
+from desk.decisions.said import loose
 from desk.decisions.store import session
 
 DAYS = 90
@@ -106,7 +107,7 @@ def _cite(rows: dict[str, dict], key: str) -> list[dict]:
 
 def _row(rid: str, text: str, source: str, *, evidence: list[dict] | None = None, **more) -> dict:
     base = {"id": rid, "symbol": None, "date": None, "until": None, "text": text, "detail": None, "why": None, "basis": None}
-    base |= {"changes_if": None, "source": source, "ref": None, "status": None, "completes": None, "when": None}
+    base |= {"changes_if": None, "source": source, "ref": None, "status": None, "completes": None, "when": None, "read": None, "undo": None}
     evidence = evidence or []
     return base | more | {"evidence": evidence, "backed": evidence[0]["reading"] if evidence else None}
 
@@ -307,6 +308,38 @@ def _rule_rows(cfg: Config, lib: dict, rate: float) -> list[dict]:
     return out
 
 
+def _you_row(s: dict, lib: dict, tz: str) -> dict:
+    traded = bool(s["symbol"]) and s["kind"] in BUYS + SELLS
+    changes = "Yours to take off the list."
+    if traded and s["due"]:
+        what = "sale" if s["kind"] in SELLS else "buy"
+        changes = f"Completes itself when the broker shows the {what}, and leaves the list after {day_words(s['until'], tz)} if there is none. {changes}"
+    elif s["due"]:
+        changes = f"Leaves the list after {day_words(s['until'], tz)}. {changes}"
+    about = f", when you passed on “{s['passed_title']}”" if s["passed_title"] else ""
+    return _row(
+        f"you:{s['id']}",
+        s["said"],
+        "you",
+        symbol=s["symbol"],
+        date=s["due"],
+        until=s["until"],
+        basis=f"Your words on {day_words(s['said_on'], tz)}{about}.",
+        changes_if=changes,
+        ref={"step_id": s["id"], "decision_id": s["decision_id"], "kind": s["kind"]},
+        status=s["status"] if s["due"] else None,
+        completes="broker" if traded else "you",
+        read={"date": s["due"], "until": s["until"], "phrase": s["phrase"]} if s["due"] else None,
+        undo={"method": "DELETE", "path": f"/api/decisions/next-steps/{s['id']}"},
+        evidence=_cite(lib, s["kind"]),
+    )
+
+
+def step_row(cfg: Config, step_id: str, *, now: datetime | None = None) -> dict | None:
+    found = next((s for s in loose(cfg, now=now) if s["id"] == step_id), None)
+    return _you_row(found, _library(cfg, sorted({row for row, _ in EVIDENCE.values()})), cfg.timezone) if found else None
+
+
 # ---- The list ----
 
 
@@ -324,7 +357,11 @@ def next_steps(cfg: Config, *, days: int = DAYS, now: datetime | None = None) ->
         debit = _debit(conn)
         agreed = _agreed(conn, now_iso(moment - timedelta(days=AGREED_DAYS)), debit, tz)
         routes = _routes(conn)
+    planned = {(r["symbol"], r["ref"]["kind"] in SELLS) for r in dated}
     dated += _deposit_rows(upcoming_deposits(cfg, days=days, now=moment), today.isoformat(), dated, agreed, routes, lib, rate, tz)
+    mine = [s for s in loose(cfg, now=moment) if not (s["due"] and s["symbol"] and (s["symbol"], s["kind"] in SELLS) in planned)]
+    dated += [_you_row(s, lib, tz) for s in mine if s["due"] and (s["status"] == "open" or s["due"] <= ahead)]
     items = sorted(dated, key=lambda r: (r["date"], r["symbol"] or "", r["id"]))
-    standing = [*windows, *(_agreed_row(d, lib, tz) for d in agreed), *_rule_rows(cfg, lib, rate), *undated]
+    said = [_you_row(s, lib, tz) for s in mine if not s["due"]]
+    standing = [*windows, *(_agreed_row(d, lib, tz) for d in agreed), *_rule_rows(cfg, lib, rate), *said, *undated]
     return {"as_of": today.isoformat(), "days": days, "count": len(items), "items": items, "standing": standing, "readings": READINGS}

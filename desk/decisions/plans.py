@@ -684,6 +684,13 @@ def open_steps(cfg: Config, *, days: int = 0, now: datetime | None = None) -> li
         for s in p["steps"]:
             if s["status"] in ("open", "partial") or s["no_buy_now"] or (s["status"] == "upcoming" and s["due"] <= ahead):
                 out.append(s | {"line": _line(s)})
+    from desk.decisions.said import loose
+
+    planned = {(s["symbol"], s["kind"] in SELLS) for s in out if s["due"]}
+    for s in loose(cfg, now=now):
+        live = s["status"] == "open" or (s["status"] == "upcoming" and s["due"] <= ahead)
+        if live and s["symbol"] and (s["symbol"], s["kind"] in SELLS) not in planned:
+            out.append(s | {"line": _line(s)})
     return sorted(out, key=lambda s: (s["due"] or "9999", s["symbol"], s["id"]))
 
 
