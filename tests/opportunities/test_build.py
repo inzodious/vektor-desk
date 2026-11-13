@@ -67,7 +67,8 @@ def signal(conn, symbol, *, day=AS_OF, reason="crossed_10", case=None):
         conn.execute("INSERT OR REPLACE INTO discount_scans VALUES (?, ?, 20, 1, '[]')", (day, day))
         if case:
             conn.execute(
-                "INSERT INTO discount_cases VALUES (?, ?, ?, ?, ?, 90, '[]', 'opus', '2026-11-07T02:00:00+00:00', '1')",
+                "INSERT INTO discount_cases (signal_id, verdict, case_text, risks, confidence, horizon_days, numbers_cited, model, written_at, run_id) "
+                "VALUES (?, ?, ?, ?, ?, 90, '[]', 'opus', '2026-11-07T02:00:00+00:00', '1')",
                 (sid, case, f"{symbol} fell with the market, not on its own news.", "The sell-off may be the start of something longer", 0.62),
             )
     return sid
