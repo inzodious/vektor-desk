@@ -399,16 +399,17 @@ def test_a_skeptic_flag_says_no_price_changes_it_and_an_avoid_case_is_not_for_no
 def test_the_page_quotes_the_lab_s_own_line_for_its_rule_and_shows_nothing_until_it_is_tested(cfg, rules, monkeypatch):
     seed(cfg)
     assert ob.build(cfg, now=NOW)["evidence"] == []
-    tested = {"id": "lib-stock-dip-hold", "title": "Buy the 30% dip", "status": "tested", "verdict": "fell_short", "outdated": False}
-    tested |= {"line": "Trailed the S&P 500 out of sample.", "tested_at": "2026-11-14T06:00:00Z", "out_of_sample": {"excess_pts": -1.0}}
-    waiting = {"id": "lib-average-down", "title": "Average down", "status": "waiting", "verdict": None, "line": None, "tested_at": None}
-    other = tested | {"id": "lib-something-else"}
-    monkeypatch.setattr("desk.engine.lab.shelf.view", lambda cfg: {"rows": [other, waiting, tested]})
+    tested = {"id": "lib-stock-dip-hold", "title": "Buy the 30% dip", "status": "tested", "verdict": "fell_short", "backs": "no", "outdated": False}
+    tested |= {"line": "Trailed the S&P 500 out of sample.", "tested_at": "2026-11-14T06:00:00Z", "rule": None, "kind": "tested", "type": "experiment"}
+    waiting = {"id": "lib-average-down", "title": None, "status": "not_run", "verdict": None, "backs": None, "line": None, "tested_at": None}
+    asked = []
+    monkeypatch.setattr("desk.engine.lab.shelf.rows", lambda cfg, ids: asked.append(tuple(ids)) or {"lib-average-down": waiting, "lib-stock-dip-hold": tested})
     assert ob.build(cfg, now=NOW)["evidence"] == [
         {"id": "lib-stock-dip-hold", "title": "Buy the 30% dip", "line": "Trailed the S&P 500 out of sample.", "verdict": "fell_short"}
-        | {"tested_at": "2026-11-14T06:00:00Z", "outdated": False}
+        | {"backs": "no", "tested_at": "2026-11-14T06:00:00Z", "outdated": False}
     ]
-    monkeypatch.setattr("desk.engine.lab.shelf.view", lambda cfg: 1 / 0)
+    assert asked == [("lib-stock-dip-hold", "lib-average-down")]
+    monkeypatch.setattr("desk.engine.lab.shelf.rows", lambda cfg, ids: 1 / 0)
     assert ob.build(cfg, now=NOW)["evidence"] == []
 
 
