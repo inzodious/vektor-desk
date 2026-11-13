@@ -8,6 +8,7 @@ import { LabHero, Slots } from '../lab/parts.jsx';
 import { useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
 import { COMPARE_METRICS, DEFAULT_IDS, SLOT_COLORS, TABLE_COLS, WINDOWS, idLabel, isSymbol, parseIds, seriesRows } from '../lib/lab.js';
+import { About } from '../components/About.jsx';
 
 function useCompareState() {
   const [params, setParams] = useSearchParams();
@@ -183,9 +184,11 @@ export default function Compare() {
                   <span className="chip">Table view of every chart above</span>
                 </div>
                 <SideTable table={d.table} colorOf={colorOf} />
-                <p className="empty-hint" style={{ marginTop: 6 }}>
-                  Averaged yearly returns only show for a year or more. Correlation and beta are against {idLabel(shown[0])}.{shown.some(isSymbol) ? ' Click a symbol for its sheet.' : ''}
-                </p>
+                <About testid="compare-about">
+                  <p>
+                    Averaged yearly returns only show for a year or more. Correlation and beta are against {idLabel(shown[0])}.{shown.some(isSymbol) ? ' Click a symbol for its sheet.' : ''}
+                  </p>
+                </About>
               </section>
             </>
           ) : null}

@@ -3,6 +3,7 @@ import { Icon } from '../components/Icon.jsx';
 import { postJson, useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
 import { bandBody, bandCheck, bandText, droppedText, editRefusal, meter, nudgeLine, pct, savedText, startForm, statusWord, suggestLine, weightLine } from '../lib/convictions.js';
+import { About } from '../components/About.jsx';
 
 // ---------- meter ----------
 function Meter({ item }) {
@@ -185,7 +186,9 @@ export function Convictions({ i = 2 }) {
         <p className="empty-hint">The desk API didn’t answer. Your holds come back as soon as it does.</p>
       ) : (
         <>
-          <p className="muted job-lede">A stock you mean to keep long gets its own band instead of the single-stock cap. Above the ceiling, the desk nudges a trim once a week. It never trades.</p>
+          <About label="How a conviction hold works" testid="cv-about">
+            <p>A stock you mean to keep long gets its own band instead of the single-stock cap. Above the ceiling, the desk nudges a trim once a week. It never trades.</p>
+          </About>
           {msg ? (
             <p className="job-note done" role="status" data-testid="cv-msg">
               {msg}

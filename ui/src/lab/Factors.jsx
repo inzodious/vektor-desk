@@ -4,6 +4,7 @@ import { useApi } from '../lib/api.js';
 import { divergingColor } from '../lib/charts.js';
 import { factorBars, holdingGrid, leanSummary } from '../lib/fi.js';
 import { pct } from '../lib/format.js';
+import { About } from '../components/About.jsx';
 
 const beta = (v) => (v == null ? '—' : `${v.toFixed(2) < 0 ? '−' : ''}${Math.abs(v).toFixed(2)}`);
 
@@ -57,7 +58,9 @@ export function Factors() {
               />
             </div>
           </div>
-          <p className="empty-hint">Market 1.00 moves one for one with US stocks. Other bars near zero mean no lean; past ±0.15 is a lean. A description of the last three years, not a forecast.</p>
+          <About testid="factors-about">
+            <p>Market 1.00 moves one for one with US stocks. Other bars near zero mean no lean; past ±0.15 is a lean. A description of the last three years, not a forecast.</p>
+          </About>
         </>
       ) : (
         <p className="empty-hint">{api.loading ? 'Reading the factors…' : v?.note || 'No factor exposure yet.'} It runs with the nightly engine once the French factor library is in.</p>

@@ -1839,3 +1839,17 @@ a.chip { text-decoration: none; }
 @media (max-width: 760px) {
   .night-steps ol { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ---------- about fold ---------- */
+.about { font-size: 12.5px; margin-top: 8px; }
+.about > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-weight: 700; color: var(--teal-ink); border-radius: 8px; }
+.about > summary::-webkit-details-marker { display: none; }
+.about > summary::before { content: '+'; font-weight: 800; color: var(--teal); }
+.about[open] > summary::before { content: '−'; }
+.about > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.about-body { display: grid; gap: 6px; margin-top: 6px; color: var(--ink-2); max-width: 76ch; }
+.about-body > p, .about-body > ul { margin: 0; }
+.about-body > ul { padding-left: 18px; display: grid; gap: 4px; }
+.rs-more { margin-top: 0; font-size: inherit; }
+.rs-more > summary { font-size: 12.5px; }
+.rs-more[open] > summary { margin-bottom: 8px; }

@@ -4,6 +4,7 @@ import { useApi } from '../lib/api.js';
 import { dayLabel } from '../lib/charts.js';
 import { accountText, boardGroups, boardHead, boardStatus, edgeText, edgeTone, gateText, groupText, luckText, rankLabel, rewardLine, statLine, trackText } from '../lib/leaderboard.js';
 import { plural } from '../lib/format.js';
+import { About } from '../components/About.jsx';
 
 function Rank({ r }) {
   if (r.rank == null) {
@@ -108,9 +109,12 @@ export function Leaderboard({ api: given }) {
               <>Everyone&apos;s just off the line.</>
             )}{' '}
             <span className="muted">
-              {plural(head.racing, 'racer')} on paper{head.eligible ? `, ${head.eligible} ready to go live` : ''}. Ranked within each benchmark by lead against noise, after {d?.young_days || 60} days. Paper money only; nothing trades for real.
+              {plural(head.racing, 'racer')} on paper{head.eligible ? `, ${head.eligible} ready to go live` : ''}.
             </span>
           </p>
+          <About label="How the race is ranked" testid="lb-about">
+            <p>Ranked within each benchmark by lead against noise, after {d?.young_days || 60} days. Paper money only; nothing trades for real.</p>
+          </About>
           {groups.map((g) => (
             <div className="lb-group" key={g.benchmark} data-group={g.benchmark}>
               <p className="kicker lb-bench">

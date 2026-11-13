@@ -3,6 +3,7 @@ import { Icon } from '../components/Icon.jsx';
 import { useApi } from '../lib/api.js';
 import { cooldownText, jobState, jobWord, refusalText, runAndWait, scheduleWords, splitJobs } from '../lib/jobs.js';
 import { plural } from '../lib/format.js';
+import { About } from '../components/About.jsx';
 
 const busy = (d) => (d?.jobs || []).some((j) => j.running || j.queued || j.waiting);
 
@@ -115,7 +116,9 @@ export function Jobs() {
               The scheduler is taking a break, so Run now is off. Jobs pick up again once the cron service runs.
             </p>
           ) : (
-            <p className="muted job-lede">Everything runs on its own schedule. Run now when you want fresh numbers sooner.</p>
+            <About label="How jobs run" testid="jobs-about">
+              <p>Everything runs on its own schedule. Run now when you want fresh numbers sooner.</p>
+            </About>
           )}
           {low ? (
             <p className="note job-low" data-testid="jobs-low">
