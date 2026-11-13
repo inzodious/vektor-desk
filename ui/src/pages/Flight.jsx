@@ -9,6 +9,7 @@ import { dayLabel } from '../lib/charts.js';
 import { DECISION_TABS, SCORE_WINDOWS, kindName, originName } from '../lib/decisions.js';
 import { GROUP_BY, calibrationPoints, chipOf, decisionRows, groupItems, intervalGeo, scoredCount, totalRecord } from '../lib/flight.js';
 import { usd } from '../lib/format.js';
+import { About } from '../components/About.jsx';
 
 const tone = (v) => (v == null ? '' : v >= 0 ? 'up' : 'dn');
 const signed = (v) => (v == null ? '—' : usd(v, { sign: true }));
@@ -126,9 +127,9 @@ function Calibration({ desks }) {
           </tbody>
         </table>
       </div>
-      <p className="empty-hint" style={{ marginTop: 6 }}>
-        Dots on the dashed line mean a desk&apos;s confidence matches how often it beat the safe mix. Lower Brier is better; 0.25 is a coin flip.
-      </p>
+      <About testid="flight-about">
+        <p>Dots on the dashed line mean a desk&apos;s confidence matches how often it beat the safe mix. Lower Brier is better; 0.25 is a coin flip.</p>
+      </About>
     </>
   );
 }

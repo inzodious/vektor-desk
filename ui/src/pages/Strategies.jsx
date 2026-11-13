@@ -136,10 +136,10 @@ export default function Strategies() {
           <section className="grid">
             {bare ? null : <StrategyList list={list} off={counts.off} loading={api.loading} />}
             <div className={bare ? 'stack c12' : 'stack c4'}>
-              <div className={bare ? 'card honest wide' : 'card honest'}>
-                <div className="card-head">
-                  <span className="tag mint">How the lab stays honest</span>
-                </div>
+              <details className={bare ? 'card honest wide fold-card' : 'card honest fold-card'} data-testid="honest">
+                <summary>
+                  <b>How the lab stays honest</b>
+                </summary>
                 <div className="rule">
                   <Icon name="book" />
                   <span>
@@ -164,7 +164,7 @@ export default function Strategies() {
                   </span>
                   <span />
                 </div>
-              </div>
+              </details>
             </div>
           </section>
         </>

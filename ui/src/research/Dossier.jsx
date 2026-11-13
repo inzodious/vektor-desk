@@ -132,7 +132,7 @@ function Events({ symbol, today }) {
           ))}
         </div>
       ) : (
-        <p className="empty-hint">{res.loading ? 'Reading filings…' : 'No filings or events on file. Funds file holdings each quarter, and those show here once fetched.'}</p>
+        <p className="empty-hint">{res.loading ? 'Reading filings…' : 'No filings or events on file.'}</p>
       )}
     </div>
   );

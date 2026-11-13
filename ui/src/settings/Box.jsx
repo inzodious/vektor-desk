@@ -3,6 +3,7 @@ import { Copy } from '../components/Copy.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { getText, postJson, useApi } from '../lib/api.js';
 import { BUILDER_START, HAND_COPY, QUEUED_TEXT, boxBusy, boxRefusal, boxState, buildView, composeView, cooldownText, lastLine, scriptView, settleLine, splitBox } from '../lib/box.js';
+import { About } from '../components/About.jsx';
 
 function HandCopy({ lede }) {
   const [copied, setCopied] = useState(false);
@@ -132,8 +133,7 @@ function ActionRow({ a, alive, mine, onRun }) {
     <div className="job-row box-row" data-box={a.name} data-state={shown}>
       <span className={`job-dot ${shown}`} aria-hidden="true" />
       <span className="job-text">
-        <b>{a.title}</b>
-        <small>{a.what}</small>
+        <b title={a.what}>{a.title}</b>
         <small className="job-when">{waiting && st.state !== 'running' ? QUEUED_TEXT : st.line}</small>
         {summary ? <small className="job-when">{summary}</small> : null}
         {doneText ? (
@@ -210,9 +210,18 @@ export function Box() {
           {!alive ? (
             <HandCopy lede="One hand step left, then never again: the box hasn’t checked in, so these buttons wait. Copy deploy.sh for the cron jobs once, from a TrueNAS shell:" />
           ) : (
-            <p className="muted job-lede">
-              Chores for the NAS itself. The box picks each one up within 5 minutes and the result lands here.{settle ? <span data-testid="box-settle"> {settle}</span> : null}
-            </p>
+            <About label="What each chore does" testid="box-about">
+              <p>
+                Chores for the NAS itself. The box picks each one up within 5 minutes and the result lands here.{settle ? <span data-testid="box-settle"> {settle}</span> : null}
+              </p>
+              <ul>
+                {(d?.actions || []).map((a) => (
+                  <li key={a.name} data-what={a.name}>
+                    <b>{a.title}.</b> {a.what}
+                  </li>
+                ))}
+              </ul>
+            </About>
           )}
           {sv && sv.state !== 'current' ? (
             <div className="box-script" data-testid="box-script" data-state={sv.state}>

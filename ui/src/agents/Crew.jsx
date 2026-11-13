@@ -6,6 +6,7 @@ import { DESK_KEY } from '../lib/decisions.js';
 import { RUN_STATUS, TRIGGER, usageShare, whenLabel } from '../lib/agents.js';
 import { count } from '../lib/format.js';
 import { useNow } from '../lib/useNow.js';
+import { About } from '../components/About.jsx';
 
 const NEXT_NONE = { skeptic: 'After each buy or sell', strategy: 'When you start a test' };
 
@@ -214,9 +215,9 @@ export function Crew({ status, reload }) {
           {err}
         </p>
       ) : null}
-      <p className="empty-hint" style={{ marginTop: 8 }}>
-        Desks advise only. Each run goes through the Claude Code CLI on your subscription, so the weekly caps keep usage in check.
-      </p>
+      <About label="How desks run" testid="crew-about">
+        <p>Desks advise only. Each run goes through the Claude Code CLI on your subscription, so the weekly caps keep usage in check.</p>
+      </About>
     </div>
   );
 }

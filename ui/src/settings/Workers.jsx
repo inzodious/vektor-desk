@@ -3,6 +3,7 @@ import { Copy } from '../components/Copy.jsx';
 import { Icon } from '../components/Icon.jsx';
 import { postJson, useApi } from '../lib/api.js';
 import { WORKERS_EVENT, nameProblem, startCommand, workerRefusal, workersBusy, workersView } from '../lib/workers.js';
+import { About } from '../components/About.jsx';
 
 const tell = () => window.dispatchEvent(new Event(WORKERS_EVENT));
 
@@ -225,8 +226,13 @@ export function Workers() {
         </span>
       </div>
       <p className="muted job-lede" data-testid="workers-lead">
-        {view.lead} {view.state === 'none' ? 'A second machine at home can take the heavy jobs: add it here, start it once, and it picks up work whenever it is awake.' : null}
+        {view.lead}
       </p>
+      {view.state === 'none' ? (
+        <About label="What a worker does" testid="workers-about">
+          <p>A second machine at home can take the heavy jobs: add it here, start it once, and it picks up work whenever it is awake.</p>
+        </About>
+      ) : null}
       {made ? <KeyOnce made={made} onDone={() => setMade(null)} /> : null}
       {view.workers.length ? (
         <div className="job-list wk-list">

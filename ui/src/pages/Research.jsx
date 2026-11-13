@@ -195,9 +195,9 @@ export default function Research() {
       {byHolding?.line ? (
         <p className="note" role="note" data-testid="holding-line">
           <Icon name="book" />
-          <span>
+          <span title={byHolding.pass?.note || undefined}>
             {byHolding.line}
-            {byHolding.pass?.note || byHolding.pass?.blocked ? ` ${byHolding.pass.note || byHolding.pass.blocked}` : ''}
+            {byHolding.pass?.blocked ? ` ${byHolding.pass.blocked}` : ''}
           </span>
         </p>
       ) : null}

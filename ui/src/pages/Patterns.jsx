@@ -12,6 +12,7 @@ import { baseRateText, fundingItems, patternValue, seasonGrid, setupItems } from
 import { pct, usd } from '../lib/format.js';
 import { headline } from '../lib/replay.js';
 import { GapGate } from '../start/EmptyState.jsx';
+import { About } from '../components/About.jsx';
 
 const signedUsd = (v) => (v == null ? '—' : usd(v, { sign: true }));
 
@@ -24,8 +25,23 @@ function PatternTile({ p }) {
       <b>{patternValue(p)}</b>
       {p.bucket ? <span className="chip">{p.bucket}</span> : null}
       {rate ? <p className={p.n ? '' : 'muted'}>{rate}</p> : null}
-      {p.what_it_is_not ? <p className="pat-not">{p.what_it_is_not}</p> : null}
     </div>
+  );
+}
+
+function PatternNots({ items }) {
+  const nots = items.filter((p) => p.what_it_is_not);
+  if (!nots.length) return null;
+  return (
+    <About label="What these are not" testid="pat-nots">
+      <ul>
+        {nots.map((p) => (
+          <li key={`${p.id}-${p.scope_id}`} className="pat-not">
+            <b>{p.label}.</b> {p.what_it_is_not}
+          </li>
+        ))}
+      </ul>
+    </About>
   );
 }
 
@@ -45,6 +61,7 @@ function Holdings({ holdings }) {
           <PatternTile p={p} key={`${p.id}-${p.scope_id}`} />
         ))}
       </div>
+      <PatternNots items={holdings[sym]} />
     </>
   );
 }
@@ -155,11 +172,14 @@ export default function Patterns() {
                 <span className="chip">{d?.as_of ? `As of ${dayLabel(d.as_of)}` : 'Market context'}</span>
               </div>
               {mkt.length ? (
-                <div className="pats four">
-                  {mkt.map((p) => (
-                    <PatternTile p={p} key={p.id} />
-                  ))}
-                </div>
+                <>
+                  <div className="pats four">
+                    {mkt.map((p) => (
+                      <PatternTile p={p} key={p.id} />
+                    ))}
+                  </div>
+                  <PatternNots items={mkt} />
+                </>
               ) : (
                 <p className="empty-hint">{api.loading ? 'Reading the tape…' : 'No market context yet. It runs with the nightly engine.'}</p>
               )}
@@ -177,9 +197,9 @@ export default function Patterns() {
                   <span className="tag mustard">Drawdown base rates</span>
                 </div>
                 <Drawdowns rows={d?.drawdowns || []} />
-                <p className="empty-hint" style={{ marginTop: 6 }}>
-                  Trading days from an old high back to it, for past drops at least this deep. A base rate, not a call.
-                </p>
+                <About testid="drawdown-about">
+                  <p>Trading days from an old high back to it, for past drops at least this deep. A base rate, not a call.</p>
+                </About>
               </div>
             </section>
             <section className="grid">

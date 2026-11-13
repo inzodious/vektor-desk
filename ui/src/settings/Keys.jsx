@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../components/Icon.jsx';
 import { postJson, useApi } from '../lib/api.js';
 import { fileWord, keyCheck, keyCount, keyRefusal, keyState, keyWord } from '../lib/keys.js';
+import { About } from '../components/About.jsx';
 
 function KeyRow({ k, ready, open, note, onOpen, onClose, onSave }) {
   const st = keyState(k);
@@ -146,7 +147,9 @@ export function Keys() {
               <span>The box hasn’t shared its lock yet, so keys wait here. It does on its next check-in once the box script is current (Box → Update box script).</span>
             </div>
           ) : (
-            <p className="muted job-lede">Write-only. The desk seals each value to the box’s own lock, the box saves it within 5 minutes, and nothing ever shows it again. Saving a key redeploys the desk.</p>
+            <About label="How keys are kept" testid="keys-about">
+              <p>Write-only. The desk seals each value to the box’s own lock, the box saves it within 5 minutes, and nothing ever shows it again. Saving a key redeploys the desk.</p>
+            </About>
           )}
           <div className="job-list">
             {(d?.keys || []).map((k) => (

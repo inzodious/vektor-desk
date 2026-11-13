@@ -75,10 +75,10 @@ export default function ResearchSources() {
               ))}
             </div>
           </div>
-          <div className="card">
-            <div className="card-head">
-              <span className="tag mint">How sources are graded</span>
-            </div>
+          <details className="card fold-card" data-testid="grades">
+            <summary>
+              <b>How sources are graded</b>
+            </summary>
             {GRADES.map(([k, t]) => (
               <div className="rule" key={k}>
                 <span className={`chip ${SOURCE_WORD[k].tone}`}>{SOURCE_WORD[k].t}</span>
@@ -88,7 +88,7 @@ export default function ResearchSources() {
                 <span />
               </div>
             ))}
-          </div>
+          </details>
         </div>
       </section>
     </>

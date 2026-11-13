@@ -10,6 +10,7 @@ import { DECISION_TABS, STATUS, journalPage, kindName, latestScore, originName, 
 import { parseDay } from '../lib/charts.js';
 import { plural, usd } from '../lib/format.js';
 import { GapNote } from '../start/EmptyState.jsx';
+import { About } from '../components/About.jsx';
 
 const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SHOW_UNMATCHED = 5;
@@ -146,9 +147,9 @@ function Unmatched({ trades, onLogged }) {
               {err}
             </p>
           ) : null}
-          <p className="empty-hint" style={{ marginTop: 6 }}>
-            Fidelity trades with no decision record. Logging one after the fact counts, but it shows as logged late.
-          </p>
+          <About label="What counts as unlogged" testid="unlogged-about">
+            <p>Fidelity trades with no decision record. Logging one after the fact counts, but it shows as logged late.</p>
+          </About>
         </>
       ) : (
         <p className="empty-hint">Every Fidelity trade in the last 90 days has a decision record.</p>
@@ -299,9 +300,9 @@ export default function Journal() {
                   <b>{s.streak_days}</b>
                   <span className="muted">{s.streak_days === 1 ? 'day' : 'days'} without an unlogged trade</span>
                 </div>
-                <p className="empty-hint" style={{ marginTop: 6 }}>
-                  An unmatched Fidelity trade or one logged late resets it. Overrides with a reason never do.
-                </p>
+                <About label="What resets it" testid="streak-about">
+                  <p>An unmatched Fidelity trade or one logged late resets it. Overrides with a reason never do.</p>
+                </About>
               </>
             ) : (
               <p className="empty-hint">Counting…</p>
