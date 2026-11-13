@@ -44,7 +44,7 @@ A held symbol is fetched from Tiingo unless the mirror already has a close for t
 | Piece | Rule |
 |---|---|
 | Who is asked | Held, benchmark, plan and watched names and the scanner's quality list while their newest bar is older than the last trading day; never-fetched names once; the rest every 90 days |
-| Public stock list | Role `public`, last in the order. Full history once, then a top-up when a name's last ask is 7 days old, only while Tiingo still lists it as trading. Never asked from 16:00 to 01:00 ET, so the evening run is held, benchmark, plan, watched, quality and library names only. A list name he also holds keeps its own role and its daily refresh |
+| Public stock list | Role `public`, last in the order. Full history once, then a top-up when a name's last ask is 7 days old, only while Tiingo still lists it as trading. Never asked from 16:00 to 20:00 ET, so the evening run is held, benchmark, plan, watched, quality and library names only. From 20:00 on it takes what is left of each hour's 40 asks, still behind every daily name, so a list that is loading can finish before the 00:55 lab export. A list name he also holds keeps its own role and its daily refresh |
 | Order | By role (held first), never-fetched first inside a role, so a history backlog never delays a held name |
 | Nothing behind | The run makes no call and says so |
 | An error | Asked again next run; a rate limit or no answer also ends the run. A name is parked only when Tiingo says "no prices" and has never had a bar for it: 7 days, or 20 hours for a held name |
