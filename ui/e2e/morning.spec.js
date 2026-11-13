@@ -327,6 +327,29 @@ test('the page leads with what could be bought and folds the rest under Not now'
   expect(errors).toEqual([]);
 });
 
+test('a could row says what the desk is waiting for, and the page quotes the lab on its own rule', async ({ page }) => {
+  const errors = watchErrors(page);
+  await page.goto('/research/opportunities');
+  const ideas = page.getByTestId('ideas');
+  await expect(ideas.locator('[data-idea="VXUS"]').getByTestId('idea-becomes')).toHaveText('What would change it No written case yet. It is next in line tonight; the desk writes up to 6 a night.');
+  await expect(ideas.locator('[data-idea="NOVA"]').getByTestId('idea-becomes')).toContainText('It moves up only if a later Scout idea gets past Skeptic; no price changes that.');
+  await expect(ideas.locator('[data-idea="QUAL"]').getByTestId('idea-becomes')).toHaveCount(0);
+  await ideas.locator('[data-group="not_now"] summary').click();
+  await expect(ideas.locator('[data-idea="ACME"]').getByTestId('idea-becomes')).toHaveCount(0);
+  const lab = page.getByTestId('opp-top').getByTestId('opp-evidence');
+  await expect(lab).toHaveCount(2);
+  await expect(lab.first()).toHaveText('Lab test, Buy a stock dip and hold: Ahead by 1.2 points a year out of sample, but inside the luck band for 212 tries.');
+  await expect(lab.nth(1)).toHaveText('Lab test, Average down on the way: Behind by 0.8 points a year out of sample.');
+  const o = await overflow(page);
+  expect(o.scroll).toBeLessThanOrEqual(o.view);
+  await page.goto('/research/opportunities?scenario=evening');
+  await expect(page.getByTestId('ideas').locator('[data-idea="NOVA"]').getByTestId('idea-becomes')).toHaveCount(0);
+  await page.goto('/research/opportunities?scenario=fresh');
+  await expect(page.getByTestId('opp-top')).toBeVisible();
+  await expect(page.getByTestId('opp-evidence')).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('when nothing is a buy or close to one the Not now list stays folded until opened, and an older desk keeps one flat list', async ({ page }) => {
   const fact = '31.3% under its 52-week high at the latest price (31.9% when the case was written)';
   let mode = 'not_now';

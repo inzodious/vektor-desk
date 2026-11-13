@@ -38,6 +38,24 @@
   "note": "Sizes come from free cash first, then the next deposit. Never from margin."
  },
  "method": "Ranked by how unusual the discount is for that name, lifted by a written buy case or a Scout idea. It is a sort, not a forecast.",
+ "evidence": [
+  {
+   "id": "lib-stock-dip-hold",
+   "title": "Buy a stock dip and hold",
+   "line": "Ahead by 1.2 points a year out of sample, but inside the luck band for 212 tries.",
+   "verdict": "within_noise",
+   "tested_at": "2026-11-09T08:12:00+00:00",
+   "outdated": false
+  },
+  {
+   "id": "lib-average-down",
+   "title": "Average down on the way",
+   "line": "Behind by 0.8 points a year out of sample.",
+   "verdict": "fell_short",
+   "tested_at": "2026-11-09T08:14:00+00:00",
+   "outdated": false
+  }
+ ],
  "rows": [
   {
    "rank": 1,
@@ -89,6 +107,8 @@
    "next_earnings": null,
    "as_of": "2026-11-09",
    "score": 78,
+   "becomes_buy": null,
+   "trigger": null,
    "group": "buy",
    "group_label": "Worth buying",
    "queued": false,
@@ -145,6 +165,19 @@
    },
    "as_of": "2026-11-06",
    "score": 64,
+   "becomes_buy": "Skeptic disagreed with Scout’s idea. It moves up only if a later Scout idea gets past Skeptic; no price changes that.",
+   "trigger": {
+    "kind": "skeptic",
+    "on": null,
+    "price_below": null,
+    "step_pct": null,
+    "on_sale_under": null,
+    "earnings": "2026-11-18",
+    "queue": null,
+    "buy_if": null,
+    "met": false,
+    "waiting": null
+   },
    "group": "could",
    "group_label": "Could become a buy",
    "queued": true,
@@ -204,6 +237,8 @@
    "next_earnings": null,
    "as_of": "2026-11-09",
    "score": 51,
+   "becomes_buy": null,
+   "trigger": null,
    "group": "not_now",
    "group_label": "Not now",
    "queued": false,
@@ -252,6 +287,19 @@
    "next_earnings": null,
    "as_of": "2026-11-09",
    "score": 44,
+   "becomes_buy": "No written case yet. It is next in line tonight; the desk writes up to 6 a night.",
+   "trigger": {
+    "kind": "case_due",
+    "on": null,
+    "price_below": 54.72,
+    "step_pct": 20,
+    "on_sale_under": 61.56,
+    "earnings": null,
+    "queue": 1,
+    "buy_if": null,
+    "met": false,
+    "waiting": null
+   },
    "group": "could",
    "group_label": "Could become a buy",
    "queued": false,
