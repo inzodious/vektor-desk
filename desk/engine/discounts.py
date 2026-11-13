@@ -304,7 +304,8 @@ def record(cfg: Config, signal_id: str, case: dict) -> bool:
             raise ValueError("; ".join(errors))
         with conn:
             n = conn.execute(
-                "INSERT OR IGNORE INTO discount_cases VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO discount_cases (signal_id, verdict, case_text, risks, confidence, horizon_days, numbers_cited, model, written_at, "
+                "run_id, buy_if) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     signal_id,
                     case["verdict"],
@@ -316,6 +317,7 @@ def record(cfg: Config, signal_id: str, case: dict) -> bool:
                     case["model"],
                     case["written_at"],
                     case.get("run_id"),
+                    json.dumps(case["buy_if"], sort_keys=True) if case.get("buy_if") is not None else None,
                 ),
             ).rowcount
     finally:
@@ -324,6 +326,13 @@ def record(cfg: Config, signal_id: str, case: dict) -> bool:
 
 
 # ---- API view ----
+
+
+def _stored_json(text: str | None):
+    try:
+        return json.loads(text) if text else None
+    except ValueError:
+        return None
 
 
 def view(conn: sqlite3.Connection | None, days: int = 10) -> dict:
@@ -342,6 +351,7 @@ def view(conn: sqlite3.Connection | None, days: int = 10) -> dict:
         if c:
             c["numbers_cited"] = json.loads(c["numbers_cited"])
             c["case"] = c.pop("case_text")
+            c["buy_if"] = _stored_json(c.get("buy_if"))
             c.pop("signal_id")
         rows.append(hit | {"case": c})
     note = None if rows else "No discounts in the last 10 days."

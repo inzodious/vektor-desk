@@ -280,6 +280,111 @@ def test_the_library_is_queued_once_run_and_reported_out_of_sample_only(stocked,
     assert all(s["library"] for s in lab.strategies(cfg) if s["kind"] == "strategy")
     with TestClient(create_app(cfg)) as client:
         assert client.get("/api/lab/library").json()["counts"] == view["counts"]
+    ids = [r["id"] for r in view["rows"]]
+    looked = shelf.rows(cfg, [*ids, "lib-not-yet", ids[0]])
+    assert list(looked) == [*ids, "lib-not-yet"] and all(tuple(v) == shelf.LOOKUP for v in looked.values())
+    for r in view["rows"]:
+        assert looked[r["id"]] == {k: r[k] for k in shelf.LOOKUP}
+        if r["type"] != "rule":
+            assert r["backs"] == {"held_up": "yes", "within_noise": "no_edge", "fell_short": "no"}.get(r["verdict"])
+    unknown = {"id": "lib-not-yet", "status": "not_run", "outdated": False}
+    assert looked["lib-not-yet"] == {k: unknown.get(k) for k in shelf.LOOKUP}
+    assert set(shelf._latest(cfg, only=ids[:2])[0]) == set(ids[:2]) and shelf._latest(cfg, only=[])[0] == {}
+
+
+PUBLISHED = (
+    "lib-buy-hold-sp500",
+    "lib-buy-hold-total-world",
+    "lib-60-40",
+    "lib-risk-parity",
+    "lib-trend-200d",
+    "lib-vol-cap",
+    "lib-dual-momentum",
+    "lib-sector-momentum-12-1",
+    "lib-sector-rotation",
+    "lib-sector-low-vol",
+    "lib-stock-momentum",
+    "lib-stock-low-vol",
+    "lib-size-small",
+    "lib-momentum-top-tenth",
+    "lib-value-tilt",
+    "lib-profitability-tilt",
+    "lib-quality-tilt",
+    "lib-industry-momentum",
+    "lib-industry-low-vol",
+    "lib-three-fund",
+    "lib-permanent",
+    "lib-all-weather",
+    "lib-trend-five",
+    "lib-golden-cross",
+    "lib-asset-momentum",
+    "lib-equal-sectors",
+    "lib-equal-weight-500",
+    "lib-dividend-growers",
+    "lib-small-value-fund",
+    "lib-value-momentum",
+    "lib-small-reversal",
+    "lib-plan-mix",
+    "lib-as-held",
+    "lib-safe-mix",
+    "lib-tech-tilt",
+    "lib-dip-only",
+    "lib-dip-sectors",
+    "lib-dip-reserve",
+    "lib-margin-dip",
+    "lib-lump-sum-spread",
+    "lib-deposit-steering",
+    "lib-rebalance-bands",
+    "lib-rebalance-bands-plan",
+    "lib-harvest",
+    "lib-core-satellite",
+    "lib-themes-equal",
+    "lib-as-held-capped",
+    "lib-margin-paydown",
+    "lib-trend-dip",
+    "lib-sector-momentum-uptrend",
+    "lib-calm-winners",
+    "lib-breakout-vol-cap",
+    "lib-discount-day",
+    "insider-momentum-filter",
+    "drift-insider-confirmed",
+    "lib-momentum-calm",
+    "lib-drawdown-stop",
+    "lib-down-week",
+    "lib-canary",
+    "lib-credit-canary",
+    "lib-tech-tilt-vol-target",
+    "lib-discount-day-uptrend",
+)
+
+
+def test_a_row_id_once_published_is_never_dropped_or_renamed():
+    assert len(PUBLISHED) == len(set(PUBLISHED)) == 62 and not set(PUBLISHED) - shelf.IDS
+    assert len(shelf.IDS) == len(shelf.LIBRARY)
+
+
+def test_a_row_is_looked_up_by_id_before_anything_ran(stocked):
+    out = shelf.rows(stocked, ["lib-harvest", "lib-average-down"])
+    assert (out["lib-harvest"]["status"], out["lib-harvest"]["title"], out["lib-harvest"]["type"]) == ("waiting", "Tax-loss harvesting", "rule")
+    assert out["lib-harvest"]["line"] is None and out["lib-harvest"]["backs"] is None and out["lib-average-down"]["status"] == "not_run"
+    assert shelf.rows(stocked, []) == {}
+
+
+def test_only_a_current_result_on_firm_ground_backs_a_step():
+    base = {"status": "tested", "outdated": False, "thin_coverage": False, "leans_on_hindsight": False, "hindsight": False, "yardstick": False, "rule": None}
+    verdicts = ("held_up", "within_noise", "fell_short", "inconclusive", None)
+    assert [shelf._backs(base | {"verdict": v}) for v in verdicts] == ["yes", "no_edge", "no", None, None]
+    for flag in ("outdated", "thin_coverage", "leans_on_hindsight", "hindsight", "yardstick"):
+        assert shelf._backs(base | {"verdict": "held_up", flag: True}) is None
+    assert shelf._backs(base | {"verdict": "held_up", "status": "waiting"}) is None
+    rule = {"p5_pts": -1.0, "p50_pts": 0.4, "p95_pts": 2.0, "share_better": 0.7, "share_worse": 0.2}
+    within = base | {"verdict": "within_noise"}
+    assert shelf._backs(within | {"rule": rule}) == "yes"
+    assert shelf._backs(within | {"rule": rule | {"share_better": 0.2, "share_worse": 0.7}}) == "no"
+    assert shelf._backs(within | {"rule": rule | {"share_better": 0.4, "share_worse": 0.4}}) == "no_edge"
+    assert shelf._backs(within | {"rule": rule | {"share_better": 0.4, "share_worse": None}}) == "no_edge"
+    assert shelf._backs(within | {"rule": {"p5_pts": 0.0, "p50_pts": 0.02, "p95_pts": 0.04, "share_better": 0.9, "share_worse": 0.0}}) == "no_edge"
+    assert shelf._backs(base | {"verdict": "fell_short", "rule": rule}) == "no" and shelf._backs(base | {"verdict": "held_up", "rule": rule}) == "yes"
 
 
 def test_an_entry_the_lab_refused_is_explained_and_tried_again_the_next_evening(stocked, monkeypatch):

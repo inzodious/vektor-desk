@@ -736,7 +736,7 @@ Module `desk.engine.discounts`, job `discounts` weekdays 17:40 ET, after the clo
 
 **`GET /api/engine/discounts`.** `{as_of, scanned, rule, rows, note}`. Rows from the last 10 days, newest first: `signal_id, symbol, name, as_of, list, reason, price, drop_from_high_pct, move_z, valuation {metric, value, pctile_own}, numbers {price, day_move_pct, drop_from_high_pct, move_z, high_52w, ret_1y_pct, valuation_value, valuation_pctile}, case` (null, or `{verdict, case, risks, confidence, horizon_days, numbers_cited, model, written_at, run_id}`).
 
-For the research desk: `discounts.pending(cfg, limit)` returns the last 5 days' hits with no case, biggest discount first, and raises `discounts.NotReady` before the first scan. `discounts.record(cfg, signal_id, case)` checks a case (verdict buy/wait/avoid, case ≤ 400, risks ≤ 240, confidence 0–1, horizon_days ≥ 1, numbers_cited from the hit's `numbers`, model, written_at), raises `ValueError` on bad values and returns False when a case already exists.
+For the research desk: `discounts.pending(cfg, limit)` returns the last 5 days' hits with no case, biggest discount first, and raises `discounts.NotReady` before the first scan. `discounts.record(cfg, signal_id, case)` checks a case (verdict buy/wait/avoid, case ≤ 400, risks ≤ 240, confidence 0–1, horizon_days ≥ 1, numbers_cited from the hit's `numbers`, model, written_at), raises `ValueError` on bad values and returns False when a case already exists. A case may carry `buy_if` (`{kind, value, date, words}`, the condition to buy on): it is stored as sent in `discount_cases.buy_if`, never judged here, and comes back on the view row's `case.buy_if` (null when the case gave none). `desk.opportunities.cases.buy_if` decides what is usable.
 
 ## One as of
 
@@ -1258,6 +1258,19 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Cost | Eighteen SEC frames (ten for floats, four each for shares outstanding and total assets), one Tiingo file (no key, no quota), and up to two small SEC requests per company not on today's list. Kept 6 days; runs at 10:30 and 14:30 ET and exits at once while the list is fresh |
 
 The job's `detail` and the route's `detail` are the same sentence, for example "Of the 200 largest US companies of mid-2011, 191 have a ticker and Tiingo prices 183 of them from January 2012 (91.5%). The largest are Exxon Mobil Corp, Apple Inc and International Business Machines Corp. 41 companies were left out because the size they reported looks mistyped. 1 fund or trust was left out because it is not a company." `top` is the first 25 names in order, for a check by eye.
+
+**Row ids.** A library row's `id` is permanent: once published it is never renamed, dropped or given to another strategy, because other pages store only the id and look the rest up. A test pins the published set. A retired idea keeps its row.
+
+**Lookup by id.** `shelf.rows(cfg, ids)` returns `{id: {id, title, kind, type, status, verdict, line, tested_at, outdated, rule, backs}}` and reads only those ids' results, so a page can call it on every load. An id that is not in the library yet comes back with status `not_run` and nulls. `line` is always one sentence.
+
+| `backs` | When |
+|---|---|
+| `yes` | The row held up, or a deposit rule inside the noise was ahead in more than half of its start months |
+| `no_edge` | Inside the noise, including a rule that made no difference |
+| `no` | The row fell short, or a deposit rule inside the noise was behind in more than half of its start months |
+| null | Not tested, inconclusive, outdated, a thin public list, a result that leans on hindsight, a hindsight row or the yardstick. Nothing may lean on such a row |
+
+`GET /api/lab/library` rows carry the same `backs`, so the Lab page and any page citing a row read it the same way.
 
 **Outdated rows.** A tested row whose result is from an older revision keeps its numbers, has `outdated: true` and is counted in `counts.outdated`; `note` then says those rows are being run again. Bump `shelf.REV` (or one entry's `rev`) when a change to the lab alters results. `shelf.MIX_REV` marks the five mixes whose test held cash for a fund not yet trading (US plus international, risk parity, plan mix, safe mix, tech tilt); `shelf.SCREEN_REV` marks the six stock screens (see "Stock screens run on the public stock list").
 

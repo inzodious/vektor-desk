@@ -357,7 +357,8 @@ CREATE TABLE IF NOT EXISTS discount_cases (
   numbers_cited TEXT NOT NULL,
   model TEXT NOT NULL,
   written_at TEXT NOT NULL,
-  run_id TEXT
+  run_id TEXT,
+  buy_if TEXT
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS discount_scans (
   as_of TEXT PRIMARY KEY,
@@ -748,6 +749,12 @@ def apply(conn: sqlite3.Connection) -> None:
     conn.executescript(SCHEMA)
     rebuild_quotes(conn)
     add_health_columns(conn)
+    add_case_columns(conn)
+
+
+def add_case_columns(conn: sqlite3.Connection) -> None:
+    if "buy_if" not in {r[1] for r in conn.execute("PRAGMA table_info(discount_cases)")}:
+        conn.execute("ALTER TABLE discount_cases ADD COLUMN buy_if TEXT")
 
 
 def add_health_columns(conn: sqlite3.Connection) -> None:
