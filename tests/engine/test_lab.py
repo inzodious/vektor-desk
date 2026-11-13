@@ -314,6 +314,28 @@ def test_experiment_finalize_paper_and_views(cfg, app_client):
     assert client.get("/api/lab/strategies/nobody").status_code == 404
 
 
+FIXED = SPEC | {"id": "fixed-three", "signals": [{"metric_id": "ret", "window": "126d", "transform": "rank"}], "entry": "top 3 by rank", "params": {}}
+NO_VARIANT = "No variant met the constraints in any fold."
+
+
+def test_a_strategy_with_nothing_to_tune_is_judged_on_its_numbers(cfg):
+    write_lab_db(cfg)
+    queue(cfg, experiment(spec=FIXED, grid={}), "001-fixed-three-v1-experiment.json")
+    queue(cfg, {"request": "finalize", "strategy_id": "fixed-three", "version": 1}, "002-fixed-three-v1-finalize.json")
+    queue(cfg, experiment(spec=SPEC | {"id": "never-fits", "constraints": SPEC["constraints"] | {"max_turnover": 0.0001}}), "003-never-fits-v1-experiment.json")
+    queue(cfg, {"request": "finalize", "strategy_id": "never-fits", "version": 1}, "004-never-fits-v1-finalize.json")
+    done = process_queue(cfg, now=NOW)["done"]
+    assert [d["status"] for d in done] == ["experiment", "finalize", "experiment", "finalize"]
+    view = lab.desk_view(cfg, "fixed-three")
+    assert view["tear_sheet"]["variants"] == 1 and all(f["params"] == {} for f in view["folds"])
+    final = view["final"]
+    assert final["params"] == {} and final["note"] != NO_VARIANT and final["verdict"] in ("pass", "fail", "inconclusive")
+    assert final["holdout"]["start"] >= "2022-12-30" and set(final["bars"]) >= {"excess_interval", "deflated_sharpe", "pbo", "holdout"}
+    never = lab.desk_view(cfg, "never-fits")
+    assert all(f["params"] is None for f in never["folds"])
+    assert (never["final"]["verdict"], never["final"]["note"], never["final"]["bars"], never["status"]) == ("fail", NO_VARIANT, {}, "failed")
+
+
 def test_paper_portfolio_steps_and_graduates(cfg, monkeypatch):
     write_lab_db(cfg)
     conn = ledger(cfg)

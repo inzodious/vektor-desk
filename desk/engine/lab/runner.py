@@ -459,7 +459,7 @@ def finalize(cfg: Config, conn, data: LabData, request: dict, *, now: datetime) 
         return _reject(conn, raw, [f"{sid} v{version} has no experiment result yet"], now)
     exp = json.loads(exp["body"])
     spec = parse(json.loads(row["spec"]), data, model=row["model"] or "")
-    if not exp.get("deploy_params"):
+    if exp.get("deploy_params") is None:
         body = {"verdict": "fail", "bars": {}, "note": "No variant met the constraints in any fold."}
         _close(conn, spec, "failed")
         return _record(conn, spec, "finalize", body, now)
