@@ -1,15 +1,17 @@
+import re
 from datetime import date, datetime, timedelta
 
 from desk.config import Config
 from desk.decisions.plan import AUTO, LAND_WINDOW_DAYS, _today, upcoming_deposits
 from desk.decisions.plans import BUYS, LOT_TEXT, SELLS, approved_plans
 from desk.decisions.profile import active_profile, margin_rate
-from desk.decisions.records import _now, day_words, local_day, now_iso, tidy, to_dict
+from desk.decisions.records import _account_ok, _now, day_words, local_day, now_iso, tidy, to_dict
 from desk.decisions.rules import active_rules
 from desk.decisions.said import loose
 from desk.decisions.store import session
 
 DAYS = 90
+SHELTERED = re.compile(r"hsa|health savings|\bira\b|roth|rollover|retire|401|403|457|529", re.I)
 AGREED_DAYS = 30
 WHY_MAX = 240
 READINGS = {
@@ -229,35 +231,61 @@ def _routes(conn) -> tuple[dict | None, dict | None]:
     return (to_dict(approved) if approved else None, to_dict(waiting) if waiting else None)
 
 
-def _deposit_rows(deposits: list[dict], today: str, dated: list[dict], agreed: list[dict], routes: tuple, lib: dict, rate: float, tz: str) -> list[dict]:
+def _owing(conn) -> set[str]:
+    try:
+        rows = conn.execute(
+            "SELECT scope_id FROM metric_values WHERE metric_id='margin.call_drop' AND scope='account' "
+            "AND as_of = (SELECT MAX(as_of) FROM metric_values WHERE metric_id='margin.debit' AND scope='portfolio')"
+        ).fetchall()
+    except Exception:  # noqa: BLE001
+        return set()
+    return {str(r["scope_id"]) for r in rows if r["scope_id"]}
+
+
+def _matches(account: str | None, owing: set[str]) -> bool:
+    return bool(account) and any(_account_ok(account, a) for a in owing)
+
+
+def _can_owe(d: dict, owing: set[str], named: bool) -> bool:
+    if owing and (named or d["mode"] == AUTO):
+        return _matches(d["account"], owing)
+    return not SHELTERED.search(d["account"] or "")
+
+
+def _deposit_rows(deposits: list[dict], today: str, dated: list[dict], agreed: list[dict], routes: tuple, owing: set[str], lib: dict, rate: float, tz: str):
     out = []
     repay = next((r for r in dated if r["ref"]["kind"] == "repay"), None)
     note = next((d for d in agreed if d["margin"]), None)
-    approved, waiting = routes
-    first = True
-    for d in deposits:
-        if d["status"] != "expected" or d["date"] < today:
-            continue
+    route = routes[0] or routes[1]
+    due = [d for d in deposits if d["status"] == "expected" and d["date"] >= today]
+    named = any(_matches(d["account"], owing) for d in due)
+    seen: set[str | None] = set()
+    for d in due:
         head = f"Deposit of ${d['amount_usd']:,.0f} lands" if d["amount_usd"] else "A deposit lands"
         more = {"date": d["date"], "status": "upcoming", "ref": {"deposit_id": d["id"]}, "detail": f"Into {d['account']}." if d["account"] else None}
-        near = repay and d["date"] >= (date.fromisoformat(repay["date"]) - timedelta(days=LAND_WINDOW_DAYS)).isoformat()
+        pays = _can_owe(d, owing, named)
+        near = pays and repay and d["date"] >= (date.fromisoformat(repay["date"]) - timedelta(days=LAND_WINDOW_DAYS)).isoformat()
         margin = {
             "why": MARGIN_WHY.format(rate=rate),
             "changes_if": "Retires by itself once the margin debit reads zero. If one deposit does not clear it, the next one picks this up.",
             "completes": "desk",
             "evidence": _cite(lib, "repay"),
         }
+        fits = route and (_account_ok(route["account"], d["account"]) if route["account"] and d["account"] else pays)
         if near:
             dated.remove(repay)
             row = _row(f"deposit:{d['id']}:{d['date']}", f"{head} and pays the margin debit", "deposit", **more, **margin, basis=repay["basis"])
             row["ref"] |= {k: repay["ref"][k] for k in ("symbol", "version", "step_id")}
             repay = None
-        elif first and note and not repay:
+        elif d["account"] in seen:
+            continue
+        elif pays and note and not repay:
             basis = f"You agreed to this {DESK_NAMES.get(note['origin'], 'desk')} note on {day_words(note['decided_at'], tz)}."
             row = _row(f"deposit:{d['id']}:{d['date']}", f"{head} and goes to the margin debit first", "deposit", **more, **margin, basis=basis)
             row["ref"]["decision_id"] = note["id"]
-        elif first and (approved or waiting):
-            route = approved or waiting
+            note = None
+        elif fits:
+            approved = route["status"] == "approved"
             words = f"{head}: {route['title']}" if approved else f"{head}. The Plan keeper's route for it is waiting in your queue: {route['title']}"
             basis = f"You approved this route on {day_words(route['decided_at'], tz)}." if approved else "Waiting on your decision."
             changes = "Changes if you pass on the route or approve a newer one." if approved else "Yours to approve, change or pass on."
@@ -273,12 +301,11 @@ def _deposit_rows(deposits: list[dict], today: str, dated: list[dict], agreed: l
                 evidence=_cite(lib, "route"),
             )
             row["ref"]["decision_id"] = route["id"]
-        elif first:
+            route = None
+        else:
             basis = "From the pattern of your past deposits." if d["mode"] == AUTO else "From your deposit schedule."
             row = _row(f"deposit:{d['id']}:{d['date']}", f"{head}. Nothing is planned for it yet", "deposit", **more, basis=basis, completes="desk")
-        else:
-            continue
-        first = False
+        seen.add(d["account"])
         out.append(row)
     return out
 
@@ -355,10 +382,11 @@ def next_steps(cfg: Config, *, days: int = DAYS, now: datetime | None = None) ->
     with session(cfg) as conn:
         tidy(cfg, conn, now_iso(moment))
         debit = _debit(conn)
+        owing = _owing(conn) if debit and debit[0] > 1 else set()
         agreed = _agreed(conn, now_iso(moment - timedelta(days=AGREED_DAYS)), debit, tz)
         routes = _routes(conn)
     planned = {(r["symbol"], r["ref"]["kind"] in SELLS) for r in dated}
-    dated += _deposit_rows(upcoming_deposits(cfg, days=days, now=moment), today.isoformat(), dated, agreed, routes, lib, rate, tz)
+    dated += _deposit_rows(upcoming_deposits(cfg, days=days, now=moment), today.isoformat(), dated, agreed, routes, owing, lib, rate, tz)
     mine = [s for s in loose(cfg, now=moment) if not (s["due"] and s["symbol"] and (s["symbol"], s["kind"] in SELLS) in planned)]
     dated += [_you_row(s, lib, tz) for s in mine if s["due"] and (s["status"] == "open" or s["due"] <= ahead)]
     items = sorted(dated, key=lambda r: (r["date"], r["symbol"] or "", r["id"]))

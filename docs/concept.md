@@ -133,7 +133,7 @@ The plan desk writes through `desk.decisions.plans.save_draft`. It never changes
   | Source | Row |
   |---|---|
   | Approved stock plan step | Its text, window and lots. A step due later than `days` is left out; an undated step goes to `standing` with its `when` |
-  | Expected deposit | The next one says what it does: it pays the margin debit (a plan repay step, which then has no row of its own, or a margin note he agreed to), follows an approved deposit route, points at a route waiting in the queue, or says nothing is planned yet. A deposit that is late is never listed |
+  | Expected deposit | The next one into each account says what it does: it pays the margin debit (a plan repay step, which then has no row of its own, or a margin note he agreed to), follows an approved deposit route, points at a route waiting in the queue, or says nothing is planned yet. Only a deposit into the account that carries the debit can pay it (the engine's per-account margin reading names that account; when a schedule's account name matches none, or nothing names the account, only a tax-sheltered account such as an HSA or IRA is ruled out). A route with an account goes to that account's deposit. A deposit that is late is never listed |
   | Desk note he agreed to | In `standing` for 30 days. A margin note ends when the debit reads zero |
   | Rule | `no_margin_buys` and `no_new_single_stocks`, in `standing` |
   | His own words | A reason he types when he passes on a proposal. See the table below |
