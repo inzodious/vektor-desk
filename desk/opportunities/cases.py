@@ -13,6 +13,8 @@ FRESH_DAYS = 7
 KEEP_DAYS = 45
 HIT_NUMBERS = ("price", "day_move_pct", "drop_from_high_pct", "high_52w", "ret_1y_pct", "sigma_month_pct", "vs_sma_200_pct", "swings_under_high")
 VALUATION_NUMBERS = ("valuation_value", "valuation_pctile")
+BUY_IF_KINDS = ("price_below", "price_above", "after_date", "after_earnings")
+BUY_IF_WORDS = 120
 
 
 # ---- The file ----
@@ -91,8 +93,44 @@ def hit_for(row: dict) -> dict:
     }
 
 
+def queue(rows: list[dict]) -> list[dict]:
+    priced = [r for r in rows if (r.get("numbers") or {}).get("price")]
+    met = [r for r in priced if (r.get("trigger") or {}).get("met")]
+    return met + [r for r in priced if r.get("stance") == "screen" and r not in met]
+
+
 def wanted(listing: dict) -> list[dict]:
-    return [hit_for(r) for r in listing.get("rows") or () if r.get("stance") == "screen" and (r.get("numbers") or {}).get("price")]
+    return [hit_for(r) for r in queue(listing.get("rows") or [])]
+
+
+# ---- The case's own condition ----
+
+
+def buy_if(found: object, price: object = None, as_of: object = None) -> dict | None:
+    if isinstance(found, str):
+        try:
+            found = json.loads(found)
+        except ValueError:
+            return None
+    if not isinstance(found, dict) or found.get("kind") not in BUY_IF_KINDS:
+        return None
+    kind, value, day = found["kind"], found.get("value"), found.get("date")
+    out = {"kind": kind, "value": None, "date": None, "words": " ".join(str(found.get("words") or "").split())[:BUY_IF_WORDS] or None}
+    if kind in ("price_below", "price_above"):
+        if not isinstance(value, int | float) or isinstance(value, bool) or value <= 0:
+            return None
+        if isinstance(price, int | float) and price > 0 and (value >= price if kind == "price_below" else value <= price):
+            return None
+        out["value"] = round(float(value), 2)
+    if kind == "after_date":
+        try:
+            day = date.fromisoformat(str(day)[:10]).isoformat()
+        except ValueError:
+            return None
+        if as_of and day <= str(as_of)[:10]:
+            return None
+        out["date"] = day
+    return out
 
 
 # ---- The source the Discount cases desk reads and writes ----
@@ -141,7 +179,9 @@ class ListSource:
             "signal_id": signal_id,
             "symbol": hit["symbol"],
             "as_of": hit["as_of"],
+            "price": hit.get("price"),
             "drop_from_high_pct": hit.get("drop_from_high_pct"),
+            "buy_if": buy_if(case.get("buy_if"), hit.get("price"), hit["as_of"]),
             "verdict": case["verdict"],
             "case": case["case"].strip(),
             "risks": case["risks"].strip(),

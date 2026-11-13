@@ -93,11 +93,35 @@ Every row has a `group`, and the list is sorted by it so the page leads with wha
 |---|---|---|
 | `buy` | Worth buying | Stance `buy` |
 | `could` | Could become a buy | On sale and nothing rules it out: the case says wait, the Skeptic disagreed, or no case is written yet |
-| `not_now` | Not now | A holding whose research note does not say add; a row a cap, rule, hold-off note or no-buy window blocks; a name that is not on sale and only fills the list |
+| `not_now` | Not now | A holding whose research note does not say add; a row a cap, rule, hold-off note or no-buy window blocks; a case that says avoid; a name that is not on sale and only fills the list |
 
 Inside a group rows are sorted by score. The score is a sort key from 0 to 100: depth of the discount in monthly swings (up to 40), cheapness against its own history (±15), above or below the 200-day average (±8), a fresh hit (+10), a buy case (+25 × confidence), a wait case (−5), a Scout idea (+20 × confidence, −15 if flagged), a research note that says add (+15), a blocked size (−25), earnings inside 5 days (−5). It is not a forecast and has not been through the lab's gate; the payload's `method` says so.
 
 The headline counts the groups: "Nothing rated a buy yet. 2 could become one, 9 not for now. Top: VGT, 12.4% under its high." The drop in the headline is the top row's `numbers.drop_from_high_pct`, the same figure as its first fact. When a written case is older than the row's price, the fact says both: "31.3% under its 52-week high at the latest price (31.9% when the case was written)", because the case's own sentence quotes the scanner's number from its day.
+
+## What would make a "could" a buy
+
+No price rule turns a row into a buy. Only words do: a written case that says buy, a Scout idea the Skeptic passes, or a research note that says add. So every `could` row carries `becomes_buy`, one line on when the desk looks again, and `trigger`, the same thing as fields. Both are null on every other row. The line never reads as a buy signal.
+
+| Row | `trigger.kind` | `becomes_buy` says | From |
+|---|---|---|---|
+| No case yet | `case_due` | Its place in tonight's line against the cap of six. "Waiting to be written" when last night's case steps were put off or switched off (`trigger.waiting`: `put_off`, `off`) | The list order, `night.json` |
+| Case says wait | `reread` | "The desk re-reads it on Nov 18 if it is still under $X, and writes a fresh case sooner if it closes under $Y, 20% under its high." Earnings are named when they come first | `trigger.on`: the day the case ages off (a scanner case 5 days after its hit, a list case 7). `on_sale_under`: the on-sale rule at today's high and swing. `price_below`, `step_pct`: the scanner's next step (10, 20, 30% under the high) |
+| A newer hit, older case | `case_due` | "It tripped the scanner again on Nov 9, so a fresh case is due tonight." | The scanner |
+| Skeptic disagreed | `skeptic` | No price changes it; a later Scout idea has to get past Skeptic | Scout's idea |
+
+### The case's own condition, `buy_if`
+
+A case may answer one more optional field. The list stores it for its own cases and reads it from the scanner's cases when they carry it.
+
+| Field | Meaning |
+|---|---|
+| `kind` | `price_below`, `price_above`, `after_date`, `after_earnings`, `none` |
+| `value` | The price, for the two price kinds |
+| `date` | The day, for `after_date` (`after_earnings` takes its date from the earnings table) |
+| `words` | Up to 120 characters, the case's reason |
+
+A condition that is malformed, `none`, or already true the day the case was written is dropped; the case is kept. The line then leads with it: "The case says wait for a close under $180.00." When a later price meets it, `trigger.met` is true, the row goes first in tonight's case line (inside the six) and the line says a fresh case is written tonight. A met condition never changes the row's stance or group.
 
 ## The night job
 
@@ -128,5 +152,6 @@ The list never waits for the night job. Rows without a case show as `screen` and
 | `freshness` | `scanner_as_of`, `last_case_at` (newest case of either kind), `last_scout_at`, `night_run_at`, `night_status` (`ok`, `partial`, `waiting`), `night_summary`, `night_steps[]` (`step`, `status`, `note`), `note` |
 | `headline`, `counts`, `note` | One line for the door; totals by stance and by group (`could`, `not_now`), held and outside, `with_case` and `written` (rows with a case, a Scout idea or a research note); the reason when the list is empty |
 | `profile`, `cash`, `method` | The band sizes use; free cash, margin debit and next deposit; how rows are ranked |
-| `rows[]` | `rank`, `symbol`, `name`, `kind`, `held`, `weight_pct`, `sources`, `source_label`, `stance`, `stance_label`, `group`, `group_label`, `why_now`, `facts`, `entry`, `size`, `wrong_if`, `invalid_below`, `case`, `decision_id`, `queued`, `not_queued`, `research_verdict`, `research`, `numbers`, `next_earnings`, `as_of`, `price_as_of`, `price_source`, `price_at`, `price_behind`, `analysis_as_of`, `since_analysis_pct`, `as_of_words`, `score` |
+| `evidence[]` | The lab's own result for the page's rule, quoted, never restated: `id`, `title`, `line`, `verdict`, `tested_at`, `outdated` for library rows `lib-stock-dip-hold` and `lib-average-down`. A row shows only once its status is `tested`; until then the list is empty |
+| `rows[]` | `rank`, `symbol`, `name`, `kind`, `held`, `weight_pct`, `sources`, `source_label`, `stance`, `stance_label`, `group`, `group_label`, `becomes_buy`, `trigger` (`kind`, `on`, `price_below`, `step_pct`, `on_sale_under`, `earnings`, `queue`, `buy_if`, `met`, `waiting`), `why_now`, `facts`, `entry`, `size`, `wrong_if`, `invalid_below`, `case`, `decision_id`, `queued`, `not_queued`, `research_verdict`, `research`, `numbers`, `next_earnings`, `as_of`, `price_as_of`, `price_source`, `price_at`, `price_behind`, `analysis_as_of`, `since_analysis_pct`, `as_of_words`, `score` |
 | `passed[]` | `symbol`, `name`, `reason` |
