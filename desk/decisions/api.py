@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from desk.config import Config
-from desk.decisions import plan, plans, records, risk, starter, tickets, yamlfile
+from desk.decisions import plan, plans, records, risk, starter, steps, tickets, yamlfile
 from desk.decisions import profile as profiles
 from desk.decisions import rules as ruleset
 from desk.decisions.store import session
@@ -140,6 +140,11 @@ def get_plans(cfg: Cfg) -> JSONResponse:
 @router.get("/plan-steps")
 def get_plan_steps(cfg: Cfg, days: int = Query(0, ge=0, le=366)) -> JSONResponse:
     return fresh({"items": plans.open_steps(cfg, days=days), "no_buy": plans.no_buy(cfg)})
+
+
+@router.get("/next-steps")
+def get_next_steps(cfg: Cfg, days: int = Query(steps.DAYS, ge=0, le=366)) -> JSONResponse:
+    return fresh(steps.next_steps(cfg, days=days))
 
 
 @router.get("/plans/{symbol}")
