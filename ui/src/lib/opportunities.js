@@ -1,5 +1,6 @@
 import { dayLabel } from './charts.js';
 import { usd } from './format.js';
+import { plainLine } from './jobs.js';
 
 const price = (v) => usd(v, { cents: true });
 
@@ -62,4 +63,17 @@ export function opportunityGroups(rows) {
     const mine = list.filter((r) => (GROUPS.some((x) => x.key === r.group) ? r.group : 'not_now') === g.key);
     return { key: g.key, title: mine[0]?.group_label || g.t, rows: mine, fold: g.key === 'not_now' };
   }).filter((g) => g.rows.length);
+}
+
+// ---------- what would make a could a buy ----------
+export function becomesBuy(row) {
+  if (!row || (row.group && row.group !== 'could')) return null;
+  return plainLine(row.becomes_buy);
+}
+
+export function evidenceLines(d) {
+  const list = Array.isArray(d?.evidence) ? d.evidence : [];
+  return list
+    .filter((e) => e && plainLine(e.line))
+    .map((e, k) => ({ key: e.id || `e${k}`, title: plainLine(e.title), line: plainLine(e.line), outdated: Boolean(e.outdated) }));
 }

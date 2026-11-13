@@ -241,7 +241,16 @@ const holdingsFresh = {
 
 // ---------- buying opportunities ----------
 const ZONE = "Today's close down to one monthly swing lower. Split the buy in two.";
-const opp = (rank, symbol, name, kind, o) => ({ rank, symbol, name, kind, held: false, weight_pct: 0, sources: ['scanner'], source_label: 'Discount scanner', stance: 'screen', stance_label: 'Cheap by the numbers, no written case yet', why_now: '', facts: [], entry: null, size: null, wrong_if: '', invalid_below: null, case: null, decision_id: null, next_earnings: null, as_of: '2026-11-09', score: 50, ...o });
+const opp = (rank, symbol, name, kind, o) => ({ rank, symbol, name, kind, held: false, weight_pct: 0, sources: ['scanner'], source_label: 'Discount scanner', stance: 'screen', stance_label: 'Cheap by the numbers, no written case yet', why_now: '', facts: [], entry: null, size: null, wrong_if: '', invalid_below: null, case: null, decision_id: null, next_earnings: null, as_of: '2026-11-09', score: 50, becomes_buy: null, trigger: null, ...o });
+const trigger = (kind, o = {}) => ({ kind, on: null, price_below: null, step_pct: null, on_sale_under: null, earnings: null, queue: null, buy_if: null, met: false, waiting: null, ...o });
+const BECOMES = {
+  NOVA: { becomes_buy: 'Skeptic disagreed with Scout’s idea. It moves up only if a later Scout idea gets past Skeptic; no price changes that.', trigger: trigger('skeptic', { earnings: '2026-11-18' }) },
+  VXUS: { becomes_buy: 'No written case yet. It is next in line tonight; the desk writes up to 6 a night.', trigger: trigger('case_due', { price_below: 54.72, step_pct: 20, on_sale_under: 61.56, queue: 1 }) },
+};
+const EVIDENCE = [
+  { id: 'lib-stock-dip-hold', title: 'Buy a stock dip and hold', line: 'Ahead by 1.2 points a year out of sample, but inside the luck band for 212 tries.', verdict: 'within_noise', tested_at: at('08:12:00'), outdated: false },
+  { id: 'lib-average-down', title: 'Average down on the way', line: 'Behind by 0.8 points a year out of sample.', verdict: 'fell_short', tested_at: at('08:14:00'), outdated: false },
+];
 const OPPS = [
   opp(1, 'QUAL', 'Synthetic Quality Factor ETF', 'fund', {
     sources: ['scanner', 'case'],
@@ -346,7 +355,8 @@ const opportunities = {
   profile: PROFILE,
   cash: { free_usd: 142, account: 'individual', next_deposit_usd: 500, next_deposit_on: '2026-11-18', note: 'Sizes come from free cash first, then the next deposit. Never from margin.' },
   method: METHOD,
-  rows: OPPS,
+  evidence: EVIDENCE,
+  rows: OPPS.map((r) => ({ ...r, ...(BECOMES[r.symbol] || {}) })),
   prices: { day: '2026-11-09', words: 'Prices run to Mon Nov 9. NOVA is still at an earlier close: live quotes cover what you hold, and other closes arrive the same evening, mutual funds later.', older: [{ symbol: 'NOVA', price_as_of: '2026-11-06', held: false }] },
   passed: [{ symbol: 'BND', name: 'Synthetic Total Bond ETF', reason: 'Written case says avoid: cheap for a reason that looks lasting.' }],
 };
@@ -356,7 +366,7 @@ const opportunitiesDebit = {
   headline: '2 worth buying once the margin debit is paid, 2 to watch. Top: QUAL, 12% under its high.',
   counts: { ...opportunities.counts, buy: 2, watch: 1, could: 1 },
   cash: { ...opportunities.cash, free_usd: 0, margin_debit_usd: 1500, note: 'A margin debit of $1,500 is open. It is paid before anything here is bought.' },
-  rows: OPPS.map((r) => (r.symbol === 'QUAL' || r.symbol === 'NOVA' ? { ...r, stance: 'buy', stance_label: 'Worth buying once cash is free', group: 'buy', group_label: 'Worth buying', queued: false, not_queued: DEBIT, size: { ...r.size, usd: 0, shares: 0, funding: 'wait', note: 'Nothing to buy until the margin debit is paid.' } } : r)),
+  rows: opportunities.rows.map((r) => (r.symbol === 'QUAL' || r.symbol === 'NOVA' ? { ...r, becomes_buy: null, trigger: null, stance: 'buy', stance_label: 'Worth buying once cash is free', group: 'buy', group_label: 'Worth buying', queued: false, not_queued: DEBIT, size: { ...r.size, usd: 0, shares: 0, funding: 'wait', note: 'Nothing to buy until the margin debit is paid.' } } : r)),
 };
 const opportunitiesFresh = {
   as_of: null,
@@ -369,6 +379,7 @@ const opportunitiesFresh = {
   profile: PROFILE,
   cash: { free_usd: null, account: null, next_deposit_usd: null, next_deposit_on: null, note: 'Sizes come from free cash first, then the next deposit. Never from margin.' },
   method: METHOD,
+  evidence: [],
   rows: [],
   passed: [],
 };

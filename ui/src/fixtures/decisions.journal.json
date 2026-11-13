@@ -2047,7 +2047,7 @@
        {
         "after": 168,
         "before": 0,
-        "detail": "Cash covers $142; the other $168 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 98% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $168 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 98% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -2235,7 +2235,7 @@
        {
         "after": 198,
         "before": 0,
-        "detail": "Cash covers $142; the other $198 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 98% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $198 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 98% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -2597,7 +2597,7 @@
        {
         "after": 308,
         "before": 0,
-        "detail": "Cash covers $142; the other $308 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $308 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -3315,7 +3315,7 @@
        {
         "after": 488,
         "before": 0,
-        "detail": "Cash covers $142; the other $488 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 95% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $488 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 95% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -3677,7 +3677,7 @@
        {
         "after": 328,
         "before": 0,
-        "detail": "Cash covers $142; the other $328 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $328 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -4217,7 +4217,7 @@
        {
         "after": 258,
         "before": 0,
-        "detail": "Cash covers $142; the other $258 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $258 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -4406,7 +4406,7 @@
        {
         "after": 358,
         "before": 0,
-        "detail": "Cash covers $142; the other $358 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 96% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $358 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 96% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -4768,7 +4768,7 @@
        {
         "after": 438,
         "before": 0,
-        "detail": "Cash covers $142; the other $438 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 96% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $438 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 96% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -5125,7 +5125,7 @@
        {
         "after": 278,
         "before": 0,
-        "detail": "Cash covers $142; the other $278 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $278 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -5314,7 +5314,7 @@
        {
         "after": 318,
         "before": 0,
-        "detail": "Cash covers $142; the other $318 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $318 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -5503,7 +5503,7 @@
        {
         "after": 278,
         "before": 0,
-        "detail": "Cash covers $142; the other $278 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $278 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -5870,7 +5870,7 @@
        {
         "after": 378,
         "before": 0,
-        "detail": "Cash covers $142; the other $378 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 96% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $378 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 96% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -6059,7 +6059,7 @@
        {
         "after": 198,
         "before": 0,
-        "detail": "Cash covers $142; the other $198 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 98% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $198 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 98% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -7137,7 +7137,7 @@
        {
         "after": 368,
         "before": 0,
-        "detail": "Cash covers $142; the other $368 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 96% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $368 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 96% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -7326,7 +7326,7 @@
        {
         "after": 178,
         "before": 0,
-        "detail": "Cash covers $142; the other $178 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 98% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $178 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 98% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -7693,7 +7693,7 @@
        {
         "after": 168,
         "before": 0,
-        "detail": "Cash covers $142; the other $168 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 98% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $168 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 98% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -7882,7 +7882,7 @@
        {
         "after": 388,
         "before": 0,
-        "detail": "Cash covers $142; the other $388 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 96% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $388 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 96% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -9656,7 +9656,7 @@
        {
         "after": 168,
         "before": 0,
-        "detail": "Cash covers $142; the other $168 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 98% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $168 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 98% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -11421,7 +11421,7 @@
        {
         "after": 468,
         "before": 0,
-        "detail": "Cash covers $142; the other $468 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 95% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $468 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 95% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -11610,7 +11610,7 @@
        {
         "after": 278,
         "before": 0,
-        "detail": "Cash covers $142; the other $278 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $278 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -12150,7 +12150,7 @@
        {
         "after": 428,
         "before": 0,
-        "detail": "Cash covers $142; the other $428 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 96% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $428 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 96% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -12685,7 +12685,7 @@
        {
         "after": 198,
         "before": 0,
-        "detail": "Cash covers $142; the other $198 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 98% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $198 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 98% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -13402,7 +13402,7 @@
        {
         "after": 448,
         "before": 0,
-        "detail": "Cash covers $142; the other $448 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 95% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $448 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 95% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -13759,7 +13759,7 @@
        {
         "after": 398,
         "before": 0,
-        "detail": "Cash covers $142; the other $398 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 96% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $398 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 96% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -14477,7 +14477,7 @@
        {
         "after": 458,
         "before": 0,
-        "detail": "Cash covers $142; the other $458 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 95% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $458 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 95% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"
@@ -14839,7 +14839,7 @@
        {
         "after": 268,
         "before": 0,
-        "detail": "Cash covers $142; the other $268 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+        "detail": "Cash covers $142; the other $268 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
         "id": "funding",
         "label": "Funding",
         "status": "act"

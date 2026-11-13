@@ -73,7 +73,7 @@
    {
     "after": 258,
     "before": 0,
-    "detail": "Cash covers $142; the other $258 goes on margin. Set DESK_MARGIN_RATE_PCT to see the interest in dollars. A 97% drop would bring a margin call.",
+    "detail": "Cash covers $142; the other $258 goes on margin. The margin rate could not be read from your profile, so the interest is not shown in dollars. A 97% drop would bring a margin call.",
     "id": "funding",
     "label": "Funding",
     "status": "act"

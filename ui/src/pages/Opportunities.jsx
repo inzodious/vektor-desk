@@ -3,7 +3,7 @@ import { ApiDown, ResearchHero } from '../research/parts.jsx';
 import { useApi } from '../lib/api.js';
 import { useAsOf, fromDay } from '../lib/asof.js';
 import { whenWords } from '../lib/morning.js';
-import { earningsLine, entryLine, heldLine, inQueue, opportunityGroups, opportunityNotes, sizeLine, stanceOf } from '../lib/opportunities.js';
+import { becomesBuy, earningsLine, entryLine, evidenceLines, heldLine, inQueue, opportunityGroups, opportunityNotes, sizeLine, stanceOf } from '../lib/opportunities.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 
 // ---------- one idea ----------
@@ -13,6 +13,7 @@ function Idea({ row, deskDay }) {
   const size = sizeLine(row.size);
   const earnings = earningsLine(row.next_earnings);
   const older = fromDay(row.as_of, deskDay);
+  const becomes = becomesBuy(row);
   return (
     <article className="card idea" data-idea={row.symbol} data-stance={row.stance}>
       <div className="card-head">
@@ -31,6 +32,11 @@ function Idea({ row, deskDay }) {
         </span>
       </div>
       <p className="idea-why">{row.why_now}</p>
+      {becomes ? (
+        <p className="idea-becomes" data-testid="idea-becomes">
+          <b>What would change it</b> {becomes}
+        </p>
+      ) : null}
       {row.facts?.length ? (
         <ul className="idea-facts">
           {row.facts.map((f) => (
@@ -111,6 +117,7 @@ export default function Opportunities() {
   const total = d.counts?.total ?? rows.length;
   const fresh = whenWords(d.freshness?.night_run_at || d.built_at);
   const notes = opportunityNotes(d);
+  const evidence = evidenceLines(d);
   const passed = Array.isArray(d.passed) ? d.passed : [];
   const groups = opportunityGroups(rows);
   const open = groups ? groups.filter((g) => !g.fold) : [];
@@ -142,6 +149,12 @@ export default function Opportunities() {
           </p>
         ))}
         {d.method ? <p className="muted opp-note">{d.method}</p> : null}
+        {evidence.map((e) => (
+          <p className="muted opp-note opp-evidence" key={e.key} data-testid="opp-evidence">
+            <b>Lab test{e.title ? `, ${e.title}` : ''}:</b> {e.line}
+            {e.outdated ? ' This result is from an older version of the rule and is queued to run again.' : ''}
+          </p>
+        ))}
       </section>
       {rows.length ? (
         groups ? (
