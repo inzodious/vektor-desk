@@ -122,12 +122,12 @@ def test_dry_run_says_what_would_skip(cli_env, capsys, monkeypatch):
 
 
 def test_trigger_runs_count_against_the_weekly_cap_but_console_does_not(cfg):
-    risk = get("risk")
-    for _ in range(risk.weekly_runs):
-        assert run_desk(risk, "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="trigger").status == "ok"
-    assert run_desk(risk, "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="trigger").status == "over_budget"
-    assert run_desk(risk, "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="retry").status == "over_budget"
-    assert run_desk(risk, "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="console").status == "ok"
+    tax = get("tax")
+    for _ in range(tax.weekly_runs):
+        assert run_desk(tax, "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="trigger").status == "ok"
+    assert run_desk(tax, "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="trigger").status == "over_budget"
+    assert run_desk(tax, "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="retry").status == "over_budget"
+    assert run_desk(tax, "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="console").status == "ok"
 
 
 def test_two_queue_passes_never_claim_the_same_request(cfg):

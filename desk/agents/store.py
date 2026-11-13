@@ -76,6 +76,8 @@ LANES = {
     None: "",
     "pass": " AND id IN (SELECT run_id FROM agent_holding_tries WHERE run_id IS NOT NULL)",
     "desk": " AND id NOT IN (SELECT run_id FROM agent_holding_tries WHERE run_id IS NOT NULL)",
+    "scheduled": " AND trigger IN ('schedule','retry')",
+    "asked": " AND trigger NOT IN ('schedule','retry')",
 }
 
 
@@ -89,6 +91,16 @@ def week_usage(cfg: Config, desk: str, now: datetime | None = None, lane: str | 
             (desk, since, *COUNTED),
         ).fetchone()
     return {"runs": row["runs"], "turns": row["turns"], "tokens": row["tokens"]}
+
+
+def counted_starts(cfg: Config, desk: str, since: datetime, lane: str | None = None) -> list[datetime]:
+    marks = ",".join("?" * len(COUNTED))
+    with db(cfg) as conn:
+        rows = conn.execute(
+            f"SELECT started_at FROM agent_runs WHERE desk=? AND started_at>=? AND status IN ({marks}){LANES[lane]} ORDER BY started_at, id",
+            (desk, since.isoformat(timespec="seconds"), *COUNTED),
+        ).fetchall()
+    return [datetime.fromisoformat(r["started_at"]) for r in rows]
 
 
 def runs_since(cfg: Config, desk: str, hours: float, now: datetime | None = None) -> int:
