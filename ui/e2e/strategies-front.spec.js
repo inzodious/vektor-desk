@@ -30,6 +30,10 @@ test('the leaderboard groups racers under their own benchmark and ranks on lead 
   await expect(lane.locator('.lb-rank')).toHaveText('·');
   await expect(lane.locator('.lb-edge .chip')).toHaveText('Too new to rank');
   await expect(lane.getByRole('link')).toHaveCount(0);
+  await expect(lane.getByTestId('lb-account')).toBeHidden();
+  await expect(board.locator('.lb-stat:visible')).toHaveCount(0);
+  await lane.getByTestId('lb-more').locator('> summary').click();
+  await expect(lane.getByTestId('lb-account')).toBeVisible();
   await expect(lane.getByTestId('lb-account')).toHaveText('Paper account $1,012 of $1,000 (+1.2%) · $906 cash');
   await expect(board.locator('[data-row="low-vol-sectors"]')).toContainText('passed the day 182 check');
   await expect(board.locator('[data-row="sector-momentum"] .lb-edge b')).toHaveClass(/dn/);

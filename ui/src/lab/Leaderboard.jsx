@@ -60,8 +60,9 @@ function Row({ r }) {
         ) : null}
         <span className={`chip ${st.tone}`}>{fresh ? 'Too new to rank' : st.t}</span>
       </span>
-      <small className="lb-stats">
-        {statLine(r)}
+      <details className="lb-stats" data-testid="lb-more">
+        <summary>The numbers</summary>
+        <span className="lb-stat">{statLine(r)}</span>
         {rewardLine(r) ? (
           <span className="lb-acct" data-testid="lb-reward">
             {rewardLine(r)}
@@ -72,7 +73,7 @@ function Row({ r }) {
             {accountText(r)}
           </span>
         ) : null}
-      </small>
+      </details>
     </div>
   );
 }

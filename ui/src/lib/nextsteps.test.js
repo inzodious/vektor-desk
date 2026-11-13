@@ -18,7 +18,7 @@ describe('next steps', () => {
       stamp: 'Nov 13',
       text: 'Sell 40 ACME to harvest the loss',
       detail: 'From Individual. Lots: Specific Shares, highest-cost lots.',
-      meta: 'Any day to Nov 20',
+      meta: 'to Nov 20',
       why: 'A sale below your cost books the loss against this year’s taxes.',
       basis: 'Your ACME plan, version 2, approved Nov 6.',
       changes: 'No longer worth doing if ACME is back above your cost.',
@@ -27,10 +27,10 @@ describe('next steps', () => {
   });
 
   it('shows the lab’s reading as the chip, and only a test that does not back the step stands out', () => {
-    expect(view.items[0].chip).toEqual({ text: 'The lab’s test backs this.', tone: '' });
-    expect(view.items[1].chip).toEqual({ text: 'The lab’s test shows no clear edge either way.', tone: '' });
+    expect(view.items[0].chip).toEqual({ text: 'Lab backs it', words: 'The lab’s test backs this.', tone: '' });
+    expect(view.items[1].chip).toEqual({ text: 'No clear edge', words: 'The lab’s test shows no clear edge either way.', tone: '' });
     const agreed = view.standing.find((s) => s.id.startsWith('agreed:'));
-    expect(agreed.chip).toEqual({ text: 'The lab’s test does not back this.', tone: 'watch' });
+    expect(agreed.chip).toEqual({ text: 'Lab disagrees', words: 'The lab’s test does not back this.', tone: 'watch' });
     expect(agreed.meta).toBe('Until Dec 9');
     expect(agreed.tests).toEqual([{ key: 'lib-wait-for-rates', row: 'lib-wait-for-rates', title: 'Wait for a rate decision before buying bonds', sentence: 'Hurt: behind in 61% of 120 start months.' }]);
     expect(view.standing.find((s) => s.id === 'nobuy:ACME')).toMatchObject({ chip: null, tests: [], stamp: null, meta: null });
@@ -45,7 +45,7 @@ describe('next steps', () => {
   it('says when an undated step happens and what state a step is in', () => {
     expect(view.standing.find((s) => s.id === 'plan:ACME:add').meta).toBe('On a pullback below $2.60');
     expect(stepRow({ id: 'a', text: 'Sell 10 ACME', status: 'partial', date: '2026-11-10' }).meta).toBe('Partly done');
-    expect(stepRow({ id: 'a', text: 'Sell 10 ACME', status: 'open', date: '2026-11-10', until: '2026-11-12' }).meta).toBe('Due now · Any day to Nov 12');
+    expect(stepRow({ id: 'a', text: 'Sell 10 ACME', status: 'open', date: '2026-11-10', until: '2026-11-12' }).meta).toBe('Due now · to Nov 12');
   });
 
   it('reads an empty or older answer as nothing to show', () => {
@@ -62,7 +62,7 @@ describe('his own words as a step', () => {
   const standing = view.standing[0];
 
   it('keeps his sentence and shows how its date was read', () => {
-    expect(dated).toMatchObject({ mine: true, stamp: 'Dec 7', text: 'I’ll trim FTEC after Dec 6, once the year’s gains are clear.', read: 'read as Dec 7 to Dec 31, from “after Dec 6”', meta: 'Your words · read as Dec 7 to Dec 31, from “after Dec 6”' });
+    expect(dated).toMatchObject({ mine: true, stamp: 'Dec 7', text: 'I’ll trim FTEC after Dec 6, once the year’s gains are clear.', read: 'read as Dec 7 to Dec 31, from “after Dec 6”', meta: 'Your words · to Dec 31' });
     expect(standing).toMatchObject({ mine: true, stamp: null, text: 'I’ll wait for earnings first', read: null, meta: 'Your words' });
     expect(readWords({ date: '2026-12-07', until: null, phrase: null })).toBe('read as Dec 7');
     expect(readWords({ date: null, until: '2026-12-31', phrase: 'by year end' })).toBe('read as until Dec 31, from “by year end”');
