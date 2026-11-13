@@ -8,7 +8,8 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine import catalog, gate
 from desk.engine.lab.data import PUBLIC_COVERAGE, data_path, lab_build, ledger_path, plan_path, read_plan
-from desk.engine.lab.rulebook import STAND_IN
+from desk.engine.lab.listrules import UNIT as LIST_UNIT
+from desk.engine.lab.rulebook import LIST_RULES, STAND_IN
 from desk.engine.lab.runner import PBO_BAR
 from desk.engine.lab.simcache import queue_dir
 from desk.engine.lab.spec import SCREEN_HINDSIGHT
@@ -30,6 +31,9 @@ RULE_BENCH = {
     "spread": "Investing it all on day one",
     "margin": "The same deposits, never borrowing",
     "paydown": "Investing every deposit and leaving the debit",
+    "average_down": "The same money in the S&P 500",
+    "cap_position": "Letting the big position run",
+    "harvest_return": "Holding the losing position",
 }
 BENCH_WORDS = {
     SPY: "The S&P 500 index fund SPY, bought and held with dividends reinvested.",
@@ -40,6 +44,9 @@ BENCH_WORDS = {
     RULE_BENCH["spread"]: "The whole sum invested in the same funds on the first day.",
     RULE_BENCH["margin"]: "The same deposits into the same funds, with no borrowing.",
     RULE_BENCH["paydown"]: "The same starting debit, with every deposit invested and the debit left to grow with interest.",
+    RULE_BENCH["average_down"]: "The same dollar put into the S&P 500 index fund SPY on the same day and held just as long.",
+    RULE_BENCH["cap_position"]: "The same start, 30% in one company and the rest in the S&P 500, never trimmed.",
+    RULE_BENCH["harvest_return"]: "The same losing position simply held, with no sale and no month away.",
 }
 NOTE = (
     "Every number here is out of sample: from periods the strategy was not tuned on. The last two years of data are held back and untouched. "
@@ -659,7 +666,7 @@ LIBRARY: tuple[dict, ...] = (
         "practical",
         "Factor tilt",
         "Ten largest companies, equal weight",
-        "Once a year buy the ten largest companies in equal parts and hold them for the year.",
+        "Buy the ten largest companies in equal parts at the start of each test year and hold them for the year.",
         SPY,
         {"universe": STOCKS, "signals": [_sig("size", "252d")], "entry": {"top_n": 10}, "rebalance": "yearly", "benchmark": "SPY"},
         rev=SCREEN_REV,
@@ -669,10 +676,40 @@ LIBRARY: tuple[dict, ...] = (
         "practical",
         "Dip buying",
         "Ten most beaten-down large companies",
-        "Once a year buy the ten large companies furthest under their one-year high and hold them for the year.",
+        "Buy the ten large companies furthest under their one-year high at the start of each test year and hold them a year.",
         SPY,
         {"universe": STOCKS, "signals": [_sig("dd", "252d", "inverse_rank")], "entry": {"top_n": 10}, "rebalance": "yearly", "benchmark": "SPY"},
         rev=SCREEN_REV,
+    ),
+    _rule(
+        "lib-average-down",
+        "practical",
+        "Dip buying",
+        "Averaging down on a fallen company",
+        "Put new money into a large company the first day it sits 50% under its one-year high, instead of into the S&P 500.",
+        "average_down",
+        {"drop_pct": 50},
+        horizons=[1, 3, 5],
+    ),
+    _rule(
+        "lib-cap-position",
+        "practical",
+        "Rebalancing",
+        "Capping a big position",
+        "Start with 30% in one company and the rest in the S&P 500, then trim it to 25% or 10% each quarter instead of letting it run.",
+        "cap_position",
+        {"cap_pct": [25, 10]},
+        horizons=[3, 5],
+    ),
+    _rule(
+        "lib-harvest-return",
+        "practical",
+        "Rebalancing",
+        "Harvest a loss and buy back",
+        "Sell a company 30% under its one-year high for the tax loss, wait 31 days in the S&P 500, then buy it back.",
+        "harvest_return",
+        {"drop_pct": 30},
+        horizons=[1, 3],
     ),
     # ---- Novel and creative ----
     _exp(
@@ -1049,17 +1086,27 @@ def _tenth(x: float) -> float:
     return round(x, 1) or 0.0
 
 
-def _split(h: dict) -> str:
+def _split(h: dict, unit: str = "start months") -> str:
     n, ahead = h["starts"], round(h["share_better"] * 100)
     if h.get("share_worse") is None:
         if not h["share_better"] and not _tenth(h["p50_pts"]):
-            return f"never ahead, and no different in at least half of {n} start months"
-        return f"ahead in {ahead}% of {n} start months"
+            return f"never ahead, and no different in at least half of {n} {unit}"
+        return f"ahead in {ahead}% of {n} {unit}"
     behind = round(h["share_worse"] * 100)
     same = max(0, 100 - ahead - behind)
     if not same:
-        return f"ahead in {ahead}% and behind in {behind}% of {n} start months"
-    return f"ahead in {ahead}%, behind in {behind}% and no different in {same}% of {n} start months"
+        return f"ahead in {ahead}% and behind in {behind}% of {n} {unit}"
+    return f"ahead in {ahead}%, behind in {behind}% and no different in {same}% of {n} {unit}"
+
+
+def _cases(h: dict) -> str:
+    if not h.get("cases"):
+        return ""
+    out = f", and {round(h['case_share_better'] * 100)}% of {h['cases']:,} single cases ended ahead"
+    if h.get("tax_pts") is not None and h.get("tracking_pts") is not None:
+        away = _tenth(h["tracking_pts"])
+        out += f"; on average the tax was worth {_tenth(h['tax_pts']):+.1f} points and the month away {'added' if away > 0 else 'cost'} {abs(away):.1f}"
+    return out
 
 
 def _rule_row(entry: dict, body: dict) -> dict:
@@ -1067,24 +1114,32 @@ def _rule_row(entry: dict, body: dict) -> dict:
     h = next((x for x in sorted(best.get("horizons") or [], key=lambda x: -x["years"]) if x.get("starts")), None)
     verdict = RULE_VERDICT.get(str(body.get("verdict")), "inconclusive")
     if not h:
-        return {"verdict": "inconclusive", "line": "Not enough history before the two-year holdout to judge this rule.", "variants": body.get("trials")}
-    bench = entry["benchmark"].lower()
+        short = "Too few cases" if body.get("rule") in LIST_RULES else "Not enough history"
+        return {"verdict": "inconclusive", "line": f"{short} before the two-year holdout to judge this rule.", "variants": body.get("trials")}
+    bench = entry["benchmark"][:1].lower() + entry["benchmark"][1:]
+    unit = LIST_UNIT.get(str(body.get("rule")), "start months")
+    span = f"{h['years']} year{'' if h['years'] == 1 else 's'}"
+    cap = (best.get("params") or {}).get("cap_pct") if body.get("rule") == "cap_position" else None
     if not any(_tenth(h[k]) for k in ("p5_pts", "p50_pts", "p95_pts")):
         verdict = "within_noise"
         line = (
-            f"No difference: within a tenth of a point of {bench} in nearly every one of {h['starts']} start months over {h['years']} years. "
+            f"No difference: within a tenth of a point of {bench} in nearly every one of {h['starts']} {unit} over {span}. "
             "The rule seldom acted, or changed little when it did."
         )
     else:
         lead = {"held_up": "Helped", "within_noise": "No clear edge", "fell_short": "Hurt"}.get(verdict, "Unclear")
+        lead = f"{lead} at a {cap:g}% cap" if cap else lead
         typical = _tenth(h["p50_pts"])
-        line = f"{lead}: a typical {f'{typical:+.1f}' if typical else '0.0'} points of the money put in over {h['years']} years against {bench}; {_split(h)}."
+        tail = f"{_split(h, unit)}{_cases(h)}"
+        line = f"{lead}: a typical {f'{typical:+.1f}' if typical else '0.0'} points of the money put in over {span} against {bench}; {tail}."
     if any(str(c).startswith(STAND_IN) for c in body.get("caveats") or []):
         line = f"Run on the built-in safe mix, as no plan of your own is loaded. {line}"
     return {
         "verdict": verdict,
         "line": line,
-        "rule": {"horizon_years": h["years"], **{k: h.get(k) for k in ("starts", "p5_pts", "p50_pts", "p95_pts", "share_better", "share_worse")}},
+        "rule": {"horizon_years": h["years"], **{k: h.get(k) for k in ("starts", "p5_pts", "p50_pts", "p95_pts", "share_better", "share_worse")}}
+        | {k: h[k] for k in LIST_FIELDS if h.get(k) is not None}
+        | ({"cap_pct": cap} if cap else {}),
         "variants": body.get("trials"),
     }
 
@@ -1095,6 +1150,8 @@ def _barred(row: dict, ahead: str, barred: str, words: str) -> dict:
     return {"line": f"{row['line']} {words}"} if row["line"] else {}
 
 
+LIST_FIELDS = ("cases", "names", "case_share_better", "case_share_worse", "tax_pts", "tracking_pts")
+LEAN_STARTS = 12
 BACKS = {"held_up": "yes", "within_noise": "no_edge", "fell_short": "no"}
 LOOKUP = ("id", "title", "kind", "type", "status", "verdict", "line", "tested_at", "outdated", "rule", "backs")
 
@@ -1103,7 +1160,8 @@ def _backs(row: dict) -> str | None:
     if row["status"] != "tested" or row["outdated"] or row["thin_coverage"] or row["leans_on_hindsight"] or row["hindsight"] or row["yardstick"]:
         return None
     rule = row.get("rule")
-    if rule and row["verdict"] == "within_noise" and any(_tenth(rule[k] or 0.0) for k in ("p5_pts", "p50_pts", "p95_pts")):
+    few = bool(rule) and rule.get("starts") is not None and rule["starts"] < LEAN_STARTS
+    if rule and not few and row["verdict"] == "within_noise" and any(_tenth(rule[k] or 0.0) for k in ("p5_pts", "p50_pts", "p95_pts")):
         if (rule.get("share_better") or 0.0) > 0.5:
             return "yes"
         if (rule.get("share_worse") or 0.0) > 0.5:
@@ -1116,7 +1174,7 @@ def _row(entry: dict, seen: dict | None, waiting: set[str], trials: int, alone: 
     row["benchmark_words"] = BENCH_WORDS[entry["benchmark"]]
     row |= {"status": "waiting", "verdict": None, "line": None, "reason": None, "tested_at": None, "out_of_sample": None, "noise": None, "rule": None}
     row |= {"yardstick": False, "gap_pts": None, "outdated": False, "hindsight": bool(entry.get("hindsight"))}
-    screen = (entry.get("spec") or {}).get("universe", {}).get("type") == "screen"
+    screen = (entry.get("spec") or {}).get("universe", {}).get("type") == "screen" or (entry.get("body") or {}).get("rule") in LIST_RULES
     row |= {
         "leans_on_hindsight": False,
         "thin_coverage": False,

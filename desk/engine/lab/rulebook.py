@@ -25,6 +25,7 @@ REQUIRED = {
     "spread": ("months",),
     "paydown": ("debit_pct", "rate_pct"),
 }
+LIST_RULES = ("average_down", "cap_position", "harvest_return")
 SCALAR = ("rate_pct", "debit_pct")
 PAYDOWN_HOLD = "paydown_hold"
 DEFAULT_DEPOSIT = 1_000.0
@@ -100,7 +101,7 @@ def parse(raw: dict, data: LabData) -> Rule:
         problems.append("a rule request needs an id")
     name = str(raw.get("rule") or "")
     if name not in RULES:
-        problems.append(f"rule must be one of {', '.join(RULES)}")
+        problems.append(f"rule must be one of {', '.join((*RULES, *LIST_RULES))}")
         raise RuleError(problems)
     params = raw.get("params") or {}
     if not isinstance(params, dict):
@@ -556,8 +557,13 @@ def run(conn, data: LabData, request: dict, *, now: datetime) -> dict:
     raw = {k: v for k, v in request.items() if k not in ("request", "written_at")}
     rid, version = str(raw.get("id") or "unknown"), int(raw.get("version") or 1)
     try:
-        rule = parse(raw, data)
-        body = evaluate(data, rule, raw.get("date_range"))
+        if str(raw.get("rule")) in LIST_RULES:
+            from desk.engine.lab import listrules
+
+            body = listrules.evaluate(data, listrules.parse(raw, data))
+        else:
+            rule = parse(raw, data)
+            body = evaluate(data, rule, raw.get("date_range"))
     except RuleError as e:
         body = {"strategy_id": rid, "version": version, "kind": "rejected", "result_at": stamp, "problems": e.problems, "lab_build": lab_build()}
         with conn:

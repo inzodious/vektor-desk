@@ -1021,6 +1021,30 @@ Both sides are sold and taxed at the end, so deferring a gain is not a win. The 
 | `hurts` | p95 below zero |
 | `no_clear_edge` | Otherwise; `inconclusive` when no horizon fits |
 
+**Rules across the public stock list.** `lab/listrules.py`. Same queue file, same verdicts, same result shape, but the rule is tried on every company of the public stock list instead of on one mix, so the answer is a spread, not one path. No mix, deposits or account apply; `rulebook.run` hands the three names in `rulebook.LIST_RULES` to it. Each takes under a second at 200 names.
+
+| Rule | A case | The two sides | Horizons |
+|---|---|---|---|
+| `average_down` (`drop_pct`) | The day a company first closes that far under its one-year high (at least 300 bars, $5 or more; it cannot count again for 252 sessions) | $1 into the company at the next open against $1 into SPY, both sold at the end | 1, 3, 5 |
+| `cap_position` (`cap_pct`, grid; `start_pct` 30) | Every company on the first session of each January | `start_pct` in the company and the rest in SPY. One side never trims. The other trims to the cap on day one and at the start of each quarter, pays tax on the gain it sells and puts the rest in SPY | 3, 5 |
+| `harvest_return` (`drop_pct`) | As `average_down`, at its own threshold | A position bought at the one-year high, held, against the same position sold at the next open, parked in SPY for 31 days and bought back | 1, 3 |
+
+| Piece | Rule |
+|---|---|
+| Purchase price | Nobody's purchase price is known for a company picked this way, so the one-year high and its date stand in for it; a caveat on the row says so |
+| Window | The public list's `tests_from` up to the two-year holdout. A case counts for a horizon only if the horizon ends before the holdout |
+| One vote a month | Cases bunch up in crash months. Each month's cases are averaged into one value, and p5, p50, p95 and the shares ahead and behind are read across months (`starts` is months; for `cap_position` it is January starts). The single cases are kept beside them: `cases`, `names`, `case_p5_pts`, `case_p50_pts`, `case_p95_pts`, `case_share_better`, `case_share_worse` |
+| Too few | A horizon with under 6 months is reported as `starts: 0` with `too_few`, so it cannot carry a verdict. Under 12, a caveat calls the result a rough guide and `backs` never leans yes or no on a result inside the noise |
+| Tax | Both sides are sold at the end. Gains and losses count alike at 15% past a year and at the lab's marginal rate setting inside it, so a loss is worth the tax it saves. Trims are taxed when they happen. Costs are 15 bps a stock trade and 5 bps a fund trade |
+| Harvest, split in two | `tracking_pts` is the difference in pre-tax ending value (the month out of the stock, plus fees). `tax_pts` is the rest: the loss taken now at the marginal rate, less the extra tax later on the lower basis and the restarted one-year clock. They add up to the mean difference and the row's sentence gives both |
+| A company that stops trading | Leaves at its last price (30% less if it had collapsed, as for screens) and the money moves to SPY, on both sides |
+| Holdout | One-year outcomes of cases inside the last two years, pooled the same way; it can only veto `helps`, and needs 6 months to count |
+| Luck bar | Trials are stored as kind `rule`, so they stay outside the library's trial count, like deposit rules |
+| Coverage | The result keeps `public_coverage`. A list still loading is refused; a thin list (under 90%) makes the row research only, as for screens |
+| Row | `rule` also carries `cases`, `names`, `case_share_better`, `case_share_worse`, and `tax_pts`, `tracking_pts` or `cap_pct` where they apply. The sentence names the unit ("months with a case", "January starts") and, for the cap, which cap read best |
+
+Library rows: `lib-average-down` (50% under the high), `lib-cap-position` (30% start, caps of 25% and 10%; the row shows the cap with the better typical result, the other is in the detail), `lib-harvest-return` (30% under the high).
+
 Rule results are `lab_results` kind `rule`, each variant logged in `strategy_trials`. `GET /api/lab/strategies` lists them under `rules`; `GET /api/lab/strategies/{id}` returns `kind: "rule"` with the full body.
 
 **Watchlist.** `GET /api/engine/watchlist` lists `market_symbols` role `watch` (`source: "desk"`) and `DESK_WATCHLIST` (`"env"`, read-only) with name, last two closes, last bar and whether research exists. `POST {symbol}` and `DELETE /{symbol}` change desk rows only; a bad symbol, an env row or a symbol not on the list is a 400 `{detail}`.
@@ -1156,10 +1180,10 @@ A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/sh
 | Kind | Entries | Examples |
 |---|---|---|
 | Old and tested | 31 | Buy and hold, 60/40, three-fund, permanent portfolio, all-weather style mix, risk parity, 200-day trend, 10-month trend across five asset classes, golden cross, volatility cap, dual momentum, asset-class momentum, 12-1 momentum (sectors, stocks, industries), sector rotation, equal-weight sectors and S&P 500, dividend growers, small value, value plus momentum, small-cap reversal, low volatility, and size, momentum, value, profitability and quality tilts from the French portfolios |
-| Practical | 21 | The plan's mix, safe mix, aggressive tech tilt, core and satellite, theme funds at equal weight, today's holdings (as held, and with single stocks capped at 10%), dip-only, beaten-down sectors, deposits held back for a dip, margin dip-buy, margin debit paid first, lump sum spread over months, deposit steering, rebalance bands, tax-loss harvesting, large companies 30% under their high held a year, core plus five stock picks, the ten largest companies, the ten most beaten-down large companies |
+| Practical | 24 | The plan's mix, safe mix, aggressive tech tilt, core and satellite, theme funds at equal weight, today's holdings (as held, and with single stocks capped at 10%), dip-only, beaten-down sectors, deposits held back for a dip, margin dip-buy, margin debit paid first, lump sum spread over months, deposit steering, rebalance bands, tax-loss harvesting, large companies 30% under their high held a year, core plus five stock picks, the ten largest companies, the ten most beaten-down large companies, averaging down on a fallen company, capping a big position, harvesting a loss and buying back |
 | Novel and creative | 14 | Trend-filtered dip-buy, sector momentum in uptrends only, sector momentum that stands down in rough markets, calm winners, 52-week-high breakout with a volatility cap, drawdown stop, buy after a 5% down week, canary rule, credit canary, tech tilt at a volatility target, discount-day entries (plain and in an uptrend only), insider cluster with a momentum filter, earnings drift where insiders also bought |
 
-66 entries: 58 experiments and 8 deposit rules. The two as-held rows are hindsight, shown but never judged (see "Hindsight rows").
+69 entries: 58 experiments, 8 deposit rules and 3 rules tested across the public stock list. The two as-held rows are hindsight, shown but never judged (see "Hindsight rows").
 
 **What a row is measured against.** Every row carries `benchmark` (a short label) and `benchmark_words` (one plain sentence); the payload's `benchmarks` lists each `{name, words, rows}`, most used first.
 
@@ -1170,6 +1194,7 @@ A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/sh
 | Small caps (IWM) | The small-company index fund IWM, bought and held with dividends reinvested. | 3 |
 | Your plan's mix | The funds in your plan at their target weights. With no plan loaded this is the S&P 500. | 1 |
 | A deposit rule's own baseline (four labels) | The same money into the same funds without the rule | 8 |
+| A list rule's own baseline (three labels) | The same money in the S&P 500, the same start never trimmed, or the same losing position simply held | 3 |
 
 **Left out, and why.**
 
@@ -1250,7 +1275,7 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | Limit | What it means |
 |---|---|
 | One threshold | The dip row tests 30% only, the Opportunities page's own rule. A filter bound cannot be searched, and a grid of thresholds would add trials to the luck bar for little |
-| Test years start fresh | Each walk-forward test year opens with nothing held. A name bought late in a test year is held to the end of that year, not a full 252 days, and the yearly rows are bought once at the start of each test year. "Yearly" is therefore the start of each test year, which is not always January |
+| Test years start fresh | Each walk-forward test year opens with nothing held. A name bought late in a test year is held to the end of that year, not a full 252 days, and the yearly rows are bought once at the start of each test year. "Yearly" is therefore the start of each test year, which is not always January; the two rows' descriptions say "at the start of each test year" |
 | Size | The float is the one figure per company from its annual report nearest mid-2011 (`lab.db` setting `public_sizes`: symbol, dollars, date). It is moved by total return from that date, or from the first bar when prices start later. Buybacks, new shares and mergers are not counted, so the ranking drifts from true size over the years. A lab file exported before this build has no sizes; `lib-ten-largest` is then refused with a plain reason and runs the night after the next export |
 
 **Public stock list.** `public.py`, job `public` ("Public stock list"), `GET /api/engine/public-stocks`. The job builds the list and says which names Tiingo can price; the price backfill fetches them.
@@ -1281,9 +1306,9 @@ The job's `detail` and the route's `detail` are the same sentence, for example "
 
 | `backs` | When |
 |---|---|
-| `yes` | The row held up, or a deposit rule inside the noise was ahead in more than half of its start months |
+| `yes` | The row held up, or a rule inside the noise was ahead in more than half of its start months (12 or more of them; fewer never lean) |
 | `no_edge` | Inside the noise, including a rule that made no difference |
-| `no` | The row fell short, or a deposit rule inside the noise was behind in more than half of its start months |
+| `no` | The row fell short, or a rule inside the noise was behind in more than half of its start months (12 or more) |
 | null | Not tested, inconclusive, outdated, a thin public list, a result that leans on hindsight, a hindsight row or the yardstick. Nothing may lean on such a row |
 
 `GET /api/lab/library` rows carry the same `backs`, so the Lab page and any page citing a row read it the same way.
@@ -1301,7 +1326,7 @@ The job's `detail` and the route's `detail` are the same sentence, for example "
 | In `lab.db` | `data.PUBLIC_FUNDS` (benchmarks, library funds, IWM) export as kind `fund` and role `benchmark` whatever he holds, so a held benchmark fund no longer reads `universe` |
 | Short histories | UFO starts in 2019, so the two theme rows test from then; a fixed mix starts once 90% of it is trading |
 
-**Row** (`rows[]`): `id`, `title`, `kind`, `family`, `description`, `benchmark`, `type` (`experiment` or `rule`), `status` (`tested`, `waiting`, `not_run`), `verdict`, `line` (one sentence with the numbers), `reason` (why it has not run, as a plain sentence from `shelf.plain`; it never quotes request syntax), `tested_at`, `out_of_sample` (`start`, `end`, `ann_return_pct`, `excess_pts`, `sharpe`, `mdd_pct`), `noise` (`trials`, `band_pts`, `luck`), `rule` (`horizon_years`, `starts`, `p5_pts`, `p50_pts`, `p95_pts`, `share_better`, `share_worse`), `deflated_sharpe`, `pbo`, `variants`, `research_only`, `caveats`, `detail`, `yardstick`, `gap_pts`, `outdated`, `benchmark_words`. The payload also has `as_of`, `trials`, `note`, `counts`, `kinds` and `benchmarks`. `shelf.ready(cfg)` gives the morning alert its line.
+**Row** (`rows[]`): `id`, `title`, `kind`, `family`, `description`, `benchmark`, `type` (`experiment` or `rule`), `status` (`tested`, `waiting`, `not_run`), `verdict`, `line` (one sentence with the numbers), `reason` (why it has not run, as a plain sentence from `shelf.plain`; it never quotes request syntax), `tested_at`, `out_of_sample` (`start`, `end`, `ann_return_pct`, `excess_pts`, `sharpe`, `mdd_pct`), `noise` (`trials`, `band_pts`, `luck`), `rule` (`horizon_years`, `starts`, `p5_pts`, `p50_pts`, `p95_pts`, `share_better`, `share_worse`; list rules add `cases`, `names`, `case_share_better`, `case_share_worse`, `tax_pts`, `tracking_pts`, `cap_pct`), `deflated_sharpe`, `pbo`, `variants`, `research_only`, `caveats`, `detail`, `yardstick`, `gap_pts`, `outdated`, `benchmark_words`. The payload also has `as_of`, `trials`, `note`, `counts`, `kinds` and `benchmarks`. `shelf.ready(cfg)` gives the morning alert its line.
 
 ## Memory budget
 

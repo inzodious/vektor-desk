@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from desk.api.app import create_app
 from desk.engine import kinds, lab
 from desk.engine.jobs import JOBS
-from desk.engine.lab import rulebook, runner, shelf, sim, simcache
+from desk.engine.lab import listrules, rulebook, runner, shelf, sim, simcache
 from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, PUBLIC_COVERAGE, PUBLIC_ROLE, PUBLIC_SIZES, data_path, held_path, load, plan_path
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
@@ -35,6 +35,7 @@ COVERED = {"as_of": "2013-06-28", "tests_from": "2014-01-02", "listed": 8, "pric
 ON_THE_LIST = "Tested on the 8 largest US companies of mid-2013, a list that owes nothing to what you hold. All 8 have prices."
 SIZES = {s: [1e9 * (i + 1), "2013-06-28"] for i, s in enumerate(STOCKS)}
 NEW_SCREENS = ("lib-stock-dip-hold", "lib-core-stock-picks", "lib-ten-largest", "lib-ten-beaten")
+LIST_ROWS = ("lib-average-down", "lib-cap-position", "lib-harvest-return")
 SUBSET = ("lib-60-40", "lib-vol-cap", "lib-size-small", "lib-trend-dip", "lib-plan-mix", "insider-momentum-filter", "lib-dip-reserve", "lib-lump-sum-spread")
 
 
@@ -114,7 +115,8 @@ def test_every_entry_is_a_valid_request_on_lab_data(stocked):
     for entry in shelf.LIBRARY:
         req = shelf.request(entry, "2025-01-02T00:00:00+00:00")
         if entry["type"] == "rule":
-            assert rulebook.parse({k: v for k, v in req.items() if k not in ("request", "written_at")}, data).variants
+            reader = listrules if entry["body"]["rule"] in rulebook.LIST_RULES else rulebook
+            assert reader.parse({k: v for k, v in req.items() if k not in ("request", "written_at")}, data).variants
             continue
         spec = parse(req["spec"], data, model="library")
         assert spec.parent_id == (shelf.HINDSIGHT_FAMILY if entry.get("hindsight") else shelf.FAMILY)
@@ -359,18 +361,20 @@ PUBLISHED = (
     "lib-tech-tilt-vol-target",
     "lib-discount-day-uptrend",
     *NEW_SCREENS,
+    *LIST_ROWS,
 )
 
 
 def test_a_row_id_once_published_is_never_dropped_or_renamed():
-    assert len(PUBLISHED) == len(set(PUBLISHED)) == 66 and not set(PUBLISHED) - shelf.IDS
+    assert len(PUBLISHED) == len(set(PUBLISHED)) == 69 and not set(PUBLISHED) - shelf.IDS
     assert len(shelf.IDS) == len(shelf.LIBRARY)
 
 
 def test_a_row_is_looked_up_by_id_before_anything_ran(stocked):
-    out = shelf.rows(stocked, ["lib-harvest", "lib-average-down"])
+    out = shelf.rows(stocked, ["lib-harvest", "lib-average-down", "lib-not-built"])
     assert (out["lib-harvest"]["status"], out["lib-harvest"]["title"], out["lib-harvest"]["type"]) == ("waiting", "Tax-loss harvesting", "rule")
-    assert out["lib-harvest"]["line"] is None and out["lib-harvest"]["backs"] is None and out["lib-average-down"]["status"] == "not_run"
+    assert out["lib-harvest"]["line"] is None and out["lib-harvest"]["backs"] is None and out["lib-not-built"]["status"] == "not_run"
+    assert (out["lib-average-down"]["status"], out["lib-average-down"]["type"]) == ("waiting", "rule")
     assert shelf.rows(stocked, []) == {}
 
 
@@ -389,6 +393,62 @@ def test_only_a_current_result_on_firm_ground_backs_a_step():
     assert shelf._backs(within | {"rule": rule | {"share_better": 0.4, "share_worse": None}}) == "no_edge"
     assert shelf._backs(within | {"rule": {"p5_pts": 0.0, "p50_pts": 0.02, "p95_pts": 0.04, "share_better": 0.9, "share_worse": 0.0}}) == "no_edge"
     assert shelf._backs(base | {"verdict": "fell_short", "rule": rule}) == "no" and shelf._backs(base | {"verdict": "held_up", "rule": rule}) == "yes"
+    assert shelf._backs(within | {"rule": rule | {"starts": 12}}) == "yes" and shelf._backs(within | {"rule": rule | {"starts": 11}}) == "no_edge"
+    assert shelf._backs(base | {"verdict": "fell_short", "rule": rule | {"starts": 6}}) == "no"
+
+
+def test_a_list_rule_row_is_one_sentence_with_the_months_and_the_single_cases():
+    h = {"years": 5, "starts": 34, "p5_pts": -40.0, "p50_pts": -4.2, "p95_pts": 30.0, "share_better": 0.4118, "share_worse": 0.5882}
+    h |= {"cases": 1212, "names": 90, "case_share_better": 0.38, "case_share_worse": 0.62}
+
+    def row(sid, rule, params, horizon, verdict="no_clear_edge"):
+        entry = next(e for e in shelf.LIBRARY if e["id"] == sid)
+        thin = {"years": 10, "starts": 0, "too_few": 3, "cases": 40}
+        variants = [{"params": params, "horizons": [horizon, thin]}]
+        return shelf._rule_row(entry, {"rule": rule, "verdict": verdict, "best": params, "trials": 1, "variants": variants, "caveats": []})
+
+    down = row("lib-average-down", "average_down", {"drop_pct": 50.0}, h)
+    assert down["line"] == (
+        "No clear edge: a typical -4.2 points of the money put in over 5 years against the same money in the S&P 500; "
+        "ahead in 41% and behind in 59% of 34 months with a case, and 38% of 1,212 single cases ended ahead."
+    )
+    assert down["verdict"] == "within_noise" and down["rule"]["cases"] == 1212 and down["rule"]["names"] == 90 and "cap_pct" not in down["rule"]
+    cap = row("lib-cap-position", "cap_position", {"cap_pct": 10.0}, h | {"years": 3, "starts": 8}, "hurts")
+    assert cap["line"].startswith("Hurt at a 10% cap: a typical -4.2 points of the money put in over 3 years against letting the big position run; ")
+    assert "of 8 January starts, and 38% of 1,212 single cases ended ahead." in cap["line"] and cap["rule"]["cap_pct"] == 10.0
+    harvest = row("lib-harvest-return", "harvest_return", {"drop_pct": 30.0}, h | {"years": 1, "tax_pts": 3.26, "tracking_pts": -2.89}, "helps")
+    assert harvest["line"].startswith("Helped: a typical -4.2 points of the money put in over 1 year against holding the losing position; ")
+    assert harvest["line"].endswith("single cases ended ahead; on average the tax was worth +3.3 points and the month away cost 2.9.")
+    assert harvest["rule"]["tax_pts"] == 3.26 and harvest["rule"]["tracking_pts"] == -2.89
+    added = row("lib-harvest-return", "harvest_return", {}, h | {"tax_pts": -1.0, "tracking_pts": 0.5})
+    assert added["line"].endswith("-1.0 points and the month away added 0.5.")
+    none = row("lib-average-down", "average_down", {"drop_pct": 50.0}, {"years": 5, "starts": 0, "too_few": 2, "cases": 2})
+    assert none == {"verdict": "inconclusive", "line": "Too few cases before the two-year holdout to judge this rule.", "variants": 1}
+    assert all(shelf.BENCH_WORDS[shelf.RULE_BENCH[name]].endswith(".") for name in rulebook.LIST_RULES)
+
+
+def test_the_three_list_rules_run_from_the_queue_outside_the_luck_bar(stocked, monkeypatch):
+    cfg = stocked
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in LIST_ROWS))
+    monkeypatch.setattr(shelf, "IDS", frozenset(LIST_ROWS))
+    assert shelf.queue_missing(cfg, now=NOW) == {"queued": 3, "of": 3}
+    process_queue(cfg, now=NOW)
+    view = shelf.view(cfg)
+    rows = {r["id"]: r for r in view["rows"]}
+    assert set(rows) == set(LIST_ROWS) and view["trials"] == 0
+    for row in rows.values():
+        assert (row["status"], row["type"], row["kind"]) == ("tested", "rule", "practical") and row["caveats"][:2] == [ON_THE_LIST, PUBLIC_EXITS]
+        assert not row["thin_coverage"] and not row["leans_on_hindsight"] and not row["outdated"] and row["line"].count(". ") == 0
+    cap, harvest, down = rows["lib-cap-position"], rows["lib-harvest-return"], rows["lib-average-down"]
+    assert cap["benchmark"] == "Letting the big position run" and f"at a {cap['rule']['cap_pct']:g}% cap" in cap["line"] and "January starts" in cap["line"]
+    assert cap["rule"]["starts"] == 6 and cap["rule"]["cases"] == 48 and cap["backs"] in ("no_edge", "no", "yes") and "rough guide" in cap["caveats"][-1]
+    assert harvest["benchmark"] == "Holding the losing position" and "on average the tax was worth" in harvest["line"]
+    assert harvest["rule"]["tax_pts"] > 0 and harvest["rule"]["horizon_years"] == 3 and harvest["rule"]["cases"] >= harvest["rule"]["starts"] >= 6
+    assert down["verdict"] == "inconclusive" and down["line"] == "Too few cases before the two-year holdout to judge this rule." and down["backs"] is None
+    thin = COVERED | {"priced": 7, "missing": 1, "pct": 87.5, "enough": False}
+    restamp(cfg, lambda body: body.update({PUBLIC_COVERAGE: thin}))
+    rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    assert all(r["thin_coverage"] and r["research_only"] and r["backs"] is None for r in rows.values())
 
 
 def test_an_entry_the_lab_refused_is_explained_and_tried_again_the_next_evening(stocked, monkeypatch):
@@ -922,11 +982,11 @@ def test_a_screen_waits_while_the_list_loads_and_a_result_from_mid_load_runs_aga
 
 def test_the_library_grew_and_each_kind_names_its_new_rows():
     by = {e["id"]: e for e in shelf.LIBRARY}
-    assert len(shelf.LIBRARY) == 66 and len(by) == 66
+    assert len(shelf.LIBRARY) == 69 and len(by) == 69 and sum(e["type"] == "rule" for e in shelf.LIBRARY) == 11
     new = {
         "classic": ("lib-three-fund", "lib-permanent", "lib-all-weather", "lib-trend-five", "lib-golden-cross", "lib-asset-momentum")
         + ("lib-equal-sectors", "lib-equal-weight-500", "lib-dividend-growers", "lib-small-value-fund", "lib-value-momentum", "lib-small-reversal"),
-        "practical": ("lib-core-satellite", "lib-themes-equal", "lib-as-held-capped", "lib-margin-paydown", *NEW_SCREENS),
+        "practical": ("lib-core-satellite", "lib-themes-equal", "lib-as-held-capped", "lib-margin-paydown", *NEW_SCREENS, *LIST_ROWS),
         "novel": ("lib-momentum-calm", "lib-drawdown-stop", "lib-down-week", "lib-canary", "lib-credit-canary", "lib-tech-tilt-vol-target")
         + ("lib-discount-day-uptrend",),
     }
