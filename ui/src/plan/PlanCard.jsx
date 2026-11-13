@@ -6,6 +6,7 @@ import { approvesOnSave, canMarkDone, canUndo, draftLine, planChanges, refusal, 
 import { useConsole } from '../research/consoleContext.js';
 import { PlanForm, StepForm } from './PlanForms.jsx';
 import { PlanBlock, RoleChip, StepRow, VersionChip } from './PlanParts.jsx';
+import { About } from '../components/About.jsx';
 
 const SHOW = 4;
 const base = (symbol) => `/api/decisions/plans/${encodeURIComponent(symbol)}`;
@@ -262,7 +263,9 @@ export function BareCard({ rows, i, onChanged }) {
           <span className="chip">{rows.length === 1 ? '1 holding' : `${rows.length} holdings`}</span>
         </span>
       </div>
-      <p className="muted job-lede">Write one yourself, or ask the Plan desk for a draft. A draft does nothing until you approve it.</p>
+      <About label="How plans work" testid="plans-about">
+        <p>Write one yourself, or ask the Plan desk for a draft. A draft does nothing until you approve it.</p>
+      </About>
       {msg ? (
         <p className="job-note done" role="status" data-testid="plan-msg">
           {msg}

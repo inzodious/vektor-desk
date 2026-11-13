@@ -9,6 +9,7 @@ import { assumptions, backtestLine, bandAt, caseOf, chanceText, feeText, fiHeadl
 import { signedPct } from '../lib/strategy.js';
 import { trackText } from '../lib/leaderboard.js';
 import { EmptyState, GapNote } from '../start/EmptyState.jsx';
+import { About } from '../components/About.jsx';
 
 function Rank({ rank }) {
   return (
@@ -102,9 +103,11 @@ function FiHead({ d, lower, onLower }) {
           Set an FI goal in Escape Vektor to see how long each monthly deposit takes to reach it.
         </p>
       )}
-      <p className="mix-assume" data-testid="mix-assume">
-        {assumptions(d).join(' · ')}.
-      </p>
+      <About label="What this assumes" testid="mix-about">
+        <p className="mix-assume" data-testid="mix-assume">
+          {assumptions(d).join(' · ')}.
+        </p>
+      </About>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { statusWord } from '../lib/convictions.js';
 import { accountName, bandLine, debriefState, decisionRows, diffText, eventWord, kpis, ledger, moverLine, moverRows, riskFacts, scoreLine, versusLine, versusRows, versusScale } from '../lib/results.js';
 import { signedPct } from '../lib/strategy.js';
 import { EmptyState } from '../start/EmptyState.jsx';
+import { About } from '../components/About.jsx';
 
 const SHOW = 8;
 
@@ -58,38 +59,41 @@ export function Debrief({ review }) {
               <span className="chip watch">Heads up</span> {st.hint}
             </p>
           ) : null}
-          <dl className="rs-words">
-            {d.what_happened ? (
-              <div>
-                <dt>What happened</dt>
-                <dd>{d.what_happened}</dd>
-              </div>
-            ) : null}
-            {d.why ? (
-              <div>
-                <dt>Why</dt>
-                <dd>{d.why}</dd>
-              </div>
-            ) : null}
-            {d.against_decisions ? (
-              <div>
-                <dt>Against your decisions</dt>
-                <dd>{d.against_decisions}</dd>
-              </div>
-            ) : null}
-            {d.watch?.length ? (
-              <div>
-                <dt>Watch</dt>
-                <dd>
-                  <ul>
-                    {d.watch.map((w) => (
-                      <li key={w}>{w}</li>
-                    ))}
-                  </ul>
-                </dd>
-              </div>
-            ) : null}
-          </dl>
+          <details className="about rs-more" data-testid="rs-more">
+            <summary>Read the debrief</summary>
+            <dl className="rs-words">
+              {d.what_happened ? (
+                <div>
+                  <dt>What happened</dt>
+                  <dd>{d.what_happened}</dd>
+                </div>
+              ) : null}
+              {d.why ? (
+                <div>
+                  <dt>Why</dt>
+                  <dd>{d.why}</dd>
+                </div>
+              ) : null}
+              {d.against_decisions ? (
+                <div>
+                  <dt>Against your decisions</dt>
+                  <dd>{d.against_decisions}</dd>
+                </div>
+              ) : null}
+              {d.watch?.length ? (
+                <div>
+                  <dt>Watch</dt>
+                  <dd>
+                    <ul>
+                      {d.watch.map((w) => (
+                        <li key={w}>{w}</li>
+                      ))}
+                    </ul>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          </details>
         </>
       ) : (
         <div data-testid="rs-debrief-wait">
@@ -127,7 +131,9 @@ export function NextSteps({ review }) {
       ) : (
         <p className="empty-hint">{review.debrief ? 'Nothing to do. Stay the course.' : 'Next steps come with the debrief.'}</p>
       )}
-      <p className="muted rs-foot">Suggestions only. Orders still go through the queue and Preflight.</p>
+      <About label="How these work" testid="rs-steps-about">
+        <p>Suggestions only. Orders still go through the queue and Preflight.</p>
+      </About>
     </div>
   );
 }
@@ -159,7 +165,9 @@ export function Versus({ pack }) {
               </li>
             ))}
           </ul>
-          <p className="muted rs-foot">Same starting dollars and the same deposits on the same days.</p>
+          <About testid="rs-vs-about">
+            <p>Same starting dollars and the same deposits on the same days.</p>
+          </About>
         </>
       ) : (
         <p className="empty-hint">The S&amp;P 500 and the mixes show here once their prices are in for this period.</p>
@@ -276,12 +284,14 @@ export function RiskCard({ pack, i }) {
           ))}
         </div>
       ) : (
-        <p className="empty-hint">One day is too short for dips and swing. See the week.</p>
+        <p className="empty-hint">One day is too short for dips and swing.</p>
       )}
       {band ? (
-        <p className="muted rs-foot">
-          {band.chip}. {band.text}
-        </p>
+        <About label="Your band" testid="rs-band">
+          <p>
+            {band.chip}. {band.text}
+          </p>
+        </About>
       ) : null}
       {holds.length ? (
         <ul className="rs-holds">

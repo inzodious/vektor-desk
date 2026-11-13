@@ -33,6 +33,12 @@ PLAN = {
         {"id": "far", "kind": "review", "due": "2027-06-01"},
     ],
 }
+HSA = """  - id: health
+    account: hsa
+    cadence: biweekly
+    anchor: "2026-10-29"
+    amount_usd: 150
+"""
 ROW = {"status": "tested", "outdated": False, "tested_at": "2026-11-08T05:00:00+00:00"}
 LIBRARY = {
     "lib-margin-paydown": ROW
@@ -136,6 +142,78 @@ def test_a_route_the_lab_does_not_back_says_so_and_an_agreed_note_claims_the_dep
     assert later["items"][0]["text"] == "Deposit of $500 lands: Route $500 to WXYZ"
     assert [r["id"] for r in later["standing"]] == ["rule:no-margin-buys"]
     assert next_steps(home, now=now + timedelta(days=40))["standing"][0]["id"] == "rule:no-margin-buys"
+
+
+def owes(conn, day, account):
+    conn.execute(
+        "INSERT OR REPLACE INTO metric_values (metric_id, scope, scope_id, window, as_of, value, unit, n_obs, quality, engine_version) "
+        "VALUES ('margin.call_drop', 'account', ?, 'now', ?, 40, 'pct', 1, 'modelled', '1')",
+        (account, day),
+    )
+    conn.commit()
+
+
+def margin_note(cfg, proposal, now):
+    note = create_proposal(
+        cfg,
+        proposal(kind="hold_off", symbol=None, subject="margin", title="Margin loan: let deposits pay it off first", invalidation="The debit is paid off."),
+        "plan_keeper",
+        "r1",
+        now=now,
+    )
+    approve(cfg, note["id"], now=now)
+    return note
+
+
+@pytest.mark.parametrize("known", [True, False])
+def test_only_a_deposit_into_the_account_that_owes_goes_to_the_margin_debit(home, preflight, now, desk_db, proposal, known):
+    (home.data_dir / "desk.yaml").write_text(PROFILE.replace("rules:", HSA + "rules:"))
+    if known:
+        debit(desk_db, "2026-11-09", 900.0)
+        owes(desk_db, "2026-11-09", "Brokerage")
+    margin_note(home, proposal, now)
+    out = next_steps(home, now=now)["items"]
+    assert [(r["id"], r["text"], r["detail"]) for r in out] == [
+        ("deposit:health:2026-11-12", "Deposit of $150 lands. Nothing is planned for it yet", "Into hsa."),
+        ("deposit:payday:2026-11-20", "Deposit of $500 lands and goes to the margin debit first", "Into brokerage."),
+    ]
+    assert (out[0]["evidence"], out[0]["backed"], out[0]["completes"]) == ([], None, "desk")
+    assert "decision_id" not in out[0]["ref"] and out[1]["backed"] == "yes"
+
+
+def test_a_plan_repay_and_a_route_each_go_to_the_deposit_they_fit(home, preflight, now, desk_db, proposal):
+    (home.data_dir / "desk.yaml").write_text(PROFILE.replace("rules:", HSA + "rules:"))
+    debit(desk_db, "2026-11-09", 900.0)
+    owes(desk_db, "2026-11-09", "Brokerage")
+    save_plan(home, "ABCD", PLAN, approve=True, now=now)
+    route = create_proposal(
+        home,
+        proposal(kind="deposit_route", funding="deposit", title="Route $150 to WXYZ", account="HSA", expires="2099-01-01"),
+        "plan_keeper",
+        "r1",
+        now=now,
+    )
+    out = next_steps(home, now=now)["items"]
+    assert [(r["id"], r["text"]) for r in out[:2]] == [
+        ("deposit:health:2026-11-12", "Deposit of $150 lands. The Plan keeper's route for it is waiting in your queue: Route $150 to WXYZ"),
+        ("deposit:payday:2026-11-20", "Deposit of $500 lands and pays the margin debit"),
+    ]
+    assert out[0]["ref"]["decision_id"] == route["id"] and out[1]["ref"]["step_id"] == "repay"
+
+
+def test_a_schedule_name_the_broker_does_not_use_still_reaches_the_debit(home, preflight, now, desk_db, proposal):
+    debit(desk_db, "2026-11-09", 900.0)
+    owes(desk_db, "2026-11-09", "Individual 1")
+    margin_note(home, proposal, now)
+    assert next_steps(home, now=now)["items"][0]["text"] == "Deposit of $500 lands and goes to the margin debit first"
+    assert listing._can_owe({"account": "Health 2", "mode": listing.AUTO}, {"Individual 1"}, False) is False
+    assert [listing._can_owe({"account": a, "mode": "set"}, set(), False) for a in ("Health Savings Account", "Roth IRA", "Individual", None)] == [
+        False,
+        False,
+        True,
+        True,
+    ]
+    assert listing._can_owe({"account": "Individual 1", "mode": listing.AUTO}, {"Individual 1"}, False) is True
 
 
 def test_a_deposit_with_nothing_planned_shows_once_and_a_late_one_never(home, now):

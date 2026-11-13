@@ -16,6 +16,7 @@ import { QUALITY } from '../lib/quality.js';
 import { plural, usd } from '../lib/format.js';
 import { emptyText, moneyIn, rhythmText, seenText } from '../lib/deposits.js';
 import { GapGate } from '../start/EmptyState.jsx';
+import { About } from '../components/About.jsx';
 
 const HEAD_IDS = 'plan.drift_max,plan.in_mix,plan.single_stock,plan.rules,fi.progress';
 const TILT = { growth: 'Growth tilt', balanced: 'Balanced', income: 'Income tilt' };
@@ -48,10 +49,9 @@ function Rules({ rules, m, version, reference }) {
       ) : (
         <p className="empty-hint">No rules in your profile yet.</p>
       )}
-      <div className="note" style={{ marginTop: 8 }}>
-        <Icon name="info" />
-        <span>Rules are checked by Preflight before every proposal. Changing one makes a new profile version and is logged like a decision.</span>
-      </div>
+      <About label="How rules are used" testid="rules-about">
+        <p>Rules are checked by Preflight before every proposal. Changing one makes a new profile version and is logged like a decision.</p>
+      </About>
     </div>
   );
 }

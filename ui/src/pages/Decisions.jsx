@@ -17,6 +17,7 @@ import { addedStep, undoStep } from '../lib/nextsteps.js';
 import { snoozedRows, successorLine } from '../lib/queue.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 import { useGap } from '../start/context.js';
+import { About } from '../components/About.jsx';
 
 
 // ---------- heads-up notes ----------
@@ -46,7 +47,9 @@ function Notes() {
           </div>
         ))}
       </div>
-      <p className="empty-hint">The latest note from each desk, for the last {api.data.days || 7} days. Older ones are in the Journal.</p>
+      <About label="About these notes" testid="notes-about">
+        <p>The latest note from each desk, for the last {api.data.days || 7} days. Older ones are in the Journal.</p>
+      </About>
     </div>
   );
 }
@@ -62,10 +65,10 @@ function Cleared() {
       <summary>
         <b>Cleared overnight</b>
         <span className="chip">{items.length}</span>
-        <small>
-          Desk proposals taken off your queue in the last {days === 1 ? 'day' : `${days} days`}, each with its reason. Your own drafts are never cleared.
-        </small>
       </summary>
+      <p className="empty-hint" data-testid="cleared-note">
+        Desk proposals taken off your queue in the last {days === 1 ? 'day' : `${days} days`}, each with its reason. Your own drafts are never cleared.
+      </p>
       <div className="rows">
         {items.map((d) => {
           const when = whenWords(d.cleared_at);

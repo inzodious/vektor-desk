@@ -17,6 +17,7 @@ import { useJsonMany } from '../lib/useResearch.js';
 import { todayEt } from '../lib/tax.js';
 import { alignSeries, chunkIds, drawdown, monthGrid, pairMatrix, scenarioItems } from '../lib/lab.js';
 import { GapGate } from '../start/EmptyState.jsx';
+import { About } from '../components/About.jsx';
 
 const P = (v, d = 1, sign = false) => pct(v / 100, d, sign);
 
@@ -160,9 +161,9 @@ function Drawdowns({ start }) {
       ) : (
         <p className="empty-hint">{mine.loading ? 'Loading the value history…' : 'No value history yet.'}</p>
       )}
-      <p className="empty-hint" style={{ marginTop: 6 }}>
-        Value includes deposits, so a deposit can hide part of a drop.
-      </p>
+      <About testid="risk-value-about">
+        <p>Value includes deposits, so a deposit can hide part of a drop.</p>
+      </About>
     </div>
   );
 }
@@ -266,9 +267,9 @@ export default function Risk() {
               <span className="chip">Today&apos;s positions</span>
             </div>
             <HBars items={shocks} fmt={(v) => usd(v)} name="Change in value" labelW={132} empty="No scenarios yet. They run with the nightly engine." />
-            <p className="empty-hint" style={{ marginTop: 6 }}>
-              Dollars lost if it happened again tomorrow. Replays need prices from back then; set shocks are modelled from beta and rate sensitivity.
-            </p>
+            <About testid="risk-shock-about">
+              <p>Dollars lost if it happened again tomorrow. Replays need prices from back then; set shocks are modelled from beta and rate sensitivity.</p>
+            </About>
           </div>
           <div className="card c6" data-testid="lookthrough">
             <div className="card-head">
