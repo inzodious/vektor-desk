@@ -9,6 +9,17 @@
     "risks": {"type": "string", "maxLength": 240},
     "confidence": {"type": "number", "minimum": 0, "maximum": 1},
     "horizon_days": {"type": "integer", "minimum": 5, "maximum": 365},
-    "numbers_cited": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 80}}
+    "numbers_cited": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 80}},
+    "buy_if": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": {"enum": ["price_below", "price_above", "after_date", "after_earnings", "none"]},
+        "value": {"type": ["number", "null"]},
+        "date": {"type": ["string", "null"], "maxLength": 10},
+        "words": {"type": ["string", "null"], "maxLength": 120}
+      }
+    }
   }
 }

@@ -131,6 +131,31 @@ def test_not_ready_and_empty(cfg):
         RealDiscounts().pending(cfg, 3)
 
 
+def test_buy_if_reaches_the_record_unchanged_and_is_never_required(cfg):
+    wanted = {"kind": "price_below", "value": 182.5, "date": None, "words": "A close under $182.50"}
+    odd = {"kind": "sometime", "value": "soon"}
+    report, box, _ = go(cfg, [hit(1)], answer=CASE | {"buy_if": wanted})
+    assert report.written and box.recorded["2026-11-07:MSFT:1"]["buy_if"] == wanted
+    report, box, _ = go(cfg, [hit(2)], answer=CASE | {"buy_if": odd})
+    assert report.written and box.recorded["2026-11-07:MSFT:2"]["buy_if"] == odd
+    report, box, _ = go(cfg, [hit(3)])
+    assert report.written and box.recorded["2026-11-07:MSFT:3"]["buy_if"] is None
+    schema = briefs.schema_file("discounts")
+    rule = schema["properties"]["buy_if"]
+    assert "buy_if" not in schema["required"] and rule["required"] == ["kind"]
+    assert rule["properties"]["kind"]["enum"] == ["price_below", "price_above", "after_date", "after_earnings", "none"]
+    assert rule["properties"]["words"]["maxLength"] == 120 and rule["properties"]["value"]["type"] == ["number", "null"]
+    text = briefs.prompt_file("discounts")
+    assert all(kind in text for kind in rule["properties"]["kind"]["enum"]) and "hit.price" in text and "hit.as_of" in text
+
+
+def test_the_engine_record_takes_a_case_with_buy_if(cfg):
+    from desk.engine import discounts as engine
+
+    case, _ = discounts.case_for(CASE | {"buy_if": {"kind": "after_earnings"}}, hit(1), "opus", 7)
+    assert engine._check(case, hit(1)["numbers"]) == []
+
+
 def test_schema_and_prompt():
     schema = briefs.schema_file("discounts")
     assert schema["properties"]["verdict"]["enum"] == ["buy", "wait", "avoid"]

@@ -19,6 +19,19 @@ The engine's scanner flagged one name after the close because it looks cheap tod
 | `risks` | The best argument against, 240 characters at most |
 | `confidence` | Your probability, 0 to 1, that the verdict is right at `horizon_days`. 0.5 is a coin flip; be honest |
 | `horizon_days` | Days until the verdict can be judged, 5 to 365 |
+| `buy_if` | For a `wait`, the one condition that would make you look again, in a form the desk can check: `{kind, value, date, words}`. For `buy` and `avoid`, `{"kind": "none"}` |
+
+`buy_if.kind`:
+
+| Kind | Needs | Rule |
+|---|---|---|
+| `price_below` | `value` | A close under `value`. It must not already be true at `hit.price` |
+| `price_above` | `value` | A close above `value`. It must not already be true at `hit.price` |
+| `after_date` | `date` as YYYY-MM-DD | A day after `hit.as_of`, such as the end of a wash-sale window or a ruling |
+| `after_earnings` | nothing | The next earnings report |
+| `none` | nothing | No single condition would change it |
+
+Leave `value` and `date` null when the kind does not need them. `words` says the condition in plain words, 120 characters at most, for example "A close under $182, where it trades at its five-year average multiple".
 
 Friendly, short, no hype. Most hits are `wait`.
 

@@ -249,6 +249,7 @@ Drafts and refreshes one stock plan per holding (`docs/concept.md` owns the plan
 | Queue | `desk.engine.discounts.pending(cfg, limit)`, biggest discount first; `[]` when no hits, `NotReady` until S4 ships |
 | Write | `desk.engine.discounts.record(cfg, signal_id, case)`, first write wins; a refused case is noted on the run |
 | Case | `schemas/discounts.json`: `verdict` buy / wait / avoid, `case` ≤ 400, `risks` ≤ 240, `confidence` 0..1, `horizon_days` 5..365, `numbers_cited` (keys of the hit's `numbers`; others dropped), plus `model`, `written_at`, `run_id` |
+| `buy_if` | Optional answer field, same call: `{kind: price_below, price_above, after_date, after_earnings or none; value; date; words ≤ 120}`. For a `wait` it is the one condition that would make the desk look again; `none` for buy and avoid. `case_for` passes it to `record` unchanged (null when absent). Opportunities owns its meaning and drops a bad one while keeping the case; a missing or bad `buy_if` never fails the run |
 | Volume | `usage.discount_cases_per_day` in `desk.yaml`, default 3, at most 10; weekly cap is seven days' worth |
 | Stops | Usage limit, run lock busy, weekly cap, switch off, or 2 failures in a row |
 | On switch | Off unless switched on in Settings or `agents.desks.discounts: true`; the first-run guard holds it |
