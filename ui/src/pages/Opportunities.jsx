@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom';
 import { ApiDown, ResearchHero } from '../research/parts.jsx';
 import { useApi } from '../lib/api.js';
 import { useAsOf, fromDay } from '../lib/asof.js';
+import { oneLine } from '../lib/decisions.js';
+import { usd } from '../lib/format.js';
 import { whenWords } from '../lib/morning.js';
 import { becomesBuy, earningsLine, entryLine, evidenceLines, heldLine, inQueue, opportunityGroups, opportunityNotes, sizeLine, stanceOf } from '../lib/opportunities.js';
 import { EmptyState } from '../start/EmptyState.jsx';
@@ -14,6 +16,9 @@ function Idea({ row, deskDay }) {
   const earnings = earningsLine(row.next_earnings);
   const older = fromDay(row.as_of, deskDay);
   const becomes = becomesBuy(row);
+  const why = oneLine(row.why_now);
+  const full = (row.why_now || '').trim();
+  const more = full === why ? null : full.startsWith(why) ? full.slice(why.length).trim() : full;
   return (
     <article className="card idea" data-idea={row.symbol} data-stance={row.stance}>
       <div className="card-head">
@@ -28,70 +33,79 @@ function Idea({ row, deskDay }) {
           <span className="muted">{row.name}</span>
         </span>
         <span className="acts">
+          {row.size?.usd ? (
+            <b className="idea-usd" data-testid="idea-usd" title="Suggested size">
+              {usd(row.size.usd)}
+            </b>
+          ) : null}
           <span className={`chip ${stance.tone}`}>{stance.t}</span>
         </span>
       </div>
-      <p className="idea-why">{row.why_now}</p>
-      {becomes ? (
-        <p className="idea-becomes" data-testid="idea-becomes">
-          <b>What would change it</b> {becomes}
-        </p>
-      ) : null}
-      {row.facts?.length ? (
-        <ul className="idea-facts">
-          {row.facts.map((f) => (
-            <li key={f}>{f}</li>
-          ))}
-        </ul>
-      ) : null}
-      <dl className="idea-plan">
-        {entry ? (
-          <div>
-            <dt>Entry zone</dt>
-            <dd>
-              {entry}
-              {row.as_of_words ? <small data-testid="idea-asof">{row.as_of_words}</small> : null}
-              {row.entry.basis ? <small>{row.entry.basis}</small> : null}
-            </dd>
-          </div>
+      {why ? <p className="idea-why">{why}</p> : null}
+      <details className="idea-more" data-testid="idea-more">
+        <summary>Details</summary>
+        {more ? <p className="idea-why">{more}</p> : null}
+        {becomes ? (
+          <p className="idea-becomes" data-testid="idea-becomes">
+            <b>What would change it</b> {becomes}
+          </p>
         ) : null}
-        {size ? (
-          <div>
-            <dt>Size</dt>
-            <dd>{size}</dd>
-          </div>
+        {row.facts?.length ? (
+          <ul className="idea-facts">
+            {row.facts.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
         ) : null}
-        {row.wrong_if ? (
-          <div>
-            <dt>Wrong if</dt>
-            <dd>{row.wrong_if}</dd>
-          </div>
+        <dl className="idea-plan">
+          {entry ? (
+            <div>
+              <dt>Entry zone</dt>
+              <dd>
+                {entry}
+                {row.as_of_words ? <small data-testid="idea-asof">{row.as_of_words}</small> : null}
+                {row.entry.basis ? <small>{row.entry.basis}</small> : null}
+              </dd>
+            </div>
+          ) : null}
+          {size ? (
+            <div>
+              <dt>Size</dt>
+              <dd>{size}</dd>
+            </div>
+          ) : null}
+          {row.wrong_if ? (
+            <div>
+              <dt>Wrong if</dt>
+              <dd>{row.wrong_if}</dd>
+            </div>
+          ) : null}
+        </dl>
+        {row.as_of_words && !entry ? (
+          <p className="idea-asof muted" data-testid="idea-asof">
+            {row.as_of_words}
+          </p>
         ) : null}
-      </dl>
-      {row.as_of_words && !entry ? (
-        <p className="idea-asof muted" data-testid="idea-asof">
-          {row.as_of_words}
-        </p>
-      ) : null}
-      {row.not_queued ? (
-        <p className="idea-noq" data-testid="idea-not-queued">
-          {row.not_queued}
-        </p>
-      ) : null}
-      <p className="idea-foot muted">
-        <span>{heldLine(row)}</span>
-        {row.source_label ? <span>{row.source_label}</span> : null}
-        {earnings ? <span>{earnings}</span> : null}
-        {older && !row.as_of_words ? <span>Numbers {older}</span> : null}
-        <Link className="link" to={`/research?s=${encodeURIComponent(row.symbol)}`}>
-          Open its research
-        </Link>
-        {inQueue(row) ? (
-          <Link className="link" to="/decisions" data-testid="idea-queue">
-            See it in Decisions
+        {row.not_queued ? (
+          <p className="idea-noq" data-testid="idea-not-queued">
+            {row.not_queued}
+          </p>
+        ) : null}
+        <p className="idea-foot muted">
+          <span>{heldLine(row)}</span>
+          {row.source_label ? <span>{row.source_label}</span> : null}
+          {earnings ? <span>{earnings}</span> : null}
+          {older && !row.as_of_words ? <span>Numbers {older}</span> : null}
+          <Link className="link" to={`/research?s=${encodeURIComponent(row.symbol)}`}>
+            Open its research
           </Link>
-        ) : null}
-      </p>
+          {inQueue(row) ? (
+            <Link className="link" to="/decisions" data-testid="idea-queue">
+              See it in Decisions
+            </Link>
+          ) : null}
+        </p>
+      </details>
     </article>
   );
 }
@@ -143,18 +157,29 @@ export default function Opportunities() {
           <span className="acts">{fresh && rows.length ? <span className="chip">Checked {fresh} ET</span> : null}</span>
         </div>
         <p className="opp-headline">{rows.length ? d.headline : d.note || d.headline}</p>
-        {notes.map((n) => (
-          <p className="muted opp-note" key={n}>
-            {n}
-          </p>
-        ))}
-        {d.method ? <p className="muted opp-note">{d.method}</p> : null}
-        {evidence.map((e) => (
-          <p className="muted opp-note opp-evidence" key={e.key} data-testid="opp-evidence">
-            <b>Lab test{e.title ? `, ${e.title}` : ''}:</b> {e.line}
-            {e.outdated ? ' This result is from an older version of the rule and is queued to run again.' : ''}
-          </p>
-        ))}
+        {rows.length && (notes.length || d.method || evidence.length) ? (
+          <details className="opp-how" data-testid="opp-how">
+            <summary>How this list is made</summary>
+            {notes.map((n) => (
+              <p className="muted opp-note" key={n}>
+                {n}
+              </p>
+            ))}
+            {d.method ? <p className="muted opp-note">{d.method}</p> : null}
+            {evidence.map((e) => (
+              <p className="muted opp-note opp-evidence" key={e.key} data-testid="opp-evidence">
+                <b>Lab test{e.title ? `, ${e.title}` : ''}:</b> {e.line}
+                {e.outdated ? ' This result is from an older version of the rule and is queued to run again.' : ''}
+              </p>
+            ))}
+          </details>
+        ) : (
+          notes.map((n) => (
+            <p className="muted opp-note" key={n}>
+              {n}
+            </p>
+          ))
+        )}
       </section>
       {rows.length ? (
         groups ? (

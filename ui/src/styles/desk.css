@@ -991,6 +991,12 @@ code { font: 600 12px ui-monospace, 'SFMono-Regular', Menlo, monospace; padding:
   .lb-edge > b { font-size: 16px; }
 }
 .lb-acct { display: block; color: var(--ink-2); font-weight: 600; }
+.lb-stats > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-weight: 700; color: var(--teal-ink); border-radius: 8px; }
+.lb-stats > summary::-webkit-details-marker { display: none; }
+.lb-stats > summary::before { content: '+'; font-weight: 800; color: var(--teal); }
+.lb-stats[open] > summary::before { content: '−'; }
+.lb-stats > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.lb-stat { display: block; }
 
 /* ---------- first run ---------- */
 .fr-track { display: block; margin: 6px 14px 14px 4px; }
@@ -1652,7 +1658,6 @@ a.chip { text-decoration: none; }
 
 /* ---------- strategy library ---------- */
 .lib-note { font-size: 12.5px; margin: 0 0 6px; max-width: 86ch; color: var(--ink-2); }
-.lib-row .lib-bench { color: var(--ink); font-weight: 600; }
 .lib-benchmarks { margin: 0 0 10px; padding: 10px 12px; border-radius: 14px; background: var(--card-2); font-size: 12.5px; max-width: 86ch; }
 .lib-benchmarks p { margin: 0; color: var(--ink-2); }
 .lib-benchmarks p b { color: var(--ink); }
@@ -1664,16 +1669,28 @@ a.chip { text-decoration: none; }
 .lib-head { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; padding: 6px 0 2px; border-bottom: 1px solid var(--line); }
 .lib-head h3 { margin: 0; font-family: var(--f-head); font-size: 15px; font-weight: 700; color: var(--ink); }
 .lib-head .muted { font-size: 12px; }
-.lib-row { align-items: start; }
-.lib-row small { white-space: normal; overflow: visible; }
-.lib-row .lib-desc { color: var(--ink-2); }
-.lib-row .lib-line { color: var(--ink); }
-.lib-end { display: grid; justify-items: end; gap: 3px; text-align: right; }
-.lib-end small { font-size: 11.5px; color: var(--ink-2); white-space: nowrap; }
+.lib-how { margin: 0 0 8px; font-size: 12.5px; }
+.lib-how > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-weight: 700; color: var(--teal-ink); border-radius: 8px; }
+.lib-how > summary::-webkit-details-marker { display: none; }
+.lib-how > summary::before { content: '+'; font-weight: 800; color: var(--teal); }
+.lib-how[open] > summary::before { content: '−'; }
+.lib-how[open] > summary { margin-bottom: 8px; }
+.lib-how > summary:focus-visible, .lib-row > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.lib-row > summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 6px; border-radius: 10px; cursor: pointer; list-style: none; }
+.lib-row > summary::-webkit-details-marker { display: none; }
+.lib-row > summary:hover { background: var(--track); }
+.lib-row > summary b { font-size: 13.5px; color: var(--ink); min-width: 0; }
+.lib-end { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.lib-end small { font-size: 12px; font-weight: 700; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lib-more-text { padding: 0 6px 10px; display: grid; gap: 4px; font-size: 12.5px; max-width: 96ch; }
+.lib-more-text p { margin: 0; }
+.lib-desc, .lib-retest { color: var(--ink-2); }
+.lib-line { color: var(--ink); }
+.lib-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--ink-3); font-size: 12px; }
+.lib-facts .lib-bench { color: var(--ink-2); font-weight: 600; }
 .lib-more { margin-top: 6px; }
 @media (max-width: 560px) {
-  .lib-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
-  .lib-end { justify-items: start; text-align: left; grid-auto-flow: column; justify-content: start; align-items: center; gap: 8px; }
+  .lib-end { display: grid; justify-items: end; gap: 2px; }
 }
 
 /* ---------- research by holding ---------- */
@@ -1709,6 +1726,14 @@ a.chip { text-decoration: none; }
 .idea-facts li { padding: 3px 9px; border-radius: 12px; background: var(--card-2); font-size: 12px; color: var(--ink-2); }
 .idea-plan { margin: 0; display: grid; gap: 8px; }
 .idea-asof { margin: 8px 0 0; font-size: 12px; }
+.opp-how, .idea-more { font-size: 12.5px; }
+.opp-how > summary, .idea-more > summary { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; list-style: none; font-weight: 700; color: var(--teal-ink); border-radius: 8px; }
+.opp-how > summary::-webkit-details-marker, .idea-more > summary::-webkit-details-marker { display: none; }
+.opp-how > summary::before, .idea-more > summary::before { content: '+'; font-weight: 800; color: var(--teal); }
+.opp-how[open] > summary::before, .idea-more[open] > summary::before { content: '−'; }
+.opp-how[open] > summary, .idea-more[open] > summary { margin-bottom: 8px; }
+.opp-how > summary:focus-visible, .idea-more > summary:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.idea-usd { font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
 .idea-becomes { margin: 0 0 10px; font-size: 12.5px; color: var(--ink-2); }
 .idea-becomes b { color: var(--ink); margin-right: 4px; }
 .opp-evidence b { color: var(--ink); }
@@ -1760,7 +1785,6 @@ a.chip { text-decoration: none; }
 .fold-card[open] > summary { margin-bottom: 10px; }
 .cleared-why { color: var(--ink); }
 .cleared-next { color: var(--ink-2); }
-.ns-lead { margin: 0 0 6px; font-size: 12.5px; max-width: 96ch; }
 .ns-list { display: grid; gap: 2px; }
 .ns-row > summary { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; padding: 9px 6px; border-radius: 10px; cursor: pointer; list-style: none; }
 .ns-row.undated > summary { grid-template-columns: minmax(0, 1fr) auto; }
@@ -1772,7 +1796,7 @@ a.chip { text-decoration: none; }
 .ns-main b { font-size: 13.5px; color: var(--ink); }
 .ns-main small { font-size: 12px; color: var(--ink-2); }
 .ns-main small.ns-meta { color: var(--ink-3); }
-.ns-row > summary .chip { white-space: normal; text-align: right; }
+.ns-row > summary .chip { white-space: nowrap; }
 .ns-more { margin: 2px 6px 10px 82px; display: grid; gap: 6px; font-size: 12.5px; }
 .ns-row.undated .ns-more { margin-left: 6px; }
 .ns-more > div { display: grid; grid-template-columns: 176px minmax(0, 1fr); gap: 10px; }

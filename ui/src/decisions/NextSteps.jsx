@@ -10,16 +10,27 @@ function Step({ s, busy, onUndo }) {
         {s.stamp ? <span className="stamp-day ns-stamp">{s.stamp}</span> : null}
         <span className="ns-main">
           <b>{s.text}</b>
-          {s.detail ? <small>{s.detail}</small> : null}
           {s.meta ? <small className="ns-meta">{s.meta}</small> : null}
         </span>
         {s.chip ? (
-          <span className={`chip ${s.chip.tone}`} data-testid="ns-backed">
+          <span className={`chip ${s.chip.tone}`} data-testid="ns-backed" title={s.chip.words}>
             {s.chip.text}
           </span>
         ) : null}
       </summary>
       <dl className="ns-more">
+        {s.detail ? (
+          <div>
+            <dt>How</dt>
+            <dd>{s.detail}</dd>
+          </div>
+        ) : null}
+        {s.read ? (
+          <div data-testid="ns-read">
+            <dt>Your date</dt>
+            <dd>{`${s.read[0].toUpperCase()}${s.read.slice(1)}.`}</dd>
+          </div>
+        ) : null}
         {s.why ? (
           <div>
             <dt>Why</dt>
@@ -44,6 +55,7 @@ function Step({ s, busy, onUndo }) {
             <dd>
               {t.title ? <b>{t.title}. </b> : null}
               {t.sentence}
+              {s.chip?.words ? ` ${s.chip.words}` : ''}
               {t.row ? (
                 <>
                   {' '}
@@ -106,7 +118,6 @@ export function NextSteps({ api }) {
         <span className="tag mint">Next steps</span>
         <span className="chip">{view.items.length ? `${view.items.length} dated` : 'Nothing dated'}</span>
       </div>
-      <p className="muted ns-lead">What you already approved, agreed to or said you would do, in date order. Each one completes by itself; tap a row for why and what would change it.</p>
       {msg ? (
         <p className={msg.ok ? 'act-note' : 'act-err'} role={msg.ok ? 'status' : 'alert'} data-testid="ns-msg">
           {msg.text}
@@ -126,7 +137,6 @@ export function NextSteps({ api }) {
           <summary>
             <b>Standing</b>
             <span className="chip">{view.standing.length}</span>
-            <small>Rules, holds and things you said with no date.</small>
           </summary>
           <div className="ns-list">
             {view.standing.map((s) => (

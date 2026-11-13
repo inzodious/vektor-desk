@@ -4,6 +4,7 @@ import { plainLine } from './jobs.js';
 
 const STATE = { open: 'Due now', partial: 'Partly done' };
 const UNDO_BASE = '/api/decisions/next-steps/';
+const BADGE = { yes: 'Lab backs it', no_edge: 'No clear edge', no: 'Lab disagrees' };
 
 // ---------- one row ----------
 function evidenceOf(s, readings) {
@@ -11,7 +12,7 @@ function evidenceOf(s, readings) {
   const list = (Array.isArray(s.evidence) ? s.evidence : []).filter((e) => e && typeof e === 'object');
   const tests = list.filter((e) => plainLine(e.sentence) || plainLine(e.title)).map((e, k) => ({ key: e.row || `t${k}`, row: typeof e.row === 'string' && e.row ? e.row : null, title: plainLine(e.title), sentence: plainLine(e.sentence) }));
   const words = plainLine(readings?.[s.backed]) || plainLine(list[0]?.words);
-  return { tests, chip: words ? { text: words, tone: s.backed === 'no' ? 'watch' : '' } : null };
+  return { tests, chip: words ? { text: BADGE[s.backed] || words, words, tone: s.backed === 'no' ? 'watch' : '' } : null };
 }
 
 function span(from, to) {
@@ -37,8 +38,8 @@ export function stepRow(s, readings = null) {
   const until = dayLabel(s.until || '');
   const mine = s.source === 'you';
   const read = mine ? readWords(s.read) : null;
-  const window = read ? null : date && until ? `Any day to ${until}` : !date && until ? `Until ${until}` : null;
-  const meta = [mine ? 'Your words' : null, STATE[s.status] || null, read, window, plainLine(s.when)].filter(Boolean);
+  const window = date && until ? `to ${until}` : !date && until ? `Until ${until}` : null;
+  const meta = [mine ? 'Your words' : null, STATE[s.status] || null, window, plainLine(s.when)].filter(Boolean);
   const queued = s.completes === 'you' && typeof s.ref?.decision_id === 'string' ? s.ref.decision_id : null;
   return {
     id: s.id,
