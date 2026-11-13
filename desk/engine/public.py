@@ -24,6 +24,7 @@ LAST_KNOWN = "2011-12-31"
 TESTS_FROM = "2012-01-03"
 SIZE = 200
 SMALLER = 150
+SPARE = 20
 ROOM = 220
 ENOUGH_PCT = 90.0
 FLOAT_MIN, FLOAT_MAX = 1e9, 4.5e11
@@ -31,19 +32,22 @@ APART_DAYS = 300
 AGREE = 10.0
 PRICE_MIN, PRICE_MAX = 1.0, 2000.0
 ASSETS_MAX = 15.0
-TOO_BIG, UNBACKED, OVER_ASSETS = "too_big", "unbacked", "over_assets"
+TOO_BIG, UNBACKED, OVER_ASSETS, FUND = "too_big", "unbacked", "over_assets", "fund"
 WHY = {
     TOO_BIG: "larger than any company was",
     UNBACKED: "nothing else the company reported backs it",
     OVER_ASSETS: "far above its own balance sheet",
+    FUND: "a fund or trust, not a company",
 }
+FUND_TYPES = ("etf", "mutual fund")
+SHARE_CLASS = {"GOOG": "GOOGL"}
 MISFILED = "misfiled"
 LEFT_OUT_RANK = 10_000
 LEFT_OUT_KEPT = 100
 LEFT_OUT_SHOWN = 15
 TOP_SHOWN = 25
 CALLS = "public_list"
-RULE = "checked-floats-1"
+RULE = "checked-floats-2"
 FRESH_DAYS = 6
 TRADING_DAYS = 10
 PRICED, LATE, MISSING, NO_TICKER, UNASKED = "priced", "late", "missing", "no_ticker", "unasked"
@@ -114,7 +118,7 @@ def doubt(fact: dict, others: list[dict], shares: float | None, assets: float | 
     return None
 
 
-def largest(http, agent: str, sleep=time.sleep, size: int = SIZE) -> tuple[list[dict], list[dict]]:
+def largest(http, agent: str, sleep=time.sleep, size: int = SIZE, spare: int = 0) -> tuple[list[dict], list[dict]]:
     floats, shares, assets = figures(http, agent, sleep)
     picked, doubted = [], []
     for cik, facts in floats.items():
@@ -138,8 +142,8 @@ def largest(http, agent: str, sleep=time.sleep, size: int = SIZE) -> tuple[list[
     def row(r: dict) -> dict:
         return {"cik": r["cik"], "name": r["name"], "float_usd": r["val"], "float_at": r["end"], "accn": r["accn"]}
 
-    ranked = sorted(picked, key=lambda r: (-r["val"], r["cik"]))[:size]
-    least = ranked[-1]["val"] if len(ranked) == size else FLOAT_MIN
+    ranked = sorted(picked, key=lambda r: (-r["val"], r["cik"]))[: size + spare]
+    least = ranked[size - 1]["val"] if len(ranked) >= size else FLOAT_MIN
     left = sorted((r for r in doubted if r["val"] >= least), key=lambda r: (-r["val"], r["cik"]))
     return [row(r) | {"rank": i} for i, r in enumerate(ranked, 1)], [row(r) | {"why": r["why"]} for r in left]
 
@@ -147,7 +151,7 @@ def largest(http, agent: str, sleep=time.sleep, size: int = SIZE) -> tuple[list[
 # ---- Tickers ----
 
 
-def tiingo_listing(http) -> dict[str, list[tuple[str, str]]]:
+def tiingo_listing(http) -> tuple[dict[str, list[tuple[str, str]]], set[str]]:
     res = _reach("Tiingo's ticker list", lambda: http.get(TIINGO_TICKERS, timeout=120))
     if res.status_code != 200:
         raise ProviderError(f"Tiingo's ticker list answered {res.status_code}")
@@ -160,14 +164,19 @@ def tiingo_listing(http) -> dict[str, list[tuple[str, str]]]:
             return list(csv.DictReader(io.StringIO(z.read(name).decode("utf-8", "replace"))))
 
     out: dict[str, list[tuple[str, str]]] = {}
+    funds: set[str] = set()
     for r in _reach("Tiingo's ticker list", rows):
         start, end = (r.get("startDate") or "")[:10], (r.get("endDate") or "")[:10]
-        if (r.get("assetType") or "").lower() != "stock" or (r.get("priceCurrency") or "").upper() != "USD" or not start or not end or not r.get("ticker"):
+        kind = (r.get("assetType") or "").lower()
+        if (r.get("priceCurrency") or "").upper() != "USD" or not start or not end or not r.get("ticker"):
             continue
-        out.setdefault(shape(r["ticker"]), []).append((start, end))
+        if kind == "stock":
+            out.setdefault(shape(r["ticker"]), []).append((start, end))
+        elif kind in FUND_TYPES and start <= TESTS_FROM <= end:
+            funds.add(shape(r["ticker"]))
     if not out:
         raise ProviderError("Tiingo's ticker list is empty")
-    return out
+    return out, funds - set(out)
 
 
 def shape(symbol: str) -> str:
@@ -212,23 +221,34 @@ def pick(listing: dict[str, list[tuple[str, str]]], candidates: list[tuple[str, 
     return {"symbol": None, "source": None, "first_bar": None, "last_bar": None, "state": NO_TICKER}
 
 
-def resolve(http, agent: str, top: list[dict], listing: dict, by_cik: dict[int, list[str]], sleep=time.sleep) -> list[dict]:
+def _classes(candidates: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    have = {sym for sym, _ in candidates}
+    return candidates + [(SHARE_CLASS[sym], source) for sym, source in candidates if sym in SHARE_CLASS and SHARE_CLASS[sym] not in have]
+
+
+def resolve(http, agent: str, top: list[dict], listing: dict, by_cik: dict, sleep=time.sleep, funds=frozenset(), size: int = SIZE) -> tuple[list, list]:
     newest = max(end for spans in listing.values() for _, end in spans)
     live = (date.fromisoformat(newest) - timedelta(days=TRADING_DAYS)).isoformat()
-    out, asking = [], True
+    out, aside, asking = [], [], True
     for row in top:
-        known = [(s, SEC_LIST) for s in sorted(by_cik.get(row["cik"], ()), key=lambda s: (len(s), s))]
-        got = pick(listing, known)
-        if got["state"] != PRICED and asking:
+        if len(out) == size:
+            break
+        known = _classes([(s, SEC_LIST) for s in sorted(by_cik.get(row["cik"], ()), key=lambda s: (len(s), s))])
+        got, tried = pick(listing, known), known
+        if got["state"] != PRICED and asking and not any(sym in funds for sym, _ in known):
             try:
                 filed = _reach("The SEC", lambda r=row: filing_symbols(http, agent, r["cik"], r["accn"], sleep))
-                got = pick(listing, known + [c for c in filed if c not in known])
+                tried = _classes(known + [c for c in filed if c not in known])
+                got = pick(listing, tried)
             except ProviderError as e:
                 asking = not any(w in str(e) for w in GIVE_UP)
+        if got["state"] != PRICED and any(sym in funds for sym, _ in tried):
+            aside.append(row | {"why": FUND})
+            continue
         if got["state"] != PRICED and not asking:
             got = got | {"state": UNASKED}
-        out.append(row | got | {"trading": int(got["state"] == PRICED and got["last_bar"] >= live)})
-    return out
+        out.append(row | got | {"rank": len(out) + 1, "trading": int(got["state"] == PRICED and got["last_bar"] >= live)})
+    return out, aside
 
 
 # ---- Store and report ----
@@ -314,6 +334,8 @@ def summary(conn: sqlite3.Connection, rows: list[dict], now: datetime) -> dict:
         return f"{r['name']} ({r['symbol']})" if r["symbol"] else r["name"]
 
     aside = left_out(conn)
+    funds = [r["name"] for r in aside if r["source"] == FUND]
+    aside = [r for r in aside if r["source"] != FUND]
     out = {
         "as_of": AS_OF,
         "tests_from": TESTS_FROM,
@@ -335,6 +357,7 @@ def summary(conn: sqlite3.Connection, rows: list[dict], now: datetime) -> dict:
         "top": [r["name"] for r in rows[:TOP_SHOWN]],
         "left_out_count": len(aside),
         "left_out": [f"{r['name']} (${r['float_usd'] / 1e9:,.0f} billion, {WHY.get(r['source'], WHY[UNBACKED])})" for r in aside[:LEFT_OUT_SHOWN]],
+        "funds": funds,
         "tiingo": room(conn, rows, now),
     }
     out["enough"] = out["priced_pct"] >= ENOUGH_PCT
@@ -353,6 +376,10 @@ def words(s: dict) -> str:
         parts.append(
             f"{s['left_out_count']} {'company was' if one else 'companies were'} left out because the size {'it' if one else 'they'} reported looks mistyped."
         )
+    if s.get("funds"):
+        one = len(s["funds"]) == 1
+        what, why = ("fund or trust was", "it is not a company") if one else ("funds or trusts were", "they are not companies")
+        parts.append(f"{len(s['funds'])} {what} left out because {why}.")
     if s["listed"] < s["wanted"]:
         parts.append(f"The SEC lists only {s['listed']} of the {s['wanted']} asked for.")
     if s["stopped"]:
@@ -376,17 +403,17 @@ def run(conn: sqlite3.Connection, http, *, now: datetime | None = None, sleep=ti
     if fresh(conn, now):
         return {"ok": True, "fresh": True} | summary(conn, names(conn), now)
     try:
-        top, left = largest(http, agent, sleep)
-        listing = tiingo_listing(http)
+        top, left = largest(http, agent, sleep, SIZE, SPARE)
+        listing, funds = tiingo_listing(http)
         by_cik: dict[int, list[str]] = {}
         for symbol, cik in _reach("The SEC", lambda: sec_ciks(conn, http, agent, now, sleep)).items():
             by_cik.setdefault(cik, []).append(shape(symbol))
-        rows = resolve(http, agent, top, listing, by_cik, sleep)
+        rows, not_companies = resolve(http, agent, top, listing, by_cik, sleep, funds, SIZE)
     except ProviderError as e:
         return {"ok": False, "error": f"{e}. The public stock list was left as it was."}
     known = {r["cik"]: r for r in names(conn) if r["state"] == PRICED}
     rows = [r | {k: known[r["cik"]][k] for k in TICKER_FIELDS} if r["state"] == UNASKED and r["cik"] in known else r for r in rows]
-    store(conn, rows, now, left)
+    store(conn, rows, now, [*not_companies, *left])
     return {"ok": True, "fresh": False} | summary(conn, names(conn), now)
 
 

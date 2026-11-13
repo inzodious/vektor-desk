@@ -25,7 +25,7 @@ COMPANIES = [
     (106, "Fir Paper Co", 4.0e10, "2011-06-30", (2011, 2)),
     (107, "Gum Tree Foods Inc", 3.0e10, "2010-09-30", (2010, 3)),
 ]
-SEC_LIST = {"AAA": 101, "BBB": 102, "BBBL": 102, "GGG": 107}
+SEC_LIST = {"AAA": 101, "BBB": 102, "BBBL": 102, "GGG": 107, "BARS": 108}
 TIINGO = [
     ("AAA", "NYSE", "Stock", "USD", "2001-05-01", TODAY),
     ("BBB", "NASDAQ", "Stock", "USD", "2014-04-03", TODAY),
@@ -36,6 +36,10 @@ TIINGO = [
     ("AAA", "NYSE", "ETF", "USD", "1990-01-02", TODAY),
     ("ZZZ", "SHE", "Stock", "CNY", "1990-01-02", TODAY),
     ("QQQQ", "NASDAQ", "Stock", "USD", "", ""),
+    ("BARS", "NYSE ARCA", "ETF", "USD", "2004-11-18", TODAY),
+    ("GGG", "NYSE ARCA", "ETF", "USD", "2019-05-01", TODAY),
+    ("GOOG", "NASDAQ", "Stock", "USD", "2014-03-27", TODAY),
+    ("GOOGL", "NASDAQ", "Stock", "USD", "2004-08-19", TODAY),
 ]
 PAGE = """<table class="report"><tr class="ro"><td class="pl"><a class="a" href="javascript:void(0);">Entity Registrant Name</a></td>
 <td class="text">CEDAR SYSTEMS INC<span></span></td></tr>
@@ -47,6 +51,7 @@ FILINGS = {
     104: ["Financial_Report.xls", "ddd-20111231.xml", "ddd-20111231_lab.xml"],
     105: ["eee-20120128.xml"],
     107: ["gumtreefoods-20110630.xml"],
+    110: ["goog-20101231.xml"],
 }
 
 
@@ -248,6 +253,32 @@ def test_the_obvious_giants_of_mid_2011_lead_the_list_and_no_mistyped_small_comp
         "float_at": "2011-06-30",
         "why": "larger than any company was",
     }
+
+
+def test_a_fund_is_left_out_so_the_next_company_takes_its_place_and_google_is_read_through_its_older_shares(desk, monkeypatch):
+    more = [
+        (108, "Bullion Bars Trust", 8.5e10, "2011-06-30", (2011, 2)),
+        (110, "Search Engine Inc", 2.0e10, "2010-12-31", (2010, 4)),
+        (111, "Hickory Tools Co", 1.0e10, "2011-06-30", (2011, 2)),
+    ]
+    monkeypatch.setattr(public, "SIZE", 8)
+    http = Http(companies=COMPANIES + more)
+    out = run(desk, http)
+    rows = public.names(desk)
+    assert [r["name"].split()[0] for r in rows] == ["Alder", "Birch", "Cedar", "Dogwood", "Elm", "Fir", "Gum", "Search"]
+    assert [r["rank"] for r in rows] == list(range(1, 9)) and out["listed"] == out["wanted"] == 8
+    search = rows[-1]
+    assert (search["symbol"], search["source"], search["state"], search["trading"], search["first_bar"]) == ("GOOGL", "filing_file", "priced", 1, "2004-08-19")
+    assert by_name(desk)["Gum"]["state"] == "missing"
+    assert out["funds"] == ["Bullion Bars Trust"] and out["left_out_count"] == 0 and out["left_out"] == []
+    assert "1 fund or trust was left out because it is not a company." in out["detail"] and "mistyped" not in out["detail"]
+    assert not NOT_PLAIN.search(out["detail"]) and not any("/edgar/data/108/" in u for u in http.calls)
+    assert [(r["name"], r["source"]) for r in public.left_out(desk)] == [("Bullion Bars Trust", "fund")]
+    aside = public.view(desk, now=NOW)["left_out_names"]
+    assert [(r["name"], r["why"]) for r in aside] == [("Bullion Bars Trust", "a fund or trust, not a company")]
+    assert public.coverage(desk, set())["listed"] == 8
+    two = dict(out, funds=["Bullion Bars Trust", "Silver Bars Trust"])
+    assert "2 funds or trusts were left out because they are not companies." in public.words(two)
 
 
 def test_a_float_needs_a_second_figure_that_agrees_and_must_fit_the_balance_sheet():
