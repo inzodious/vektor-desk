@@ -262,3 +262,27 @@ def test_demo_daily_run(demo_cfg):
     result = run_daily(demo_cfg)
     assert result["ok"] and result["core"]["ok"] and result["core"]["metrics"] > 100
     assert result["core"]["checks"]["value"] == "ok"
+
+
+def test_a_buy_counted_as_owed_is_not_reported_as_a_price_difference():
+    from desk.engine.core import _value_check
+
+    def row(account, symbol, shares, close, value, reported, cash=0, quality="ok"):
+        keys = ("account", "symbol", "shares", "close", "value", "reported_value", "is_cash", "quality")
+        return dict(zip(keys, (account, symbol, shares, close, value, reported, cash, quality), strict=True))
+
+    day = "2026-11-12"
+    rows = [row("a1", "AAA", 10, 50.0, 500.0, 500.0), row("a1", "SPAXX", 60.0, 1.0, 60.0, 60.0, 1)]
+    rows += [row("a2", "BBB", 4, 25.0, 100.0, 100.0), row("a2", "FDRXX", 5.0, 1.0, 5.0, 25.0, 1, "modelled")]
+    check = _value_check(rows, day)
+    assert check[:2] == ("value", "warn") and check.kind == core.heal.FIXES and "price gaps" not in check[2]
+    assert check[2].startswith("a2 desk 105.00 vs broker 125.00. Every price matches") and "as owed: a2 20.00." in check[2] and "a1" not in check[2]
+    assert "counts them as money owed" in check.say and "different time" not in check.say
+    plain = _value_check([r | {"value": r["reported_value"], "quality": "ok"} for r in rows], day)
+    assert plain[1:3] == ("ok", f"Values match the broker on {day}.")
+    both = _value_check([*rows[:2], row("a2", "BBB", 4, 30.0, 120.0, 100.0), rows[3] | {"value": 15.0}], day)
+    assert both[1] == "warn" and "owed" not in both[2] and "BBB 30.00 vs 25.00" in both[2] and "different time" in both.say
+    unexplained = _value_check([*rows[:3], rows[3] | {"quality": "ok"}], day)
+    assert (
+        unexplained[1] == "warn" and "a2 desk 105.00 vs broker 125.00" in unexplained[2] and "owed" not in unexplained[2] and "price gaps" not in unexplained[2]
+    )

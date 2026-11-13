@@ -411,18 +411,19 @@ def test_the_public_stock_list_is_asked_last_in_the_daytime_and_topped_up_weekly
     with conn:
         conn.executemany(listed, rows)
     add_symbols(conn, ["OLD"], "past")
-    morning, evening, midnight, small_hours = (datetime(2026, 11, d, h, 13, tzinfo=UTC) for d, h in ((12, 15), (12, 21), (13, 5), (13, 6)))
+    morning, evening, dusk, night, small_hours = (datetime(2026, 11, d, h, 13, tzinfo=UTC) for d, h in ((12, 15), (12, 21), (13, 0), (13, 1), (13, 6)))
     backfill.sync_roles(conn, morning)
     roles = {r[0]: (r[1], r[2]) for r in conn.execute("SELECT symbol, role, priority FROM market_symbols")}
     assert roles["BIG"] == roles["DEAD"] == ("public", 4) and "LOST" not in roles and roles["AAPL"] == ("universe", 3) and roles["OLD"] == ("past", 3)
     assert backfill.public_names(conn) == {"BIG": True, "DEAD": False, "AAPL": True, "OLD": True}
     order = [r["symbol"] for r in due(conn, morning)]
     assert order[-2:] == ["BIG", "DEAD"] and "OLD" in order and "AAPL" in order
-    assert [backfill.quiet(t) for t in (morning, evening, midnight, small_hours)] == [False, True, True, False]
-    for late in (evening, midnight):
+    assert [backfill.quiet(t) for t in (morning, evening, dusk, night, small_hours)] == [False, True, True, False, False]
+    for late in (evening, dusk):
         asked = [r["symbol"] for r in due(conn, late)]
         assert not {"BIG", "DEAD", "OLD"} & set(asked) and "AAPL" in asked and "SPY" in asked
-    assert {"BIG", "DEAD", "OLD"} <= {r["symbol"] for r in due(conn, small_hours)}
+    for free in (night, small_hours):
+        assert {"BIG", "DEAD", "OLD"} <= {r["symbol"] for r in due(conn, free)}
 
     def fetched(days_ago: int) -> set[str]:
         stamp = datetime(2026, 11, 12 - days_ago, 15, 0, tzinfo=UTC).isoformat(timespec="seconds")

@@ -21,7 +21,7 @@ PARK_DAYS = 7
 HELD_PARK_HOURS = 20
 ASK_WORDS = "every hour, day and night"
 TOP_UP_DAYS = 7
-QUIET_FROM, QUIET_TO = 16, 1
+QUIET_FROM, QUIET_TO = 16, 20
 
 
 def _int_env(name: str, default: int) -> int:
@@ -73,7 +73,7 @@ def public_names(conn: sqlite3.Connection) -> dict[str, bool]:
 
 def quiet(now: datetime) -> bool:
     hour = now.astimezone(ET).hour
-    return hour >= QUIET_FROM or hour < QUIET_TO
+    return QUIET_FROM <= hour < QUIET_TO
 
 
 def sync_roles(conn: sqlite3.Connection, now: datetime | None = None) -> None:
