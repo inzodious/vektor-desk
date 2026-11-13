@@ -24,6 +24,7 @@ _EXPORTS = {
     "journal": "records",
     "log_trade": "records",
     "mark_placed": "records",
+    "next_steps": "steps",
     "notes": "records",
     "pass_on": "records",
     "queue": "records",

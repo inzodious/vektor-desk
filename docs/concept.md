@@ -128,6 +128,33 @@ This is the heart of the desk.
 | `GET /api/decisions/plan-steps?days=` | Approved steps live today or coming up, plus symbols under a no-buy window |
 
 The plan desk writes through `desk.decisions.plans.save_draft`. It never changes an approved version, waits when his own draft is unapproved, and carries his steps into its drafts untouched.
+- **Next steps (2026-11-13).** One ordered list of what to do next across his holdings and deposits: `GET /api/decisions/next-steps?days=90` returns `{as_of, days, count, items, standing, readings}`. `items` are dated and sorted by date; `standing` has no date. Nothing here is a new record: the list is read from what he already approved, agreed to or set.
+
+  | Source | Row |
+  |---|---|
+  | Approved stock plan step | Its text, window and lots. A step due later than `days` is left out; an undated step goes to `standing` with its `when` |
+  | Expected deposit | The next one says what it does: it pays the margin debit (a plan repay step, which then has no row of its own, or a margin note he agreed to), follows an approved deposit route, points at a route waiting in the queue, or says nothing is planned yet. A deposit that is late is never listed |
+  | Desk note he agreed to | In `standing` for 30 days. A margin note ends when the debit reads zero |
+  | Rule | `no_margin_buys` and `no_new_single_stocks`, in `standing` |
+  | No-buy window | One `standing` row per symbol while a harvest step holds buys back |
+
+  | Field | Holds |
+  |---|---|
+  | `text`, `detail` | What he does, in one line; account and lots when they matter |
+  | `why`, `basis` | One sentence of reason; where the row comes from ("Your ABCD plan, version 2, approved Nov 9.") |
+  | `changes_if` | What would change or retire it |
+  | `evidence`, `backed` | The strategy library row it leans on: `{row, title, sentence, verdict, tested_at, stance, reading, words}`. Only the row id is fixed in code; the rest is read from the lab each time. `backed` is the reading, or null with no evidence |
+  | `source`, `ref` | `plan`, `deposit`, `agreed` or `rule`, with the ids behind it |
+  | `status`, `completes` | `open`, `partial`, `upcoming` or `waiting`; who can tell it is done: `broker` (a fill), `desk` (a figure) or `you` |
+
+  | Lab result | `reading` | `words` |
+  |---|---|---|
+  | Held up, or a deposit rule ahead in most start months | `yes` | The lab's test backs this. |
+  | Inside the noise | `no_edge` | The lab's test shows no clear edge either way. |
+  | Fell short, or behind in most start months | `no` | The lab's test does not back this. |
+  | Not run yet, could not be judged, or measured before a lab fix | `untested` | The lab has not judged this yet. |
+
+  A row with `stance` `against` cites a test of the opposite (borrowing to buy a dip, for the no-margin rule), so its reading is flipped. A step the lab does not back stays on the list and says so; it is his to change.
 - FI projection: the path to the FI number at current contributions, with scenarios (contribution changes, return assumptions, a drawdown at a bad time). Lines and bars only, no area fills.
 
 ### Lab
