@@ -135,7 +135,7 @@ def test_the_daily_check_runs_when_the_week_is_spent_but_extras_wait(cfg):
     assert run_proposal_desk(cfg, "plan_keeper", engine=FakeEngine(day_slice("2026-11-11", "Wednesday, 9:12 PM.")), **kw).status == "ok"
     thursday = FakeEngine(day_slice("2026-11-12", "Thursday, 5:20 PM."))
     soon = run_proposal_desk(cfg, "plan_keeper", engine=thursday, **kw)
-    assert soon.status == "over_budget" and soon.note == "Weekly cap of 1 runs reached."
+    assert soon.status == "over_budget" and soon.note.startswith("Weekly cap of 1 runs reached. The next one is free on ")
     age_runs(cfg, 5)
     assert run_proposal_desk(cfg, "plan_keeper", engine=thursday, trigger="trigger", **kw).status == "over_budget"
     daily = run_proposal_desk(cfg, "plan_keeper", engine=thursday, **kw)

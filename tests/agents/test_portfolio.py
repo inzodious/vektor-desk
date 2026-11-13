@@ -514,5 +514,7 @@ def test_settings_says_the_daily_check_still_runs_when_the_plan_keeper_is_over(c
     for _ in range(10):
         run_desk(get("plan_keeper"), "s", "p", cfg=cfg, adapter=FakeAdapter(), trigger="console")
     tiles = {d["desk"]: d for d in crew(cfg, facts=FakeFacts(rows()))["desks"]}
-    assert tiles["plan_keeper"]["week"]["line"] == "Over this week's allowance, so extra runs wait. The daily check still runs once a day."
+    line = tiles["plan_keeper"]["week"]["line"]
+    assert line.startswith("Over this week's allowance until ") and line.endswith(", so extra runs wait. The daily check still runs once a day.")
+    assert tiles["plan_keeper"]["week"]["frees_at"] and tiles["tax"]["week"]["frees_at"] is None
     assert tiles["tax"]["week"]["line"] is None and tiles["tax"]["week"]["parts"] == []

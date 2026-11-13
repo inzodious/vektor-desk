@@ -1,4 +1,5 @@
 from dataclasses import asdict, dataclass
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from desk.agents import alerts, limits, store
@@ -11,6 +12,9 @@ LOCK = "agents"
 FIRST_RUN = store.GUARD_UNTIL
 UNGUARDED = (*FIRST_RUN, "debrief", "plans")
 CAPPED = ("schedule", "trigger", "retry", "lab")
+SCHEDULED = ("schedule", "retry")
+WEEK = timedelta(days=7)
+SLACK = timedelta(hours=6)
 GUARD_NOTE = "First-run guard: the other desks start once the Plan keeper and the Tax desk have each finished a run. It lifts itself then."
 
 
@@ -29,6 +33,43 @@ class Outcome:
 def _usage(result: AgentResult) -> dict:
     keep = ("turns", "input_tokens", "output_tokens", "cache_tokens", "duration_ms", "cost_estimate")
     return {k: v for k, v in asdict(result).items() if k in keep}
+
+
+# ---- Weekly room ----
+
+
+def room(cfg: Config, desk: Desk, trigger: str, now: datetime | None = None) -> dict:
+    now = now or limits.clock_now()
+    lane, cap, span = None, desk.weekly_runs, WEEK
+    if desk.kept:
+        lane, cap, span = ("scheduled", desk.kept, WEEK - SLACK) if trigger in SCHEDULED else ("asked", max(desk.weekly_runs - desk.kept, 0), WEEK)
+    starts = store.counted_starts(cfg, desk.name, now - span, lane)
+    over = len(starts) >= cap
+    frees = starts[len(starts) - cap] + span if over and cap > 0 else None
+    return {"lane": lane, "runs": len(starts), "cap": cap, "over": over, "frees_at": frees, "now": now}
+
+
+def free_words(cfg: Config, left: dict) -> str:
+    if left["frees_at"] is None:
+        return ""
+    return f"The next one is free {limits.clock(left['frees_at'], left['now'], ZoneInfo(cfg.timezone))}."
+
+
+def used_words(left: dict) -> str:
+    many, extra = left["cap"] != 1, " extra" if left["lane"] == "asked" else ""
+    return f"This week's {left['cap']}{extra} runs are used." if many else f"This week's{extra} run is used."
+
+
+def refusal(cfg: Config, left: dict) -> str:
+    said = {
+        None: f"Weekly cap of {left['cap']} runs reached.",
+        "scheduled": "This week's scheduled check has already run.",
+        "asked": f"{used_words(left)} One run is kept for the scheduled check.",
+    }[left["lane"]]
+    return f"{said} {free_words(cfg, left)}".strip()
+
+
+# ---- One run ----
 
 
 def run_desk(
@@ -50,8 +91,10 @@ def run_desk(
         return skip("disabled", "Switched off in Settings.")
     if desk.name in DESKS and desk.name not in UNGUARDED and store.guard_on(cfg):
         return skip("guarded", GUARD_NOTE)
-    if capped and trigger in CAPPED and store.week_usage(cfg, desk.name)["runs"] >= desk.weekly_runs:
-        return skip("over_budget", f"Weekly cap of {desk.weekly_runs} runs reached.")
+    if capped and trigger in CAPPED:
+        left = room(cfg, desk, trigger)
+        if left["over"]:
+            return skip("over_budget", refusal(cfg, left))
     held = limits.paused_until(cfg) if trigger in CAPPED else None
     if held:
         now = limits.clock_now()

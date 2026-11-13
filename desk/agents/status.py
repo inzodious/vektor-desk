@@ -4,20 +4,23 @@ from zoneinfo import ZoneInfo
 from desk.agents import limits, portfolio, store, switches
 from desk.agents.desks import DESKS, Desk
 from desk.agents.pipeline import ONCE_A_DAY
-from desk.agents.runner import FIRST_RUN, UNGUARDED
+from desk.agents.runner import FIRST_RUN, UNGUARDED, free_words, room, used_words
 from desk.agents.sources import Decisions, NotReady, PlanFacts, RealDecisions, RealPlanFacts
 from desk.config import Config
 from desk.runlock import running
 from desk.scheduler import parse
 
 HORIZON_DAYS = 35
+KEEPS = "The scheduled check keeps its own run."
 
 
-def next_run(desk: Desk, now: datetime, zone: ZoneInfo) -> str | None:
+def next_run(desk: Desk, now: datetime, zone: ZoneInfo, free: datetime | None = None) -> str | None:
     if not desk.schedules:
         return None
     jobs = parse("\n".join(f"{s} true" for s in desk.schedules))
     t = now.astimezone(zone).replace(second=0, microsecond=0) + timedelta(minutes=1)
+    if free is not None and free > now:
+        t = max(t, free.astimezone(zone).replace(second=0, microsecond=0) + timedelta(minutes=1))
     end = t + timedelta(days=HORIZON_DAYS)
     while t < end:
         if desk.due_on(t.date()) and any(j.due(t) for j in jobs):
@@ -48,17 +51,34 @@ def _held(cfg: Config, facts: PlanFacts | None) -> int | None:
 
 
 def week_of(cfg: Config, desk: Desk, now: datetime, facts: PlanFacts | None = None) -> dict:
-    week = store.week_usage(cfg, desk.name, now) | {"cap": desk.weekly_runs, "line": None, "parts": []}
+    week = store.week_usage(cfg, desk.name, now) | {"cap": desk.weekly_runs, "line": None, "parts": [], "frees_at": None}
     if desk.name == portfolio.NAME:
         nightly, asked = store.week_usage(cfg, desk.name, now, lane="pass")["runs"], store.week_usage(cfg, desk.name, now, lane="desk")["runs"]
         held = _held(cfg, facts)
-        room = portfolio.desk_for(held).weekly_runs if held else max(nightly, 1)
-        week["cap"] = desk.weekly_runs + room
-        week["parts"] = [{"name": "Holdings pass", "runs": nightly, "cap": room}, {"name": "On request", "runs": asked, "cap": desk.weekly_runs}]
-        week["line"] = f"Holdings pass {nightly} of {room} this week, one per holding. On request {asked} of {desk.weekly_runs}."
-    elif desk.name in ONCE_A_DAY and week["runs"] >= desk.weekly_runs:
-        week["line"] = "Over this week's allowance, so extra runs wait. The daily check still runs once a day."
+        spare = portfolio.desk_for(held).weekly_runs if held else max(nightly, 1)
+        week["cap"] = desk.weekly_runs + spare
+        week["parts"] = [{"name": "Holdings pass", "runs": nightly, "cap": spare}, {"name": "On request", "runs": asked, "cap": desk.weekly_runs}]
+        week["line"] = f"Holdings pass {nightly} of {spare} this week, one per holding. On request {asked} of {desk.weekly_runs}."
+        return week
+    left = room(cfg, desk, "trigger", now)
+    if not left["over"]:
+        return week
+    free, when = left["frees_at"], None
+    if free is not None:
+        week["frees_at"] = free.isoformat(timespec="seconds")
+        when = limits.clock(free, now, ZoneInfo(cfg.timezone))
+    if desk.name in ONCE_A_DAY:
+        until = f" until {when.removeprefix('at ').removeprefix('on ')}" if when else ""
+        week["line"] = f"Over this week's allowance{until}, so extra runs wait. The daily check still runs once a day."
+    else:
+        week["line"] = " ".join(x for x in (used_words(left), free_words(cfg, left), KEEPS if desk.kept else "") if x)
     return week
+
+
+def _free(cfg: Config, desk: Desk, now: datetime) -> datetime | None:
+    if desk.name in ONCE_A_DAY or desk.name == portfolio.NAME:
+        return None
+    return room(cfg, desk, "schedule", now)["frees_at"]
 
 
 def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None = None, facts: PlanFacts | None = None) -> dict:
@@ -91,7 +111,7 @@ def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None =
                 "yaml": switch["yaml"],
                 "guarded": guarded,
                 "last_run": _last(store.last_run(cfg, d.name)),
-                "next_run": next_run(d, now, zone) if d.live and enabled and on and not guarded else None,
+                "next_run": next_run(d, now, zone, _free(cfg, d, now)) if d.live and enabled and on and not guarded else None,
                 "week": week,
                 "retry_at": retries.get(d.name),
             }

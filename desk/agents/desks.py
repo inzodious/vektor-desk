@@ -17,6 +17,7 @@ class Desk:
     tools: tuple[str, ...] = ()
     model: str = "opus"
     live: bool = False
+    kept: int = 0
     only_if: Callable[[date], bool] | None = field(default=None, compare=False)
 
     def due_on(self, day: date) -> bool:
@@ -33,7 +34,7 @@ DESKS: dict[str, Desk] = {
         Desk("plan_keeper", "Plan keeper", "high", 1, 12, 10, ("30 17 * * *",), live=True),
         Desk("tax", "Tax desk", "high", 2, 16, 8, ("0 2 * 1-11 0", "0 2 * 12 *"), live=True),
         Desk("debrief", "Debrief desk", "high", 2, 8, 24, ("36 8 * * 1-5", "46 17 * * 1-5", "30 18 * * 5", "40 1-6 * * 2-6"), live=True),
-        Desk("risk", "Risk desk", "high", 3, 16, 3, ("0 2 * * 6",), live=True),
+        Desk("risk", "Risk desk", "high", 3, 16, 3, ("0 2 * * 6",), live=True, kept=1),
         Desk("plans", "Plan desk", "high", 3, 12, 34, ("40 18 * * 1-5", "0 3 * * 6"), live=True),
         Desk("research", "Research desk", "xhigh", 4, 40, 4, ("5 0 * * *", "5 2 * * *", "5 4 * * *"), WEB, live=True),
         Desk("skeptic", "Skeptic", "high", 4, 8, 10, live=True),

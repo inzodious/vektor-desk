@@ -341,7 +341,9 @@ Agent runs share the subscription's 5-hour and weekly limits with Joshua's inter
 - **Metered.** Each run logs turns, tokens and wall time. The status page shows usage per desk per week. Start with a small weekly budget and set the real one after two weeks of logs.
 - **Weekly caps** count scheduled, trigger, retry and lab runs over a rolling seven days. Console questions are his own asks and bypass the cap; Skeptic runs ride on the run that asked for them.
 - **The plan keeper's daily check is always allowed**: the first scheduled run for a new book day runs even when the week is spent, unless the desk made any call in the last three hours. Trigger runs still wait for the cap.
-- **Settings** (`GET /api/agents/status`): each desk's `week` has `runs`, `cap`, a `line` in plain words and `parts`. Research shows the holdings pass (its own allowance, two per holding plus six) apart from runs on request, and `cap` is the two added together.
+- **The Risk desk keeps one of its three runs for the Saturday check.** Trigger and lab runs stop at two in any seven days; the scheduled check (and its retry after a limit) has the third to itself, once every six days and eighteen hours, so a start a few seconds early is not refused. The cap stays three.
+- **A desk at its cap says when it runs again.** A run stops counting exactly seven days after it started. `week.frees_at` is the moment the count drops under the cap, `week.line` says it ("This week's 8 runs are used. The next one is free on Thursday at 10:00 AM."), the refused run's note says the same, and `next_run` skips scheduled times the cap would refuse.
+- **Settings** (`GET /api/agents/status`): each desk's `week` has `runs`, `cap`, a `line` in plain words, `parts` and `frees_at`. Research shows the holdings pass (its own allowance, two per holding plus six) apart from runs on request, and `cap` is the two added together.
 - **Rate limits.** A run that fails on a usage or rate limit is marked `deferred`. No retry loops.
 
 | When Claude's limit is used up | What the desks do |

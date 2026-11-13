@@ -87,7 +87,9 @@ def clock(t: datetime, now: datetime, zone: ZoneInfo) -> str:
         return f"at {hour}"
     if local.date() == today + timedelta(days=1):
         return f"tomorrow at {hour}"
-    return f"on {local.strftime('%A')} at {hour}"
+    if local.date() < today + timedelta(days=7):
+        return f"on {local.strftime('%A')} at {hour}"
+    return f"on {local.strftime('%A, %b')} {local.day} at {hour}"
 
 
 def saw_limit(cfg: Config, text: str, run_id: int | None = None, now: datetime | None = None) -> datetime | None:
