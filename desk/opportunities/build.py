@@ -764,11 +764,11 @@ def evidence(cfg: Config) -> list[dict]:
     try:
         from desk.engine.lab import shelf
 
-        rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+        rows = shelf.rows(cfg, LAB_ROWS)
     except Exception:  # noqa: BLE001
         return []
     found = [rows[i] for i in LAB_ROWS if i in rows and rows[i].get("status") == "tested" and rows[i].get("line")]
-    return [{k: r.get(k) for k in ("id", "title", "line", "verdict", "tested_at", "outdated")} for r in found]
+    return [{k: r.get(k) for k in ("id", "title", "line", "verdict", "backs", "tested_at", "outdated")} for r in found]
 
 
 def build(cfg: Config, *, now: datetime | None = None) -> dict:
