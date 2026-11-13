@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from desk.agents import briefs, store
+from desk.agents import briefs, limits, store
 from desk.agents.console import process_queue, process_triggers, queue_retry
 from desk.agents.debrief import parse_kinds, run_debrief_desk, settle
 from desk.agents.debrief import preview as preview_debrief
@@ -32,8 +32,26 @@ EXIT = {"ok": 0, "disabled": 0, "over_budget": 0, "not_ready": 0, "unchanged": 0
 SKIPPED = ("disabled", "over_budget", "not_ready", "unchanged", "unhealthy", "guarded")
 REASON_CHARS = 300
 RUN_WAIT = 2700
+RETRY_WAIT = 300
 STANDALONE = ("filings", "discounts", "debrief", "plans")
 NIGHTLY = "research"
+CASES = "discounts"
+
+
+def _wait(trigger: str) -> float:
+    return RUN_WAIT if trigger == "schedule" else RETRY_WAIT if trigger == "retry" else 0.0
+
+
+def _retry(cfg: Config, name: str) -> None:
+    main(["run", name, "--trigger", "retry"])
+    if name != CASES:
+        return
+    try:
+        from desk.opportunities.night import list_cases_step
+    except ImportError:
+        return
+    step = list_cases_step(cfg)
+    print(f"Cases for rows on sale: {step.get('status')}. {step.get('note') or ''}".strip())
 
 
 def _end(status: str, line: str, note: str | None = None) -> int:
@@ -127,7 +145,7 @@ def _dry_run(cfg: Config, name: str, args) -> int:
 
 def _portfolio(cfg: Config, args) -> int:
     symbols = (args.symbol,) if args.symbol else None
-    night = run_pass(cfg, symbols=symbols, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
+    night = run_pass(cfg, symbols=symbols, trigger=args.trigger, limit=args.limit, wait=_wait(args.trigger))
     left = f", {night.left} left for the next run" if night.left else ""
     tally = f"{len(night.analysed)} analysed, {len(night.failed) + len(night.rejected)} failed of {night.pending}{left}"
     print(f"Portfolio pass: {night.status}, {tally}. {night.note or ''}".strip())
@@ -164,6 +182,8 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("lab-reviews", help="queue a Strategy desk run for each new lab result")
     sub.add_parser("smoke", help="one-turn check that the CLI and token work")
     sub.add_parser("status", help="print the crew status as JSON")
+    spent = sub.add_parser("usage", help="runs, tokens and estimated cost per desk per day, as JSON")
+    spent.add_argument("--days", type=int, default=8)
     dry = sub.add_parser("dry-run", help="build a desk's real brief and prompt and print them, without calling claude")
     dry.add_argument("desk", choices=sorted(DESKS))
     dry.add_argument("--symbol", help="focus symbol (research) or strategy id (strategy)")
@@ -204,6 +224,13 @@ def main(argv: list[str] | None = None) -> int:
         tally = process_queue(cfg, now_only=args.now_only)
         if tally.ran:
             print(f"queue: {tally.ran} ran, {tally.done} done, {tally.failed} failed, {tally.requeued} moved to tonight")
+        fired = limits.fire(cfg, lambda name: _retry(cfg, name))
+        if fired:
+            print(f"retry after the limit reset: {fired[0]} {fired[1]}")
+        return 0
+    if args.cmd == "usage":
+        json.dump(limits.usage(cfg, args.days), sys.stdout, indent=2)
+        print()
         return 0
     if args.cmd == "triggers":
         made = process_triggers(cfg)
@@ -222,38 +249,38 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"skipped": f"{desk.title}: not due today."}))
         return 0
     if desk.name == "strategy":
-        nightly = run_nightly(cfg, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
+        nightly = run_nightly(cfg, wait=_wait(args.trigger))
         queued = f" Queued {nightly.queued.name}." if nightly.queued else ""
         if nightly.lane:
             queued = f" Registered lane {nightly.lane['id']} v{nightly.lane['version']}."
         return _end(nightly.status, f"{desk.title}: {nightly.status}.{queued} {nightly.note or ''}".rstrip(), nightly.note)
     if desk.name == "debrief":
-        wait = RUN_WAIT if args.trigger == "schedule" else 0.0
+        wait = _wait(args.trigger)
         if args.trigger == "schedule":
             settle(cfg)
         review = run_debrief_desk(cfg, kinds=parse_kinds(args.kinds), so_far=args.so_far, trigger=args.trigger, wait=wait)
         done = ", ".join(review.written) or "none"
         return _end(review.status, f"{desk.title}: {review.status}, wrote {done}, {len(review.failed)} failed. {review.note or ''}".strip(), review.note)
     if desk.name == "plans":
-        wait = RUN_WAIT if args.trigger == "schedule" else 0.0
+        wait = _wait(args.trigger)
         symbols = (args.symbol,) if args.symbol else None
         book = run_plan_desk(cfg, symbols=symbols, full=True if args.all else None, trigger=args.trigger, limit=args.limit, wait=wait)
         left = f", {book.left} left for the next run" if book.left else ""
         tally = f"{len(book.drafted)} drafted, {len(book.kept)} kept, {len(book.failed)} failed of {book.pending}{left}"
         return _end(book.status, f"{desk.title}: {book.status}, {tally}. {book.note or ''}".strip(), book.note)
     if desk.name == "discounts":
-        day = run_discount_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
+        day = run_discount_desk(cfg, trigger=args.trigger, limit=args.limit, wait=_wait(args.trigger))
         votes = list(day.verdicts.values())
         tally = ", ".join(f"{v} {votes.count(v)}" for v in ("buy", "wait", "avoid") if v in votes)
         written = f"{len(day.written)} written" + (f" ({tally})" if tally else "")
         return _end(day.status, f"{desk.title}: {day.status}, {written}, {len(day.failed)} failed of {day.pending}. {day.note or ''}".strip(), day.note)
     if desk.name == "filings":
-        night = run_filings_desk(cfg, trigger=args.trigger, limit=args.limit, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
+        night = run_filings_desk(cfg, trigger=args.trigger, limit=args.limit, wait=_wait(args.trigger))
         extra = f", {len(night.rejected)} refused" if night.rejected else ""
         line = f"{desk.title}: {night.status}, {len(night.scored)} scored, {len(night.failed)} failed{extra} of {night.pending}. {night.note or ''}".strip()
         return _end(night.status, line, night.note)
-    report = run_proposal_desk(cfg, desk.name, trigger=args.trigger, wait=RUN_WAIT if args.trigger == "schedule" else 0.0)
-    if report.status in ("deferred", "busy") and args.trigger == "schedule":
+    report = run_proposal_desk(cfg, desk.name, trigger=args.trigger, wait=_wait(args.trigger))
+    if report.status in ("deferred", "busy") and args.trigger == "schedule" and not store.waiting_retry(cfg, desk.name):
         queue_retry(cfg, desk.name)
     line = f"{desk.title}: {report.status}, {report.tally}. {report.note or ''}".strip()
     return _end(report.status, line, report.note)

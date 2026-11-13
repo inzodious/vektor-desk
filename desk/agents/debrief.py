@@ -311,7 +311,12 @@ def rewrite_for(cfg: Config, view: dict, *, reviews: Reviews | None = None, deci
     if not due_at:
         why = "The Debrief desk is switched off, so it stays as written." if off else "The numbers were revised after it was written."
         return {"state": "late", "due_at": None, "words": f"{BEFORE} {why}"}
-    if _gave_up(cfg, name, since):
+    retry = store.waiting_retry(cfg, NAME)
+    if retry:
+        again = _at(retry["due_at"]).astimezone(zone)
+        return {"state": "due", "due_at": again.isoformat() if again > now else due_at, "words": None}
+    tried = store.last_retry(cfg, NAME)
+    if _gave_up(cfg, name, since) or (tried and tried["status"] == "failed" and _at(tried["ran_at"]) > since):
         return {"state": "failed", "due_at": due_at, "words": f"{BEFORE} The rewrite did not finish; the desk tries again {_when(due_at, now, zone)}."}
     if now - since > LATE_AFTER:
         return {"state": "late", "due_at": due_at, "words": f"{BEFORE} The rewrite is running late; the next try is {_when(due_at, now, zone)}."}

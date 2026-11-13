@@ -74,6 +74,26 @@ CREATE TABLE IF NOT EXISTS agent_triggers_seen (
   request_id INTEGER REFERENCES agent_requests (id),
   PRIMARY KEY (as_of, kind, scope_id)
 );
+CREATE TABLE IF NOT EXISTS agent_limits (
+  id INTEGER PRIMARY KEY,
+  scope TEXT NOT NULL,
+  seen_at TEXT NOT NULL,
+  resets_at TEXT NOT NULL,
+  run_id INTEGER,
+  UNIQUE (scope, resets_at)
+);
+CREATE TABLE IF NOT EXISTS agent_retries (
+  id INTEGER PRIMARY KEY,
+  desk TEXT NOT NULL,
+  due_at TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'waiting',
+  reason TEXT,
+  run_id INTEGER,
+  created_at TEXT NOT NULL,
+  ran_at TEXT,
+  note TEXT
+);
+CREATE INDEX IF NOT EXISTS agent_retries_desk ON agent_retries (desk, id);
 CREATE TABLE IF NOT EXISTS agent_plan_pins (
   symbol TEXT NOT NULL,
   step_id TEXT NOT NULL,

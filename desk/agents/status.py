@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from desk.agents import portfolio, store, switches
+from desk.agents import limits, portfolio, store, switches
 from desk.agents.desks import DESKS, Desk
 from desk.agents.pipeline import ONCE_A_DAY
 from desk.agents.runner import FIRST_RUN, UNGUARDED
@@ -70,6 +70,8 @@ def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None =
     guard = store.guard_on(cfg)
     ready, why = switches.guard_ready(cfg, FIRST_RUN)
     busy = any(j["job"] == "agents" for j in running(cfg))
+    held = limits.state(cfg, now)
+    retries = {r["desk"]: r["due_at"] for r in held["retries"]}
     desks = []
     for d in sorted(DESKS.values(), key=lambda d: (d.priority, d.name)):
         switch = switches.resolve(cfg, d.name, profile)
@@ -91,6 +93,7 @@ def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None =
                 "last_run": _last(store.last_run(cfg, d.name)),
                 "next_run": next_run(d, now, zone) if d.live and enabled and on and not guarded else None,
                 "week": week,
+                "retry_at": retries.get(d.name),
             }
         )
     return {
@@ -98,5 +101,6 @@ def crew(cfg: Config, now: datetime | None = None, decisions: Decisions | None =
         "enabled_source": master["source"],
         "busy": busy,
         "guard": {"on": guard, "allowed": list(UNGUARDED), "ready": ready, "why": why},
+        "limit": held,
         "desks": desks,
     }
