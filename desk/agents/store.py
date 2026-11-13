@@ -345,3 +345,60 @@ def pins_delivered(cfg: Config, symbol: str, step_ids: list[str]) -> None:
         conn.executemany(
             "UPDATE agent_plan_pins SET delivered_at=? WHERE symbol=? AND step_id=? AND delivered_at IS NULL", [(now_iso(), symbol, sid) for sid in step_ids]
         )
+
+
+# ---- Limits and retries ----
+
+
+def runs_between(cfg: Config, since: datetime, until: datetime) -> list[dict]:
+    span = (since.isoformat(timespec="seconds"), until.isoformat(timespec="seconds"))
+    with db(cfg) as conn:
+        return [dict(r) for r in conn.execute("SELECT * FROM agent_runs WHERE started_at>=? AND started_at<? ORDER BY id", span)]
+
+
+def note_limit(cfg: Config, scope: str, seen_at: datetime, resets_at: datetime, run_id: int | None) -> bool:
+    row = (scope, seen_at.isoformat(timespec="seconds"), resets_at.astimezone(UTC).isoformat(timespec="seconds"), run_id)
+    with db(cfg) as conn:
+        return conn.execute("INSERT OR IGNORE INTO agent_limits (scope, seen_at, resets_at, run_id) VALUES (?,?,?,?)", row).rowcount > 0
+
+
+def limits(cfg: Config, scope: str | None = None, limit: int = 20) -> list[dict]:
+    where, args = ("WHERE scope=?", (scope,)) if scope else ("", ())
+    with db(cfg) as conn:
+        return [dict(r) for r in conn.execute(f"SELECT * FROM agent_limits {where} ORDER BY resets_at DESC, id DESC LIMIT ?", (*args, limit))]
+
+
+def plan_retry(cfg: Config, desk: str, due_at: datetime, reason: str, run_id: int | None) -> dict:
+    with db(cfg) as conn:
+        row = conn.execute("SELECT * FROM agent_retries WHERE desk=? AND status='waiting' ORDER BY id DESC LIMIT 1", (desk,)).fetchone()
+        if row is None:
+            due = due_at.astimezone(UTC).isoformat(timespec="seconds")
+            cur = conn.execute(
+                "INSERT INTO agent_retries (desk, due_at, reason, run_id, created_at) VALUES (?,?,?,?,?)", (desk, due, reason, run_id, now_iso())
+            )
+            row = conn.execute("SELECT * FROM agent_retries WHERE id=?", (cur.lastrowid,)).fetchone()
+        return dict(row)
+
+
+def waiting_retry(cfg: Config, desk: str) -> dict | None:
+    with db(cfg) as conn:
+        row = conn.execute("SELECT * FROM agent_retries WHERE desk=? AND status='waiting' ORDER BY id DESC LIMIT 1", (desk,)).fetchone()
+    return dict(row) if row else None
+
+
+def last_retry(cfg: Config, desk: str) -> dict | None:
+    with db(cfg) as conn:
+        row = conn.execute("SELECT * FROM agent_retries WHERE desk=? ORDER BY id DESC LIMIT 1", (desk,)).fetchone()
+    return dict(row) if row else None
+
+
+def retries(cfg: Config, status: str | None = None) -> list[dict]:
+    where, args = ("WHERE status=?", (status,)) if status else ("", ())
+    with db(cfg) as conn:
+        return [dict(r) for r in conn.execute(f"SELECT * FROM agent_retries {where} ORDER BY due_at, id", args)]
+
+
+def mark_retry(cfg: Config, retry_id: int, status: str, note: str | None = None, at: datetime | None = None) -> None:
+    ran = None if status == "waiting" else (at or datetime.now(UTC)).isoformat(timespec="seconds")
+    with db(cfg) as conn:
+        conn.execute("UPDATE agent_retries SET status=?, ran_at=?, note=? WHERE id=?", (status, ran, note, retry_id))

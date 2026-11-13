@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from desk.agents import console, debrief, portfolio, store, switches
+from desk.agents import console, debrief, limits, portfolio, store, switches
 from desk.agents.desks import DESKS
 from desk.agents.runner import UNGUARDED
 from desk.agents.sources import NotReady, RealDecisions
@@ -69,6 +69,11 @@ def get_debrief(cfg: CfgDep, kind: str = "day", end: str | None = None) -> JSONR
     if kind not in debrief.KINDS:
         raise HTTPException(404, f"unknown kind {kind}")
     return JSONResponse(debrief.rewrite(cfg, kind, end), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/usage")
+def get_usage(cfg: CfgDep, days: Annotated[int, Query(ge=1, le=60)] = 8) -> JSONResponse:
+    return JSONResponse(limits.usage(cfg, days), headers={"Cache-Control": "no-store"})
 
 
 @router.get("/runs")

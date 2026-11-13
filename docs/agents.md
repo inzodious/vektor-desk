@@ -341,7 +341,17 @@ Agent runs share the subscription's 5-hour and weekly limits with Joshua's inter
 - **Weekly caps** count scheduled, trigger, retry and lab runs over a rolling seven days. Console questions are his own asks and bypass the cap; Skeptic runs ride on the run that asked for them.
 - **The plan keeper's daily check is always allowed**: the first scheduled run for a new book day runs even when the week is spent, unless the desk made any call in the last three hours. Trigger runs still wait for the cap.
 - **Settings** (`GET /api/agents/status`): each desk's `week` has `runs`, `cap`, a `line` in plain words and `parts`. Research shows the holdings pass (its own allowance, two per holding plus six) apart from runs on request, and `cap` is the two added together.
-- **Rate limits.** If a run fails on a usage or rate limit, it is marked `deferred` and retried once in the next window. No retry loops.
+- **Rate limits.** A run that fails on a usage or rate limit is marked `deferred`. No retry loops.
+
+| When Claude's limit is used up | What the desks do |
+|---|---|
+| The message names its reset ("resets 9am", "resets Nov 20, 9am", "resets in 3 hours") | `limits.saw_limit` records it. Until then every scheduled, trigger, retry and lab run is marked `deferred` without calling Claude. Console questions still try |
+| A scheduled run was deferred | One retry is planned for 5 minutes after the reset (`agent_retries`, one waiting per desk). The run's note says when: "The desk tries again at 9:05 AM." |
+| After the reset | The every-minute `queue --now-only` job runs one due retry per minute as `run <desk> --trigger retry`, in `limits.ORDER`: Plan keeper, Risk, Debrief, written cases, Research, Plan desk, Tax, Filings, Strategy, Scout. Console questions go first each minute. The written-cases retry also writes the cases for rows on sale (`desk.opportunities.night.list_cases_step`) |
+| The retry is deferred or fails | It is not planned again; the desk's next scheduled run is the next try. A busy run lock leaves the retry waiting |
+| The message names no reset | Nothing is planned. A proposal desk's scheduled run still queues its overnight retry, as before |
+| What the app reads | `GET /api/agents/status`: `limit` is `{paused, paused_until, scope, retries, order, line}` and each desk has `retry_at`. A stale debrief with a retry waiting reads `rewrite.state: "due"` until that retry has failed |
+| What was spent | `GET /api/agents/usage?days=8` or `python -m desk.agents usage`: runs, turns, tokens, minutes and `cost_estimate` (the CLI's API-price figure, a weight, not a bill) per desk per Eastern day, with totals and the limits seen |
 - **Token health.** The `setup-token` token lasts a year. The status page shows the date it was created and warns 30 days before it expires. An authentication failure pauses every desk and shows a banner instead of failing silently each night.
 
 ## Scorecard

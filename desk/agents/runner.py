@@ -1,6 +1,7 @@
 from dataclasses import asdict, dataclass
+from zoneinfo import ZoneInfo
 
-from desk.agents import alerts, store
+from desk.agents import alerts, limits, store
 from desk.agents.adapter import Adapter, AgentError, AgentResult, AgentTimeout, ClaudeCli, UsageLimitError
 from desk.agents.desks import DESKS, Desk
 from desk.config import Config
@@ -51,6 +52,12 @@ def run_desk(
         return skip("guarded", GUARD_NOTE)
     if capped and trigger in CAPPED and store.week_usage(cfg, desk.name)["runs"] >= desk.weekly_runs:
         return skip("over_budget", f"Weekly cap of {desk.weekly_runs} runs reached.")
+    held = limits.paused_until(cfg) if trigger in CAPPED else None
+    if held:
+        now = limits.clock_now()
+        until = limits.clock(held, now, ZoneInfo(cfg.timezone)).removeprefix("at ").removeprefix("on ")
+        note = f"Claude's limit is used up until {until}, so this run waits. {limits.plan(cfg, desk.name, trigger, held, now=now)}".strip()
+        return skip("deferred", note)
     adapter = adapter or ClaudeCli()
     try:
         with job_lock(LOCK, wait=wait, cfg=cfg):
@@ -58,8 +65,9 @@ def run_desk(
             try:
                 result = adapter.run(desk, system, prompt, schema)
             except UsageLimitError as e:
-                store.finish_run(cfg, run_id, "deferred", note=str(e))
-                return Outcome("deferred", run_id, note=str(e))
+                note = f"{e} {limits.plan(cfg, desk.name, trigger, limits.saw_limit(cfg, str(e), run_id), run_id)}".strip()
+                store.finish_run(cfg, run_id, "deferred", note=note)
+                return Outcome("deferred", run_id, note=note)
             except AgentTimeout as e:
                 store.finish_run(cfg, run_id, "timeout", note=str(e))
                 alerts.run_failed(cfg, desk.name, "timeout", run_id, str(e))
