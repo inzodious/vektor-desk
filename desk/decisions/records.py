@@ -562,10 +562,18 @@ def pass_on(cfg: Config, decision_id: str, reason: str, *, now: datetime | None 
         d = to_dict(_get(conn, decision_id))
         if d["status"] != "approved":
             _open(conn, decision_id, at)
+        from desk.decisions.said import from_pass
+
         with conn:
             _update(conn, decision_id, at, status="passed", decided_at=at, status_reason=reason)
             log_event(conn, decision_id, "passed", reason=reason, at=at)
-        return to_dict(_get(conn, decision_id))
+            added = from_pass(conn, to_dict(_get(conn, decision_id)), at, cfg.timezone)
+        out = to_dict(_get(conn, decision_id))
+    if added:
+        from desk.decisions.steps import step_row
+
+        out["step"] = step_row(cfg, added["id"], now=now)
+    return out
 
 
 def mark_placed(cfg: Config, decision_id: str, shares: float | None = None, price: float | None = None, *, now: datetime | None = None) -> dict:
