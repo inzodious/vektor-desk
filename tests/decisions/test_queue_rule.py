@@ -163,7 +163,38 @@ def test_a_replaced_row_names_the_end_of_its_chain_when_that_one_later_goes(cfg,
     end = {"id": third["id"], "title": "Buy $500 ABCD again", "status": "expired", "open": False}
     assert all({k: seen[d["id"]]["successor"][k] for k in end} == end for d in (first, second))
     assert seen[first["id"]]["successor"]["status_reason"] == "Ready cash is $0 as of Nov 10 (estimated), less than the $500 this needs."
+    assert seen[first["id"]]["successor"]["outcome"] == seen[first["id"]]["successor"]["status_reason"]
     assert seen[third["id"]]["successor"] is None
+
+
+def test_a_successor_says_in_plain_words_what_became_of_it(cfg, preflight, now, proposal):
+    note = {"kind": "hold_off", "symbol": None, "subject": "margin", "expires": "2099-01-01"}
+    far = {"expires": "2099-01-01", "funding": "deposit"}
+    later = now + timedelta(days=1)
+    pairs = {}
+    for key, over in (("agreed", note), ("passed", far | {"symbol": "AAAA"}), ("dismissed", far | {"symbol": "BBBB"}), ("approved", far | {"symbol": "CCCC"})):
+        old = create_proposal(cfg, proposal(**over), "plan_keeper", run_id="r1", now=now)
+        pairs[key] = (old, create_proposal(cfg, proposal(**over), "plan_keeper", run_id="r2", now=later))
+    waiting = create_proposal(cfg, proposal(symbol="DDDD", **far), "scout", run_id="s1", now=now)
+    pairs["waiting"] = (waiting, create_proposal(cfg, proposal(symbol="DDDD", **far), "scout", run_id="s2", now=later))
+    asleep = create_proposal(cfg, proposal(symbol="EEEE", **far), "scout", run_id="s1", now=now)
+    snooze(cfg, asleep["id"], days=7, now=now)
+    pairs["asleep"] = (asleep, create_proposal(cfg, proposal(symbol="EEEE", **far), "scout", run_id="s2", now=later))
+    approve(cfg, pairs["agreed"][1]["id"], now=later)
+    pass_on(cfg, pairs["passed"][1]["id"], "I will sell after Dec 6", now=later)
+    dismiss(cfg, pairs["dismissed"][1]["id"], now=later)
+    approve(cfg, pairs["approved"][1]["id"], now=later)
+    seen = {d["id"]: d["successor"] for d in cleared(cfg, now=later)["items"]}
+    said = {k: seen[old["id"]]["outcome"] for k, (old, _) in pairs.items()}
+    assert said == {
+        "agreed": "You agreed to it on Nov 10.",
+        "passed": "You passed on it on Nov 10. Your reason: I will sell after Dec 6.",
+        "dismissed": "You dismissed it on Nov 10.",
+        "approved": "You approved it on Nov 10. It is waiting to be placed.",
+        "waiting": "Waiting in your queue.",
+        "asleep": "Snoozed until Nov 16.",
+    }
+    assert seen[pairs["agreed"][0]["id"]]["status"] == "done" and seen[pairs["agreed"][0]["id"]]["decided_at"]
 
 
 # ---- Nothing leaves without a trace ----

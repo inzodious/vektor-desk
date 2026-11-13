@@ -853,17 +853,40 @@ def clear_contradictions(cfg: Config, conn: sqlite3.Connection, moment: datetime
     return cleared
 
 
-def _successor(conn: sqlite3.Connection, d: dict) -> dict | None:
+YOURS = {
+    "approved": "You approved it on {day}. It is waiting to be placed.",
+    "placed": "You approved it on {day} and marked it placed.",
+    "filled": "You approved it on {day} and the broker filled it.",
+    "done": "You agreed to it on {day}.",
+    "dismissed": "You dismissed it on {day}.",
+    "passed": "You passed on it on {day}.",
+}
+
+
+def outcome(d: dict, tz: str) -> str:
+    status, reason = d["status"], _text(d["status_reason"])
+    if status == "proposed":
+        return "Waiting in your queue."
+    if status == "snoozed":
+        return f"Snoozed until {day_words(d['snoozed_until'], tz)}."
+    if status not in YOURS:
+        return reason or "It left the queue without a decision."
+    said = f" Your reason: {reason if reason.endswith(('.', '!', '?')) else reason + '.'}" if reason else ""
+    return YOURS[status].format(day=day_words(d["decided_at"], tz)) + said
+
+
+def _successor(conn: sqlite3.Connection, d: dict, tz: str) -> dict | None:
     seen, last, nxt = {d["id"]}, None, d["replaced_by"]
     while nxt and nxt not in seen:
-        row = conn.execute("SELECT id, title, status, status_reason, replaced_by FROM decisions WHERE id=?", (nxt,)).fetchone()
+        row = conn.execute("SELECT id, title, status, status_reason, decided_at, snoozed_until, replaced_by FROM decisions WHERE id=?", (nxt,)).fetchone()
         if row is None:
             break
         seen.add(nxt)
         last, nxt = row, row["replaced_by"]
     if last is None:
         return None
-    return {"id": last["id"], "title": last["title"], "status": last["status"], "status_reason": last["status_reason"], "open": last["status"] in OPEN}
+    out = {k: last[k] for k in ("id", "title", "status", "status_reason", "decided_at")}
+    return out | {"open": last["status"] in OPEN, "outcome": outcome(dict(last), tz)}
 
 
 def cleared(cfg: Config, *, days: int = CLEARED_DAYS, now: datetime | None = None) -> dict:
@@ -883,7 +906,7 @@ def cleared(cfg: Config, *, days: int = CLEARED_DAYS, now: datetime | None = Non
             ).fetchone()
             d["check"] = "replaced" if last and last["event"] == "replaced" else (loads(last["detail"]) or {}).get("check") if last else None
             d["cleared_at"] = d["decided_at"]
-            d["successor"] = _successor(conn, d)
+            d["successor"] = _successor(conn, d, cfg.timezone)
             items.append(d)
     return {"count": len(items), "days": days, "items": items}
 
