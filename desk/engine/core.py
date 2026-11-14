@@ -1053,12 +1053,11 @@ def _value_check(rows, day: str, series=None) -> Check:
     if len(owed) == len(bad):
         return Check(
             "value",
-            "warn",
-            f"{'; '.join(bad)}. Every price matches; the desk counts buys the broker has not yet taken out of cash as owed: {'; '.join(owed)}. "
-            "Fix: nothing to do; it clears when the broker's cash shows those buys.",
-            "Your broker has not yet taken recent buys out of cash. The desk already counts them as money owed, so its totals sit below your broker's "
-            "by that much. It clears when the broker's cash catches up.",
-            heal.FIXES,
+            "ok",
+            f"Values match the broker on {day} once that day's buys are taken out of cash, which the broker's file had not done yet: {'; '.join(owed)}. "
+            f"Unadjusted: {'; '.join(bad)}. A newer broker file replaces this comparison.",
+            f"Values match your broker for {heal.plain_day(day)}. "
+            "The desk already takes that day's buys out of cash, which your broker's file had not done yet.",
         )
     top = ", ".join(g for _, g in sorted(gaps, reverse=True)[:3])
     why = f" Biggest price gaps (close vs broker): {top}." if top else ""
