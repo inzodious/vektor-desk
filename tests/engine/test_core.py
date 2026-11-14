@@ -275,9 +275,10 @@ def test_a_buy_counted_as_owed_is_not_reported_as_a_price_difference():
     rows = [row("a1", "AAA", 10, 50.0, 500.0, 500.0), row("a1", "SPAXX", 60.0, 1.0, 60.0, 60.0, 1)]
     rows += [row("a2", "BBB", 4, 25.0, 100.0, 100.0), row("a2", "FDRXX", 5.0, 1.0, 5.0, 25.0, 1, "modelled")]
     check = _value_check(rows, day)
-    assert check[:2] == ("value", "warn") and check.kind == core.heal.FIXES and "price gaps" not in check[2]
-    assert check[2].startswith("a2 desk 105.00 vs broker 125.00. Every price matches") and "as owed: a2 20.00." in check[2] and "a1" not in check[2]
-    assert "counts them as money owed" in check.say and "different time" not in check.say
+    assert check[:2] == ("value", "ok") and check.kind is None and "price gaps" not in check[2]
+    assert check[2].startswith(f"Values match the broker on {day} once that day's buys are taken out of cash") and "a1" not in check[2]
+    assert "done yet: a2 20.00. Unadjusted: a2 desk 105.00 vs broker 125.00." in check[2]
+    assert "takes that day's buys out of cash" in check.say and "different time" not in check.say
     plain = _value_check([r | {"value": r["reported_value"], "quality": "ok"} for r in rows], day)
     assert plain[1:3] == ("ok", f"Values match the broker on {day}.")
     both = _value_check([*rows[:2], row("a2", "BBB", 4, 30.0, 120.0, 100.0), rows[3] | {"value": 15.0}], day)
