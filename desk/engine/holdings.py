@@ -18,6 +18,7 @@ STALE_MIN_ROWS = 1
 STALE_SHARE = 0.6
 SETTLE_TOLERANCE = 1.0
 LANDED_SHARE = 0.98
+LIST_ROLE = "public"
 CASH_SYMBOLS = {"SPAXX", "FDRXX", "FCASH", "CORE", "CASH", "FZFXX", "SPRXX"}
 
 
@@ -272,10 +273,26 @@ class Prices:
         return {d for ds in self.dates.values() for d in ds}
 
 
+def _has_table(desk: sqlite3.Connection, name: str) -> bool:
+    return desk.execute("SELECT 1 FROM sqlite_master WHERE name=?", (name,)).fetchone() is not None
+
+
+def list_only(desk: sqlite3.Connection) -> set[str]:
+    if not _has_table(desk, "market_symbols"):
+        return set()
+    only = {r[0] for r in desk.execute("SELECT symbol FROM market_symbols WHERE role=?", (LIST_ROLE,))}
+    if only and _has_table(desk, "holdings_daily"):
+        only -= {r[0] for r in desk.execute("SELECT DISTINCT symbol FROM holdings_daily")}
+    return only
+
+
 def bar_series(desk: sqlite3.Connection) -> dict[str, dict[str, tuple[float, float | None]]]:
     out: dict[str, dict[str, tuple[float, float | None]]] = {}
-    if desk.execute("SELECT 1 FROM sqlite_master WHERE name='price_bars'").fetchone():
-        for r in desk.execute("SELECT symbol, date, close, adj_close FROM price_bars"):
+    if not _has_table(desk, "price_bars"):
+        return out
+    skip = list_only(desk)
+    for r in desk.execute("SELECT symbol, date, close, adj_close FROM price_bars"):
+        if r["symbol"] not in skip:
             out.setdefault(r["symbol"], {})[r["date"]] = (r["close"], r["adj_close"])
     return out
 
