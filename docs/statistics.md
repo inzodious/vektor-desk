@@ -1331,7 +1331,7 @@ The job's `detail` and the route's `detail` are the same sentence, for example "
 
 ## Memory budget
 
-The NAS containers are small (cron 640 MB, lab 1,536 MB, API 256 MB), so no job may hold a whole table in Python. Measured 2026-11-11 on a synthetic database of 191k price bars, 85k insider rows, 2.2M Alpaca bars, the full French sets and three years of mirror:
+The NAS containers are small (cron 544 MB, lab 512 MB, API 192 MB; docs/architecture.md "Shared NAS rules"), so no job may hold a whole table in Python. Measured 2026-11-11 on a synthetic database of 191k price bars, 85k insider rows, 2.2M Alpaca bars, the full French sets and three years of mirror:
 
 | Job | Peak MB | Seconds | How it stays small |
 |---|---|---|---|
@@ -1342,6 +1342,7 @@ The NAS containers are small (cron 640 MB, lab 1,536 MB, API 256 MB), so no job 
 | Lab, 3 workers, 12-variant screen | 132 (was 1,611) | 5 (was 24) | See below |
 | Lab, 3 workers, French 49 industries since 1963 | 184 (was 3,120) | 12 (was 387) | See below |
 | API, every read endpoint | 94 | | |
+| `daily` with the public list, 2026-11-16: 262 names, 1.44M price bars since 2005 | 278 (was 812, killed at 640 on 11-14) | | Prices read for the book leave out names only on the public list (`holdings.list_only`: role `public` and never held). Output identical |
 
 **Lab data.** `load` keeps each series as packed arrays of doubles with one shared set of date strings; a day is found through one shared calendar and a small per-series offset table (`DayIndex`), about 40 bytes a bar instead of 290. A French set is read as a stream. Workers are forked from the process that already holds the data, so they share it and never reload it; where fork is not available the variants run one after another. Results are identical to the old loader's, down to every stored trial.
 

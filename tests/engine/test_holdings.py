@@ -130,3 +130,25 @@ def test_api_holdings_and_value_series(cfg, mirror, app_client):
     assert client.get("/api/engine/holdings", params={"date": "2026-11-02"}).json()["quality"] == "ok"
     series = client.get("/api/engine/value", params={"account": IND}).json()["series"]
     assert [p["value"] for p in series] == [1300.0, 1350.0, 1400.0]
+
+
+def test_the_daily_price_read_leaves_out_names_only_on_the_public_list_unless_held(cfg, mirror):
+    from desk.engine import backfill, schema
+    from desk.engine.holdings import LIST_ROLE, bar_series
+
+    seed_two_days(mirror)
+    run_holdings(cfg)
+    desk = connect(cfg.desk_db)
+    schema.apply(desk)
+    with desk:
+        backfill.add_symbols(desk, ["SPY"], "benchmark")
+        backfill.add_symbols(desk, ["AAPL", "FXAIX", "MSFT"], backfill.PUBLIC)
+        backfill.add_symbols(desk, ["MSFT"], "past")
+        desk.executemany(
+            "INSERT INTO price_bars (symbol, date, close, adj_close) VALUES (?, ?, ?, ?)",
+            [(s, d, 100.0, 99.0) for s in ("SPY", "AAPL", "FXAIX", "MSFT") for d in ("2026-11-02", "2026-11-03")],
+        )
+    series = bar_series(desk)
+    desk.close()
+    assert LIST_ROLE == backfill.PUBLIC
+    assert sorted(series) == ["FXAIX", "MSFT", "SPY"] and series["SPY"]["2026-11-03"] == (100.0, 99.0)
