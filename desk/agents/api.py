@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from desk.agents import console, debrief, limits, portfolio, store, switches
+from desk.agents import console, debrief, limits, moves, portfolio, store, switches
 from desk.agents.desks import DESKS
 from desk.agents.runner import UNGUARDED
 from desk.agents.sources import NotReady, RealDecisions
@@ -125,3 +125,19 @@ def get_dossier(symbol: str, cfg: CfgDep) -> JSONResponse:
     if row is None:
         raise HTTPException(404, "no dossier yet")
     return JSONResponse(_dossier(row), headers={"Cache-Control": "no-store"})
+
+
+@router.get("/moves")
+def get_moves(cfg: CfgDep) -> JSONResponse:
+    return JSONResponse(moves.view(cfg), headers={"Cache-Control": "no-store"})
+
+
+@router.post("/moves/ask", status_code=202)
+def ask_moves(cfg: CfgDep) -> dict:
+    try:
+        moves.ask(cfg)
+    except PermissionError as e:
+        raise HTTPException(409, str(e)) from None
+    except LookupError as e:
+        raise HTTPException(422, str(e)) from None
+    return moves.view(cfg)

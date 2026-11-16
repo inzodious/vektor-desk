@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from desk.agents import briefs, limits, store
+from desk.agents import briefs, limits, moves, store
 from desk.agents.console import process_queue, process_triggers, queue_retry
 from desk.agents.debrief import parse_kinds, run_debrief_desk, settle
 from desk.agents.debrief import preview as preview_debrief
@@ -179,6 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     queue = sub.add_parser("queue", help="work through Console and trigger requests")
     queue.add_argument("--now-only", action="store_true", help="only requests marked Run now")
     sub.add_parser("triggers", help="turn today's engine triggers into requests")
+    sub.add_parser("moves", help="explain today's big moves in held names, after the close")
     sub.add_parser("lab-reviews", help="queue a Strategy desk run for each new lab result")
     sub.add_parser("smoke", help="one-turn check that the CLI and token work")
     sub.add_parser("status", help="print the crew status as JSON")
@@ -212,7 +213,7 @@ def main(argv: list[str] | None = None) -> int:
         on = store.guard_on(cfg)
         print(f"first-run guard {'on: only ' + ', '.join(UNGUARDED) + ' run' if on else 'off: every enabled desk runs'}")
         return 0
-    if args.cmd in ("run", "queue", "portfolio"):
+    if args.cmd in ("run", "queue", "portfolio", "moves"):
         _recover(cfg)
     if args.cmd == "portfolio" or (args.cmd == "run" and args.desk == NIGHTLY):
         return _portfolio(cfg, args)
@@ -220,7 +221,16 @@ def main(argv: list[str] | None = None) -> int:
         out = run_desk(SMOKE, SMOKE_SYSTEM, "Connectivity check.", cfg=cfg, trigger="smoke", wait=60)
         print(f"{out.status}: {(out.result.text if out.result else out.note) or ''}".strip())
         return EXIT.get(out.status, 1)
+    if args.cmd == "moves":
+        day = moves.run_moves(cfg, wait=RUN_WAIT)
+        print(f"Why it moved: {day.status}, {len(day.explained)} explained, {len(day.failed)} failed of {day.due} big moves. {day.note or ''}".strip())
+        print(json.dumps(day.last))
+        return EXIT.get(day.status, 1)
     if args.cmd == "queue":
+        if args.now_only:
+            asked = moves.process_ask(cfg)
+            if asked is not None:
+                print(f"why it moved, asked: {asked.status}, {len(asked.explained)} explained, {len(asked.failed)} failed. {asked.note or ''}".strip())
         tally = process_queue(cfg, now_only=args.now_only)
         if tally.ran:
             print(f"queue: {tally.ran} ran, {tally.done} done, {tally.failed} failed, {tally.requeued} moved to tonight")

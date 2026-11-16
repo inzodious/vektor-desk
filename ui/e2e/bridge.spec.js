@@ -143,7 +143,7 @@ test('the shadows drawer has the value chart with a table view and period combo'
 test('what changed lists the day’s movers and each opens its sheet', async ({ page }) => {
   await page.goto('/');
   const movers = page.getByTestId('movers');
-  await expect(movers.locator('[data-sym]')).toHaveCount(3);
+  await expect(movers.locator('[data-mover]')).toHaveCount(3);
   await movers.locator('[data-sym]').first().click();
   await expect(page.getByRole('dialog', { name: /symbol sheet$/ })).toBeVisible();
 });

@@ -12,6 +12,7 @@ const SHOTS = [
   { name: 'bridge', path: '/', fixtures: true, clock: MONDAY },
   { name: 'bridge-holdings', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('open-holdings').click() },
   { name: 'bridge-sheet', path: '/', fixtures: true, clock: MONDAY, act: async (p) => { await p.getByTestId('open-holdings').click(); await p.locator('.board-row[data-sym="FTEC"]').click(); } },
+  { name: 'bridge-why', path: '/', fixtures: true, clock: MONDAY, act: async (p) => p.getByTestId('movers').locator('[data-mover="ACME"]').click() },
   { name: 'bridge-demo', path: '/' },
   { name: 'research', path: '/research', fixtures: true, clock: MONDAY, full: true },
   { name: 'research-acme', path: '/research?s=ACME', fixtures: true, clock: MONDAY, full: true },

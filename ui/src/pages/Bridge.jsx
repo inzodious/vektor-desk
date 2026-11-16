@@ -5,6 +5,7 @@ import { Icon } from '../components/Icon.jsx';
 import { Kpi } from '../components/Kpi.jsx';
 import { Spark } from '../components/Spark.jsx';
 import { BriefCard } from '../agents/BriefCard.jsx';
+import { MoverChips, WhyMovedDrawer } from '../agents/WhyMoved.jsx';
 import { TodayRun } from '../components/TodayRun.jsx';
 import { StepsDue } from './BridgeSteps.jsx';
 import { Morning } from './BridgeMorning.jsx';
@@ -16,8 +17,10 @@ import { driftTone, usePlanLimits, useReference } from '../lib/plan.js';
 import { dayLabel } from '../lib/charts.js';
 import { dayStamp, useAsOf } from '../lib/asof.js';
 import { movers } from '../lib/bridge.js';
+import { movesEvery } from '../lib/moves.js';
 import { QUALITY } from '../lib/quality.js';
 import { etTime, pct, usd } from '../lib/format.js';
+import { todayEt } from '../lib/tax.js';
 import { EmptyState } from '../start/EmptyState.jsx';
 import { FIRST_RUN } from '../lib/start.js';
 
@@ -52,10 +55,12 @@ export default function Bridge() {
   const reference = useReference();
   const spark = useApi('/api/engine/value');
   const [drill, setDrill] = useState(null);
+  const [moveFocus, setMoveFocus] = useState(null);
   const queue = useApi('/api/decisions/queue', { every: 120000 });
   const brief = useApi('/api/agents/brief', { every: 600000 });
   const steps = useApi('/api/decisions/plan-steps?days=14');
   const discounts = useApi('/api/engine/discounts');
+  const moves = useApi('/api/agents/moves', { every: movesEvery });
   const sparkVals = useMemo(() => (spark.data?.series || []).slice(-30).map((p) => p.value), [spark.data]);
   const funds = useMemo(() => fundsFromMetrics(plan.rows), [plan.rows]);
   const values = useMemo(() => Object.fromEntries(ctx.symbols.map((s) => [s.symbol, s.value])), [ctx.symbols]);
@@ -122,6 +127,11 @@ export default function Bridge() {
   const moved = showMove && head.live ? movers(ctx.symbols) : [];
   const sale = discounts.data?.rows?.length || 0;
   const hasDiscounts = discounts.error?.status !== 404;
+  const hasMoves = !!moves.data?.day;
+  const openMove = (sym) => {
+    setMoveFocus(sym);
+    setDrill('moves');
+  };
 
   return (
     <>
@@ -178,7 +188,9 @@ export default function Bridge() {
       <section className="grid">
         <TodayRun i={5} />
         <BriefCard brief={brief} i={6} tag="What changed" span="c5">
-          {moved.length ? (
+          {hasMoves ? (
+            <MoverChips data={moves.data} today={todayEt()} onOpen={openMove} />
+          ) : moved.length ? (
             <div className="movers" data-testid="movers">
               <span className="kicker">Movers today</span>
               {moved.map((r) => (
@@ -196,6 +208,7 @@ export default function Bridge() {
       <HoldingsDrawer open={drill === 'holdings'} onClose={closeDrill} symbols={ctx.symbols} names={ctx.names} intraday={ctx.intraday} nav={trading} state={live.state} accounts={accounts} />
       <MixDrawer open={drill === 'mix'} onClose={closeDrill} funds={funds} limits={limits} values={values} m={m} reference={reference} />
       <DiscountsDrawer open={drill === 'discounts'} onClose={closeDrill} api={discounts} />
+      <WhyMovedDrawer open={drill === 'moves'} onClose={closeDrill} api={moves} focus={moveFocus} />
       <CashDrawer open={drill === 'cash'} onClose={closeDrill} m={m} accounts={accounts} />
     </>
   );

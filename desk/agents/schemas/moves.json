@@ -1,0 +1,31 @@
+{
+  "title": "Why it moved",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["verdict", "headline", "why", "overdone_case", "real_case", "watch", "plan_note", "confidence", "sources", "summary"],
+  "properties": {
+    "verdict": {"enum": ["overreaction", "justified", "sector", "unclear"]},
+    "headline": {"type": "string", "maxLength": 140},
+    "why": {"type": "string", "maxLength": 700},
+    "overdone_case": {"type": "string", "maxLength": 400},
+    "real_case": {"type": "string", "maxLength": 400},
+    "watch": {"type": "string", "maxLength": 240},
+    "plan_note": {"type": "string", "maxLength": 240},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "sources": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "title", "date"],
+        "properties": {
+          "url": {"type": "string", "maxLength": 500},
+          "title": {"type": "string", "maxLength": 200},
+          "date": {"type": ["string", "null"], "maxLength": 32}
+        }
+      }
+    },
+    "summary": {"type": "string", "maxLength": 200}
+  }
+}

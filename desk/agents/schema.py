@@ -102,4 +102,28 @@ CREATE TABLE IF NOT EXISTS agent_plan_pins (
   delivered_at TEXT,
   PRIMARY KEY (symbol, step_id)
 );
+CREATE TABLE IF NOT EXISTS agent_moves (
+  day TEXT NOT NULL,
+  symbol TEXT NOT NULL,
+  status TEXT NOT NULL,
+  pct REAL,
+  market_pct REAL,
+  verdict TEXT,
+  body TEXT,
+  note TEXT,
+  run_id INTEGER,
+  tries INTEGER NOT NULL DEFAULT 0,
+  after_close INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (day, symbol)
+);
+CREATE TABLE IF NOT EXISTS agent_move_asks (
+  day TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  asked_at TEXT NOT NULL,
+  started_at TEXT,
+  finished_at TEXT,
+  tries INTEGER NOT NULL DEFAULT 0,
+  note TEXT
+);
 """

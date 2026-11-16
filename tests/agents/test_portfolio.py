@@ -264,7 +264,7 @@ def test_waiting_rows_while_the_pass_runs(cfg, monkeypatch):
 
 
 def test_job_is_named_for_the_night_order_and_resumes(cfg):
-    mine = [j for j in JOBS if isinstance(j, dict)]
+    mine = [j for j in JOBS if isinstance(j, dict) and j["name"] == "run-research"]
     assert [j["schedule"] for j in mine] == ["5 0 * * *", "5 2 * * *", "5 4 * * *"] and [j.get("overnight") for j in mine] == [200, None, None]
     assert {j["command"] for j in mine} == {"python -m desk.agents run research"} and {j["title"] for j in mine} == {"Analyse every holding"}
     assert [j.name for j in package_jobs(["agents"])].count("agents-run-research") == 3
