@@ -5,7 +5,9 @@
 #                      isn't healthy. Waits for nothing: refuses while a desk job (mirror, engine, agent, lab) is running.
 #   deploy.sh auto     what the auto-deploy cron job runs every 5 minutes: deploys when main has moved and been quiet for ten
 #                      minutes, quietly does nothing otherwise, waits out a running job and (for a while) a builder that is
-#                      working on it, and doesn't retry a commit that failed until the box script changes
+#                      working on it, and doesn't retry a commit that failed until the box script changes. It starts at a
+#                      random second within 90, makes no GitHub sync from 1 to 6 AM ET (the NAS's night window), and a box
+#                      build waits for the NAS's shared build lock (/mnt/Manifest/locks/nas-build.lock)
 #   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
 #   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
 #   deploy.sh restore-test  restore drill: unpacks the newest backup into a scratch folder and checks every database
@@ -72,6 +74,11 @@ BUILD_ASKED=$ROOT/deploy-build.asked
 BUILD_LAST=$ROOT/deploy-build.last
 BUILT_WHY=
 SETTLE=${DESK_SETTLE:-600}
+NAS_BUILD_LOCK=${DESK_NAS_BUILD_LOCK:-/mnt/Manifest/locks/nas-build.lock}
+NAS_BUILD_WAIT=${DESK_NAS_BUILD_WAIT:-1800}
+QUIET_HOURS=${DESK_QUIET_HOURS-01 02 03 04 05}
+QUIET_TZ=${DESK_QUIET_TZ:-America/New_York}
+SYNC_JITTER=${DESK_SYNC_JITTER:-90}
 
 # ---- Helpers ----
 
@@ -113,6 +120,26 @@ build_failed() {
     die "the box ran out of memory building $image ($(free_mb) MB free now), so nothing was changed. Settings → Box shows what was stopped"
   fi
   die "$image didn't build; the live app wasn't touched. See $BUILD_LOG"
+}
+
+nas_build_lock() {
+  [ -n "$NAS_BUILD_LOCK" ] || return 0
+  if [ ! -e "$NAS_BUILD_LOCK" ]; then
+    mkdir -p "$(dirname "$NAS_BUILD_LOCK")"
+    : >>"$NAS_BUILD_LOCK"
+    chmod 0666 "$NAS_BUILD_LOCK" 2>/dev/null || true
+  fi
+  exec 8<"$NAS_BUILD_LOCK"
+  flock -w "$NAS_BUILD_WAIT" 8 ||
+    die "another app on the NAS is building (it holds the NAS's shared build lock), so this build waits its turn; auto-deploy tries again in 5 minutes" "$BUSY"
+}
+
+quiet_now() {
+  local hour
+  [ -n "$QUIET_HOURS" ] || return 1
+  hour=$(TZ=$QUIET_TZ date +%H)
+  case " $QUIET_HOURS " in *" $hour "*) return 0 ;; esac
+  return 1
 }
 
 run_job() {
@@ -244,7 +271,7 @@ update_checkout() {
 }
 
 deploy() {
-  local state why before target pair image dir id stage kills live=1 built=() previous=() files code=vektor-desk:local how=''
+  local state why before target pair image dir id stage kills live=1 locked=0 built=() previous=() files code=vektor-desk:local how=''
   state=$(app_state)
   if [ "$state" = RUNNING ] && why=$(busy); then
     die "a desk job is running: $why. Nothing was changed" "$BUSY"
@@ -262,6 +289,10 @@ deploy() {
     built+=("$image")
     [ "$(image_build "${image%:*}:candidate")" = "$target" ] && continue
     [ "$image" != "$BUILT" ] || how=box
+    [ "$locked" -eq 1 ] || {
+      nas_build_lock
+      locked=1
+    }
     log "Building $image ${target:0:7}, one stage at a time: $(repo log -1 --format=%s) (output in $BUILD_LOG)"
     echo "==== $(date '+%F %T') build $image ${target:0:7} ($(free_mb) MB free)" >>"$BUILD_LOG"
     kills=$(oom_kills)
@@ -273,6 +304,7 @@ deploy() {
     docker build --build-arg "DESK_BUILD=$target" --label vektor-desk.app=1 -t "${image%:*}:candidate" "$SRC/$dir" >>"$BUILD_LOG" 2>&1 ||
       build_failed "$image" "$kills"
   done
+  [ "$locked" -eq 0 ] || exec 8<&-
 
   if [ "$state" = MISSING ]; then
     for image in "${built[@]}"; do
@@ -369,6 +401,8 @@ pinned_stale() { [ -f "$PINNED" ] && ! cmp -s "$PINNED" "$SRC/deploy/deploy.sh";
 
 auto() {
   local target why
+  quiet_now && return 0
+  [ "$SYNC_JITTER" -le 0 ] || sleep $((RANDOM % (SYNC_JITTER + 1)))
   exec 9>"$LOCK"
   flock -n 9 || return 0
   [ "$(app_state)" = RUNNING ] || return 0

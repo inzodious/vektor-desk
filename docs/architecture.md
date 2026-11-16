@@ -67,18 +67,37 @@ Firestore document ids are `encodeURIComponent(JSON.stringify(primaryKey))`; eac
 
 ## Compute budget
 
-The box is a Ryzen 5 5600GT (6 cores, 12 threads) with 15 GiB of RAM and no swap, shared with Jellyfin, Home Assistant, Ollama, kokoro, Hemline and Starlite. There's no usable GPU, so everything runs on the CPU.
+The box is a Ryzen 5 5600GT (6 cores, 12 threads) with 30.7 GiB of RAM and no swap, shared by about 42 containers (Jellyfin, Home Assistant, Ollama, kokoro, Tdarr, Hemline, Starlite and more). There's no usable GPU, so everything runs on the CPU.
 
-| Service | Now (16 GB) | After the 32 GB upgrade |
-|---|---|---|
-| tailscale, caddy | 96 MB each | same |
-| api | 256 MB | same |
-| cron (mirror, engine, one agent at a time) | 640 MB | 2 GB |
-| lab | 1.5 GB, 3 CPUs, 3 workers | 8 GB, 8 CPUs, 8 workers |
+### Shared NAS rules
+
+Joshua's rules for every app on the NAS (2026-11-15). The desk's share is 2.5 GiB of memory limits in total.
+
+| Service | Limit | Steady use, Nov 15 | Why this limit |
+|---|---|---|---|
+| tailscale | 128 MB | 65 MB | Was at 68% of 96 MB |
+| caddy | 64 MB | 31 MB | About twice its steady use |
+| api | 192 MB | 57 MB | One worker; every read endpoint peaks near 94 MB |
+| cron (scheduler, engine, agents) | 544 MB | 45 MB | The rest of the budget; the scheduler never passed 173 MB in two days, single jobs peak near 140 MB |
+| ntfy | 96 MB | 36 MB | Was at 56% of 64 MB |
+| lab | 512 MB | 24 MB | Its heaviest night (3 workers, French industries) peaks near 190 MB |
+| eval | 1 GB | 192 MB | Kept for the Claude Code session |
+
+| Rule | How the desk keeps it |
+|---|---|
+| Hard memory limit on every container | `mem_limit` on each service; `tests/infra/test_compose.py` holds the total to 2.5 GiB |
+| No builds at runtime | Images are built off the box by the Horizon builder when it is approved; a box build waits for `/mnt/Manifest/locks/nas-build.lock`, one stage at a time, with Node capped at 1 GB and `make -j2` |
+| Git syncs | Auto-deploy makes no GitHub sync from 1 to 6 AM ET and starts at a random second within 90. The fetch stays a normal one: a shallow fetch would break the fast-forward check, and it moves only the new commits |
+| Python web apps | The API runs one uvicorn worker under uvicorn's own supervisor (`python -m desk.api.serve`), replaced after 1,000 to 1,100 requests |
+| Node apps | `NODE_OPTIONS=--max-old-space-size` below the container's limit: 320 MB in cron, 768 MB in eval |
+| LLM calls | No model runs on the NAS. The desks call Claude through the Claude Code CLI |
+| Headless browsers | None in the desk's images |
+| Scheduled jobs | Every job runs under `nice -n 10 ionice -c3` and its own run lock; only one scheduler can run |
+| Logging | `json-file`, 10 MB, 3 files, on every service |
 
 - Heavy sweeps run from 1:00 to 6:00 ET and never alongside an agent run (`desk.runlock.job_lock`).
 - Disk: the Manifest NVMe has about 110 GiB free. The desk's budget is 20 GiB, with lab data under 5 GiB and run artifacts pruned after 30 days.
-- After the upgrade, raise the limits in `deploy/compose.yaml` and paste it into the app again.
+- A change to the limits reaches the box with Apply compose (Settings → Box).
 
 ## Claude Code
 

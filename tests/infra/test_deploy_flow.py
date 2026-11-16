@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 import pytest
@@ -63,6 +64,9 @@ docker() {
 }
 LOG=$S/deploy.log
 LOCK=$S/lock
+NAS_BUILD_LOCK=$S/nas-build.lock
+QUIET_HOURS=
+SYNC_JITTER=0
 """
 
 
@@ -110,6 +114,37 @@ def test_deploy_backs_up_then_swaps_images_and_keeps_what_was_running_as_previou
     assert box.tag("vektor-desk:candidate") == "" and "Live: bbb" in box.log()
     again = box.run()
     assert again.returncode == 0 and "Already live: bbb" in box.log() and box.calls().count("restart") == 1
+
+
+def test_a_box_build_waits_for_the_nas_wide_build_lock_and_gives_way_without_marking_the_commit(tmp_path):
+    box = Box(tmp_path, running="aaa", local="aaa", head="bbb")
+    lock = box.dir / "nas-build.lock"
+    holder = subprocess.Popen(["flock", str(lock), "sleep", "30"])
+    try:
+        for _ in range(50):
+            if lock.exists() and subprocess.run(["flock", "-n", str(lock), "true"]).returncode != 0:
+                break
+            time.sleep(0.1)
+        res = box.run("NAS_BUILD_WAIT=1; deploy")
+        assert res.returncode == 75 and "holds the NAS's shared build lock" in box.log() and box.calls() == []
+        assert box.run("NAS_BUILD_WAIT=1; auto").returncode == 75 and not (tmp_path / "root" / "deploy-auto.failed").exists()
+    finally:
+        holder.kill()
+        holder.wait()
+    res = box.run()
+    assert res.returncode == 0, res.stdout + res.stderr
+    assert box.calls()[:2] == ["build vektor-desk:candidate", "build vektor-desk/caddy:candidate"] and box.running() == "bbb"
+    (tmp_path / "fresh").mkdir()
+    fresh = Box(tmp_path / "fresh", running="aaa", local="aaa", head="bbb")
+    made = fresh.dir / "locks" / "nas-build.lock"
+    assert fresh.run(f"NAS_BUILD_LOCK={made}; deploy").returncode == 0 and made.stat().st_mode & 0o777 == 0o666
+
+
+def test_auto_makes_no_github_sync_in_the_nights_quiet_hours(tmp_path):
+    box = Box(tmp_path, running="aaa", local="aaa", head="bbb")
+    hour = 'QUIET_HOURS="$(TZ=$QUIET_TZ date +%H)"; '
+    assert box.run(hour + "auto").returncode == 0 and box.running() == "aaa" and box.calls() == [] and not (box.dir / "deploy.log").exists()
+    assert box.run("auto").returncode == 0 and box.running() == "bbb"
 
 
 def test_a_failed_backup_changes_no_image_and_the_next_try_reuses_the_build(tmp_path):

@@ -1,7 +1,9 @@
 import argparse
+import fcntl
 import os
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -15,7 +17,7 @@ from zoneinfo import ZoneInfo
 from desk import jobrun, memory, overnight
 from desk.config import Config
 from desk.packages import seams
-from desk.runlock import BUSY
+from desk.runlock import BUSY, run_dir
 
 RANGES = ((0, 59), (0, 23), (1, 31), (1, 12), (0, 7))
 LIGHT = frozenset({"engine-quotes", "engine-lots", "notify-ops", "decisions-sync", "agents-triggers"})
@@ -23,6 +25,8 @@ ALERT_JOB = "notify-ops"
 MODE_EVERY = 30.0
 LINE_MAX = 20_000
 _LOW = {"on": False, "checked": None, "sample_due": None}
+GENTLE = ("nice", "-n", "10", "ionice", "-c3", "-t")
+INSTANCE = "scheduler.instance"
 
 
 def _field(text: str, low: int, high: int) -> frozenset[int]:
@@ -193,12 +197,18 @@ def _pump(job: Job, out) -> None:
             job.said = line.strip()[:LINE_MAX]
 
 
+def gentle() -> tuple[str, ...]:
+    if shutil.which("nice") is None:
+        return ()
+    return GENTLE if shutil.which("ionice") else GENTLE[:3]
+
+
 def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = None) -> None:
     log(f"{job.line} start ({trigger}): {shlex.join(job.command)}")
     job.said = ""
     job.waiting = None
     job.group = memory.cgroup() if cfg is not None else None
-    job.proc = subprocess.Popen(job.command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1)  # noqa: S603
+    job.proc = subprocess.Popen([*gentle(), *job.command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1)  # noqa: S603
     job.pump = threading.Thread(target=_pump, args=(job, job.proc.stdout), daemon=True)
     job.pump.start()
     job.run = {
@@ -415,6 +425,18 @@ def run_night(jobs: list[Job], cfg: Config) -> None:
         log(f"the overnight run stopped on an error and will try again: {e!r}")
 
 
+def only_one(cfg: Config) -> int | None:
+    folder = run_dir(cfg)
+    folder.mkdir(parents=True, exist_ok=True)
+    fd = os.open(folder / INSTANCE, os.O_RDWR | os.O_CREAT, 0o644)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        return None
+    return fd
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m desk.scheduler", description="Runs every package's jobs.py and deploy/crontab in the desk's time zone.")
     parser.add_argument("crontab", nargs="?", default="/app/deploy/crontab")
@@ -428,6 +450,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     from desk.db import apply_schemas
 
+    held = only_one(Config.from_env())
+    if held is None:
+        log("another scheduler is already running here, so this one stops")
+        return BUSY
     log(f"schemas applied: {', '.join(apply_schemas()) or 'none'}")
     zone = ZoneInfo(Config.from_env().timezone)
     stopping = False
