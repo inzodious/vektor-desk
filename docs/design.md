@@ -61,6 +61,17 @@ Copy follows Escape Vektor's tone sheet. Desk-specific lines:
 - Losses are facts: "−$693 long-term", not "lost".
 - Agent text renders as plain text only, never HTML or Markdown links.
 
+### App icon
+
+A launch toggle under a raised safety cover: the desk is the cover you lift before you act. Flat 1960s space-age screenprint in four colours, navy `#2B2D42`, coral `#E0603F`, sky `#78BDE3`, cream `#FFF6E5`, the same navy as Escape Vektor's rocket icon so the two read as a pair. Generated in Gemini from one 2x2 sheet (`assets/icons/source-sheet.jpg`, bottom-left tile), snapped to the four colours, and given rounded corners (radius 21.5%).
+
+| File | Size | Used for |
+|---|---|---|
+| `ui/public/icon-512.png` | 512 | TrueNAS app card (`deploy.sh card`), manifest |
+| `ui/public/icon-192.png` | 192 | Header mark, manifest |
+| `ui/public/apple-touch-icon.png` | 180, full bleed | Phone home screen |
+| `ui/public/favicon-32.png`, `favicon-16.png` | 32, 16 | Browser tab |
+
 ## Shell and navigation
 
 | Piece | Behaviour |
