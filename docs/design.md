@@ -63,14 +63,16 @@ Copy follows Escape Vektor's tone sheet. Desk-specific lines:
 
 ### App icon
 
-A launch toggle under a raised safety cover: the desk is the cover you lift before you act. Flat 1960s space-age screenprint in four colours, navy `#2B2D42`, coral `#E0603F`, sky `#78BDE3`, cream `#FFF6E5`, the same navy as Escape Vektor's rocket icon so the two read as a pair. Generated in Gemini from one 2x2 sheet (`assets/icons/source-sheet.jpg`, bottom-left tile), snapped to the four colours, and given rounded corners (radius 21.5%).
+A launch toggle under a raised safety cover: the desk is the cover you lift before you act. Flat 1960s space-age screenprint in coral `#E0603F`, sky `#78BDE3` and cream `#FFF6E5`. Generated in Gemini from one 2x2 sheet (`assets/icons/source-sheet.jpg`, bottom-left tile) and snapped to those colours.
 
-| File | Size | Used for |
-|---|---|---|
-| `ui/public/icon-512.png` | 512 | TrueNAS app card (`deploy.sh card`), manifest |
-| `ui/public/icon-192.png` | 192 | Header mark, manifest |
-| `ui/public/apple-touch-icon.png` | 180, full bleed | Phone home screen |
-| `ui/public/favicon-32.png`, `favicon-16.png` | 32, 16 | Browser tab |
+Only the TrueNAS app card puts it on a navy `#2B2D42` rounded tile (radius 21.5%), the same navy as Escape Vektor's, so the two read as a pair on the Apps page. Everywhere else the switch sits on a transparent background.
+
+| File | Size | Background | Used for |
+|---|---|---|---|
+| `ui/public/icon-512.png` | 512 | Navy tile | TrueNAS app card only (`deploy.sh card`) |
+| `ui/public/logo-512.png`, `logo-192.png` | 512, 192 | Transparent | Header mark (192), manifest |
+| `ui/public/favicon-32.png`, `favicon-16.png` | 32, 16 | Transparent | Browser tab |
+| `ui/public/apple-touch-icon.png` | 180 | Paper `#f6eedc` | Phone home screen (iOS turns transparency black) |
 
 ## Shell and navigation
 
