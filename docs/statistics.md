@@ -147,6 +147,7 @@ Every non-ok detail ends with `Fix:` and the one step that clears it. That detai
 | Symbol kinds, company facts | Research (`engine-research`) | 12 hours |
 | Fund breakdowns missing or over 150 days old | Look-through (`engine-lookthrough`) | 24 hours |
 | Checks written by an older build; or Accounts, Research or Look-through finished after being asked | Daily numbers (`engine-daily`), once, so the checks are read again | 30 minutes |
+| `daily_run`: the last Daily numbers run failed and no full pass has finished since. One failure is `fixes_itself`; two or more in a row is `fail`, `blocks` ("The daily figures haven't updated since Friday: the last two runs ran out of memory.") | Daily numbers again, unless the scheduler's cap stopped it: the same run would stop at the same cap, so it waits for the next scheduled run | 30 minutes |
 
 | Rule | |
 |---|---|

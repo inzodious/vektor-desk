@@ -29,6 +29,7 @@ CLIENT = "desk"
 OLD_BUILD = "health"
 COUNT = ("No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten")
 STUCK = "The desk has tried {n} times and it has not cleared. Settings, Box shows why."
+DAILY_CHECK = "daily_run"
 
 # ---- Words ----
 
@@ -115,6 +116,56 @@ def latest(cfg: Config) -> list[dict]:
         conn.close()
 
 
+# ---- A daily run that failed ----
+
+
+def daily_failures(cfg: Config) -> list[dict]:
+    out = []
+    for r in jobrun.runs(cfg, DAILY):
+        if r.get("result") == "skipped":
+            continue
+        if r.get("result") != "failed":
+            break
+        out.append(r)
+    return out
+
+
+def _caught_up_since(cfg: Config, after: datetime) -> bool:
+    if not cfg.desk_db.exists():
+        return False
+    conn = connect(cfg.desk_db, readonly=True)
+    try:
+        if not conn.execute("SELECT 1 FROM sqlite_master WHERE name='engine_runs'").fetchone():
+            return False
+        done = conn.execute("SELECT max(finished_at) FROM engine_runs WHERE job='core' AND ok=1").fetchone()[0]
+    except sqlite3.Error:
+        return False
+    finally:
+        conn.close()
+    seen = jobrun.parse_stamp(done)
+    return bool(seen and seen > after)
+
+
+def daily_failed(cfg: Config) -> list[dict]:
+    failed = daily_failures(cfg)
+    last = jobrun.parse_stamp(failed[0].get("finished")) if failed else None
+    return failed if last and not _caught_up_since(cfg, last) else []
+
+
+def daily_check(cfg: Config, now: datetime | None = None) -> dict | None:
+    failed = daily_failed(cfg)
+    if not failed:
+        return None
+    now = now or jobrun.now_utc()
+    why = "ran out of memory" if all(r.get("oom") for r in failed) else "failed"
+    row = {"check_name": DAILY_CHECK, "job": DAILY, "detail": failed[0].get("error") or failed[0].get("detail")}
+    if len(failed) == 1:
+        return row | {"status": "warn", "kind": FIXES, "say": f"The last daily figures run {why}; the desk tries again."}
+    good = next((jobrun.parse_stamp(r.get("finished")) for r in jobrun.runs(cfg, DAILY) if r.get("result") == "ok"), None)
+    since = f" since {plain_day(overnight.local(cfg, good).date().isoformat(), overnight.local(cfg, now).date().isoformat())}" if good else ""
+    return row | {"status": "fail", "kind": BLOCKS, "say": f"The daily figures haven't updated{since}: the last {count(len(failed)).lower()} runs {why}."}
+
+
 def _jobs() -> list:
     from desk.scheduler import all_jobs
 
@@ -134,6 +185,9 @@ def run(cfg: Config, *, now: datetime | None = None, jobs: list | None = None) -
             want.setdefault(r["job"], []).append(r["check_name"])
     if rows and all(r.get("say") is None for r in rows):
         want.setdefault(DAILY, []).append(OLD_BUILD)
+    daily = daily_failed(cfg)
+    if daily and daily[0].get("oom") != "cap":
+        want.setdefault(DAILY, []).append(DAILY_CHECK)
     follow = [name for name in FOLLOW if name in want and _finished_since_asked(cfg, name, state.get(name) or {})]
     if follow:
         want.setdefault(DAILY, []).extend(follow)
@@ -180,10 +234,11 @@ def _finished_since_asked(cfg: Config, name: str, s: dict) -> bool:
 # ---- What the page reads ----
 
 
-def annotate(cfg: Config, rows: list[dict]) -> list[dict]:
+def annotate(cfg: Config, rows: list[dict], now: datetime | None = None) -> list[dict]:
     state = read_state(cfg)
+    daily = daily_check(cfg, now)
     out = []
-    for r in rows:
+    for r in [*rows, daily] if daily else rows:
         status, job = r["status"], r.get("job")
         kind = kind_of(status, r.get("kind"))
         say = r.get("say") or r.get("detail")
