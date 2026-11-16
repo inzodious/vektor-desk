@@ -346,3 +346,31 @@ def book_names(snaps: dict, positions: list[dict]) -> dict[str, dict]:
         if label and label not in entry["held_in"]:
             entry["held_in"].append(label)
     return {s: {"name": e["name"], "held_in": e["held_in"]} for s, e in out.items()}
+
+
+class Moves(Protocol):
+    def day(self, cfg: Config) -> dict: ...
+
+    def names(self, cfg: Config) -> dict[str, str]: ...
+
+
+@dataclass
+class RealMoves:
+    def day(self, cfg: Config) -> dict:
+        live = _module("desk.engine.live")
+        db = _module("desk.db")
+        if not cfg.desk_db.exists():
+            raise NotReady("no engine database yet")
+        conn = db.connect(cfg.desk_db, readonly=True)
+        try:
+            have = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE name IN ('holdings_daily', 'quotes_live')")}
+            if len(have) < 2:
+                raise NotReady("no live quotes yet")
+            return dict(live.live_view(conn))
+        except sqlite3.Error as e:
+            raise NotReady(f"live quotes unreadable: {e}") from None
+        finally:
+            conn.close()
+
+    def names(self, cfg: Config) -> dict[str, str]:
+        return {s: str(v["name"]) for s, v in RealPlanFacts().book(cfg).items() if v.get("name")}

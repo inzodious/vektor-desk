@@ -79,6 +79,7 @@ Joshua's parameters (risk level, industry focus, general opportunity, tax opport
 | **Discount cases** | Weekdays 18:15, after the close, up to 3 a day | One discount-day scanner hit (held, watchlist or quality list), his risk band, conviction bands and planned actions, plus the web | A buy / wait / avoid case per hit, through `desk.engine.discounts.record`; never a proposal or a trade | xhigh; WebSearch, WebFetch |
 | **Debrief desk** | Weekdays 17:46, as soon as the evening's last review (17:45) has finished (day; week, month and year when they close); weekdays 08:36 after the morning review, a model call only when that review changed a pack; Friday 18:30 catches up anything missed; hourly 01:40 to 06:40 Tuesday to Saturday, a model call only when the day was restated after its debrief; also asked for by the engine whenever the book catches up (`restate`) | One period pack from the 17:35 review job, his risk band, conviction bands and stock plans | What happened, why, what worked against past decisions, what to watch, up to 3 next steps, through `desk.engine.review.record` (see [Debrief desk](#debrief-desk)); never a proposal or a trade | high; no tools |
 | **Plan desk** | Weekdays 18:40 (holdings with a reason: no plan yet, a discount day, a band crossing, earnings, a review date); Saturday 03:00 (every holding); from the Console | One holding's plan facts, its current plan, the research dossier, his risk band and conviction bands | A draft stock plan through `desk.decisions.plans.save_draft`, or nothing when the current plan still fits (see [Plan desk](#plan-desk)); never approves, never a trade | high; no tools |
+| **Why it moved** (Research desk's switch) | Weekdays 16:25, after the close; on request from the Bridge ("Explain now", picked up within a minute) | A held name that moved at least 3% and at least 2 points more than SPY (up to 3 names a day): the move, the market's move, his plan for it, the last analysis | Why it moved, the case it is overdone, the case it is real, what to watch, a verdict (`overreaction`, `justified`, `sector`, `unclear`) and sources, in `agent_moves`; never a proposal or a trade (see [Why it moved](#why-it-moved)) | high; WebSearch, WebFetch |
 
 **Model.** Every desk runs `opus` (Opus 5.5 today), at `high` effort for routine desks and `xhigh` for Research, Scout and Strategy, per Joshua on November 7, 2026. Effort per desk is set in `desk/agents/desks.py`.
 
@@ -437,3 +438,17 @@ Numbering follows `ROADMAP.md`.
 - [ ] Run `claude setup-token` on your PC and keep the token for the TrueNAS secret, never in the repo or chat.
 - [ ] Note the date you created it, for the status page.
 - [ ] Pick the first weekly usage budget once two weeks of runs are logged.
+
+## Why it moved
+
+`desk/agents/moves.py`, prompt `prompts/moves.md`, answer `schemas/moves.json`. Runs as desk `moves` in the run table, follows the Research desk's switch, weekly cap 20.
+
+| Piece | Rule |
+|---|---|
+| Moves | From `desk.engine.live.live_view` (no extra price calls): each held name's move against its previous close, SPY as the market |
+| Researched | At least 3% and at least 2 points beyond SPY; biggest gap first; 3 names a day |
+| Labels without a model call | `market` (within 2 points of SPY), `small` (beyond SPY but under 3%) |
+| When | Job `agents-run-moves`, weekdays 16:25 ET, after the close. "Explain now" on the Bridge stores an ask; the every-minute `queue --now-only` runs it, even mid-session |
+| Retries | A failed name tries twice a day. A name explained mid-session is redone once after the close |
+| App | `GET /api/agents/moves` (rows with `label`, `status`, `verdict`, `headline`, `detail`), `POST /api/agents/moves/ask`. Bridge: mover chips show name, move and verdict; the "Why it moved" drawer holds the detail |
+

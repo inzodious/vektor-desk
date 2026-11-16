@@ -1,0 +1,102 @@
+{
+ "day": "2026-11-09",
+ "state": "open",
+ "trading": true,
+ "market": {
+  "symbol": "SPY",
+  "pct": -0.84
+ },
+ "rows": [
+  {
+   "symbol": "ACME",
+   "pct": -11.33,
+   "beyond_pct": -10.49,
+   "change_usd": -26.4,
+   "value": 207.9,
+   "label": "due",
+   "status": "explained",
+   "verdict": "overreaction",
+   "headline": "Fell after a share offering priced under yesterday's close",
+   "written_at": "2026-11-09T16:12:00+00:00",
+   "after_close": false,
+   "detail": {
+    "verdict": "overreaction",
+    "headline": "Fell after a share offering priced under yesterday's close",
+    "why": "Acme sold new shares before the open at a discount to Friday's close, about 4% more shares in all. The market read it as more dilution before revenue arrives, and short sellers piled in on the open.",
+    "overdone_case": "The cash pays for launches that were already planned, so nothing in the business changed today.",
+    "real_case": "It is the second raise this year; if launches slip, more offerings could follow.",
+    "watch": "The next launch window on Nov 24.",
+    "plan_note": "This doesn't change your plan for Acme.",
+    "confidence": 0.6,
+    "sources": [
+     {
+      "url": "https://example.com/acme-prices-offering",
+      "title": "Acme prices public offering",
+      "date": "2026-11-09"
+     },
+     {
+      "url": "https://www.sec.gov/",
+      "title": "Prospectus supplement",
+      "date": "2026-11-09"
+     }
+    ]
+   }
+  },
+  {
+   "symbol": "NOVA",
+   "pct": 6.2,
+   "beyond_pct": 7.04,
+   "change_usd": 18.6,
+   "value": 318.6,
+   "label": "due",
+   "status": "waiting"
+  },
+  {
+   "symbol": "FTEC",
+   "pct": -2.25,
+   "beyond_pct": -1.41,
+   "change_usd": -65.15,
+   "value": 2828.77,
+   "label": "market",
+   "status": "market"
+  },
+  {
+   "symbol": "BND",
+   "pct": -0.69,
+   "beyond_pct": 0.15,
+   "change_usd": -9.25,
+   "value": 1340.52,
+   "label": "market",
+   "status": "market"
+  },
+  {
+   "symbol": "VXUS",
+   "pct": -0.02,
+   "beyond_pct": 0.82,
+   "change_usd": -0.6,
+   "value": 3736.64,
+   "label": "market",
+   "status": "market"
+  },
+  {
+   "symbol": "FXAIX",
+   "pct": 0,
+   "beyond_pct": 0.84,
+   "change_usd": 0,
+   "value": 9647.64,
+   "label": "market",
+   "status": "market"
+  }
+ ],
+ "explained": 1,
+ "due": 2,
+ "blocked": null,
+ "can_ask": false,
+ "ask": {
+  "status": "queued",
+  "asked_at": "2026-11-09T17:00:00+00:00",
+  "finished_at": null,
+  "note": null
+ },
+ "next": "2026-11-09T16:25:00-05:00"
+}

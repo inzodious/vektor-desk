@@ -45,7 +45,8 @@ test('Bridge, Results, Portfolio, Decisions and Research agree on the day, its c
   await expect(kpis.locator('[data-kpi="margin.debit"] .v')).toHaveText(seen[0].margin);
   await expect(kpis).not.toContainText('engine');
   await expect(kpis).not.toContainText('from ');
-  await expect(page.getByTestId('movers')).toHaveCount(0);
+  await expect(page.getByTestId('movers').locator('[data-mover]')).toHaveCount(3);
+  await expect(page.getByTestId('movers')).toContainText('Real news');
 
   await page.goto('/results/day?scenario=evening');
   await expect(page.getByTestId('rs-label')).toHaveText('Mon Nov 9, 2026');
