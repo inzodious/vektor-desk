@@ -285,6 +285,18 @@ def test_jobs_start_at_lower_cpu_and_disk_priority_and_only_one_scheduler_runs(c
     os.close(again)
 
 
+def test_a_run_records_the_jobs_own_peak_memory_through_the_run_lock(cfg):
+    grow = "b = bytearray(80 * 2**20); b[::4096] = b'x' * len(b[::4096]); print('ok')"
+    job = make_job("a", "0 0 1 1 *", ["python", "-m", "desk.runlock", "--hold", "peak", "--", sys.executable, "-c", grow], name="engine-daily")
+    scheduler.start(job, cfg, "schedule")
+    assert jobrun.last_run(cfg, "engine-daily")["peak_mb"] is None
+    while not scheduler.finished(job):
+        time.sleep(0.05)
+    reap([job], cfg)
+    run = jobrun.last_run(cfg, "engine-daily")
+    assert run["result"] == "ok" and 80 <= run["peak_mb"] < 200 and jobrun.runs(cfg, "engine-daily")[0]["peak_mb"] == run["peak_mb"]
+
+
 def test_jobs_all_start_at_once_when_the_box_has_room(cfg):
     a = make_job("a", "0 0 1 1 *", ["sleep", "0.2"], name="engine-daily")
     b = make_job("b", "0 0 1 1 *", ["sleep", "0.2"], name="engine-review")

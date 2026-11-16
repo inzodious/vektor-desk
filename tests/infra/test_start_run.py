@@ -236,6 +236,7 @@ def test_the_scheduler_keeps_what_a_job_said_last_without_secrets(cfg):
         "skipped_code": None,
         "error": None,
         "oom": None,
+        "peak_mb": None,
         "ready": None,
         "did": None,
         "said": None,

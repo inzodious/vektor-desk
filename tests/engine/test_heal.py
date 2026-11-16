@@ -332,3 +332,45 @@ def test_with_no_health_yet_nothing_is_asked(cfg, gone):
     if gone == "no table":
         sqlite3.connect(cfg.desk_db).close()
     assert heal.run(cfg, now=NOW, jobs=engine_jobs()) == {"asked": [], "waiting": {}}
+
+
+# ---- A daily run that failed ----
+
+
+def daily_run(cfg, finished, result="failed", oom="cap"):
+    run = {"trigger": "schedule", "started": jobrun.stamp(finished - timedelta(minutes=2)), "finished": jobrun.stamp(finished), "result": result}
+    run |= {
+        "exit_code": 0 if result == "ok" else -9,
+        "oom": oom if result == "failed" else None,
+        "error": "It needed more memory than the scheduler is allowed (544 MB) and was stopped.",
+    }
+    jobrun.record(cfg, heal.DAILY, run)
+
+
+def test_a_daily_run_that_keeps_failing_blocks_in_one_plain_sentence_and_only_a_box_wide_stop_is_asked_again(cfg):
+    sunday = datetime(2026, 11, 15, 12, 5, tzinfo=UTC)
+    health_rows(cfg, [("freshness", "ok", None, None)], as_of="2026-11-13")
+    daily_run(cfg, datetime(2026, 11, 14, 4, 35, tzinfo=UTC), "ok")
+    daily_run(cfg, datetime(2026, 11, 14, 13, 22, tzinfo=UTC))
+    once = next(c for c in heal.annotate(cfg, [], sunday) if c["check_name"] == heal.DAILY_CHECK)
+    assert once["kind"] == heal.FIXES and not once["counts"] and once["detail"] == "The last daily figures run ran out of memory; the desk tries again."
+    daily_run(cfg, datetime(2026, 11, 14, 22, 22, tzinfo=UTC), "skipped")
+    daily_run(cfg, datetime(2026, 11, 14, 22, 24, tzinfo=UTC))
+    beat(cfg, sunday)
+    checks = heal.annotate(cfg, [{"check_name": "freshness", "status": "ok", "detail": "long", "say": "Plain.", "kind": None, "job": None}], sunday)
+    twice = next(c for c in checks if c["check_name"] == heal.DAILY_CHECK)
+    assert twice["status"] == "fail" and twice["kind"] == heal.BLOCKS and twice["counts"] and heal.overall(checks) == "fail"
+    assert twice["detail"] == "The daily figures haven't updated since Friday: the last two runs ran out of memory."
+    assert not NOT_PLAIN.search(twice["detail"]) and "544 MB" in twice["diagnosis"]
+    assert heal.run(cfg, now=sunday, jobs=engine_jobs())["asked"] == [] and asked(cfg) == []
+    daily_run(cfg, datetime(2026, 11, 15, 11, 50, tzinfo=UTC), oom="box")
+    assert heal.run(cfg, now=sunday, jobs=engine_jobs())["asked"] == [heal.DAILY] and asked(cfg) == [heal.DAILY]
+    assert "the last three runs ran out of memory" in next(c for c in heal.annotate(cfg, [], sunday) if c["check_name"] == heal.DAILY_CHECK)["detail"]
+    desk = connect(cfg.desk_db)
+    with desk:
+        desk.execute(
+            "INSERT INTO engine_runs (job, started_at, finished_at, ok, detail, engine_version) VALUES ('core', ?, ?, 1, '{}', 'test')",
+            ("2026-11-15T12:00:00+00:00", "2026-11-15T12:01:00+00:00"),
+        )
+    desk.close()
+    assert heal.annotate(cfg, [], sunday) == [] and heal.daily_failed(cfg) == []

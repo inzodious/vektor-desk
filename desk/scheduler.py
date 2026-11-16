@@ -70,6 +70,7 @@ class Job:
     said: str = field(default="", repr=False)
     pump: threading.Thread | None = field(default=None, repr=False)
     run: dict | None = field(default=None, repr=False)
+    peak_mb: int | None = field(default=None, repr=False)
 
     def due(self, t: datetime) -> bool:
         minute, hour, dom, month, dow = self.spec
@@ -207,6 +208,7 @@ def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = N
     log(f"{job.line} start ({trigger}): {shlex.join(job.command)}")
     job.said = ""
     job.waiting = None
+    job.peak_mb = None
     job.group = memory.cgroup() if cfg is not None else None
     job.proc = subprocess.Popen([*gentle(), *job.command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1)  # noqa: S603
     job.pump = threading.Thread(target=_pump, args=(job, job.proc.stdout), daemon=True)
@@ -223,6 +225,7 @@ def start(job: Job, cfg: Config | None, trigger: str, request_id: str | None = N
         "skipped_code": None,
         "error": None,
         "oom": None,
+        "peak_mb": None,
         "ready": None,
         "did": None,
         "said": None,
@@ -240,10 +243,27 @@ def _stopped_for_memory(job: Job, rc: int, cfg: Config | None) -> tuple[str, dic
     return (scope, group) if scope else None
 
 
+def finished(job: Job) -> bool:
+    proc = job.proc
+    if proc is None:
+        return False
+    if proc.returncode is not None:
+        return True
+    try:
+        pid, status, usage = os.wait4(proc.pid, os.WNOHANG)
+    except ChildProcessError:
+        return proc.poll() is not None
+    if pid == 0:
+        return False
+    proc.returncode = os.waitstatus_to_exitcode(status)
+    job.peak_mb = usage.ru_maxrss // 1024
+    return True
+
+
 def reap(jobs: list[Job], cfg: Config | None = None) -> None:
     alert = False
     for job in jobs:
-        if job.proc is None or job.proc.poll() is None:
+        if not finished(job):
             continue
         rc = job.proc.returncode
         if job.pump is not None:
@@ -253,7 +273,7 @@ def reap(jobs: list[Job], cfg: Config | None = None) -> None:
             result = "ok" if rc == 0 else "skipped" if rc == BUSY else "failed"
             said = jobrun.last_words(job.said)
             detail = None if rc == 0 else "another run held the lock" if rc == BUSY else f"exit {rc}; see docker logs vektor-desk-cron"
-            job.run.update(finished=jobrun.stamp(jobrun.now_utc()), result=result, exit_code=rc, detail=detail)
+            job.run.update(finished=jobrun.stamp(jobrun.now_utc()), result=result, exit_code=rc, detail=detail, peak_mb=job.peak_mb)
             job.run.update(note=said.get("skipped") if rc == 0 else None, error=said.get("error") if result == "failed" else None)
             job.run.update(skipped_code=said.get("skipped_code") if rc == 0 else None)
             job.run.update(ready=said.get("ready") if rc == 0 else None, did=said.get("detail") if rc == 0 else None, said=said.get("said"))
@@ -275,6 +295,7 @@ def reap(jobs: list[Job], cfg: Config | None = None) -> None:
         job.pump = None
         job.run = None
         job.group = None
+        job.peak_mb = None
     if alert:
         teller = next((j for j in jobs if j.name == ALERT_JOB), None)
         if teller is not None and not _busy(jobs, ALERT_JOB):
