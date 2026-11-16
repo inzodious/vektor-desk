@@ -10,8 +10,11 @@ BENCHMARK = "IVV"
 DIP_CASH = 0.20
 DIP_STEPS = (0.05, 0.10, 0.20)
 TECH_TILT = {"IVV": 0.50, "FTEC": 0.30, "SMH": 0.10, "VXUS": 0.10}
-SAFE_MIX = {"FXAIX": 0.40, "SCHD": 0.20, "FTIHX": 0.10, "FTEC": 0.10, "NLR": 0.05, "GRID": 0.05, "ICLN": 0.05, "UFO": 0.05}
-SAFE_NOTE = "Your October index plan, kept as one mix among several"
+OCTOBER_MIX = {"FXAIX": 0.40, "SCHD": 0.20, "FTIHX": 0.10, "FTEC": 0.10, "NLR": 0.05, "GRID": 0.05, "ICLN": 0.05, "UFO": 0.05}
+SAFE_MIX = {"FXAIX": 0.80, "FTIHX": 0.10, "FTEC": 0.10}
+SAFE_NOTE = "Your index plan, kept as one mix among several"
+SECTORS = ("XLK", "XLF", "XLV", "XLE", "XLI", "XLY", "XLP", "XLU", "XLB", "XLRE", "XLC")
+ROTATE = {"top": 3, "look": 252, "skip": 21}
 REVERSION_PTS = 0.5
 FALLBACK = "IVV"
 PROXIES = {
@@ -88,7 +91,7 @@ ENTRIES = (
     {
         "id": "safe-mix",
         "name": "Safe mix",
-        "hypothesis": "Your October index plan (40% S&P 500, 20% SCHD, 10% international, 10% FTEC, 5% each NLR, GRID, ICLN, UFO), rebalanced on drift.",
+        "hypothesis": "Your index plan (80% S&P 500, 10% international, 10% FTEC), rebalanced on drift.",
     },
     {
         "id": "as-held",
@@ -104,6 +107,14 @@ ENTRIES = (
         "id": "dip-buy",
         "name": "Dip-buy",
         "hypothesis": "The safe mix holding 20% cash, a third deployed at each 5, 10 and 20% S&P 500 drop from its high, back to 20% cash at a new high.",
+    },
+    {
+        "id": "sector-leaders",
+        "name": "Sector leaders",
+        "hypothesis": (
+            "Hold the 3 of 11 sector funds with the best past-year return, skipping the latest month, picked at each month end. "
+            "Beat the US market in all ten decades of 100-year research data."
+        ),
     },
 )
 NAMES = {e["id"]: e["name"] for e in ENTRIES}
@@ -174,7 +185,42 @@ def mixes(held: dict[str, float], cash: float, kinds: dict[str, str] | None = No
             "policy": HOLD,
         }
     out["tech-tilt"] = {"weights": dict(TECH_TILT), "cash": 0.0, "notes": [], "source": dict(TECH_TILT)}
+    even = {s: round(1 / len(SECTORS), 6) for s in SECTORS}
+    out["sector-leaders"] = {"weights": even, "cash": 0.0, "notes": [], "source": dict(even), "rotate": dict(ROTATE)}
     return {k: out[k] for k in NAMES if k in out}
+
+
+def fixed(mixes: dict[str, dict]) -> dict[str, dict]:
+    return {k: m for k, m in mixes.items() if not m.get("rotate")}
+
+
+# ---- Rotation ----
+
+
+def month_end(days: list[str], today: str) -> str | None:
+    first = today[:8] + "01"
+    before = [d for d in days if d < first]
+    return before[-1] if before else None
+
+
+def leaders(closes: dict[str, list[tuple[str, float]]], day: str, rotate: dict) -> list[str]:
+    look, skip, top = int(rotate["look"]), int(rotate["skip"]), int(rotate["top"])
+    scores = {}
+    for sym, series in closes.items():
+        upto = [p for d, p in series if d <= day]
+        if len(upto) <= look:
+            continue
+        start, end = upto[-1 - look], upto[-1 - skip]
+        if start and end:
+            scores[sym] = end / start - 1
+    return sorted(scores, key=lambda s: (-scores[s], s))[:top]
+
+
+def rotation(closes: dict[str, list[tuple[str, float]]], today: str, rotate: dict) -> dict[str, float]:
+    days = sorted({d for series in closes.values() for d, _ in series})
+    day = month_end(days, today)
+    picks = leaders(closes, day, rotate) if day else []
+    return {s: round(1 / len(picks), 6) for s in picks}
 
 
 def held_mix(rows: list[dict]) -> tuple[dict[str, float], float, list[str]]:
@@ -286,7 +332,11 @@ def held_shares(conn: sqlite3.Connection, strategy_id: str, version: int) -> dic
     return {r[0]: round(r[1], 6) for r in rows if r[1] and abs(r[1]) > 1e-6}
 
 
-def targets(conn: sqlite3.Connection, mix: dict) -> dict[str, float]:
+def targets(conn: sqlite3.Connection, mix: dict, today: str | None = None) -> dict[str, float]:
+    if mix.get("rotate"):
+        closes = {s: _closes(conn, s) for s in mix["weights"]}
+        last = max((series[-1][0] for series in closes.values() if series), default=None)
+        return rotation(closes, today or last or "", mix["rotate"]) if last else {}
     cash = mix.get("cash", 0.0)
     if mix.get("steps"):
         cash = dip_cash([p for _, p in _closes(conn, BENCHMARK)])
@@ -321,7 +371,7 @@ def rebuild(conn: sqlite3.Connection, sleeve: float, px, *, now: datetime | None
         summary = {
             "kind": "mix",
             "hypothesis": next(e["hypothesis"] for e in ENTRIES if e["id"] == sid),
-            "weights": mix["weights"],
+            "weights": want if mix.get("rotate") else mix["weights"],
             "cash_target": round(1 - sum(want.values()), 6) if want else None,
             "notes": mix.get("notes") or [],
             "benchmark": BENCHMARK,
