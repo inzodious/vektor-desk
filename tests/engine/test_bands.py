@@ -34,11 +34,11 @@ def test_held_mix_keeps_asts_and_leaves_margin_out():
     w, cash, _ = catalog.held_mix(rows[:2] + [{"symbol": "SPAXX", "value": 250.0, "is_cash": True}])
     assert cash == pytest.approx(0.2)
     made = catalog.mixes(w, cash, safe={"FXAIX": 0.8, "VXUS": 0.2})
-    assert list(made) == ["safe-mix", "as-held", "tech-tilt", "dip-buy"]
+    assert list(made) == ["safe-mix", "as-held", "tech-tilt", "dip-buy", "sector-leaders"]
     assert made["as-held"]["weights"] == {"IVV": 0.6, "ASTS": 0.4} and made["dip-buy"]["cash"] == 0.2
     built_in = catalog.mixes({}, 0.0)
-    assert list(built_in) == ["safe-mix", "tech-tilt", "dip-buy"] and built_in["dip-buy"]["weights"] == built_in["safe-mix"]["weights"]
-    assert built_in["safe-mix"]["weights"] == {"IVV": 0.4, "SCHD": 0.2, "VXUS": 0.1, "FTEC": 0.1, "NLR": 0.05, "GRID": 0.05, "ICLN": 0.05, "UFO": 0.05}
+    assert list(built_in) == ["safe-mix", "tech-tilt", "dip-buy", "sector-leaders"] and built_in["dip-buy"]["weights"] == built_in["safe-mix"]["weights"]
+    assert built_in["safe-mix"]["weights"] == {"IVV": 0.8, "VXUS": 0.1, "FTEC": 0.1}
     assert (
         built_in["safe-mix"]["notes"] == [catalog.SAFE_NOTE, "FTIHX trades as VXUS", "FXAIX trades as IVV"]
         and built_in["safe-mix"]["source"] == catalog.SAFE_MIX
@@ -76,7 +76,8 @@ def test_sync_versions_fixed_mixes_and_follows_the_book(cfg):
     conn = desk(cfg)
     first = catalog.mixes({"FXAIX": 1.0}, 0.0, safe={"FXAIX": 0.8, "VXUS": 0.2})
     out = catalog.sync(conn, first, now=REG)
-    assert sorted(out["registered"]) == ["as-held@1", "dip-buy@1", "safe-mix@1", "tech-tilt@1"] and "FTEC" in out["symbols"]
+    assert sorted(out["registered"]) == ["as-held@1", "dip-buy@1", "safe-mix@1", "sector-leaders@1", "tech-tilt@1"] and "FTEC" in out["symbols"]
+    assert set(catalog.SECTORS) <= set(out["symbols"])
     assert {r[0] for r in conn.execute("SELECT symbol FROM market_symbols")} >= {"IVV", "VXUS", "FTEC", "SMH"}
     assert catalog.sync(conn, first, now=REG)["registered"] == []
     second = catalog.mixes({"FXAIX": 0.5, "ASTS": 0.5}, 0.0, safe={"FXAIX": 0.6, "VXUS": 0.4})
@@ -148,11 +149,44 @@ def test_the_executor_buys_each_mix_into_its_own_sleeve(cfg, monkeypatch):
         bars(conn, sym, [px])
     broker = FakeAlpaca()
     result = paper_exec.run(conn, broker, now=PRE)
-    assert result["ok"] and {r["strategy_id"] for r in result["catalog"]} == {"safe-mix", "tech-tilt", "dip-buy"}
+    assert result["ok"] and {r["strategy_id"] for r in result["catalog"]} == {"safe-mix", "tech-tilt", "dip-buy", "sector-leaders"}
+    assert next(r for r in result["catalog"] if r["strategy_id"] == "sector-leaders")["targets"] == 0
     legs = {(r["strategy_id"], r["symbol"]): r["qty"] for r in conn.execute("SELECT * FROM paper_legs")}
     assert legs[("safe-mix", "IVV")] == 9 and legs[("dip-buy", "IVV")] == 7 and legs[("tech-tilt", "FTEC")] == 1
     assert {o["symbol"] for o in broker.sent} == {"IVV", "FTEC", "VXUS"} and ("tech-tilt", "SMH") not in legs
     assert {b.kind for b in paper_exec.books(conn, 1000.0).values()} == {"mix"}
+    conn.close()
+
+
+def test_sector_leaders_holds_the_three_best_past_year_sectors_picked_at_month_end(cfg, monkeypatch):
+    monkeypatch.setenv("ALPACA_API_KEY_ID", "paper-id")
+    monkeypatch.setenv("ALPACA_API_SECRET_KEY", "paper-secret")
+    for k in ("ALPACA_BASE_URL", "DESK_PAPER_EXECUTE", "DESK_PAPER_BUDGET", "DESK_PAPER_MAX_STRATEGIES"):
+        monkeypatch.delenv(k, raising=False)
+    conn = desk(cfg)
+    built = catalog.mixes({}, 0.0)
+    assert catalog.fixed(built).keys() == {"safe-mix", "tech-tilt", "dip-buy"}
+    catalog.sync(conn, {"sector-leaders": built["sector-leaders"]}, now=REG)
+    growth = {s: 1 + 0.0004 * i for i, s in enumerate(catalog.SECTORS)}
+    growth["XLU"] = 1.004
+    for sym in catalog.SECTORS:
+        path = [50.0 * growth[sym] ** n for n in range(300)]
+        if sym == "XLE":
+            path = path[:-25] + [path[-26] * 3] * 25
+        bars(conn, sym, path, start=(2025, 12, 1))
+    last = conn.execute("SELECT max(date) FROM price_bars").fetchone()[0]
+    mix = catalog.latest(conn)["sector-leaders"]["mix"]
+    want = catalog.targets(conn, mix)
+    assert set(want) == {"XLU", "XLC", "XLRE"} and sum(want.values()) == pytest.approx(1.0, abs=1e-5)
+    assert catalog.targets(conn, mix, today=last[:8] + "28") == want
+    assert catalog.leaders({"XLK": [("2026-01-02", 10.0)]}, "2026-01-02", catalog.ROTATE) == []
+    prices = {s: round(50.0 * growth[s] ** 299, 2) for s in catalog.SECTORS} | {"IVV": 100.0}
+    out = catalog.rebuild(conn, 1000.0, prices.get, now=PRE)
+    summary = json.loads(conn.execute("SELECT summary FROM paper_portfolios WHERE strategy_id='sector-leaders'").fetchone()[0])
+    assert out[0]["targets"] == 3 and summary["weights"] == want
+    result = paper_exec.run(conn, FakeAlpaca(), now=PRE)
+    legs = {r["symbol"] for r in conn.execute("SELECT symbol FROM paper_legs WHERE strategy_id='sector-leaders'")}
+    assert result["ok"] and legs == {"XLU", "XLC", "XLRE"}
     conn.close()
 
 
@@ -376,7 +410,7 @@ def test_core_builds_bands_for_every_mix_and_serves_them(cfg, mirror, monkeypatc
     versions = {r[0] for r in conn.execute("SELECT id FROM catalog_strategies")}
     worst = conn.execute("SELECT count(*) FROM metric_values WHERE metric_id='bands.worst_year_p10'").fetchone()[0]
     conn.close()
-    assert versions == set(rows) and worst == 4
+    assert versions == set(rows) | {"sector-leaders"} and worst == 4
 
 
 def test_a_conviction_hold_gets_hold_rebalance_and_trim_side_by_side(cfg, mirror, monkeypatch, app_client):

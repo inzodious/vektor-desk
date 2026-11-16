@@ -399,7 +399,7 @@ def compute(cfg: Config, mirror: sqlite3.Connection, desk: sqlite3.Connection, *
         cfg,
         desk,
         tr,
-        wanted,
+        catalog.fixed(wanted),
         value=market,
         deposits=cash_in,
         prefs=goal,

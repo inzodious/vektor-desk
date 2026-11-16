@@ -189,7 +189,7 @@ def load(cfg: Config | None, mirror: sqlite3.Connection | None, desk: sqlite3.Co
     for r in _rows(desk, "paper_ledger_daily", "SELECT strategy_id, version, date, value FROM paper_ledger_daily ORDER BY date"):
         ledgers.setdefault((r["strategy_id"], r["version"]), []).append((r["date"], r["value"]))
     listed = catalog.latest(desk) if _has(desk, "catalog_strategies") else {}
-    mixes = {k: listed[k]["mix"] for k in catalog.NAMES if k in listed and listed[k]["retired_at"] is None}
+    mixes = catalog.fixed({k: listed[k]["mix"] for k in catalog.NAMES if k in listed and listed[k]["retired_at"] is None})
     data = Data(
         cfg=cfg,
         days=days,
