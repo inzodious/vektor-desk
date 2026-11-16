@@ -3,6 +3,7 @@ FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054f
 
 # ---- Web app: built when ui/package.json exists ----
 FROM node:24-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205 AS ui
+ENV NODE_OPTIONS=--max-old-space-size=1024
 WORKDIR /src
 COPY . .
 RUN if [ -f ui/package.json ]; then \
@@ -13,7 +14,7 @@ RUN if [ -f ui/package.json ]; then \
 
 # ---- Python dependencies ----
 FROM python:3.12-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS deps
-ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 MAKEFLAGS=-j2
 WORKDIR /src
 COPY pyproject.toml ./
 COPY desk/__init__.py desk/__init__.py
@@ -26,9 +27,9 @@ COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
 RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates sqlite3 \
+    && apt-get install -y --no-install-recommends ca-certificates sqlite3 util-linux \
     && rm -rf /var/lib/apt/lists/* \
-    && npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+    && NODE_OPTIONS=--max-old-space-size=1024 npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
     && npm cache clean --force \
     && groupadd -g 568 apps \
     && useradd -u 568 -g 568 -d /data/home -M -s /usr/sbin/nologin apps
@@ -58,4 +59,4 @@ VOLUME ["/data"]
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
     CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"
-CMD ["sh", "-c", "mkdir -p /data/home /data/inbox/fidelity /data/run && exec uvicorn desk.api.app:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips '*'"]
+CMD ["python", "-m", "desk.api.serve"]

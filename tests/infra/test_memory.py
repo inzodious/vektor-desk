@@ -270,6 +270,21 @@ def test_everything_waiting_starts_when_the_mode_goes_off(cfg, monkeypatch):
     reap(jobs, cfg)
 
 
+def test_jobs_start_at_lower_cpu_and_disk_priority_and_only_one_scheduler_runs(cfg):
+    job = make_job("a", "0 0 1 1 *", [sys.executable, "-c", "import os; print(os.nice(0))"], name="engine-daily")
+    assert scheduler.gentle() == ("nice", "-n", "10", "ionice", "-c3", "-t")
+    scheduler.start(job, cfg, "schedule")
+    finish(job)
+    reap([job], cfg)
+    assert jobrun.last_run(cfg, "engine-daily")["result"] == "ok" and jobrun.last_run(cfg, "engine-daily")["said"] == "10"
+    first = scheduler.only_one(cfg)
+    assert first is not None and scheduler.only_one(cfg) is None and runlock.running(cfg) == []
+    os.close(first)
+    again = scheduler.only_one(cfg)
+    assert again is not None
+    os.close(again)
+
+
 def test_jobs_all_start_at_once_when_the_box_has_room(cfg):
     a = make_job("a", "0 0 1 1 *", ["sleep", "0.2"], name="engine-daily")
     b = make_job("b", "0 0 1 1 *", ["sleep", "0.2"], name="engine-review")

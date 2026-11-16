@@ -1,6 +1,13 @@
 # Vektor Desk on TrueNAS SCALE: Apps → Discover Apps → ⋮ → Install via YAML, name it "vektor-desk" (docs/setup.md, step 6).
 # Private: caddy answers on the tailscale service's own tailnet address (https://desk.escape-vektor.com) and on the NAS's
 # LAN alias 192.168.0.116 (https://desk-lan.escape-vektor.com, docs/setup.md "Home network"). Your router forwards neither.
+# Memory: every service is capped, 2.5 GiB for the whole desk (the NAS's shared rules, docs/architecture.md "Shared NAS rules").
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
 services:
   tailscale:
     image: tailscale/tailscale:v1.102.4
@@ -25,7 +32,8 @@ services:
     ports:
       - "192.168.0.116:443:443"
       - "192.168.0.116:8443:8443"
-    mem_limit: 96m
+    logging: *logging
+    mem_limit: 128m
 
   caddy:
     image: vektor-desk/caddy:local
@@ -43,7 +51,8 @@ services:
     volumes:
       - /mnt/Manifest/apps/vektor-desk/caddy/data:/data
       - /mnt/Manifest/apps/vektor-desk/caddy/config:/config
-    mem_limit: 96m
+    logging: *logging
+    mem_limit: 64m
 
   api:
     image: vektor-desk:local
@@ -62,7 +71,8 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    mem_limit: 256m
+    logging: *logging
+    mem_limit: 192m
 
   # The schedule in deploy/crontab: the mirror, and the engine and agents once they land. The only service with the Claude
   # token and the Firestore key.
@@ -77,6 +87,7 @@ services:
     environment:
       DESK_FIRESTORE_CREDENTIALS: /run/secrets/firestore-reader
       DESK_NTFY_URL: http://ntfy:8080
+      NODE_OPTIONS: --max-old-space-size=320
     # settings.env, then desk.env: CLAUDE_CODE_OAUTH_TOKEN, TIINGO_API_KEY, FINNHUB_API_KEY, FRED_API_KEY, DESK_SEC_USER_AGENT.
     env_file:
       - /mnt/Manifest/apps/vektor-desk/settings.env
@@ -92,8 +103,8 @@ services:
       test: ["CMD", "python", "-m", "desk.scheduler", "--check", "/app/deploy/crontab"]
       interval: 5m
       timeout: 10s
-    # 640m on 16 GB of RAM; 2g after the upgrade to 32 GB.
-    mem_limit: 640m
+    logging: *logging
+    mem_limit: 544m
 
   # Phone alerts (docs/architecture.md): the desk publishes here, the phone subscribes at https://desk.escape-vektor.com:8443
   # over the tailnet, and ntfy.sh only relays a "poll now" wake-up to the iPhone app. Messages stay here for a week.
@@ -121,7 +132,8 @@ services:
       test: ["CMD-SHELL", "wget -q --tries=1 -O - http://localhost:8080/v1/health | grep -q true"]
       interval: 1m
       timeout: 5s
-    mem_limit: 64m
+    logging: *logging
+    mem_limit: 96m
 
   # The strategy lab (docs/statistics.md): runs queued experiment specs overnight (DESK_LAB_HOURS, 1-6 ET) with no network,
   # reading only data/lab/data/lab.db, which the engine's lab-export job writes at 00:55, and writing data/lab/runs/ledger.db.
@@ -132,7 +144,7 @@ services:
     restart: unless-stopped
     init: true
     user: "568:568"
-    command: ["python", "-m", "desk.engine.lab"]
+    command: ["nice", "-n", "10", "ionice", "-c3", "-t", "python", "-m", "desk.engine.lab"]
     network_mode: none
     # The image's health check calls the API, which a container with no network can't reach.
     healthcheck:
@@ -148,9 +160,10 @@ services:
     tmpfs: [/tmp]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    # 3 CPUs and 1.5g on 16 GB of RAM; 8 CPUs, 8g and DESK_LAB_WORKERS 8 after the upgrade.
+    # Its heaviest night, 3 workers on the French industries, peaks near 190 MB (docs/statistics.md).
     cpus: 3
-    mem_limit: 1536m
+    logging: *logging
+    mem_limit: 512m
 
   # Claude evaluation access (docs/eval-access.md): a Remote Control session this project can drive. Reads the desk's data,
   # source and redacted logs read-only, and works on copies in eval/work. No keys, no Docker socket, and on its own network,
@@ -171,6 +184,7 @@ services:
     environment:
       HOME: /home/eval
       DESK_DATA_DIR: /work/data
+      NODE_OPTIONS: --max-old-space-size=768
     volumes:
       - /mnt/Manifest/apps/vektor-desk/data:/data:ro
       - /mnt/Manifest/apps/vektor-desk-src:/src:ro
@@ -184,6 +198,7 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     cpus: 2
+    logging: *logging
     mem_limit: 1g
 
 networks:
