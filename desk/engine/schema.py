@@ -580,6 +580,24 @@ CREATE TABLE IF NOT EXISTS macro_daily (
   value REAL NOT NULL,
   PRIMARY KEY (series, date)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS av_quarters (
+  symbol TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  reported TEXT,
+  eps REAL,
+  eps_estimate REAL,
+  revenue REAL,
+  gross_profit REAL,
+  operating_income REAL,
+  net_income REAL,
+  PRIMARY KEY (symbol, period_end)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS av_fetches (
+  symbol TEXT PRIMARY KEY,
+  fetched_at TEXT NOT NULL,
+  quarters INTEGER NOT NULL,
+  error TEXT
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS earnings (
   symbol TEXT NOT NULL,
   date TEXT NOT NULL,

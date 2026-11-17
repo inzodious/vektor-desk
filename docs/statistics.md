@@ -880,6 +880,15 @@ Data the lab needs for 10-year windows, sized for the box (Ryzen 5 5600GT, 6 cor
 
 Bars land in `price_bars` in Tiingo's shape; each call is a row in `api_calls` under its provider. The run says who filled in ("Alpha Vantage filled in for ACME."). A rate-limit answer stops that provider for the run. 100 Alpha Vantage calls a day are left for the earnings history load.
 
+**Earnings history** (`desk/engine/avhistory.py`, job `av-history`, 21:10 ET). Alpha Vantage `EARNINGS` and `INCOME_STATEMENT` for the public list in rank order, then held, plan, watched and past names: two calls a company, at most 100 calls a night (`DESK_AV_HISTORY_CALLS`) and never past 490 Alpha Vantage calls in the last 24 hours. Each company is refreshed after 80 days, so the 200 names load in about four nights.
+
+| Table | Row | What it holds |
+|---|---|---|
+| `av_quarters` | symbol, quarter end | `reported` (the day the quarter was reported, so a figure is known only from then), `eps`, `eps_estimate`, `revenue`, `gross_profit`, `operating_income`, `net_income` |
+| `av_fetches` | symbol | When it was last asked, how many quarters came back, the error if any |
+
+Not in this cut: the profitability and earnings-yield screens, and copying these rows to `lab.db`. Both are Statistics' (public companies' figures only, so the worker rule allows them).
+
 Storage is Parquet files under `/data/lab/data`, read with DuckDB (free, embedded), so a backtest never loads more than its universe. Totals stay under 5 GiB, well inside the 20 GiB budget.
 
 **Compute.** A universe of 1,000 stocks over 10 years is 1,000 × 2,520 days, about 10 MB per field in float32, so a whole backtest fits in memory many times over. One vectorized variant takes well under a second. Under today's limits (3 workers, 1.5 GiB, 01:00 to 06:00 ET, never overlapping an agent run under `job_lock`) that is tens of thousands of variants a night, far more than the trial budget allows. After the RAM upgrade the limit rises to 8 workers and 8 GiB, which matters for the broader universe and for running beside Ollama and Jellyfin, not for speed. Workers stream one symbol's history at a time where they can, use float32 except for cash and tax math, and cap memory per chunk. Results are stored as summaries plus the top runs; raw run files in `/data/lab/runs` are pruned after 30 days. Trial ledger rows are never pruned.
