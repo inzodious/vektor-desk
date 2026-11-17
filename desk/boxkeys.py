@@ -38,6 +38,7 @@ KNOWN = {
         Key("TIINGO_API_KEY", "desk.env", True, "Tiingo prices"),
         Key("FINNHUB_API_KEY", "desk.env", True, "Finnhub news and earnings"),
         Key("FRED_API_KEY", "desk.env", True, "FRED rates and macro series"),
+        Key("RAPIDAPI_KEY", "desk.env", True, "RapidAPI key: Alpha Vantage, FMP and YH Finance fill in when Tiingo can't"),
         Key("DESK_SEC_USER_AGENT", "desk.env", False, "SEC contact for its User-Agent, e.g. 'Vektor Desk you@example.com'"),
         Key("ALPACA_API_KEY_ID", "desk.env", True, "Alpaca PAPER key ID (starts with PK); live keys are refused"),
         Key("ALPACA_API_SECRET_KEY", "desk.env", True, "Alpaca PAPER secret key"),

@@ -870,6 +870,16 @@ Data the lab needs for 10-year windows, sized for the box (Ryzen 5 5600GT, 6 cor
 
 **The bottleneck is Tiingo's free tier, not the hardware**: 50 requests an hour, 1,000 a day, and 500 unique symbols a month, shared with Escape Vektor. One request returns a symbol's full history, so the desk takes about 400 new symbols a month overnight and leaves the rest for Escape Vektor. Bars are cached forever and only topped up after that. Caps are set by `DESK_TIINGO_HOURLY` (40), `DESK_TIINGO_DAILY` (800) and `DESK_TIINGO_MONTHLY_SYMBOLS` (400); held and benchmark symbols top up daily, universe symbols rotate every 90 days, so a 1,000-stock universe stays inside the monthly cap. **Backfill starts in roadmap phase 3**, so the large-cap universe is ready when the lab lands in phase 9. ETF and French-portfolio strategies can run from day one of the lab.
 
+**Backups when Tiingo can't answer** (`desk/engine/rapid.py`, key `RAPIDAPI_KEY`, Joshua's free RapidAPI plans, measured 2026-11-17). Tiingo always goes first. A backup is asked only when Tiingo errors for a name, has no prices for it, is down for the run, has used its day, or its monthly symbol cap blocks a new name. Tiingo's hourly cap still just waits an hour.
+
+| Order | Provider | Free plan | Desk cap (env) | Used for |
+|---|---|---|---|---|
+| 1 | Alpha Vantage | 500 a day | 25 a run, 400 a day (`DESK_ALPHAVANTAGE_PER_RUN`, `_DAILY`) | Any name; full adjusted history from 1999, with dividends and splits |
+| 2 | FMP | 250 a day | 15 a run, 200 a day (`DESK_FMP_*`) | Top-ups only: it holds 5 years |
+| 3 | YH Finance | 100 a month | 3 a run, 80 a month (`DESK_YHFINANCE_*`) | Top-ups of held names only |
+
+Bars land in `price_bars` in Tiingo's shape; each call is a row in `api_calls` under its provider. The run says who filled in ("Alpha Vantage filled in for ACME."). A rate-limit answer stops that provider for the run. 100 Alpha Vantage calls a day are left for the earnings history load.
+
 Storage is Parquet files under `/data/lab/data`, read with DuckDB (free, embedded), so a backtest never loads more than its universe. Totals stay under 5 GiB, well inside the 20 GiB budget.
 
 **Compute.** A universe of 1,000 stocks over 10 years is 1,000 × 2,520 days, about 10 MB per field in float32, so a whole backtest fits in memory many times over. One vectorized variant takes well under a second. Under today's limits (3 workers, 1.5 GiB, 01:00 to 06:00 ET, never overlapping an agent run under `job_lock`) that is tens of thousands of variants a night, far more than the trial budget allows. After the RAM upgrade the limit rises to 8 workers and 8 GiB, which matters for the broader universe and for running beside Ollama and Jellyfin, not for speed. Workers stream one symbol's history at a time where they can, use float32 except for cash and tax math, and cap memory per chunk. Results are stored as summaries plus the top runs; raw run files in `/data/lab/runs` are pruned after 30 days. Trial ledger rows are never pruned.

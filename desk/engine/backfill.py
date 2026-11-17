@@ -4,7 +4,7 @@ import re
 import sqlite3
 from datetime import UTC, date, datetime, timedelta
 
-from desk.engine import KEYS_AT
+from desk.engine import KEYS_AT, rapid
 from desk.engine.holdings import CASH_SYMBOLS
 from desk.engine.market import BENCHMARKS, ET, LIBRARY_FUNDS, QUALITY, ProviderError, last_trading_day, tiingo_daily, tiingo_key
 
@@ -157,10 +157,20 @@ def store_bars(conn: sqlite3.Connection, symbol: str, bars: list[dict]) -> None:
     )
 
 
+def _ask_tiingo(http, symbol: str, key: str, start: str) -> tuple[list[dict], str | None]:
+    try:
+        return tiingo_daily(http, symbol, key, start), None
+    except ProviderError as e:
+        return [], str(e)
+    except (OSError, ValueError):
+        return [], f"{NO_ANSWER} for {symbol}"
+
+
 def run_backfill(conn: sqlite3.Connection, http, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     key = tiingo_key()
-    if not key:
+    backups = rapid.Backups(conn, http, now)
+    if not key and not backups.key:
         return {"ok": False, "error": f"The Tiingo key is not set. Add it in {KEYS_AT}."}
     sync_roles(conn, now)
     cap = limits()
@@ -170,41 +180,48 @@ def run_backfill(conn: sqlite3.Connection, http, *, now: datetime | None = None)
     target = last_trading_day(now.date() - timedelta(days=1)).isoformat()
     queue = due(conn, now)
     left = len(queue)
+    tiingo_up = bool(key)
     for row in queue:
-        if used["hour"] >= cap["hour"] or used["day"] >= cap["day"]:
+        day_full = used["day"] >= cap["day"]
+        if tiingo_up and not day_full and used["hour"] >= cap["hour"]:
+            break
+        tiingo_open = tiingo_up and not day_full
+        if not tiingo_open and not any(backups.open(src) for src in rapid.SOURCES):
             break
         left -= 1
         symbol = row["symbol"]
         new_symbol = symbol not in this_month
-        if new_symbol and used["month_symbols"] >= cap["month_symbols"]:
-            skipped += 1
-            continue
+        month_full = new_symbol and used["month_symbols"] >= cap["month_symbols"]
         start = start_date() if row["last_bar"] is None else (date.fromisoformat(row["last_bar"]) - timedelta(days=7)).isoformat()
         stamp = now.isoformat(timespec="seconds")
-        try:
-            bars = tiingo_daily(http, symbol, key, start)
-            error = None
-        except ProviderError as e:
-            bars, error = [], str(e)
-        except (OSError, ValueError):
-            bars, error = [], f"{NO_ANSWER} for {symbol}"
+        bars, error, asked = [], None, tiingo_open and not month_full
+        if asked:
+            bars, error = _ask_tiingo(http, symbol, key, start)
+            with conn:
+                conn.execute("INSERT INTO api_calls (provider, at, symbol, ok) VALUES ('tiingo', ?, ?, ?)", (stamp, symbol, int(error is None)))
+            used["hour"] += 1
+            used["day"] += 1
+            if new_symbol:
+                used["month_symbols"] += 1
+                this_month.add(symbol)
+            if error and ("rate limit" in error or error.startswith(NO_ANSWER)):
+                tiingo_up = False
+        if not bars and (error or not asked):
+            spare, source = backups.fetch(symbol, start, held=row["priority"] == 0, new=row["last_bar"] is None)
+            if source:
+                bars, error = spare, None
+            elif not asked:
+                skipped += 1
+                continue
         with conn:
-            conn.execute("INSERT INTO api_calls (provider, at, symbol, ok) VALUES ('tiingo', ?, ?, ?)", (stamp, symbol, int(error is None)))
             if bars:
                 store_bars(conn, symbol, bars)
             first, last = conn.execute("SELECT min(date), max(date) FROM price_bars WHERE symbol=?", (symbol,)).fetchone()
             conn.execute("UPDATE market_symbols SET first_bar=?, last_bar=?, fetched_at=?, error=? WHERE symbol=?", (first, last, stamp, error, symbol))
-        used["hour"] += 1
-        used["day"] += 1
-        if new_symbol:
-            used["month_symbols"] += 1
-            this_month.add(symbol)
         if error and error.startswith(NO_PRICES):
             unpriced.append(symbol)
         elif error:
             errors.append(f"{symbol}: {error}")
-            if "rate limit" in error or error.startswith(NO_ANSWER):
-                break
         else:
             fetched.append(symbol)
             if last and last > (row["last_bar"] or ""):
@@ -223,6 +240,8 @@ def run_backfill(conn: sqlite3.Connection, http, *, now: datetime | None = None)
         "left": left,
         "used": used,
         "limits": cap,
+        "backups": backups.filled,
+        "backup_use": backups.usage(),
     }
     return out | {"detail": words(out)}
 
@@ -233,8 +252,8 @@ def _names(xs: list[str], most: int = 6) -> str:
 
 
 def words(out: dict) -> str:
-    asked = len(out["fetched"]) + len(out["unpriced"]) + len(out["errors"])
-    if not asked and not out["left"] and not out["skipped_for_month_cap"]:
+    asked = len(out["fetched"]) + len(out["unpriced"]) + len(out["errors"]) - sum(len(v) for v in (out.get("backups") or {}).values())
+    if not asked and not out["left"] and not out["skipped_for_month_cap"] and not out.get("backups"):
         return "Nothing was behind, so Tiingo was not asked."
     parts = [f"Asked Tiingo for {asked} {'name' if asked == 1 else 'names'}."] if asked else ["Tiingo was not asked."]
     if out["errors"]:
@@ -245,9 +264,11 @@ def words(out: dict) -> str:
         parts.append(f"Tiingo has no prices for {_names(out['unpriced'])}.")
     if out["advanced"]:
         parts.append(f"New bars for {_names(out['advanced'])}.")
+    for title, names in (out.get("backups") or {}).items():
+        parts.append(f"{title} filled in for {_names(names)}.")
     waiting = out["left"] + out["skipped_for_month_cap"]
     if waiting:
-        parts.append(f"{waiting} more wait for a later run, to stay inside Tiingo's limits.")
+        parts.append(f"{waiting} more wait for a later run, to stay inside the providers' limits.")
     return " ".join(parts)
 
 
