@@ -19,6 +19,7 @@ from desk.engine import (
     ENGINE_VERSION,
     JOBS_AT,
     asof,
+    avhistory,
     broker,
     core,
     discounts,
@@ -385,6 +386,10 @@ def _backfill_then_scan(desk, http) -> dict:
     return out
 
 
+def run_av_history(cfg: Config, http=None) -> dict:
+    return _with_desk(cfg, "av-history", lambda desk: avhistory.run(desk, http or http_session()))
+
+
 JOBS = {
     "holdings": run_holdings,
     "core": run_core,
@@ -407,6 +412,7 @@ JOBS = {
     "french": run_french,
     "research": run_research,
     "public": run_public,
+    "av-history": run_av_history,
 }
 
 

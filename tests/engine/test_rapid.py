@@ -178,3 +178,59 @@ def test_the_key_is_one_the_box_settings_accept():
 
     assert boxkeys.KNOWN[rapid.KEY].file == "desk.env" and boxkeys.KNOWN[rapid.KEY].secret
     assert datetime.fromtimestamp(EPOCH["2026-11-10"], UTC).date().isoformat() == "2026-11-10"
+
+
+# ---- Earnings history ----
+
+
+class Earnings(FakeHttp):
+    def __init__(self, limited_after=None):
+        super().__init__()
+        self.limited_after = limited_after
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        self.calls.append((url, params))
+        if self.limited_after is not None and len(self.calls) > self.limited_after:
+            return Res(200, {"Information": "You have reached your daily limit."})
+        if params["function"] == "EARNINGS":
+            rows = [
+                {"fiscalDateEnding": "2026-06-30", "reportedDate": "2026-07-30", "reportedEPS": "1.5", "estimatedEPS": "1.4"},
+                {"fiscalDateEnding": "2026-09-30", "reportedDate": "2026-10-29", "reportedEPS": "1.6", "estimatedEPS": "None"},
+            ]
+            return Res(200, {"symbol": params["symbol"], "quarterlyEarnings": rows})
+        reports = [{"fiscalDateEnding": "2026-09-30", "totalRevenue": "1000", "grossProfit": "400", "operatingIncome": "300", "netIncome": "250"}]
+        return Res(200, {"symbol": params["symbol"], "quarterlyReports": reports})
+
+
+def test_earnings_history_loads_each_quarter_with_the_day_it_was_reported_inside_alpha_vantages_day(cfg, monkeypatch):
+    from desk.engine import avhistory
+    from desk.engine.__main__ import run_av_history
+
+    conn = ledger(cfg, [("HELDA", "held", "2026-11-10", None, None), ("PUBB", "public", None, None, None), ("WATC", "watch", None, None, None)])
+    monkeypatch.delenv("RAPIDAPI_KEY", raising=False)
+    assert run_av_history(cfg, Earnings())["skipped"].startswith("The RapidAPI key is not set")
+    monkeypatch.setenv("RAPIDAPI_KEY", "rk")
+    monkeypatch.setenv("DESK_AV_HISTORY_CALLS", "4")
+    first = run_av_history(cfg, Earnings())
+    assert first["ok"] and first["loaded"] == ["HELDA", "WATC"] and first["left"] >= 0 and first["calls"] == 4
+    rows = [tuple(r) for r in conn.execute("SELECT symbol, period_end, reported, eps, eps_estimate, revenue, net_income FROM av_quarters WHERE symbol='HELDA'")]
+    assert rows == [("HELDA", "2026-06-30", "2026-07-30", 1.5, 1.4, None, None), ("HELDA", "2026-09-30", "2026-10-29", 1.6, None, 1000.0, 250.0)]
+    assert conn.execute("SELECT count(*) FROM api_calls WHERE provider='alphavantage'").fetchone()[0] == 4
+    assert avhistory.wanted(conn, datetime.now(UTC)) == []
+    monkeypatch.setenv("DESK_AV_HISTORY_CALLS", "100")
+    with conn:
+        conn.executemany("INSERT INTO api_calls (provider, at, symbol, ok) VALUES ('alphavantage', ?, 'X', 1)", [(datetime.now(UTC).isoformat(),)] * 489)
+    assert avhistory._budget(conn, datetime.now(UTC)) == 0
+    conn.close()
+
+
+def test_a_daily_limit_answer_stops_the_night_and_the_name_is_tried_again_later(cfg, monkeypatch):
+    from desk.engine.__main__ import run_av_history
+
+    conn = ledger(cfg, [("HELDA", "held", "2026-11-10", None, None), ("HELDB", "held", "2026-11-10", None, None)])
+    monkeypatch.setenv("RAPIDAPI_KEY", "rk")
+    http = Earnings(limited_after=2)
+    out = run_av_history(cfg, http)
+    assert out["loaded"] == ["HELDA"] and out["errors"] == ["HELDB: Alpha Vantage rate limit"] and len(http.calls) == 3
+    assert conn.execute("SELECT error FROM av_fetches WHERE symbol='HELDB'").fetchone()[0] == "Alpha Vantage rate limit"
+    conn.close()
