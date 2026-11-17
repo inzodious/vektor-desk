@@ -8,6 +8,7 @@ const KEY_WORD = {
   TIINGO_API_KEY: 'Tiingo prices key',
   FINNHUB_API_KEY: 'Finnhub quotes key',
   FRED_API_KEY: 'FRED rates key',
+  RAPIDAPI_KEY: 'RapidAPI backup prices key',
   DESK_SEC_USER_AGENT: 'SEC contact line',
   ALPACA_API_KEY_ID: 'Alpaca paper key ID',
   ALPACA_API_SECRET_KEY: 'Alpaca paper secret',

@@ -142,7 +142,7 @@ Never in the repo, a chat or an issue. Everything lives in root-only files besid
 | File in `/mnt/Manifest/apps/vektor-desk/` | Names | Read by |
 |---|---|---|
 | `settings.env` | `DESK_FIREBASE_PROJECT`, `DESK_UID`, `DESK_CLAUDE_TOKEN_EXPIRES` (settings, not secret) | api, cron |
-| `desk.env` | `CLAUDE_CODE_OAUTH_TOKEN`, `TIINGO_API_KEY`, `FINNHUB_API_KEY`, `FRED_API_KEY`, `DESK_SEC_USER_AGENT`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY` (Alpaca **paper** only) | cron |
+| `desk.env` | `CLAUDE_CODE_OAUTH_TOKEN`, `TIINGO_API_KEY`, `FINNHUB_API_KEY`, `FRED_API_KEY`, `RAPIDAPI_KEY`, `DESK_SEC_USER_AGENT`, `ALPACA_API_KEY_ID`, `ALPACA_API_SECRET_KEY` (Alpaca **paper** only) | cron |
 | `caddy.env` | `PORKBUN_API_KEY`, `PORKBUN_API_SECRET_KEY` | caddy |
 | `tailscale.env` | `TS_AUTHKEY` (first sign-in only) | tailscale |
 | `firestore-reader.json` | the service account key, owned by `apps`, mode 400 | cron |

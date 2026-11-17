@@ -88,7 +88,7 @@ services:
       DESK_FIRESTORE_CREDENTIALS: /run/secrets/firestore-reader
       DESK_NTFY_URL: http://ntfy:8080
       NODE_OPTIONS: --max-old-space-size=320
-    # settings.env, then desk.env: CLAUDE_CODE_OAUTH_TOKEN, TIINGO_API_KEY, FINNHUB_API_KEY, FRED_API_KEY, DESK_SEC_USER_AGENT.
+    # settings.env, then desk.env: CLAUDE_CODE_OAUTH_TOKEN, TIINGO_API_KEY, FINNHUB_API_KEY, FRED_API_KEY, RAPIDAPI_KEY, DESK_SEC_USER_AGENT.
     env_file:
       - /mnt/Manifest/apps/vektor-desk/settings.env
       - /mnt/Manifest/apps/vektor-desk/desk.env
