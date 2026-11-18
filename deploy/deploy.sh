@@ -143,9 +143,16 @@ quiet_now() {
 }
 
 run_job() {
-  local id state deadline=$((SECONDS + 300))
-  id=$(midclt call "$@" 2>>"$BUILD_LOG") || return 1
-  [[ "$id" =~ ^[0-9]+$ ]] || return 1
+  local id state rc=0 deadline=$((SECONDS + 300))
+  echo "==== $(date '+%F %T') $1 asked" >>"$BUILD_LOG"
+  id=$(midclt call "$@" 2>>"$BUILD_LOG") || rc=$?
+  if [ "$rc" -ne 0 ] || ! [[ "$id" =~ ^[0-9]+$ ]]; then
+    {
+      echo "==== $(date '+%F %T') $1 didn't start a job (midclt exit $rc)"
+      printf '%s\n' "$id" | head -c 4000
+    } >>"$BUILD_LOG"
+    return 1
+  fi
   while [ "$SECONDS" -lt "$deadline" ]; do
     state=$(midclt call core.get_jobs "[[\"id\", \"=\", $id]]" | jq -r '.[0].state // "UNKNOWN"')
     case "$state" in
@@ -1342,6 +1349,8 @@ apply_compose() {
   payload=$(jq -n --rawfile c "$SRC/deploy/compose.yaml" '{custom_compose_config_string: $c}')
   log "Applying deploy/compose.yaml at ${head:0:7} to $APP"
   if ! run_job app.update "$APP" "$payload"; then
+    echo "TrueNAS's answer:"
+    awk '/^==== .* app\.update asked$/ { n = 0 } { last[n++] = $0 } END { for (i = 0; i < n; i++) print last[i] }' "$BUILD_LOG" | tail -n 40
     echo "TrueNAS didn't take the update (see $BUILD_LOG). Paste deploy/compose.yaml into Apps → $APP → Edit instead (Settings → Box has a Copy button)"
     alert "$ALERTS" "TrueNAS didn't take the compose update. Paste it by hand; Settings, Box has a Copy button."
     return 1
