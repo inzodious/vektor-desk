@@ -604,9 +604,10 @@ def backfill_view(request: Request) -> JSONResponse:
 
 @router.get("/api/engine/public-stocks")
 def public_stocks_view(request: Request) -> JSONResponse:
-    conn = _open(get_cfg(request))
+    cfg = get_cfg(request)
+    conn = _open(cfg)
     try:
-        return _json(public.view(conn))
+        return _json(public.view(conn) | {"earnings_history": lab.company_figures(cfg, conn)})
     finally:
         if conn is not None:
             conn.close()

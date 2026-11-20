@@ -9,6 +9,8 @@ import pytest
 from desk.db import connect
 from desk.engine import public, schema
 from desk.engine.__main__ import JOBS as COMMANDS
+from desk.engine.lab import fund
+from desk.engine.lab.data import EXPORT_SCHEMA, data_path
 from desk.scheduler import package_jobs
 
 NOW = datetime(2026, 11, 13, 15, 30, tzinfo=UTC)
@@ -383,6 +385,32 @@ def test_the_route_shows_the_stored_list_and_reads_empty_before_the_first_run(cf
         "trading": 0,
     }
     assert "accn" not in json.dumps(body)
+
+
+def test_the_route_shows_how_far_the_earnings_history_has_got_and_what_the_lab_made_of_it(cfg, desk, app_client):
+    client = app_client(["engine"])
+    nothing = {"listed": 0, "asked": 0, "with_quarters": 0, "errors": 0, "exported_at": None, "lab": None}
+    assert client.get("/api/engine/public-stocks").json()["earnings_history"] == nothing
+    run(desk)
+    priced = sorted(r["symbol"] for r in public.names(desk) if r["state"] == public.PRICED)
+    with desk:
+        desk.execute("INSERT INTO av_fetches VALUES (?, '2026-11-18T02:10:00+00:00', 40, NULL)", (priced[0],))
+        desk.execute("INSERT INTO av_fetches VALUES (?, '2026-11-18T02:10:00+00:00', 0, 'no data')", (priced[1],))
+        desk.execute("INSERT INTO av_fetches VALUES ('HELDX', '2026-11-18T02:10:00+00:00', 40, NULL)")
+    before = client.get("/api/engine/public-stocks").json()["earnings_history"]
+    assert before == nothing | {"listed": len(priced), "asked": 2, "with_quarters": 1, "errors": 1}
+    cover = {"listed": 4, "asked": 2, "loading": 2, "lagged": 0, "odd": 0, "eps_basis": fund.TODAYS_SHARES, "split_votes": [3, 1]}
+    cover |= {fund.YIELD: {"have": 1, "from": None}, fund.MARGIN: {"have": 1, "from": "2019-04-01"}}
+    path = data_path(cfg)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    out = connect(path)
+    out.executescript(EXPORT_SCHEMA)
+    out.executemany("INSERT INTO settings VALUES (?, ?)", [("exported_at", "2026-11-19T05:55:00+00:00"), (fund.COVERAGE, json.dumps(cover))])
+    out.commit()
+    out.close()
+    after = client.get("/api/engine/public-stocks").json()["earnings_history"]
+    assert after == before | {"exported_at": "2026-11-19T05:55:00+00:00", "lab": cover}
+    assert "HELDX" not in json.dumps(after)
 
 
 def test_coverage_counts_what_the_lab_has_and_only_a_name_never_asked_for_is_still_loading(desk):

@@ -4,12 +4,12 @@ from datetime import UTC, datetime, timedelta
 from desk.config import Config
 from desk.db import connect
 from desk.engine.french import PORTFOLIO_FILES
-from desk.engine.lab import listrules
+from desk.engine.lab import fund, listrules
 from desk.engine.lab.data import PUBLIC_ROLE, SCREEN_KIND, NotReady, data_path, ledger_path
 from desk.engine.lab.library import TRANSFORMS, catalog
 from desk.engine.lab.rulebook import RULES
 
-__all__ = ["NotReady", "desk_view", "eligible", "features", "grammar", "pending_reviews", "rules", "strategies", "universe_ready"]
+__all__ = ["NotReady", "company_figures", "desk_view", "eligible", "features", "grammar", "pending_reviews", "rules", "strategies", "universe_ready"]
 
 REVIEW_DAYS = 14
 SPEC_FIELDS = (
@@ -87,6 +87,33 @@ def universe_ready(cfg: Config, kind: str) -> bool:
 
 def features(cfg: Config) -> list[dict]:
     return catalog()
+
+
+# ---- Company figures: what the earnings history job has asked for, and what the lab's last export made of it ----
+
+
+def company_figures(cfg: Config, desk) -> dict:
+    out = {"listed": 0, "asked": 0, "with_quarters": 0, "errors": 0, "exported_at": None, "lab": None}
+    tables = {r[0] for r in desk.execute("SELECT name FROM sqlite_master WHERE name IN ('public_stocks', 'av_fetches')")} if desk is not None else set()
+    if "public_stocks" in tables:
+        names = {r[0] for r in desk.execute("SELECT symbol FROM public_stocks WHERE state='priced' AND symbol IS NOT NULL")}
+        asked = [r for r in desk.execute("SELECT symbol, quarters, error FROM av_fetches") if r[0] in names] if "av_fetches" in tables else []
+        out |= {"listed": len(names), "asked": len(asked), "with_quarters": sum(1 for r in asked if r[1]), "errors": sum(1 for r in asked if r[2])}
+    path = data_path(cfg)
+    if not path.exists():
+        return out
+    conn = connect(path, readonly=True)
+    try:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='settings'").fetchone() is None:
+            return out
+        stored = {r[0]: r[1] for r in conn.execute("SELECT key, value FROM settings WHERE key IN ('exported_at', ?)", (fund.COVERAGE,))}
+    finally:
+        conn.close()
+    try:
+        cover = json.loads(stored.get(fund.COVERAGE) or "null")
+    except ValueError:
+        cover = None
+    return out | {"exported_at": stored.get("exported_at"), "lab": cover}
 
 
 def _ledger(cfg: Config):
