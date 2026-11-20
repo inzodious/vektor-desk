@@ -2,6 +2,7 @@ import math
 import re
 from bisect import bisect_left, bisect_right
 
+from desk.engine.lab import fund
 from desk.engine.lab.data import Series
 
 SKIP = 21
@@ -20,8 +21,13 @@ FEATURES = {
     "insider.buy_usd": "Dollars of open-market Form 4 purchases by directors and officers known inside the window",
     "earnings.surprise": "Latest quarterly EPS minus the same quarter a year earlier, over the close before the news; only if the news is inside the window",
     "earnings.days_since": "Sessions since the latest earnings news, if it is inside the window",
+    fund.YIELD: "Earnings yield: the last four reported quarters' earnings per share over the share price (stock screens only; counted from the day "
+    "the latest quarter was reported; the window is how old that report may be)",
+    fund.MARGIN: "Operating margin: operating profit over sales for the last four reported quarters (stock screens only; counted from the day "
+    "the latest quarter was reported; the window is how old that report may be)",
 }
 SIZE = "size"
+FUND_FEATURES = set(fund.FEATURES)
 EVENT_FEATURES = {"insider.buyers", "insider.buy_usd"}
 EARNINGS_FEATURES = {"earnings.surprise", "earnings.days_since"}
 TRANSFORMS = {
@@ -53,7 +59,7 @@ def catalog() -> list[dict]:
             "window_options": list(WINDOWS),
             "transforms": list(TRANSFORMS),
             "point_in_time": True,
-            "kind": "insider" if k in EVENT_FEATURES else ("earnings" if k in EARNINGS_FEATURES else "price"),
+            "kind": "insider" if k in EVENT_FEATURES else ("earnings" if k in EARNINGS_FEATURES else ("fundamental" if k in FUND_FEATURES else "price")),
         }
         for k, v in FEATURES.items()
     ]
@@ -87,6 +93,12 @@ def value(metric_id: str, s: Series, i: int, days: int, events=None) -> float | 
         if metric_id == "earnings.surprise":
             return hit[1]
         return float(i - bisect_left(s.dates, hit[0]))
+    if metric_id in FUND_FEATURES:
+        hit = latest_event(events, s.dates[max(0, i - days + 1)], s.dates[i])
+        if hit is None or metric_id == fund.MARGIN:
+            return hit[1] if hit else None
+        j = s.at(hit[0])
+        return hit[1] * s.adj[j] / s.adj[i] if j is not None and s.adj[i] else None
     if metric_id in EVENT_FEATURES:
         lo = s.dates[max(0, i - days + 1)]
         owners, usd = events_in(events, lo, s.dates[i])

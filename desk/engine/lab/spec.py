@@ -5,8 +5,9 @@ import re
 from dataclasses import dataclass, field
 
 from desk.engine.french import PORTFOLIO_FILES
+from desk.engine.lab import fund
 from desk.engine.lab.data import FRENCH_KIND, FRENCH_MARKET, FUND_KINDS, PUBLIC_COVERAGE, PUBLIC_SIZES, SCREEN_KIND, SMALL_CAPS, SMALLCAP_BENCHMARK, LabData
-from desk.engine.lab.library import FEATURES, SIZE, TRANSFORMS, window_days
+from desk.engine.lab.library import FEATURES, FUND_FEATURES, SIZE, TRANSFORMS, window_days
 from desk.engine.market import BENCHMARKS
 
 SETS = {
@@ -19,6 +20,19 @@ REBALANCE = {"weekly": "W", "monthly": "M", "quarterly": "Q", "yearly": "Y", "an
 HOLD_DAYS = (21, 1260)
 NO_SIZES = "company sizes are not in the lab's data yet; the next lab export adds them"
 SIZE_WORDS = "Size is each company's public float when the list was drawn, moved by its share price since, so buybacks and new shares are not counted."
+NO_FIGURES = "company earnings history is not in the lab's data yet; the earnings history job loads it and the next lab export adds it"
+FIGURES_LOADING = "company earnings history is still loading: {asked} of {listed} listed companies are in and {loading} are on the way"
+FIGURES_THIN = "company earnings history only reaches {have} of {listed} listed companies for this measure, too few to test it"
+FIGURES_SHORT = "company earnings history only reaches back to {start} for most listed companies, too short to test before the two-year holdout"
+FIGURES_WORDS = (
+    "Company figures come from Alpha Vantage and count only from the day each quarter was reported; later corrections to a quarter may be included. "
+    "{have} of {listed} listed companies have them, and the test starts {start}, the first quarter nine in ten of the listed companies had a year of figures."
+)
+FIGURE_NOTES = {
+    fund.YIELD: "Earnings yield is the last four quarters' earnings per share over the share price, so a company losing money ranks last.",
+    fund.MARGIN: "Operating margin is operating profit over sales for the last four quarters. It favours industries with wide margins "
+    "and is not the profit-over-assets measure used in research.",
+}
 SIZING = (("fixed", "fixed"), ("inverse", "inverse_vol"), ("volatility", "inverse_vol"), ("risk parity", "inverse_vol"), ("rank", "rank"), ("equal", "equal"))
 MIN_WEIGHT_PRESENT = 0.5
 MIN_LIVE = 0.9
@@ -458,6 +472,25 @@ def parse(raw: dict, data: LabData | None = None, *, model: str = "") -> Spec:
         elif data is not None and not data.coverage(PUBLIC_SIZES):
             problems.append(NO_SIZES)
         caveats.append(SIZE_WORDS)
+    for metric in sorted(FUND_FEATURES & ({m for m, _, _ in signals} | {f[0] for f in filters})):
+        if universe.get("kind") != SCREEN_KIND:
+            problems.append(f"{metric} needs a screen universe")
+            continue
+        if data is None:
+            continue
+        cov = data.coverage(fund.COVERAGE)
+        mine = (cov or {}).get(metric) or {}
+        if not cov or not cov.get("asked"):
+            problems.append(NO_FIGURES)
+        elif cov.get("loading"):
+            problems.append(FIGURES_LOADING.format(**cov))
+        elif not mine.get("from") or mine.get("have", 0) < fund.ENOUGH * cov["listed"]:
+            problems.append(FIGURES_THIN.format(have=mine.get("have", 0), listed=cov["listed"]))
+        elif fund.years(mine["from"], data.end) < fund.MIN_YEARS:
+            problems.append(FIGURES_SHORT.format(start=mine["from"]))
+        else:
+            start = max(str(start or ""), mine["from"])
+            caveats += [FIGURES_WORDS.format(have=mine["have"], listed=cov["listed"], start=mine["from"]), FIGURE_NOTES[metric]]
     if idle and weights is not None:
         problems.append("sizing idle cannot be combined with fixed weights")
     if exit_days(raw.get("exit")) and (weights is not None or universe.get("members")):

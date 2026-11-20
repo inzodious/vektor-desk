@@ -887,7 +887,7 @@ Bars land in `price_bars` in Tiingo's shape; each call is a row in `api_calls` u
 | `av_quarters` | symbol, quarter end | `reported` (the day the quarter was reported, so a figure is known only from then), `eps`, `eps_estimate`, `revenue`, `gross_profit`, `operating_income`, `net_income` |
 | `av_fetches` | symbol | When it was last asked, how many quarters came back, the error if any |
 
-Not in this cut: the profitability and earnings-yield screens, and copying these rows to `lab.db`. Both are Statistics' (public companies' figures only, so the worker rule allows them).
+The lab's copy and the two screens built on it are under "Company figures in the lab" below.
 
 Storage is Parquet files under `/data/lab/data`, read with DuckDB (free, embedded), so a backtest never loads more than its universe. Totals stay under 5 GiB, well inside the 20 GiB budget.
 
@@ -969,7 +969,7 @@ Nothing a worker runs needs `own.db`: a screen reads only role `public`, a hand-
 | Field | Accepted |
 |---|---|
 | `universe` | `{"type": "fund_list", "set": "sector_etfs" \| "core_etfs" \| "benchmarks"}`, `{"type": "fund_list", "symbols": [funds only]}`, a `rule` naming a set, or `{"type": "screen", "min_history_days", "min_price"}` for single stocks from the public stock list (coverage sentence; see "Stock screens run on the public stock list"), or `{"type": "small_caps", "min_price"}` (default 2) for point-in-time small caps, benchmark IWM. A hand-picked stock list is rejected |
-| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `ma_cross` (the 50-day average against the window's average; a 200-day window above zero is a golden cross), `range_52w`, `dd`, `size` (stock screens only: a company's public float when the list was drawn, moved by its total return since; buybacks and new shares are not counted, and a caveat says so), `insider.buyers`, `insider.buy_usd`, `earnings.surprise`, `earnings.days_since`; window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
+| `signals` | Feature `ret`, `ret_skip`, `vol`, `ma_gap`, `ma_cross` (the 50-day average against the window's average; a 200-day window above zero is a golden cross), `range_52w`, `dd`, `size` (stock screens only: a company's public float when the list was drawn, moved by its total return since; buybacks and new shares are not counted, and a caveat says so), `insider.buyers`, `insider.buy_usd`, `earnings.surprise`, `earnings.days_since`, `fund.earnings_yield`, `fund.op_margin` (stock screens only; see "Company figures in the lab"); window `63d`, `6m`, `1y` or `{param}d`; transform `raw`, `rank`, `inverse_rank`, `zscore`, `inverse`. Score is the mean of the transformed signals |
 | `entry` | `{"top_n": 3 \| "param:top_n", "min_signal": 0}` or "top 3 by rank". `min_signal` applies to the first signal's raw value; slots it leaves empty stay in cash |
 | `exit` | `"rebalance"`, or `{"hold_rank": 5}` / "falls out of top 5" to keep a holding while it ranks in the top 5, or `{"hold_days": 252}` (21 to 1260 trading days; not with `hold_rank`, not on a fixed mix): a holding is left untouched, neither topped up nor trimmed, until it has been held that long, then it is judged again like any other name and its clock restarts if it is picked again. New picks take only the slots and the money the held names leave |
 | `rebalance`, `sizing` | Weekly, monthly, quarterly or yearly (every 252 trading days counted from the start of the test, not each January, so a one-year test window is bought once and held); `equal`, `inverse_vol` (63-day) or `rank`. `max_position_pct` caps a weight, the rest stays cash, or goes into one fund with `"sizing": {"method": "equal", "idle": "SPY"}` (a fund with bars in the lab; not with fixed weights). With `idle`, a day when nothing qualifies holds the fund alone. `"vol_target": 0.15` in `sizing` scales every weight down by target over the portfolio's own 63-day volatility whenever that ran hotter; it never scales up |
@@ -1203,7 +1203,7 @@ A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/sh
 | Practical | 24 | The plan's mix, safe mix, aggressive tech tilt, core and satellite, theme funds at equal weight, today's holdings (as held, and with single stocks capped at 10%), dip-only, beaten-down sectors, deposits held back for a dip, margin dip-buy, margin debit paid first, lump sum spread over months, deposit steering, rebalance bands, tax-loss harvesting, large companies 30% under their high held a year, core plus five stock picks, the ten largest companies, the ten most beaten-down large companies, averaging down on a fallen company, capping a big position, harvesting a loss and buying back |
 | Novel and creative | 14 | Trend-filtered dip-buy, sector momentum in uptrends only, sector momentum that stands down in rough markets, calm winners, 52-week-high breakout with a volatility cap, drawdown stop, buy after a 5% down week, canary rule, credit canary, tech tilt at a volatility target, discount-day entries (plain and in an uptrend only), insider cluster with a momentum filter, earnings drift where insiders also bought |
 
-69 entries: 58 experiments, 8 deposit rules and 3 rules tested across the public stock list. The two as-held rows are hindsight, shown but never judged (see "Hindsight rows").
+71 entries: 60 experiments, 8 deposit rules and 3 rules tested across the public stock list. The two as-held rows are hindsight, shown but never judged (see "Hindsight rows").
 
 **What a row is measured against.** Every row carries `benchmark` (a short label) and `benchmark_words` (one plain sentence); the payload's `benchmarks` lists each `{name, words, rows}`, most used first.
 
@@ -1224,7 +1224,6 @@ A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/sh
 | Quality and momentum together in single stocks | The lab has no point-in-time fundamentals for single stocks. The quality tilt runs on the French portfolios; the credit canary takes the slot |
 | Small value and short-term reversal from French files | Those files are not among the sets the desk fetches. Small value is a fund row (VBR); reversal runs on the point-in-time small caps |
 | Canary that moves into bonds | Filters send a strategy to cash, not to another fund. The row holds the S&P 500 only while emerging markets and US bonds are both up over six months |
-| Profitability and cheapness (earnings yield) screens on the public stock list | They need each company's earnings as known on each date from 2012 on. The desk does not hold SEC company facts for the 200 names, and using them means a large download, share-split handling and a coverage check before any number could be trusted. `lib-profitability-tilt` and `lib-value-tilt` already answer both questions on the whole US market from 1990 |
 
 | Step | When | What happens |
 |---|---|---|
@@ -1297,6 +1296,40 @@ The luck band is the gate's formula in points a year: `inv_cdf((1 - 0.10) ** (1 
 | One threshold | The dip row tests 30% only, the Opportunities page's own rule. A filter bound cannot be searched, and a grid of thresholds would add trials to the luck bar for little |
 | Test years start fresh | Each walk-forward test year opens with nothing held. A name bought late in a test year is held to the end of that year, not a full 252 days, and the yearly rows are bought once at the start of each test year. "Yearly" is therefore the start of each test year, which is not always January; the two rows' descriptions say "at the start of each test year" |
 | Size | The float is the one figure per company from its annual report nearest mid-2011 (`lab.db` setting `public_sizes`: symbol, dollars, date). It is moved by total return from that date, or from the first bar when prices start later. Buybacks, new shares and mergers are not counted, so the ranking drifts from true size over the years. A lab file exported before this build has no sizes; `lib-ten-largest` is then refused with a plain reason and runs the night after the next export |
+
+**Company figures in the lab.** Module `desk/engine/lab/fund.py`. `lab-export` turns `av_quarters` into table `fundamentals(symbol, known, earnings_yield, op_margin)` in `lab.db`, for names on the public stock list only. A held, planned or watched name that is not on the list is never copied, so the file a worker may download says nothing about the book.
+
+| Step | Rule |
+|---|---|
+| One quarter | Rows whose quarter ends fall within 10 days of each other are one quarter (the two Alpha Vantage calls can date a quarter differently) |
+| Trailing year | Four quarters in a row, first to last 250 to 300 days apart. A missing quarter or a missing figure gives no value for that measure |
+| Known from | The latest `reported` day among the four. A quarter with no report day counts from 75 days after its end (`lagged` in the coverage). Trades go in at the next open, so a report after the close is not used early |
+| `fund.op_margin` | Operating income over revenue for the four quarters; none when revenue is zero or negative |
+| `fund.earnings_yield` | The four quarters' EPS over the close on the known day, both in the share count of the day the company was fetched (`av_fetches.fetched_at`): the close is divided by every split up to that day, and the EPS is put on the same count by the row below. In the lab the yield then moves with the adjusted price, which is off only by dividends paid since the report. A yield above 50% either way is dropped as a share-count mismatch (`odd`) |
+| Which share count old EPS is in | Not documented by the source, so the export reads it off the data. For every split of 1.5 to 1 or more, the first quarter reported after it is compared with the same quarter a year before: if the old EPS is closer to the new one as it stands, that is a vote for today's count; if it is closer after dividing by the split, a vote for as first reported. More votes for as first reported sets `eps_basis` to `as_reported` and every older EPS is divided by the splits that came after its report (`fund.restated`); otherwise `todays_shares` and EPS is used as it is. The count is in `split_votes` |
+| Stale | A value older than the signal's window (126 sessions on the two rows) is no value, so a company that stops reporting drops out |
+
+Setting `public_fundamentals`: `{listed, asked, loading, lagged, odd, eps_basis, split_votes: [today, as_reported], "fund.earnings_yield": {have, from}, "fund.op_margin": {have, from}}`. `loading` counts listed names the earnings history job has not asked for yet (a symbol it can never ask for, such as one with a dash, is not counted). `from` is the first quarter start on or after the list's `tests_from` when 90% of the names trading that day had a value.
+
+| A spec using either feature | What happens |
+|---|---|
+| Not a screen | Refused |
+| No coverage in `lab.db`, or `loading` above zero | Refused; the library row reads "Company earnings history is still loading. This runs once that finishes." |
+| Under 90% of listed names have the measure, or no quarter reaches 90% | Refused |
+| `from` is under 4.5 years before the data ends | Refused; the row reads "Earnings history for these companies does not go back far enough to test this yet." |
+| Otherwise | Runs from `from`, with caveats naming the source, the count and the start |
+
+| Row | Rule | Measured against |
+|---|---|---|
+| `lib-stock-profitability` | The 20 listed companies with the highest operating margin, equal parts, refreshed quarterly | S&P 500 (SPY) |
+| `lib-stock-earnings-yield` | The 20 listed companies with the highest earnings yield, equal parts, refreshed quarterly | S&P 500 (SPY) |
+
+| Limit | What it means |
+|---|---|
+| Margin is not profitability over assets | The research measure divides profit by assets or book equity, which `av_quarters` does not hold. Margin favours industries with wide margins. `lib-profitability-tilt` remains the research version on the whole market |
+| As held today | Figures are what Alpha Vantage holds now, so a later correction to a quarter may be included. How far back its quarterly income statements reach is not known until the load finishes; if it is too short the margin row says so and does not run |
+| Share count vote | With no splits to vote on, `split_votes` is `[0, 0]` and EPS is used as it is. A close vote means the source is mixed and the yield row should not be trusted; read `split_votes` after the first full export |
+| Losses | A company losing money has a negative yield and ranks last; it is not left out |
 
 **Public stock list.** `public.py`, job `public` ("Public stock list"), `GET /api/engine/public-stocks`. The job builds the list and says which names Tiingo can price; the price backfill fetches them.
 
