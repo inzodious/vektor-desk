@@ -1229,7 +1229,7 @@ A fixed shelf of experiments the lab runs without any agent: `desk/engine/lab/sh
 | Step | When | What happens |
 |---|---|---|
 | Queue | End of `lab-export` (00:55), before the offer to a worker; `lab-offer` repeats it each minute of the lab hours, so a build that lands after 00:55 still queues that night | `shelf.queue_missing` writes a request for every entry with no result and none waiting. Each entry has a revision (`rev`, default `shelf.REV`); the request carries it as `library_rev` and the result stores it. A tested entry is queued again at once when its result is from an older revision, or when it is 30 days old. If a rerun leaves no new result, the next try waits 12 hours. A rerun keeps version 1, so it replaces the same trials and never adds to the trial count. Experiments sort before rules. An entry the lab refused is queued again once 12 hours have passed, or at once when the lab's code has changed since the refusal (each refusal records `lab_build`, a hash of the lab's source files). A second run the same night queues nothing |
-| Run | Lab, with a worker first | Experiments are `lab.sims` jobs like any other; deposit rules run in the lab itself. The lab keeps waiting for an offered file while the worker has answered something in the last `DESK_LAB_WORKER_WAIT_MIN` minutes, then runs what is left |
+| Run | Lab, on the NAS | The lab runs every row itself. Only with `DESK_LAB_TO_WORKER=1` are experiments offered to a worker first as `lab.sims` jobs (see "With a worker" below); deposit rules always run in the lab itself |
 | Count | Ledger | Every shelf strategy has `parent_id: "library"`, so they are one family and each variant counts toward the trial count. `insider-` and `drift-` ids also count in those gate families |
 | Report | `GET /api/lab/library` | One row per entry, sorted by kind, verdict, then excess |
 
@@ -1361,6 +1361,8 @@ The NAS containers are small (cron 544 MB, lab 512 MB, API 192 MB; docs/architec
 | Lab, 3 workers, 12-variant screen | 132 (was 1,611) | 5 (was 24) | See below |
 | Lab, 3 workers, French 49 industries since 1963 | 184 (was 3,120) | 12 (was 387) | See below |
 | API, every read endpoint | 94 | | |
+| Lab, the whole library night (69 rows) with the public list, 2026-11-20: synthetic `lab.db` of 672 names, 2.69M bars and 1.84M French rows (256 MB), run inside a 512 MB memory group with no swap | 193 | 164 | One process, since shelf rows have few variants. The group peaked at 343 MB with file cache and never reached its limit, so the night fits the lab container on the NAS |
+| Lab, 3 workers, 12-variant screen over the 196-name list (144 simulations), same file and group | 193 | 12 | Forked workers share the loaded data; group peak 350 MB with file cache |
 | `daily` with the public list, 2026-11-16: 262 names, 1.44M price bars since 2005 | 278 (was 812, killed at 640 on 11-14) | | Prices read for the book leave out names only on the public list (`holdings.list_only`: role `public` and never held). Output identical |
 
 **Lab data.** `load` keeps each series as packed arrays of doubles with one shared set of date strings; a day is found through one shared calendar and a small per-series offset table (`DayIndex`), about 40 bytes a bar instead of 290. A French set is read as a stream. Workers are forked from the process that already holds the data, so they share it and never reload it; where fork is not available the variants run one after another. Results are identical to the old loader's, down to every stored trial.
@@ -1378,7 +1380,11 @@ The NAS containers are small (cron 544 MB, lab 512 MB, API 192 MB; docs/architec
 
 On the synthetic database the heaviest experiment (French industries, 781 simulations) is 17 MB gzipped; with it staged the lab computes nothing and finishes in 8 s against 12.
 
-**With a worker (Horizon).** `desk/engine/kinds.py` registers the job kind `lab.sims` with Infrastructure's worker protocol (`docs/architecture.md`).
+**With a worker (Horizon): off by default.** The NAS computes the lab's whole night itself. `desk/engine/kinds.py` still registers the job kind `lab.sims` with Infrastructure's worker protocol (`docs/architecture.md`), and nothing below happens unless the switch is on.
+
+| Setting | Where | Default | Effect |
+|---|---|---|---|
+| `DESK_LAB_TO_WORKER` | Environment of the service that runs the engine's jobs (cron) | Unset: off | `1` or `on`: `lab-export` and `lab-offer` offer queued experiments to a worker that is online. Off: `offer_queue` offers nothing, writes no `offers.sims`, and the lab never waits for a worker |
 
 | Step | Where | What happens |
 |---|---|---|
