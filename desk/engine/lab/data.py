@@ -12,6 +12,7 @@ from pathlib import Path
 
 from desk.config import Config
 from desk.db import connect
+from desk.engine.lab import fund
 from desk.engine.market import BENCHMARKS, LIBRARY_FUNDS, QUALITY
 
 SMALLCAP_BENCHMARK = "IWM"
@@ -35,6 +36,7 @@ CREATE TABLE french (set_name TEXT NOT NULL, name TEXT NOT NULL, date TEXT NOT N
 CREATE TABLE insider (symbol TEXT NOT NULL, known TEXT NOT NULL, owner INTEGER NOT NULL, usd REAL NOT NULL);
 CREATE TABLE smallcap (symbol TEXT NOT NULL, month TEXT NOT NULL, PRIMARY KEY (symbol, month)) WITHOUT ROWID;
 CREATE TABLE earnings (symbol TEXT NOT NULL, known TEXT NOT NULL, surprise REAL NOT NULL);
+CREATE TABLE fundamentals (symbol TEXT NOT NULL, known TEXT NOT NULL, earnings_yield REAL, op_margin REAL, PRIMARY KEY (symbol, known)) WITHOUT ROWID;
 """
 )
 HELD_FILE = "held.json"
@@ -159,9 +161,14 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
         settings = {"exported_at": now.isoformat(timespec="seconds"), "marginal_rate_pct": str(rate[0]) if rate else None}
         held, covered, held_day = _held_mix(desk, spans | own)
         listed = cover({s for s in public if s in spans})
+        figures: list[tuple] = []
         if listed:
             settings[PUBLIC_COVERAGE] = json.dumps(listed)
             settings[PUBLIC_SIZES] = json.dumps({s: sizes[s] for s in sorted(sizes) if s in spans})
+            figures, figures_cover = fund.build(desk, public, spans, listed.get("tests_from"))
+            out.executemany("INSERT INTO fundamentals VALUES (?, ?, ?, ?)", figures)
+            if figures_cover:
+                settings[fund.COVERAGE] = json.dumps(figures_cover)
         if small and _has(desk, "insider_buys"):
             from desk.engine.insider import coverage
 
@@ -187,6 +194,7 @@ def export(cfg: Config, desk: sqlite3.Connection, kinds: dict[str, str], targets
         "small_caps": len(small),
         "held_mix": len(held),
         "public_stocks": (listed or {}).get("priced", 0),
+        "public_figures": len(figures),
         "kept_on_box": len(own),
     }
 
@@ -353,6 +361,7 @@ class LabData:
     earnings: dict[str, tuple[list[str], list[float]]] = field(default_factory=dict)
     held_mix: dict[str, float] = field(default_factory=dict)
     sizes: dict[str, tuple[float, str]] | None = None
+    fund: dict[str, dict[str, tuple[list[str], list[float]]]] = field(default_factory=dict)
 
     def coverage(self, key: str = "insider_coverage") -> dict | None:
         raw = self.settings.get(key)
@@ -512,6 +521,14 @@ def load(path: Path) -> LabData:
                 d, v = earnings.setdefault(r[0], ([], []))
                 d.append(r[1])
                 v.append(r[2])
+        figures: dict[str, dict[str, tuple[list[str], list[float]]]] = {k: {} for k in fund.FEATURES}
+        if _has(conn, fund.TABLE):
+            for sym, day, *values in conn.execute("SELECT symbol, known, earnings_yield, op_margin FROM fundamentals ORDER BY symbol, known"):
+                for key, x in zip(fund.FEATURES, values, strict=True):
+                    if x is not None:
+                        d, v = figures[key].setdefault(sym, ([], []))
+                        d.append(day)
+                        v.append(x)
     finally:
         for c in files:
             c.close()
@@ -543,4 +560,5 @@ def load(path: Path) -> LabData:
         smallcap=smallcap,
         earnings=earnings,
         held_mix=held.get("weights") or {},
+        fund=figures,
     )

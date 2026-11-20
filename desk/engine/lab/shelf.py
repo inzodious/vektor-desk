@@ -7,6 +7,7 @@ from statistics import NormalDist
 from desk.config import Config
 from desk.db import connect
 from desk.engine import catalog, gate
+from desk.engine.lab import fund
 from desk.engine.lab.data import PUBLIC_COVERAGE, data_path, lab_build, ledger_path, plan_path, read_plan
 from desk.engine.lab.listrules import UNIT as LIST_UNIT
 from desk.engine.lab.rulebook import LIST_RULES, STAND_IN
@@ -71,6 +72,8 @@ PLAIN = (
     (("small-cap history",), "Small-company price history is still loading. This runs once that finishes."),
     (("public stock list",), "The public stock list is still loading its prices. This runs once that finishes."),
     (("company sizes",), "Company sizes have not reached the lab yet. This runs the night after the next lab export."),
+    (("earnings history only reaches",), "Earnings history for these companies does not go back far enough to test this yet."),
+    (("company earnings history",), "Company earnings history is still loading. This runs once that finishes."),
     (("is not in the lab yet",), "Its data file has not reached the lab yet. This runs the night after the file arrives."),
     (("no price history", "too little price history"), "Most of its funds have no price history in the lab yet."),
     (("no common history", "too late for anything", "needs 2.5 or more"), "Its funds have not all traded long enough to test before the two-year holdout."),
@@ -264,6 +267,26 @@ LIBRARY: tuple[dict, ...] = (
         "Hold the 20 calmest stocks, refreshed each quarter.",
         SPY,
         {"universe": STOCKS, "signals": [_sig("vol", "252d", "inverse_rank")], "entry": {"top_n": 20}, "rebalance": "quarterly", "benchmark": "SPY"},
+        rev=SCREEN_REV,
+    ),
+    _exp(
+        "lib-stock-profitability",
+        "classic",
+        "Factor tilt",
+        "Most profitable large companies",
+        "Hold the 20 large companies that keep the most of each sales dollar as operating profit, refreshed each quarter.",
+        SPY,
+        {"universe": STOCKS, "signals": [_sig(fund.MARGIN, "126d")], "entry": {"top_n": 20}, "rebalance": "quarterly", "benchmark": "SPY"},
+        rev=SCREEN_REV,
+    ),
+    _exp(
+        "lib-stock-earnings-yield",
+        "classic",
+        "Factor tilt",
+        "Cheapest large companies by earnings",
+        "Hold the 20 large companies with the most earnings for each dollar of share price, refreshed each quarter.",
+        SPY,
+        {"universe": STOCKS, "signals": [_sig(fund.YIELD, "126d")], "entry": {"top_n": 20}, "rebalance": "quarterly", "benchmark": "SPY"},
         rev=SCREEN_REV,
     ),
     _exp(

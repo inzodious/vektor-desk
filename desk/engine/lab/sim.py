@@ -118,6 +118,8 @@ def _events(data: LabData, metric: str, sym: str):
         return data.size_base(sym)
     if metric in features.EARNINGS_FEATURES:
         return data.earnings.get(sym)
+    if metric in features.FUND_FEATURES:
+        return data.fund.get(metric, {}).get(sym)
     return data.insider.get(sym)
 
 

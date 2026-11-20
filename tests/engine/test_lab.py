@@ -16,8 +16,8 @@ from desk.engine import gate, kinds, lab, schema
 from desk.engine.__main__ import run_holdings, run_lab_export
 from desk.engine.backfill import add_symbols
 from desk.engine.lab import __main__ as lab_main
+from desk.engine.lab import fund, paper, runner, shelf, sim, simcache, stats
 from desk.engine.lab import library as features
-from desk.engine.lab import paper, runner, shelf, sim, simcache, stats
 from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, held_path, ledger_path, load, own_path, plan_path
 from desk.engine.lab.runner import ledger, process_queue
 from desk.engine.lab.sim import _year_tax, pick, simulate
@@ -567,6 +567,10 @@ def test_nothing_about_what_is_held_or_planned_is_in_the_file_a_worker_downloads
             "INSERT INTO public_stocks VALUES (?, ?, ?, 5e10, '2011-06-30', '', ?, 'sec_list', '2005-01-03', '2026-11-04', ?, 1, '2026-11-05T15:30:00+00:00')"
         )
         desk.executemany(listed, [(1, 11, "Big Co", "BIGCO", "priced"), (2, 12, "Other Co", "OTHERCO", "priced"), (3, 13, "Lost Co", "LOSTCO", "missing")])
+        reported = (("2025-12-31", "2026-01-28"), ("2026-03-31", "2026-04-28"), ("2026-06-30", "2026-07-28"), ("2026-09-30", "2026-11-03"))
+        for sym in ("BIGCO", "ACME", "FXAIX", "NEWCO"):
+            desk.executemany("INSERT INTO av_quarters VALUES (?, ?, ?, 0.51, 0.5, 100, 40, 20, 15)", [(sym, end, day) for end, day in reported])
+            desk.execute("INSERT INTO av_fetches VALUES (?, '2026-11-04T02:10:00+00:00', 4, NULL)", (sym,))
     desk.close()
     result = run_lab_export(cfg)
     assert result["held_mix"] == 2 and held_path(cfg).exists() and result["public_stocks"] == 2 and result["kept_on_box"] == 2
@@ -595,6 +599,9 @@ def test_nothing_about_what_is_held_or_planned_is_in_the_file_a_worker_downloads
         "pct": 66.7,
         "enough": False,
     }
+    assert out.execute("SELECT * FROM fundamentals").fetchall() == [("BIGCO", "2026-11-03", 0.04, 0.2)] and result["public_figures"] == 1
+    figures = json.loads(out.execute("SELECT value FROM settings WHERE key=?", (fund.COVERAGE,)).fetchone()[0])
+    assert (figures["listed"], figures["asked"], figures["loading"]) == (2, 1, 0) and figures[fund.MARGIN] == {"have": 1, "from": None}
     sizes = json.loads(out.execute("SELECT value FROM settings WHERE key='public_sizes'").fetchone()[0])
     assert sizes == {"BIGCO": [5e10, "2011-06-30"], "OTHERCO": [5e10, "2011-06-30"]}
     words = " ".join(str(v) for t in tables if t != "bars" for r in out.execute(f"SELECT * FROM {t}") for v in r)

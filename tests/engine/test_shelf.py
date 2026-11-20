@@ -9,11 +9,11 @@ from fastapi.testclient import TestClient
 from desk.api.app import create_app
 from desk.engine import kinds, lab
 from desk.engine.jobs import JOBS
-from desk.engine.lab import listrules, rulebook, runner, shelf, sim, simcache
+from desk.engine.lab import fund, listrules, rulebook, runner, shelf, sim, simcache
 from desk.engine.lab.data import EXPORT_SCHEMA, PLAN_FILE, PUBLIC_COVERAGE, PUBLIC_ROLE, PUBLIC_SIZES, data_path, held_path, load, plan_path
 from desk.engine.lab.runner import process_queue
 from desk.engine.lab.sim import pick, simulate
-from desk.engine.lab.spec import HINDSIGHT, PUBLIC_EXITS, SCREEN_HINDSIGHT, SETS, SIZE_WORDS, SpecError, local_only, parse, resolve, variants
+from desk.engine.lab.spec import FIGURE_NOTES, HINDSIGHT, PUBLIC_EXITS, SCREEN_HINDSIGHT, SETS, SIZE_WORDS, SpecError, local_only, parse, resolve, variants
 from desk.engine.market import LIBRARY_FUNDS
 from desk.worker import store
 
@@ -34,6 +34,16 @@ FRENCH = (
 COVERED = {"as_of": "2013-06-28", "tests_from": "2014-01-02", "listed": 8, "priced": 8, "loading": 0, "missing": 0, "stopped": 0, "pct": 100.0, "enough": True}
 ON_THE_LIST = "Tested on the 8 largest US companies of mid-2013, a list that owes nothing to what you hold. All 8 have prices."
 SIZES = {s: [1e9 * (i + 1), "2013-06-28"] for i, s in enumerate(STOCKS)}
+FIGURES = {
+    "listed": 8,
+    "asked": 8,
+    "loading": 0,
+    "lagged": 0,
+    "odd": 0,
+    fund.YIELD: {"have": 8, "from": "2014-04-01"},
+    fund.MARGIN: {"have": 8, "from": "2014-04-01"},
+}
+FIGURE_ROWS = ("lib-stock-profitability", "lib-stock-earnings-yield")
 NEW_SCREENS = ("lib-stock-dip-hold", "lib-core-stock-picks", "lib-ten-largest", "lib-ten-beaten")
 LIST_ROWS = ("lib-average-down", "lib-cap-position", "lib-harvest-return")
 SUBSET = ("lib-60-40", "lib-vol-cap", "lib-size-small", "lib-trend-dip", "lib-plan-mix", "insider-momentum-filter", "lib-dip-reserve", "lib-lump-sum-spread")
@@ -79,6 +89,9 @@ def lab_file(tmp_path_factory):
     conn.execute("INSERT INTO settings VALUES ('marginal_rate_pct', '24')")
     conn.execute("INSERT INTO settings VALUES (?, ?)", (PUBLIC_COVERAGE, json.dumps(COVERED)))
     conn.execute("INSERT INTO settings VALUES (?, ?)", (PUBLIC_SIZES, json.dumps(SIZES)))
+    conn.execute("INSERT INTO settings VALUES (?, ?)", (fund.COVERAGE, json.dumps(FIGURES)))
+    figures = [(s, d, rng.uniform(-0.02, 0.12), rng.uniform(0.02, 0.4)) for s in STOCKS for d in days[20::63]]
+    conn.executemany("INSERT INTO fundamentals VALUES (?, ?, ?, ?)", figures)
     conn.commit()
     conn.close()
     return path
@@ -362,11 +375,12 @@ PUBLISHED = (
     "lib-discount-day-uptrend",
     *NEW_SCREENS,
     *LIST_ROWS,
+    *FIGURE_ROWS,
 )
 
 
 def test_a_row_id_once_published_is_never_dropped_or_renamed():
-    assert len(PUBLISHED) == len(set(PUBLISHED)) == 69 and not set(PUBLISHED) - shelf.IDS
+    assert len(PUBLISHED) == len(set(PUBLISHED)) == 71 and not set(PUBLISHED) - shelf.IDS
     assert len(shelf.IDS) == len(shelf.LIBRARY)
 
 
@@ -844,6 +858,34 @@ def test_the_four_new_screens_run_on_the_public_stock_list_and_report_against_th
     assert SIZE_WORDS in rows["lib-ten-largest"]["caveats"] and SIZE_WORDS not in rows["lib-ten-beaten"]["caveats"]
 
 
+def test_the_two_company_figure_screens_run_against_the_sp500_once_every_company_is_loaded(stocked, monkeypatch):
+    cfg = stocked
+    monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in FIGURE_ROWS))
+    monkeypatch.setattr(shelf, "IDS", frozenset(FIGURE_ROWS))
+    conn = sqlite3.connect(data_path(cfg))
+    conn.execute("UPDATE settings SET value=? WHERE key=?", (json.dumps(FIGURES | {"asked": 6, "loading": 2}), fund.COVERAGE))
+    conn.commit()
+    assert shelf.queue_missing(cfg, now=NOW)["queued"] == 2
+    process_queue(cfg, now=NOW)
+    for row in shelf.view(cfg)["rows"]:
+        assert row["status"] == "not_run" and row["verdict"] is None
+        assert row["reason"] == "Company earnings history is still loading. This runs once that finishes."
+    conn.execute("UPDATE settings SET value=? WHERE key=?", (json.dumps(FIGURES | {fund.MARGIN: {"have": 8, "from": "2022-01-01"}}), fund.COVERAGE))
+    conn.commit()
+    conn.close()
+    later = NOW + timedelta(days=1)
+    assert shelf.queue_missing(cfg, now=later)["queued"] == 2
+    process_queue(cfg, now=later)
+    rows = {r["id"]: r for r in shelf.view(cfg)["rows"]}
+    short = rows["lib-stock-profitability"]
+    assert short["status"] == "not_run" and short["reason"] == "Earnings history for these companies does not go back far enough to test this yet."
+    cheap = rows["lib-stock-earnings-yield"]
+    assert cheap["status"] == "tested" and cheap["benchmark"] == shelf.SPY and "S&P 500 (SPY)" in cheap["line"] and cheap["kind"] == "classic"
+    assert cheap["verdict"] in ("held_up", "within_noise", "fell_short") and cheap["caveats"][:2] == [ON_THE_LIST, PUBLIC_EXITS]
+    assert FIGURE_NOTES[fund.YIELD] in cheap["caveats"] and any(c.startswith("Company figures come from Alpha Vantage") for c in cheap["caveats"])
+    assert cheap["out_of_sample"]["start"] >= "2014-04-01" and "fund." not in json.dumps([cheap["line"], cheap["caveats"], cheap["description"]])
+
+
 def test_every_row_says_what_it_is_measured_against_and_the_note_says_how_the_luck_bar_counts(stocked, monkeypatch):
     cfg = stocked
     view = shelf.view(cfg)
@@ -881,11 +923,11 @@ def test_stock_screen_rows_say_what_list_they_ran_on_and_only_a_result_from_befo
     cfg = stocked
     data = load(data_path(cfg))
     screens = [e["id"] for e in shelf.LIBRARY if (e.get("spec") or {}).get("universe", {}).get("type") == "screen"]
-    assert len(screens) == 10
+    assert len(screens) == 12
     for sid in screens:
         spec = parse(spec_of(sid), data)
         assert spec.caveats[:2] == [ON_THE_LIST, PUBLIC_EXITS] and SCREEN_HINDSIGHT not in spec.caveats and "survivorship" not in " ".join(spec.caveats)
-        assert spec.start == "2014-01-02"
+        assert spec.start == ("2014-04-01" if sid in FIGURE_ROWS else "2014-01-02")
     assert ON_THE_LIST not in parse(spec_of("lib-three-fund"), data).caveats
     ids = ("lib-stock-momentum", "lib-three-fund")
     monkeypatch.setattr(shelf, "LIBRARY", tuple(e for e in shelf.LIBRARY if e["id"] in ids))
@@ -982,10 +1024,11 @@ def test_a_screen_waits_while_the_list_loads_and_a_result_from_mid_load_runs_aga
 
 def test_the_library_grew_and_each_kind_names_its_new_rows():
     by = {e["id"]: e for e in shelf.LIBRARY}
-    assert len(shelf.LIBRARY) == 69 and len(by) == 69 and sum(e["type"] == "rule" for e in shelf.LIBRARY) == 11
+    assert len(shelf.LIBRARY) == 71 and len(by) == 71 and sum(e["type"] == "rule" for e in shelf.LIBRARY) == 11
     new = {
         "classic": ("lib-three-fund", "lib-permanent", "lib-all-weather", "lib-trend-five", "lib-golden-cross", "lib-asset-momentum")
-        + ("lib-equal-sectors", "lib-equal-weight-500", "lib-dividend-growers", "lib-small-value-fund", "lib-value-momentum", "lib-small-reversal"),
+        + ("lib-equal-sectors", "lib-equal-weight-500", "lib-dividend-growers", "lib-small-value-fund", "lib-value-momentum", "lib-small-reversal")
+        + FIGURE_ROWS,
         "practical": ("lib-core-satellite", "lib-themes-equal", "lib-as-held-capped", "lib-margin-paydown", *NEW_SCREENS, *LIST_ROWS),
         "novel": ("lib-momentum-calm", "lib-drawdown-stop", "lib-down-week", "lib-canary", "lib-credit-canary", "lib-tech-tilt-vol-target")
         + ("lib-discount-day-uptrend",),
@@ -1013,7 +1056,7 @@ def test_a_stock_in_the_plan_is_screened_and_costed_like_any_other_so_a_worker_a
 def test_stock_screens_are_run_again_on_the_public_stock_list():
     screens = {e["id"] for e in shelf.LIBRARY if e["rev"] == shelf.SCREEN_REV}
     assert screens == {e["id"] for e in shelf.LIBRARY if e["type"] == "experiment" and e["spec"]["universe"].get("type") == "screen"}
-    assert len(screens) == 10 and shelf.SCREEN_REV == 5 > shelf.MIX_REV
+    assert len(screens) == 12 and shelf.SCREEN_REV == 5 > shelf.MIX_REV
     for rev in (shelf.MIX_REV, 4):
         seen = {"kind": "experiment", "rev": rev, "result_at": "2026-11-12T05:56:00+00:00", "body": None}
         assert all(shelf._outdated(e, seen) == (e["id"] in screens) for e in shelf.LIBRARY)
