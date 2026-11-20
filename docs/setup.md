@@ -159,7 +159,7 @@ Open the desk at home without Tailscale, the way Hemline has its own address. Ca
 
 | When | Do |
 |---|---|
-| RAM goes to 32 GB | In Apps → `vektor-desk` → Edit, raise cron to `2g`. When the lab is switched on, raise it to `8g`, `cpus: 8` and `DESK_LAB_WORKERS` 8 (the notes in `compose.yaml` say where) |
+| RAM goes to 32 GB (done 2026-11-15) | Nothing to raise. The desk stays inside the NAS's shared rules: 2.5 GiB for all its containers, limits in `compose.yaml` ([Shared NAS rules](architecture.md#shared-nas-rules)). The lab keeps 3 workers in 512m; a wider night is one compose change, only if the NAS-only night runs long |
 | 30 days before the Claude token expires | Settings and a `desk-ops` alert flag it. Run `claude setup-token`, then paste it in Settings → Keys → `CLAUDE_CODE_OAUTH_TOKEN` and set `DESK_CLAUDE_TOKEN_EXPIRES` (or `setup-truenas.sh set` each) |
 | The morning after the first nightly backup | Settings → Box → Restore drill (or `deploy.sh restore-test`): it should end with "Restore drill passed" |
 | A market key arrives | Settings → Keys, or `setup-truenas.sh set TIINGO_API_KEY` (or `FINNHUB_API_KEY`, `FRED_API_KEY`, `RAPIDAPI_KEY`; Alpaca paper: `ALPACA_API_KEY_ID` and `ALPACA_API_SECRET_KEY`) |
