@@ -98,6 +98,15 @@ Shared seams, so nobody edits another owner's code:
 | 2026-11-12 | The Plan keeper checks once per book day; a restarted night never spends a second paid run on the same day |
 | 2026-11-12 | A desk proposal that pulls against a plan step he approved is cleared by the queue rule with its reason, without a model call |
 | 2026-11-12 | Builds on Horizon stay parked until he taps Approve builder; the NAS builds for itself meanwhile |
+| 2026-11-12 | The desk never shows a data warning it can clear by itself and never tells him to run a job. Only what needs his hands shows, in one plain sentence, and the action named must really clear it |
+| 2026-11-12 | "Holdings never leave the box" also covers weights and labels derived from his holdings or plan. The plan mix and his other single stocks stay in box-only data, and the lab file marks no name as his |
+| 2026-11-13 | Stock screens test on a public list (the 200 largest US companies at mid-2011), never on names picked with hindsight |
+| 2026-11-13 | At rest a row shows a name, a verdict and one number; explanations, benchmarks and caveats open on a tap (his feedback) |
+| 2026-11-13 | Threads are paced on his subscription: one PR per item, one full check per head, merges batched into few deploys. The desks' night work comes first |
+| 2026-11-15 | The NAS has 32 GB and every feature comes back to it. Every desk container keeps a hard memory limit, 2.5 GiB in total, under the NAS's shared rules |
+| 2026-11-15 | A thread merges its own finished PR and tells him only the one step left for him, outside 23:00 to 03:00 Eastern (his call) |
+| 2026-11-16 | Plan mix is 80% FXAIX, 10% FTIHX, 10% FTEC, and Sector leaders runs on Alpaca paper (his "Go all") |
+| 2026-11-17 | Keys are entered by a terminal command on his machine, never through a page field, and box config is handed over as the file itself (his calls of 2026-11-17 and 2026-11-18) |
 | 2026-11-07 | Free services only beyond what is already paid for |
 | 2026-11-07 | Design borrows Escape Vektor's look with a single investing focus |
 | 2026-11-07 | Engine is Python; Preflight is engine code that agents call and Design renders |

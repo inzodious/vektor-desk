@@ -221,8 +221,29 @@ He wakes to a full desk: strategies simulated, every holding analysed, buying op
 | Navigation: This morning doors, Strategies by kind, Research by holding, live-led pages | Design | ✅ (#211, #218) |
 | Fund prices that arrive late land the same morning; scanner quality list priced daily (`/api/engine/backfill`) | Statistics | ✅ (#222, #229) |
 | Health lines point to Settings; job runs keep their last line and a short history | Statistics + Infra | ✅ (#224, #228, #230) |
-| "As held" from position sizes in the library | Statistics | ⏳ |
-| Not now fold on Buying opportunities, margin rate field in Settings, job lines on the Jobs page | Design | ⏳ |
+| "As held" from position sizes in the library | Statistics | ✅ (#236) |
+| Not now fold on Buying opportunities, margin rate field in Settings, job lines on the Jobs page | Design | ✅ (#239, #245) |
+
+## Self-repair, the public stock list and next steps ✅
+
+The desk clears its own data warnings, tests stock ideas on a list picked without hindsight, and turns results into one dated list of next steps (Joshua, 2026-11-12 and 2026-11-13). Shipped as 1.5.0 on 2026-11-20.
+
+| Item | Owner | Status |
+|---|---|---|
+| Self-repair: a check the box can clear runs its own fix; only a blocking check shows on a page (`/api/engine/health` kinds) | Statistics + Infra + Design | ✅ (#253, #254, #256, #258 to #261) |
+| Library 39 to 69 rows, each with its benchmark; permanent row ids and one shared "does the test back this" answer | Statistics | ✅ (#250, #251, #270, #278, #282, #284) |
+| Public stock list: 200 largest US companies at mid-2011, sizes checked, prices loaded in the evening (`/api/engine/public-stocks`) | Statistics | ✅ (#257, #266, #271, #288) |
+| Next steps: one dated list with why, evidence and what would change it; pass reasons become steps (`/api/decisions/next-steps`) | Concept + Design | ✅ (#275, #281, #283, #287) |
+| Buying opportunities say what would change a wait; written cases carry the condition to buy on | Opportunities thread + Agents | ✅ (#273, #276, #279, #280) |
+| Queue: nothing leaves silently; debrief rewritten after the last review | Concept + Agents + Design | ✅ (#264, #265, #267 to #269, #272) |
+| Desks wait out Claude's limit and say when a weekly cap frees (`/api/agents/usage`) | Agents | ✅ (#274, #289) |
+| Worker privacy: plan mix and anything marking a name as his stay on the NAS | Statistics + Infra | ✅ (#236, #243, #244, #252) |
+| One line per item at rest on every page | Design | ✅ (#239, #285, #286) |
+| NAS shared rules (2.5 GiB in total), memory record with each job's peak, daily run fixed | Infra | ✅ (#262, #263, #291, #293, #294) |
+| Why it moved; Sector leaders on paper; long-history study; plan mix 80/10/10 | Research threads | ✅ (#296 to #298) |
+| RapidAPI price backups and quarterly earnings history (`av_quarters`) | Infra | ✅ (#299, #300) |
+| The NAS computes the lab's night itself by default; the worker is optional | Statistics | ⏳ |
+| Profitability and earnings-yield screens from quarterly earnings | Statistics | ⏳ |
 
 ## Next: Review rework
 

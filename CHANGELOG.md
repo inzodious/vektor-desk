@@ -4,6 +4,43 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.5.0 - 2026-11-20
+
+### Added
+
+- Next steps: Decisions opens with one dated list of what to do next across your plans, deposits, agreed notes, rules and your own words, each with why, what would change it and whether the lab's test backs it. A reason you type when you pass on a proposal becomes a dated step by itself, with an undo ([#275], [#281], [#283])
+- Strategy library grows from 39 to 69 entries: classic mixes, trend and canary rules, theme funds, a pay-the-margin-first rule, four stock screens a person can follow and three rules shown as a spread of outcomes (averaging down, capping a big position, harvesting a loss and buying back). Every row names what it is measured against, and the luck bar counts every variant ([#236], [#250], [#251], [#282], [#284])
+- A public stock list: stock screens pick from the 200 largest US companies as they stood in mid-2011, so their results no longer lean on hindsight ([#252], [#257], [#266], [#271], [#288])
+- Buying opportunities say what would change each wait: the day the desk re-reads the case, the price that triggers a fresh one, or the condition the written case names. It never reads as a buy signal ([#273], [#276], [#278], [#279], [#280])
+- Why it moved: Research explains why a holding moved hard today and whether the move looks overdone, real, sector-wide or unexplained ([#297])
+- Sector leaders race on paper, and the safe mix follows the new plan of 80% FXAIX, 10% FTIHX, 10% FTEC. A long-history strategy study covers 100 years out of sample with costs and taxes ([#296], [#298])
+- Prices keep coming when Tiingo cannot answer: Alpha Vantage, FMP and YH Finance fill in through RapidAPI. The desk keeps each company's quarterly earnings history, dated by the day it was reported ([#299], [#300])
+- A 48-hour record of the box's memory, and every job run records its peak ([#262], [#263], [#293])
+- The desk has its own app icon, a launch switch under a safety cover ([#292], [#295])
+- Settings takes your own margin rate, lists keys by plain name, shows which names wait on a price and lists each service as up or down. A new desk sets its profile up from a button ([#245], [#247], [#248], [#249], [#255])
+
+### Changed
+
+- The desk refreshes its own data. The "Worth a look" banner and "Refresh data" are gone: a check the box can clear runs its own fix and reads as one plain sentence, only a blocking check shows on a page, and what needs you sits behind the Setup chip ([#253], [#254], [#256], [#258], [#259], [#261])
+- Every page says less at rest: one line per item, with descriptions, figures, caveats and method notes behind a tap ([#239], [#285], [#286])
+- Prices are asked for every hour, day and night, so official closes land the same evening and fund prices the next morning, and the pages say so ([#240], [#241], [#242], [#246])
+- Nothing leaves the Decisions queue silently: snoozed items are listed, an out-of-date proposal says so on arrival, and a replaced line says what became of the newer one ([#265], [#269], [#272])
+- The day's debrief is rewritten after the evening's last review, and Results warns only when a rewrite is late or failed ([#267], [#268], [#269])
+- When Claude's limit is used up the desks wait and come back by themselves after the reset, most important first. A desk at its weekly cap says when it runs again, and Risk keeps a run for its Saturday check ([#274], [#289])
+- Your plan's mix and anything that marks a name as yours stay on the NAS, and the worker keeps only the lab copy its current job uses ([#243], [#244])
+- Every desk container fits the NAS's shared rules: 2.5 GiB of memory in total, capped logs, gentler jobs, one recycled API worker, and builds that take turns with the NAS's other apps ([#291])
+- Health says plainly when the daily figures stop updating, and the desk retries a run the box stopped. Apply compose shows TrueNAS's reason when it refuses ([#293], [#301])
+- A job's last line is kept field by field and counts notes apart from proposals ([#238], [#264])
+
+### Fixed
+
+- The daily figures run again: the daily pass no longer loads prices for the whole public stock list ([#294])
+- A strategy with nothing to tune is judged on its results instead of failing the final check ([#270])
+- The quotes job no longer fails on a fund with no market price, fund look-through finds funds in large trusts and reads SPY, and the flows note no longer asks for an upload that could not clear it ([#260])
+- Health no longer flags a broker file taken on a day you bought, before the cash left ([#288], [#290])
+- A deposit says it pays the margin debit only when it lands in the account that owes it ([#287])
+- The Tax page no longer says the numbers haven't run when no wash-sale window is open, and tests no longer depend on today's date ([#237], [#243], [#277])
+
 ## 1.4.0 - 2026-11-12
 
 ### Added
@@ -588,3 +625,69 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#232]: https://github.com/inzodious/vektor-desk/pull/232
 [#233]: https://github.com/inzodious/vektor-desk/pull/233
 [#234]: https://github.com/inzodious/vektor-desk/pull/234
+[#236]: https://github.com/inzodious/vektor-desk/pull/236
+[#237]: https://github.com/inzodious/vektor-desk/pull/237
+[#238]: https://github.com/inzodious/vektor-desk/pull/238
+[#239]: https://github.com/inzodious/vektor-desk/pull/239
+[#240]: https://github.com/inzodious/vektor-desk/pull/240
+[#241]: https://github.com/inzodious/vektor-desk/pull/241
+[#242]: https://github.com/inzodious/vektor-desk/pull/242
+[#243]: https://github.com/inzodious/vektor-desk/pull/243
+[#244]: https://github.com/inzodious/vektor-desk/pull/244
+[#245]: https://github.com/inzodious/vektor-desk/pull/245
+[#246]: https://github.com/inzodious/vektor-desk/pull/246
+[#247]: https://github.com/inzodious/vektor-desk/pull/247
+[#248]: https://github.com/inzodious/vektor-desk/pull/248
+[#249]: https://github.com/inzodious/vektor-desk/pull/249
+[#250]: https://github.com/inzodious/vektor-desk/pull/250
+[#251]: https://github.com/inzodious/vektor-desk/pull/251
+[#252]: https://github.com/inzodious/vektor-desk/pull/252
+[#253]: https://github.com/inzodious/vektor-desk/pull/253
+[#254]: https://github.com/inzodious/vektor-desk/pull/254
+[#255]: https://github.com/inzodious/vektor-desk/pull/255
+[#256]: https://github.com/inzodious/vektor-desk/pull/256
+[#257]: https://github.com/inzodious/vektor-desk/pull/257
+[#258]: https://github.com/inzodious/vektor-desk/pull/258
+[#259]: https://github.com/inzodious/vektor-desk/pull/259
+[#260]: https://github.com/inzodious/vektor-desk/pull/260
+[#261]: https://github.com/inzodious/vektor-desk/pull/261
+[#262]: https://github.com/inzodious/vektor-desk/pull/262
+[#263]: https://github.com/inzodious/vektor-desk/pull/263
+[#264]: https://github.com/inzodious/vektor-desk/pull/264
+[#265]: https://github.com/inzodious/vektor-desk/pull/265
+[#266]: https://github.com/inzodious/vektor-desk/pull/266
+[#267]: https://github.com/inzodious/vektor-desk/pull/267
+[#268]: https://github.com/inzodious/vektor-desk/pull/268
+[#269]: https://github.com/inzodious/vektor-desk/pull/269
+[#270]: https://github.com/inzodious/vektor-desk/pull/270
+[#271]: https://github.com/inzodious/vektor-desk/pull/271
+[#272]: https://github.com/inzodious/vektor-desk/pull/272
+[#273]: https://github.com/inzodious/vektor-desk/pull/273
+[#274]: https://github.com/inzodious/vektor-desk/pull/274
+[#275]: https://github.com/inzodious/vektor-desk/pull/275
+[#276]: https://github.com/inzodious/vektor-desk/pull/276
+[#277]: https://github.com/inzodious/vektor-desk/pull/277
+[#278]: https://github.com/inzodious/vektor-desk/pull/278
+[#279]: https://github.com/inzodious/vektor-desk/pull/279
+[#280]: https://github.com/inzodious/vektor-desk/pull/280
+[#281]: https://github.com/inzodious/vektor-desk/pull/281
+[#282]: https://github.com/inzodious/vektor-desk/pull/282
+[#283]: https://github.com/inzodious/vektor-desk/pull/283
+[#284]: https://github.com/inzodious/vektor-desk/pull/284
+[#285]: https://github.com/inzodious/vektor-desk/pull/285
+[#286]: https://github.com/inzodious/vektor-desk/pull/286
+[#287]: https://github.com/inzodious/vektor-desk/pull/287
+[#288]: https://github.com/inzodious/vektor-desk/pull/288
+[#289]: https://github.com/inzodious/vektor-desk/pull/289
+[#290]: https://github.com/inzodious/vektor-desk/pull/290
+[#291]: https://github.com/inzodious/vektor-desk/pull/291
+[#292]: https://github.com/inzodious/vektor-desk/pull/292
+[#293]: https://github.com/inzodious/vektor-desk/pull/293
+[#294]: https://github.com/inzodious/vektor-desk/pull/294
+[#295]: https://github.com/inzodious/vektor-desk/pull/295
+[#296]: https://github.com/inzodious/vektor-desk/pull/296
+[#297]: https://github.com/inzodious/vektor-desk/pull/297
+[#298]: https://github.com/inzodious/vektor-desk/pull/298
+[#299]: https://github.com/inzodious/vektor-desk/pull/299
+[#300]: https://github.com/inzodious/vektor-desk/pull/300
+[#301]: https://github.com/inzodious/vektor-desk/pull/301
