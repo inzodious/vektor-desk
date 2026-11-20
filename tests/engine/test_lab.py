@@ -972,6 +972,26 @@ def test_the_offer_job_is_light_and_runs_through_the_lab_hours(cfg):
     assert job.heavy is False and job.title == "Lab work to the worker"
 
 
+def test_by_default_the_lab_keeps_its_whole_night_and_nothing_is_offered(cfg, monkeypatch):
+    from desk.engine import __main__ as engine_main
+
+    monkeypatch.delenv(kinds.TO_WORKER)
+    write_lab_db(cfg)
+    queue(cfg, experiment(), "001-exp.json")
+    made = store.add_worker(cfg, "Horizon")
+    store.beat(cfg, made["id"], {}, now=NOW)
+    assert any(w["state"] == "online" for w in store.workers(cfg, NOW)) and not kinds.to_worker()
+    assert kinds.offer_queue(cfg, now=NOW) == {"offered": 0, "note": kinds.ON_THIS_BOX}
+    assert not store.in_state(cfg, "queued") and not simcache.offers_path(cfg).exists() and not simcache.worker_seen(cfg, NOW)
+    out = engine_main.run_lab_offer(cfg)
+    assert out["offered"] == 0 and out["note"] == kinds.ON_THIS_BOX and "DESK_" not in out["note"]
+    ran = process_queue(cfg, now=NOW)
+    assert "waiting_for_worker" not in ran and "001-exp.json" in [d["file"] for d in ran["done"]]
+    for word, on in (("1", True), ("on", True), ("0", False), ("", False), ("off", False)):
+        monkeypatch.setenv(kinds.TO_WORKER, word)
+        assert kinds.to_worker() is on
+
+
 def test_a_worker_result_is_staged_by_path_without_being_read(cfg, tmp_path):
     write_lab_db(cfg)
     result = tmp_path / "result.json.gz"

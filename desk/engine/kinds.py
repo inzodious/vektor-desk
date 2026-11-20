@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 from datetime import UTC, datetime
 
@@ -8,6 +9,9 @@ from desk.engine.lab import runner, simcache
 from desk.engine.lab.data import data_path, ledger_path, plan_path, read_plan
 from desk.engine.lab.spec import local_only
 from desk.worker import Kind, offer, online
+
+TO_WORKER = "DESK_LAB_TO_WORKER"
+ON_THIS_BOX = "The lab runs its whole queue on this box; sending it to a worker is switched off."
 
 # ---- Lab simulations on a worker ----
 
@@ -53,8 +57,14 @@ def waiting(cfg: Config) -> list[tuple[str, dict]]:
     return out
 
 
+def to_worker() -> bool:
+    return os.environ.get(TO_WORKER, "").strip().lower() in ("1", "on", "true", "yes")
+
+
 def offer_queue(cfg: Config, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
+    if not to_worker():
+        return {"offered": 0, "note": ON_THIS_BOX}
     try:
         if not online(cfg, now):
             return {"offered": 0, "note": "No worker is online, so the lab runs its queue itself."}
