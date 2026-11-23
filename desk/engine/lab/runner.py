@@ -218,10 +218,13 @@ def _compute(data, spec, jobs: list[tuple]) -> list[Run]:
     global _DATA, _SPEC
     _DATA, _SPEC = data, spec
     workers = max(1, int(os.environ.get("DESK_LAB_WORKERS", "1") or 1))
-    if workers > 1 and len(jobs) > 4 and "fork" in multiprocessing.get_all_start_methods():
-        with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("fork")) as pool:
-            return list(pool.map(_job, jobs, chunksize=4))
-    return [_job(j) for j in jobs]
+    try:
+        if workers > 1 and len(jobs) > 4 and "fork" in multiprocessing.get_all_start_methods():
+            with ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("fork")) as pool:
+                return list(pool.map(_job, jobs, chunksize=4))
+        return [_job(j) for j in jobs]
+    finally:
+        _DATA, _SPEC = None, None
 
 
 def _run_many(cfg, data, spec, jobs: list[tuple], cache: Cache | None = None) -> list[Run]:
