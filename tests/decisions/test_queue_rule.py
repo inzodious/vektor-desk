@@ -197,6 +197,37 @@ def test_a_successor_says_in_plain_words_what_became_of_it(cfg, preflight, now, 
     assert seen[pairs["agreed"][0]["id"]]["status"] == "done" and seen[pairs["agreed"][0]["id"]]["decided_at"]
 
 
+def debit(conn, day, value):
+    conn.execute(
+        "INSERT OR REPLACE INTO metric_values (metric_id, scope, scope_id, window, as_of, value, unit, n_obs, quality, engine_version) "
+        "VALUES ('margin.debit', 'portfolio', 'all', 'now', ?, ?, 'usd', 1, 'ok', '1')",
+        (day, value),
+    )
+    conn.commit()
+
+
+def test_a_margin_note_clears_once_the_book_shows_no_debit(cfg, preflight, now, desk_db, proposal):
+    far = {"expires": "2099-01-01", "thesis": "Made-up."}
+    margin = create_proposal(cfg, proposal(kind="hold_off", symbol=None, subject="margin", **far), "plan_keeper", run_id="r1", now=now)
+    worded = create_proposal(
+        cfg, proposal(kind="hold_off", symbol=None, title="Hold off on new buys until the margin debit is paid", **far), "risk", run_id="k1", now=now
+    )
+    stock = create_proposal(cfg, proposal(kind="hold_off", symbol="ABCD", title="Hold off on ABCD while margin is high", **far), "risk", run_id="k1", now=now)
+    mine = draft(cfg, {"kind": "hold_off", "title": "Pay down margin first", "subject": "margin", **far}, now=now)
+    debit(desk_db, "2026-11-08", 0.0)
+    debit(desk_db, "2026-11-09", 900.0)
+    assert {d["id"] for d in queue(cfg, now=now)["items"]} >= {margin["id"], worded["id"], stock["id"], mine["id"]}
+    debit(desk_db, "2026-11-11", 0.4)
+    later = now + timedelta(days=2)
+    left = {d["id"] for d in queue(cfg, now=later)["items"]}
+    assert margin["id"] not in left and worded["id"] not in left and {stock["id"], mine["id"]} <= left
+    assert reason(cfg, margin) == "The margin debit this was about is paid off: the book shows none as of Nov 11."
+    gone = {d["id"]: d for d in cleared(cfg, now=later)["items"]}
+    assert gone[margin["id"]]["check"] == "debit" and gone[worded["id"]]["status"] == "expired"
+    fresh = create_proposal(cfg, proposal(kind="hold_off", symbol=None, subject="margin", **far), "plan_keeper", run_id="r2", now=later)
+    assert (fresh["status"], fresh["status_reason"]) == ("expired", "The margin debit this was about is paid off: the book shows none as of Nov 11.")
+
+
 # ---- Nothing leaves without a trace ----
 
 
