@@ -1,4 +1,6 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
+
+import pytest
 
 from desk.engine import rapid
 from desk.engine.__main__ import run_market_backfill
@@ -52,6 +54,14 @@ class Providers(FakeHttp):
         return Res(200, {"meta": {}, "body": {str(EPOCH[d]): row | {"date_utc": EPOCH[d]} for d in WEEK}})
 
 
+@pytest.fixture(autouse=True)
+def naps(monkeypatch):
+    slept: list[float] = []
+    monkeypatch.setattr(rapid, "_sleep", slept.append)
+    monkeypatch.setattr(rapid, "_last", {})
+    return slept
+
+
 def hosts(http):
     return [c[0].split("//")[1].split(".")[0] for c in http.calls if "rapidapi" in c[0]]
 
@@ -73,13 +83,13 @@ def test_each_provider_reads_into_the_same_bar_shape():
     assert [(b["date"], b["close"], b["div_cash"], b["split_factor"]) for b in fmp] == [("2026-11-10", 41.0, 0.0, 1.0), ("2026-11-11", 41.0, 0.0, 1.0)]
     yh = rapid.yh_daily(Providers(yh={"ACME"}), "ACME", "rk", "2026-11-10")
     assert [(b["date"], b["adj_close"]) for b in yh] == [("2026-11-10", 42.0), ("2026-11-11", 42.0)]
-    for http, err in ((Providers(av_note=True), "Alpha Vantage rate limit"), (Providers(), "Alpha Vantage has no daily prices for ZZZ")):
-        try:
+    for http, err in (
+        (Providers(av_note=True), "Alpha Vantage still asked to slow down after 3 tries: "),
+        (Providers(), "Alpha Vantage has no daily prices for ZZZ"),
+    ):
+        with pytest.raises(ProviderError) as caught:
             rapid.av_daily(http, "ZZZ", "rk", "2026-11-10", today=day)
-        except ProviderError as e:
-            assert str(e) == err
-        else:
-            raise AssertionError(err)
+        assert str(caught.value).startswith(err)
 
 
 # ---- Filling in for Tiingo ----
@@ -149,7 +159,7 @@ def test_a_backup_stops_for_the_run_at_its_rate_limit_and_counts_against_its_dai
     monkeypatch.setenv("DESK_YHFINANCE_MONTHLY", "0")
     http = Providers(av_note=True)
     out = run_market_backfill(cfg, http)
-    assert hosts(http) == ["alpha-vantage"] and out["backups"] == {}
+    assert hosts(http) == ["alpha-vantage"] * rapid.TRIES and out["backups"] == {}
     assert out["backup_use"]["alphavantage"]["used"]["day"] == 1 and out["backup_use"]["fmp"]["limits"]["day"] == 0
     monkeypatch.setenv("DESK_ALPHAVANTAGE_DAILY", "1")
     again = Providers(av={"HELDA", "HELDB"})
@@ -225,12 +235,76 @@ def test_earnings_history_loads_each_quarter_with_the_day_it_was_reported_inside
 
 
 def test_a_daily_limit_answer_stops_the_night_and_the_name_is_tried_again_later(cfg, monkeypatch):
+    from desk.engine import avhistory
     from desk.engine.__main__ import run_av_history
 
     conn = ledger(cfg, [("HELDA", "held", "2026-11-10", None, None), ("HELDB", "held", "2026-11-10", None, None)])
     monkeypatch.setenv("RAPIDAPI_KEY", "rk")
     http = Earnings(limited_after=2)
     out = run_av_history(cfg, http)
-    assert out["loaded"] == ["HELDA"] and out["errors"] == ["HELDB: Alpha Vantage rate limit"] and len(http.calls) == 3
-    assert conn.execute("SELECT error FROM av_fetches WHERE symbol='HELDB'").fetchone()[0] == "Alpha Vantage rate limit"
+    said = "Alpha Vantage is out of calls for now: You have reached your daily limit."
+    assert out["loaded"] == ["HELDA"] and out["errors"] == [f"HELDB: {said}"] and len(http.calls) == 3
+    assert out["ok"] and out["stopped"] == said and "Stopped early" in out["detail"]
+    assert conn.execute("SELECT error FROM av_fetches WHERE symbol='HELDB'").fetchone()[0] == said
+    assert avhistory.wanted(conn, datetime.now(UTC)) == []
+    assert avhistory.wanted(conn, datetime.now(UTC) + timedelta(days=1, minutes=1)) == ["HELDB"]
     conn.close()
+
+
+from desk.engine import avhistory  # noqa: E402
+
+
+class Choppy(Earnings):
+    def __init__(self, slow=(), missing=()):
+        super().__init__()
+        self.slow, self.missing = list(slow), set(missing)
+
+    def get(self, url, params=None, headers=None, timeout=None):
+        if len(self.calls) in self.slow:
+            self.slow.remove(len(self.calls))
+            self.calls.append((url, params))
+            return Res(429, {"message": "You have exceeded the rate limit per minute for your plan, BASIC, by the API provider"})
+        if params["symbol"] in self.missing:
+            self.calls.append((url, params))
+            return Res(200, {"Error Message": "Invalid API call. Please retry or visit the documentation."})
+        return super().get(url, params, headers, timeout)
+
+
+def test_a_slow_down_answer_waits_a_minute_and_carries_on_and_calls_are_paced_to_five_a_minute(cfg, monkeypatch, naps):
+    from desk.engine.__main__ import run_av_history
+
+    ledger(cfg, [(s, "held", "2026-11-10", None, None) for s in ("HELDA", "HELDB", "HELDC")]).close()
+    monkeypatch.setenv("RAPIDAPI_KEY", "rk")
+    out = run_av_history(cfg, Choppy(slow=[1, 3]))
+    assert out["ok"] and out["loaded"] == ["HELDA", "HELDB", "HELDC"] and out["errors"] == [] and out["stopped"] is None
+    assert naps.count(rapid.WAIT_S) == 2
+    assert len([s for s in naps if 11.5 < s <= 60 / 5 + 0.5]) >= 6
+
+
+def test_one_companys_error_is_recorded_and_the_night_goes_on(cfg, monkeypatch):
+    from desk.engine.__main__ import run_av_history
+
+    conn = ledger(cfg, [(s, "held", "2026-11-10", None, None) for s in ("HELDA", "HELDB", "HELDC")])
+    monkeypatch.setenv("RAPIDAPI_KEY", "rk")
+    out = run_av_history(cfg, Choppy(missing={"HELDB"}))
+    assert out["ok"] and out["loaded"] == ["HELDA", "HELDC"] and out["stopped"] is None
+    assert out["errors"] == ["HELDB: Alpha Vantage has no earnings for HELDB: Invalid API call. Please retry or visit the documentation."]
+    seen = avhistory.state(conn)
+    assert seen["asked"] == 3 and seen["with_quarters"] == 2 and [e["symbol"] for e in seen["errors"]] == ["HELDB"]
+    assert seen["last_run"]["ok"] and seen["last_run"]["loaded"] == ["HELDA", "HELDC"]
+    soon = datetime.now(UTC) + timedelta(days=2)
+    assert "HELDB" not in avhistory.wanted(conn, soon) and "HELDB" in avhistory.wanted(conn, soon + timedelta(days=13))
+    backups = rapid.state(conn)
+    av = next(p for p in backups["providers"] if p["name"] == "alphavantage")
+    assert backups["key_set"] and av["used"]["day"] == 5 and av["last_error"]["symbol"] == "HELDB" and "Invalid API call" in av["last_error"]["error"]
+    assert "rk" not in str(backups)
+    conn.close()
+
+
+def test_rapidapi_answers_sort_into_slow_down_out_of_calls_and_refused():
+    av = rapid.BY_NAME[rapid.AV]
+    assert isinstance(rapid.limited(av, "You have exceeded the rate limit per minute for your plan"), rapid.SlowDown)
+    assert isinstance(rapid.limited(av, "Our standard API call frequency is 5 calls per minute and 500 calls per day."), rapid.SlowDown)
+    assert isinstance(rapid.limited(av, "You have exceeded the DAILY quota for Requests on your current plan, BASIC."), rapid.OutOfCalls)
+    assert isinstance(rapid.limited(av, "Thank you for using Alpha Vantage! This is a premium endpoint."), rapid.Refused)
+    assert rapid.stops(rapid.OutOfCalls("x")) and rapid.stops(rapid.Refused("x")) and not rapid.stops(ProviderError("ZZZ has no data"))
