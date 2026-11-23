@@ -598,6 +598,12 @@ CREATE TABLE IF NOT EXISTS av_fetches (
   quarters INTEGER NOT NULL,
   error TEXT
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS provider_errors (
+  provider TEXT PRIMARY KEY,
+  at TEXT NOT NULL,
+  symbol TEXT,
+  error TEXT NOT NULL
+) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS earnings (
   symbol TEXT NOT NULL,
   date TEXT NOT NULL,
