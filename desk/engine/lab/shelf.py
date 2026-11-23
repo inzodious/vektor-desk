@@ -57,6 +57,7 @@ NOTE = (
 BAR_NOTE = "The luck bar counts all {trials} variants tried across the library, not only a row's own, so it rises for every row as strategies are added."
 N = NormalDist()
 RETRY_AFTER = timedelta(hours=12)
+NIGHTS_SHOWN = 7
 LOADING_RETRY = timedelta(hours=20)
 REFRESH_AFTER = timedelta(days=30)
 HINDSIGHT_REFRESH = timedelta(days=7)
@@ -1242,6 +1243,19 @@ def rows(cfg: Config, ids) -> dict[str, dict]:
     return out
 
 
+def nights(cfg: Config, limit: int = NIGHTS_SHOWN) -> list[dict]:
+    path = ledger_path(cfg)
+    if not path.exists():
+        return []
+    conn = connect(path, readonly=True)
+    try:
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE name='lab_nights'").fetchone() is None:
+            return []
+        return [dict(r) for r in conn.execute("SELECT * FROM lab_nights ORDER BY at DESC LIMIT ?", (limit,))]
+    finally:
+        conn.close()
+
+
 def view(cfg: Config) -> dict:
     latest, done, trials = _latest(cfg)
     waiting = _queued(cfg, done)
@@ -1284,6 +1298,7 @@ def view(cfg: Config) -> dict:
         "counts": counts,
         "kinds": [{"key": k, "title": t} for k, t in KINDS],
         "benchmarks": [{"name": name, "words": words, "rows": sum(r["benchmark"] == name for r in rows)} for name, words in BENCH_WORDS.items()],
+        "nights": nights(cfg),
         "rows": rows,
     }
 

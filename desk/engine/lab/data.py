@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import weakref
 from array import array
 from bisect import bisect_right
 from collections.abc import Mapping, Sequence
@@ -544,7 +545,7 @@ def load(path: Path) -> LabData:
     if held:
         settings |= {"held_mix_as_of": held["as_of"], "held_mix_covered": str(held["covered"]) if held["covered"] is not None else None}
     calendar = list(series[ref].dates)
-    return LabData(
+    data = LabData(
         series,
         kinds,
         roles,
@@ -562,3 +563,15 @@ def load(path: Path) -> LabData:
         held_mix=held.get("weights") or {},
         fund=figures,
     )
+    _LOADED.append(weakref.ref(data))
+    return data
+
+
+# ---- How many loaded copies this process still holds ----
+
+_LOADED: list[weakref.ref] = []
+
+
+def copies() -> int:
+    _LOADED[:] = [r for r in _LOADED if r() is not None]
+    return len(_LOADED)

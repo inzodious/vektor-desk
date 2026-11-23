@@ -18,6 +18,7 @@ from desk.engine import gate, kinds, lab, schema
 from desk.engine.__main__ import run_holdings, run_lab_export
 from desk.engine.backfill import add_symbols
 from desk.engine.lab import __main__ as lab_main
+from desk.engine.lab import data as lab_data
 from desk.engine.lab import fund, paper, runner, shelf, sim, simcache, stats
 from desk.engine.lab import library as features
 from desk.engine.lab.data import EXPORT_SCHEMA, Series, data_path, export, held_path, ledger_path, load, own_path, plan_path
@@ -739,6 +740,55 @@ def test_the_lab_lets_go_of_a_night_s_data_so_the_next_night_never_loads_beside_
     with pytest.raises(KeyError):
         runner._compute(data, parse(SPEC, data), [({"top_n": 1}, "2015-01-02", "2017-12-29", 1.0)])
     assert runner._DATA is None and runner._SPEC is None
+
+
+def test_each_work_night_records_its_own_peak_and_how_many_copies_of_the_data_it_held(cfg, app_client):
+    write_lab_db(cfg)
+    assert "memory" not in process_queue(cfg, now=NOW) and shelf.nights(cfg) == []
+    gc.collect()
+    before = lab_data.copies()
+    queue(cfg, experiment(), "001-sector-momentum-v1-experiment.json")
+    first = process_queue(cfg, now=NOW)
+    assert (
+        first["memory"]["copies"] == before + 1
+        and first["memory"]["peak_mb"] > 0
+        and set(first["memory"]) == {"peak_mb", "copies", "group_peak_mb", "limit_mb"}
+    )
+    assert "memory" not in process_queue(cfg, now=NOW + timedelta(hours=1))
+    kept = load(data_path(cfg))
+    queue(cfg, experiment(spec=SPEC | {"id": "sector-momentum-two"}), "002-sector-momentum-two-v1-experiment.json")
+    second = process_queue(cfg, now=NOW + timedelta(days=1))
+    assert second["memory"]["copies"] == before + 2
+    del kept
+    gc.collect()
+    assert lab_data.copies() == before
+    rows = shelf.nights(cfg)
+    assert [(r["at"][:10], r["files"], r["copies"] - before) for r in rows] == [("2025-01-03", 1, 2), ("2025-01-02", 1, 1)]
+    assert all(r["peak_mb"] > 0 and r["seconds"] >= 0 for r in rows) and shelf.nights(cfg, limit=1) == rows[:1]
+    assert app_client(packages=["engine"]).get("/api/lab/library").json()["nights"] == rows
+    led = ledger(cfg)
+    with led:
+        led.executemany(
+            "INSERT INTO lab_nights VALUES (?, 1, 1.0, 100, 1, NULL, NULL)",
+            [(f"2024-{m:02d}-{d:02d}T06:00:00+00:00",) for m in range(1, 4) for d in range(1, 26)],
+        )
+    runner._night(led, NOW + timedelta(days=2), 3, 2.0, {"peak_mb": 120, "copies": 1, "group_peak_mb": 300, "limit_mb": 512})
+    kept_rows = led.execute("SELECT count(*), min(at) FROM lab_nights").fetchone()
+    led.close()
+    assert (
+        kept_rows[0] == runner.NIGHTS_KEPT
+        and kept_rows[1] > "2024-01-18"
+        and shelf.nights(cfg)[0] | {"at": ""}
+        == {
+            "at": "",
+            "files": 3,
+            "seconds": 2.0,
+            "peak_mb": 120,
+            "copies": 1,
+            "group_peak_mb": 300,
+            "limit_mb": 512,
+        }
+    )
 
 
 def test_export_keeps_the_first_source_for_a_bar(cfg):
