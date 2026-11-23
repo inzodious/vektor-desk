@@ -9,7 +9,9 @@
 #                      random second within 90, makes no GitHub sync from 1 to 6 AM ET (the NAS's night window), and a box
 #                      build waits for the NAS's shared build lock (/mnt/Manifest/locks/nas-build.lock)
 #   deploy.sh status   what's live, what's on GitHub, the desk's own status, the last log lines
-#   deploy.sh backup   the nightly backup: consistent copies of every SQLite file plus the inbox, to the Singularity pool
+#   deploy.sh backup   a backup now: consistent copies of every SQLite file plus the inbox, to the Singularity pool
+#   deploy.sh nightly  what auto runs every 5 minutes: once a night between 22:30 and 01:00 ET, a backup kept apart from
+#                      the deploy ones (newest 7), then the restore drill on it; outside that window it does nothing
 #   deploy.sh restore-test  restore drill: unpacks the newest backup into a scratch folder and checks every database
 #                      opens, passes its integrity check and has the expected tables; the live data isn't touched
 #   deploy.sh check    end-to-end checks: Claude sign-in, Firestore read access, the DNS records against the tailnet and
@@ -43,6 +45,11 @@ APP_CONFIGS=${DESK_APP_CONFIGS:-/mnt/.ix-apps/app_configs}
 ICON_URL=${DESK_ICON_URL:-https://desk-lan.escape-vektor.com/icon-512.png}
 PORTAL_URL=${DESK_PORTAL_URL:-https://desk-lan.escape-vektor.com/}
 KEEP=${DESK_BACKUP_KEEP:-14}
+NIGHTLY_KEEP=${DESK_NIGHTLY_KEEP:-7}
+NIGHTLY_FROM=${DESK_NIGHTLY_FROM:-2230}
+NIGHTLY_TO=${DESK_NIGHTLY_TO:-0100}
+NIGHTLY_TRIES=${DESK_NIGHTLY_TRIES:-3}
+BACKUP_KIND=
 HEALTH_WAIT=${DESK_HEALTH_WAIT:-120}
 LOG=$ROOT/deploy.log
 BUILD_LOG=$ROOT/deploy-build.log
@@ -61,6 +68,7 @@ AUTO_SCRIPT=$ROOT/deploy-auto.failed.script
 STOPPED_ON=deploy
 AUTO_NOTE=$ROOT/deploy-auto.note
 BACKUP_WHY=$ROOT/backup.why
+NIGHTLY_STATE=$ROOT/backup-nightly.json
 BUSY=75
 IMAGES=("vektor-desk:local=." "vektor-desk/caddy:local=deploy/caddy")
 MEMINFO=${DESK_MEMINFO:-/proc/meminfo}
@@ -198,15 +206,19 @@ busy() {
 }
 
 tarball() {
-  local file
+  local file pattern="$APP-2*.tar.gz" keep=$KEEP
   mkdir -p "$BACKUPS"
-  file="$BACKUPS/$APP-$(date +%Y%m%d-%H%M%S).tar.gz"
+  if [ "$BACKUP_KIND" = nightly ]; then
+    pattern="$APP-nightly-*.tar.gz"
+    keep=$NIGHTLY_KEEP
+  fi
+  file="$BACKUPS/$APP-${BACKUP_KIND:+$BACKUP_KIND-}$(date +%Y%m%d-%H%M%S).tar.gz"
   tar "$@" -czf "$file.part" || {
     rm -f "$file.part"
     return 1
   }
   mv "$file.part" "$file"
-  find "$BACKUPS" -maxdepth 1 -name "$APP-*.tar.gz" -printf '%T@ %p\n' | sort -rn | tail -n +$((KEEP + 1)) | cut -d' ' -f2- | xargs -r rm -f
+  find "$BACKUPS" -maxdepth 1 -name "$pattern" -printf '%T@ %p\n' | sort -rn | tail -n +$((keep + 1)) | cut -d' ' -f2- | xargs -r rm -f
   echo "$file"
 }
 
@@ -261,13 +273,78 @@ restore_test() {
   tar -xzf "$latest" -C "$scratch" || die "couldn't unpack $latest"
   chown -R 568:568 "$scratch"
   echo "Restoring $(basename "$latest") into $scratch"
-  docker run --rm --network none --user 568:568 -v "$scratch:/restore" vektor-desk:local python -m desk.backup --verify /restore || rc=$?
+  docker run --rm --network none --memory 512m --user 568:568 -v "$scratch:/restore" vektor-desk:local python -m desk.backup --verify /restore || rc=$?
   rm -rf "$scratch"
   if [ "$rc" -eq 0 ]; then
     log "Restore drill passed: $(basename "$latest")"
   else
     die "the restore drill failed for $(basename "$latest"); see the problems above"
   fi
+}
+
+# ---- Nightly backup and restore drill ----
+
+in_nightly_window() {
+  local now
+  now=$((10#$(TZ=$QUIET_TZ date +%H%M)))
+  [ "$now" -ge $((10#$NIGHTLY_FROM)) ] || [ "$now" -lt $((10#$NIGHTLY_TO)) ]
+}
+
+night_of() { TZ=$QUIET_TZ date -d '-2 hours' +%F; }
+
+nightly_get() { jq -r --arg k "$1" '.[$k] // empty' "$NIGHTLY_STATE" 2>/dev/null || true; }
+
+nightly_put() {
+  local tmp
+  tmp=$(mktemp "$ROOT/.backup-nightly.XXXXXX")
+  cat >"$tmp"
+  mv -f "$tmp" "$NIGHTLY_STATE"
+}
+
+nightly_publish() {
+  local dir
+  [ -f "$NIGHTLY_STATE" ] || return 0
+  dir=$(box_dir) || return 0
+  box_put "$dir" nightly.json <"$NIGHTLY_STATE"
+}
+
+nightly() {
+  local night tries files why drill rc=0 at
+  in_nightly_window || return 0
+  night=$(night_of)
+  [ "$(nightly_get night)" = "$night" ] || jq -n --arg n "$night" '{night: $n, tries: 0, complete: false, backup: null, drill: null}' | nightly_put
+  [ "$(nightly_get complete)" != true ] || return 0
+  tries=$(nightly_get tries)
+  [ "${tries:-0}" -lt "$NIGHTLY_TRIES" ] || return 0
+  exec 9>"$LOCK"
+  flock -n 9 || return 0
+  tries=$((${tries:-0} + 1))
+  at=$(date -u +%FT%TZ)
+  BACKUP_KIND=nightly
+  if ! files=$(backup); then
+    why=$(backup_why)
+    log "Nightly backup failed (try $tries of $NIGHTLY_TRIES)${why:+: $why}"
+    jq -n --arg n "$night" --argjson t "$tries" --arg at "$at" --arg w "${why:-unknown}" \
+      '{night: $n, tries: $t, complete: false, backup: {at: $at, ok: false, file: null, why: $w}, drill: null}' | nightly_put
+    nightly_publish
+    if [ "$tries" -ge "$NIGHTLY_TRIES" ]; then
+      ALERTS="Nightly backup failed"
+      alert "$ALERTS" "The nightly backup failed $tries times tonight${why:+: $why}. Settings, Box, Back up now tries again."
+    fi
+    return 1
+  fi
+  log "Nightly backup: $files"
+  if [ "$(cat "$AUTO_WHY" 2>/dev/null)" = backup ]; then
+    rm -f "$AUTO_FAILED" "$AUTO_WHY"
+    log "The backup works again, so auto-deploy retries the commit it was holding back"
+  fi
+  drill=$( (ALERTS="Nightly restore drill failed" restore_test) 2>&1) || rc=$?
+  jq -n --arg n "$night" --argjson t "$tries" --arg at "$at" --arg f "$(basename "$files")" --arg d "$(date -u +%FT%TZ)" \
+    --argjson ok "$([ "$rc" -eq 0 ] && echo true || echo false)" --arg w "$(printf '%s\n' "$drill" | { grep -v '^Restoring ' || true; } | tail -n 3 | tr '\n' ' ' | cut -c1-400)" \
+    '{night: $n, tries: $t, complete: true, backup: {at: $at, ok: true, file: $f, why: null}, drill: {at: $d, ok: $ok, file: $f, why: (if $ok then null else $w end)}}' |
+    nightly_put
+  nightly_publish
+  return 0
 }
 
 update_checkout() {
@@ -1479,14 +1556,17 @@ main() {
       app_card || true
       ;;
     backup)
-      ALERTS="Nightly backup failed"
+      ALERTS="Backup failed"
       backup_now
       ;;
+    nightly) nightly ;;
     auto)
       bash "$SELF" auto-deploy || rc=$?
       app_card >/dev/null 2>&1 || true
       logs_export || true
       box_requests || true
+      bash "$SELF" nightly || true
+      nightly_publish || true
       exit "$rc"
       ;;
     auto-deploy) auto ;;
@@ -1509,7 +1589,7 @@ main() {
       apply_compose
       ;;
     *)
-      echo "usage: deploy.sh [now | auto | status | backup | restore-test | check | logs | card | redeploy | box | update-script | apply-compose | deploy-now | approve-builder]" >&2
+      echo "usage: deploy.sh [now | auto | status | backup | nightly | restore-test | check | logs | card | redeploy | box | update-script | apply-compose | deploy-now | approve-builder]" >&2
       exit 2
       ;;
   esac
