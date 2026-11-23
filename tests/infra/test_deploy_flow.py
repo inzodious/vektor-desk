@@ -352,6 +352,32 @@ memory_state"""
     ]
 
 
+def test_a_kill_stays_in_the_report_for_48_hours_after_the_journal_drops_it(tmp_path):
+    from datetime import UTC, datetime, timedelta
+
+    fresh = (datetime.now(UTC) - timedelta(hours=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    stale = (datetime.now(UTC) - timedelta(hours=49)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    earlier = {
+        "checked_at": fresh,
+        "kills": [
+            {"at": fresh, "process": "python", "scope": "cap", "service": "lab"},
+            {"at": stale, "process": "node", "scope": "cap", "service": "cron"},
+            {"at": "not a time", "process": "x", "scope": "box", "service": ""},
+        ],
+    }
+    (tmp_path / "memory.json").write_text(json.dumps(earlier))
+    script = f"""source "{DEPLOY}"
+journalctl() {{ return 1; }}
+docker() {{ return 1; }}
+memory_state {tmp_path}/memory.json"""
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={"PATH": "/usr/local/bin:/usr/bin:/bin"}, timeout=30)
+    assert res.returncode == 0, res.stderr
+    assert json.loads(res.stdout)["kills"] == [{"at": fresh, "process": "python", "scope": "cap", "service": "lab"}]
+    (tmp_path / "memory.json").write_text("not json")
+    again = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={"PATH": "/usr/local/bin:/usr/bin:/bin"}, timeout=30)
+    assert again.returncode == 0 and json.loads(again.stdout)["kills"] == []
+
+
 def test_the_host_report_is_empty_not_broken_without_a_journal(tmp_path):
     script = f"""source "{DEPLOY}"
 journalctl() {{ return 1; }}

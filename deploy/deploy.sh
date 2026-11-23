@@ -999,7 +999,7 @@ box_run() {
 }
 
 memory_state() {
-  local names
+  local names before=${1:-}
   names=$(mktemp)
   docker ps -a --no-trunc --filter "name=^$APP-" --format '{{.ID}} {{.Names}}' >"$names" 2>/dev/null || true
   { journalctl -k -o short-iso --since "-2 days" --no-pager 2>/dev/null || true; } | grep -F 'oom-kill:' | tail -n 60 |
@@ -1007,8 +1007,9 @@ memory_state() {
 import json
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
+now = datetime.now(timezone.utc)
 names = {}
 for line in open(sys.argv[1]):
     parts = line.split()
@@ -1038,8 +1039,23 @@ for line in sys.stdin:
             "service": service.removeprefix(sys.argv[2] + "-"),
         }
     )
-print(json.dumps({"checked_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "kills": kills}))
-' "$names" "$APP" || true
+kept = []
+try:
+    with open(sys.argv[3]) as f:
+        before = json.load(f).get("kills") or []
+except (OSError, ValueError, IndexError, AttributeError):
+    before = []
+for row in before if isinstance(before, list) else []:
+    try:
+        at = datetime.strptime(str(row["at"]), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except (KeyError, TypeError, ValueError):
+        continue
+    if now - at <= timedelta(hours=48):
+        kept.append({k: str(row.get(k) or "") for k in ("at", "process", "scope", "service")})
+seen = {(k["at"], k["process"]) for k in kills}
+kills = sorted(kills + [k for k in kept if (k["at"], k["process"]) not in seen], key=lambda k: k["at"])[-100:]
+print(json.dumps({"checked_at": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "kills": kills}))
+' "$names" "$APP" "$before" || true
   rm -f "$names"
 }
 
@@ -1052,7 +1068,7 @@ box_requests() {
   date -u +%FT%TZ | box_put "$dir" host.alive
   script_state 2>/dev/null | box_put "$dir" script.json || true
   compose_state 2>/dev/null | box_put "$dir" compose.json || true
-  memory_state 2>/dev/null | box_put "$dir" memory.json || true
+  memory_state "$dir/memory.json" 2>/dev/null | box_put "$dir" memory.json || true
   builder_state 2>/dev/null | box_put "$dir" builder.json || true
   box_keys "$dir" || true
   for action in $BOX_ACTIONS; do
