@@ -1410,6 +1410,17 @@ The NAS containers are small (cron 544 MB, lab 512 MB, API 192 MB; docs/architec
 | Lab left running across work nights, 2026-11-23: the same file and group, one process doing four new experiments a night with 3 workers | 167 every night (was 161 the first night, then 286 from the second on) | 21 a night | The runner kept the last night's data in a module global for its workers, so the next night's copy was loaded beside it and the process held both from then on. `runner._compute` now lets go of it when the batch ends. A freshly started lab never showed this, which is why the 2026-11-20 rows above missed it |
 | `daily` with the public list, 2026-11-16: 262 names, 1.44M price bars since 2005 | 278 (was 812, killed at 640 on 11-14) | | Prices read for the book leave out names only on the public list (`holdings.list_only`: role `public` and never held). Output identical |
 
+**The lab's own memory, read from the box.** The lab container runs no scheduled job, so it had no peak figure. Each time it works its queue it now stores a row in `lab_nights` in `ledger.db` (newest 60 kept) and prints the same under `memory`. `GET /api/lab/library` returns the newest 7 as `nights[]`.
+
+| Field | Meaning |
+|---|---|
+| `at`, `files`, `seconds` | When the lab started on its queue, how many queue files it finished, how long it took |
+| `peak_mb` | The lab process's own high-water mark for that work, reset before the data loads (`/proc/self/clear_refs`); the lifetime mark if the reset is refused. Forked workers share the loaded data and added under 30 MB in every measurement above |
+| `copies` | Loaded copies of the lab data alive in the process right after the load (`data.copies`). 1 is right; 2 means something kept the last night's copy |
+| `group_peak_mb`, `limit_mb` | The container's own high-water mark since it started, file cache included, and its limit, where the kernel keeps them; else null |
+
+**What growth reaches the limit.** One loaded copy costs about 50 MB per million bars (141 MB over a 22 MB bare process at 2.7M bars) and a work night adds about 30 MB to the load. Room left is `(512 - peak_mb - 30) / 50` million bars: at a peak of 300 MB that is about 3.6 million more bars, or 700 more names with 20 years each. Act when `peak_mb` passes 400: load only the universes the night's queue needs, rather than raising the limit.
+
 **Lab data.** `load` keeps each series as packed arrays of doubles with one shared set of date strings; a day is found through one shared calendar and a small per-series offset table (`DayIndex`), about 40 bytes a bar instead of 290. A French set is read as a stream. Workers are forked from the process that already holds the data, so they share it and never reload it; where fork is not available the variants run one after another. Results are identical to the old loader's, down to every stored trial.
 
 **Lab simulations as a job.** A simulation is a pure function of the lab data file and its inputs, so it is keyed, cached and safe to run twice. Module `desk.engine.lab.simcache`.

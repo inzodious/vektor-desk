@@ -2,7 +2,9 @@ import hashlib
 import json
 import multiprocessing
 import os
+import resource
 import sqlite3
+import time
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from datetime import UTC, date, datetime, timedelta
@@ -12,7 +14,7 @@ from desk.config import Config
 from desk.db import connect
 from desk.engine import gate
 from desk.engine.lab import factors, rulebook, simcache, stats
-from desk.engine.lab.data import FRENCH_KIND, PUBLIC_COVERAGE, SCREEN_KIND, SMALL_CAPS, LabData, data_path, lab_build, lab_dir, ledger_path, load
+from desk.engine.lab.data import FRENCH_KIND, PUBLIC_COVERAGE, SCREEN_KIND, SMALL_CAPS, LabData, copies, data_path, lab_build, lab_dir, ledger_path, load
 from desk.engine.lab.sim import simulate
 from desk.engine.lab.simcache import Cache, Run
 from desk.engine.lab.spec import HELD_SET, Spec, SpecError, Variant, local_only, parse, resolve, variants
@@ -61,7 +63,18 @@ CREATE TABLE IF NOT EXISTS queue_done (
   status TEXT NOT NULL,
   done_at TEXT NOT NULL
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS lab_nights (
+  at TEXT PRIMARY KEY,
+  files INTEGER NOT NULL,
+  seconds REAL NOT NULL,
+  peak_mb INTEGER,
+  copies INTEGER NOT NULL,
+  group_peak_mb INTEGER,
+  limit_mb INTEGER
+) WITHOUT ROWID;
 """
+NIGHTS_KEPT = 60
+CGROUP = Path("/sys/fs/cgroup")
 
 
 MIGRATE = {"strategies": "'research'", "lab_results": "'rule'"}
@@ -619,18 +632,67 @@ def _ingest_one(data: LabData, cache: Cache, result: dict | None) -> dict:
     return {"status": "stored", "rows": len(rows), "new": cache.put(rows)}
 
 
+# ---- Memory of a work night (this process's own peak, and the container's where the kernel keeps one) ----
+
+
+def peak_reset() -> bool:
+    try:
+        Path("/proc/self/clear_refs").write_text("5")
+    except OSError:
+        return False
+    return True
+
+
+def peak_mb() -> int:
+    try:
+        for line in Path("/proc/self/status").read_text().splitlines():
+            if line.startswith("VmHWM:"):
+                return int(line.split()[1]) // 1024
+    except (OSError, ValueError, IndexError):
+        pass
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
+
+
+def _group_mb(*names: str) -> int | None:
+    for name in names:
+        try:
+            text = (CGROUP / name).read_text().strip()
+        except OSError:
+            continue
+        if text.isdigit() and int(text) < 2**60:
+            return int(text) // 2**20
+    return None
+
+
+def footprint(loaded: int) -> dict:
+    return {
+        "peak_mb": peak_mb(),
+        "copies": loaded,
+        "group_peak_mb": _group_mb("memory.peak", "memory/memory.max_usage_in_bytes"),
+        "limit_mb": _group_mb("memory.max", "memory/memory.limit_in_bytes"),
+    }
+
+
+def _night(conn, now: datetime, files: int, seconds: float, mem: dict) -> None:
+    row = (_stamp(now), files, round(seconds, 1), mem["peak_mb"], mem["copies"], mem["group_peak_mb"], mem["limit_mb"])
+    with conn:
+        conn.execute("INSERT OR REPLACE INTO lab_nights VALUES (?, ?, ?, ?, ?, ?, ?)", row)
+        conn.execute("DELETE FROM lab_nights WHERE at NOT IN (SELECT at FROM lab_nights ORDER BY at DESC LIMIT ?)", (NIGHTS_KEPT,))
+
+
 # ---- Queue ----
 
 
 def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
+    began = time.monotonic()
     folder = lab_dir(cfg) / "queue"
     if not folder.exists():
         return {"ok": True, "done": []}
     if not data_path(cfg).exists():
         load(data_path(cfg))
     conn = ledger(cfg)
-    done, cache, held, staged = [], None, [], []
+    done, cache, held, staged, mem = [], None, [], [], None
     try:
         waiting = [p for p in sorted(folder.glob("*.json")) if not conn.execute("SELECT 1 FROM queue_done WHERE file=?", (p.name,)).fetchone()]
         if not waiting and not simcache.staged(cfg):
@@ -645,7 +707,9 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
 
         if waiting and not simcache.staged(cfg) and owed(waiting[0]):
             return {"ok": True, "done": [], "waiting_for_worker": [p.name for p in waiting]}
+        peak_reset()
         data = load(data_path(cfg))
+        loaded = copies()
         staged = ingest(cfg, data, cache)
         for s in staged:
             if s.get("job"):
@@ -673,6 +737,9 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
             with conn:
                 conn.execute("INSERT OR REPLACE INTO queue_done VALUES (?, ?, ?)", (path.name, status, _stamp(now)))
             done.append({"file": path.name, "status": status})
+        if done or staged:
+            mem = footprint(loaded)
+            _night(conn, now, len(done), time.monotonic() - began, mem)
     finally:
         conn.close()
         if cache is not None:
@@ -684,4 +751,6 @@ def process_queue(cfg: Config, *, now: datetime | None = None) -> dict:
         out["cache"] = {"hits": cache.hits, "computed": cache.misses}
     if held:
         out["waiting_for_worker"] = held
+    if mem:
+        out["memory"] = mem
     return out
