@@ -28,6 +28,8 @@ PLAN_DAYS = 60
 CLEARED_DAYS = 2
 SUBJECT_MAX = 80
 REPLACED = "A newer proposal on the same subject replaced this one on {day}."
+DEBIT_ZERO_USD = 1.0
+DEBIT_PAID = "The margin debit this was about is paid off: the book shows none as of {day}."
 NOTE_REASON = "A heads-up that needs no decision, so it is kept in the journal."
 CARRIED = "Carries the snooze from the proposal it replaced."
 EXPIRY_TRADING_DAYS = 5
@@ -628,6 +630,7 @@ class _Facts:
         self.tables = {r[0] for r in conn.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name IN ({','.join('?' * len(marks))})", marks)}
         self._latest: dict[str, tuple[float, str] | None] = {}
         self._cash: tuple | None = None
+        self._debit: tuple | None = None
 
     def latest(self, symbol: str) -> tuple[float, str] | None:
         if symbol not in self._latest:
@@ -663,6 +666,34 @@ class _Facts:
             ok = row is not None and row["value"] is not None and row["quality"] in CASH_QUALITY
             self._cash = ((float(row["value"]), str(row["as_of"])[:10], row["quality"]),) if ok else (None,)
         return self._cash[0]
+
+    def debit(self) -> tuple[float, str] | None:
+        if self._debit is None:
+            row = None
+            if "metric_values" in self.tables:
+                row = self.conn.execute(
+                    "SELECT value, as_of FROM metric_values WHERE metric_id='margin.debit' AND scope='portfolio' AND value IS NOT NULL "
+                    "ORDER BY as_of DESC LIMIT 1"
+                ).fetchone()
+            self._debit = ((float(row["value"]), str(row["as_of"])[:10]),) if row else (None,)
+        return self._debit[0]
+
+
+def about_debit(d: dict) -> bool:
+    if d["origin"] == "you":
+        return False
+    words = f"{d['title'] or ''} {d['rule_served'] or ''}".lower()
+    return d["subject"] == "margin" or (not d["symbol"] and d["kind"] == "hold_off" and "margin" in words)
+
+
+def _debit_reason(d: dict, facts: _Facts, tz: str) -> str | None:
+    seen = facts.debit() if about_debit(d) else None
+    if not seen:
+        return None
+    value, day = seen
+    if value > DEBIT_ZERO_USD or day < local_day(d["as_of"], tz):
+        return None
+    return DEBIT_PAID.format(day=day_words(day, tz))
 
 
 def _money(value: float) -> str:
@@ -729,6 +760,9 @@ def _cash_reason(d: dict, facts: _Facts, tz: str) -> str | None:
 def stale_reason(d: dict, facts: _Facts, at: str, tz: str) -> tuple[str, str] | None:
     if d["expires_at"] and d["expires_at"] < at:
         return "window", f"Its window closed on {day_words(d['expires_at'], tz)}."
+    reason = _debit_reason(d, facts, tz)
+    if reason:
+        return "debit", reason
     reason = _price_reason(d, facts, tz)
     if reason:
         return "price", reason
