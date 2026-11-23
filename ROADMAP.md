@@ -242,8 +242,19 @@ The desk clears its own data warnings, tests stock ideas on a list picked withou
 | NAS shared rules (2.5 GiB in total), memory record with each job's peak, daily run fixed | Infra | ✅ (#262, #263, #291, #293, #294) |
 | Why it moved; Sector leaders on paper; long-history study; plan mix 80/10/10 | Research threads | ✅ (#296 to #298) |
 | RapidAPI price backups and quarterly earnings history (`av_quarters`) | Infra | ✅ (#299, #300) |
-| The NAS computes the lab's night itself by default; the worker is optional | Statistics | ⏳ |
-| Profitability and earnings-yield screens from quarterly earnings | Statistics | ⏳ |
+
+## Everything back on the NAS ✅
+
+The NAS has 32 GB, so the desk does all of its own work again inside the NAS's shared 2.5 GiB rule (Joshua, 2026-11-15). Shipped as 1.6.0 on 2026-11-23.
+
+| Item | Owner | Status |
+|---|---|---|
+| The NAS computes the lab's night itself by default; the worker is optional (`DESK_LAB_TO_WORKER`) | Statistics | ✅ (#303) |
+| The lab lets go of a night's data; each work night's peak and data copies are recorded (`/api/lab/library` `nights`) | Statistics | ✅ (#309, #312) |
+| Profitability and earnings-yield screens from quarterly earnings; coverage on `/api/engine/public-stocks` | Statistics | ✅ built (#304, #305); first results once the earnings load finishes |
+| Earnings load paced to the free plan and resilient to one company's error; backup providers' state on `/api/engine/backfill` | Infra | ✅ (#308) |
+| Nightly backup and restore drill run by the desk (`/api/box` `nightly`); memory kills kept 48 hours | Infra | ✅ (#310, #311); live after Update box script |
+| Margin notes clear from the queue once the debit is paid | Concept | ✅ (#307) |
 
 ## Next: Review rework
 

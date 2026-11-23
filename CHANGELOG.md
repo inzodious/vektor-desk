@@ -4,6 +4,26 @@ Notable changes to Vektor Desk. The format follows [Keep a Changelog](https://ke
 
 ## Unreleased
 
+## 1.6.0 - 2026-11-23
+
+### Added
+
+- Everything runs on the NAS again: the lab computes its whole night on the box, and work is offered to a worker only when that is switched on, which it is not by default ([#303])
+- Two new library rows test the most profitable and the cheapest-by-earnings large companies against the S&P 500, using the nightly earnings history. They wait until every company is loaded, and the public stock list read shows how far the load has got ([#304], [#305])
+- The desk takes its own nightly backup (22:30 to 01:00 Eastern, 7 kept) and runs the restore drill on it every night ([#310])
+- The lab records how much memory each work night took and how many copies of its data it held, and anything stopped for memory stays visible for 48 hours ([#311], [#312])
+
+### Changed
+
+- A desk note about the margin debit clears itself once the book shows the debit paid off, and says so in Cleared ([#307])
+- The price backups' calls and last error, and earnings errors by company, can be read from the box ([#308])
+- Setup: the 32 GB row follows the NAS's shared 2.5 GiB rule ([#306])
+
+### Fixed
+
+- The nightly earnings load no longer quits after a few companies: it paces Alpha Vantage to its free plan's 5 calls a minute, waits out "slow down" answers and keeps going past one company's error ([#308])
+- The lab no longer holds two copies of its data after its first work night, which could push it past its memory limit and restart it ([#309])
+
 ## 1.5.0 - 2026-11-20
 
 ### Added
@@ -691,3 +711,13 @@ Planning: concept, architecture, statistics, agents and design plans, roadmap an
 [#299]: https://github.com/inzodious/vektor-desk/pull/299
 [#300]: https://github.com/inzodious/vektor-desk/pull/300
 [#301]: https://github.com/inzodious/vektor-desk/pull/301
+[#303]: https://github.com/inzodious/vektor-desk/pull/303
+[#304]: https://github.com/inzodious/vektor-desk/pull/304
+[#305]: https://github.com/inzodious/vektor-desk/pull/305
+[#306]: https://github.com/inzodious/vektor-desk/pull/306
+[#307]: https://github.com/inzodious/vektor-desk/pull/307
+[#308]: https://github.com/inzodious/vektor-desk/pull/308
+[#309]: https://github.com/inzodious/vektor-desk/pull/309
+[#310]: https://github.com/inzodious/vektor-desk/pull/310
+[#311]: https://github.com/inzodious/vektor-desk/pull/311
+[#312]: https://github.com/inzodious/vektor-desk/pull/312

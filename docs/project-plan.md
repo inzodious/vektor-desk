@@ -107,6 +107,8 @@ Shared seams, so nobody edits another owner's code:
 | 2026-11-15 | A thread merges its own finished PR and tells him only the one step left for him, outside 23:00 to 03:00 Eastern (his call) |
 | 2026-11-16 | Plan mix is 80% FXAIX, 10% FTIHX, 10% FTEC, and Sector leaders runs on Alpaca paper (his "Go all") |
 | 2026-11-17 | Keys are entered by a terminal command on his machine, never through a page field, and box config is handed over as the file itself (his calls of 2026-11-17 and 2026-11-18) |
+| 2026-11-20 | The NAS runs the lab's night itself; a worker is offered work only by a switch that is off by default. The lab stays at 3 workers and 512 MB: more width would cost him a compose paste |
+| 2026-11-23 | The desk backs itself up every night and checks the restore itself; the paper race needs 182 unbroken days |
 | 2026-11-07 | Free services only beyond what is already paid for |
 | 2026-11-07 | Design borrows Escape Vektor's look with a single investing focus |
 | 2026-11-07 | Engine is Python; Preflight is engine code that agents call and Design renders |
