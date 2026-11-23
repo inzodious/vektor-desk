@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import time
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
@@ -9,6 +10,10 @@ KEY = "RAPIDAPI_KEY"
 AV, FMP, YH = "alphavantage", "fmp", "yhfinance"
 COMPACT_DAYS = 100
 FMP_YEARS = 5
+WAIT_S = 65
+TRIES = 3
+ANSWER_CHARS = 240
+STOP_WORDS = ("quota", "daily", "per day", "monthly", "per month")
 
 
 @dataclass(frozen=True)
@@ -17,6 +22,7 @@ class Source:
     title: str
     host: str
     per_run: int
+    per_minute: int
     per_day: int | None
     per_month: int | None
     full_history: bool
@@ -24,9 +30,9 @@ class Source:
 
 
 SOURCES = (
-    Source(AV, "Alpha Vantage", "alpha-vantage.p.rapidapi.com", 25, 400, None, True, False),
-    Source(FMP, "FMP", "financial-modeling-prep.p.rapidapi.com", 15, 200, None, False, False),
-    Source(YH, "YH Finance", "yahoo-finance15.p.rapidapi.com", 3, None, 80, False, True),
+    Source(AV, "Alpha Vantage", "alpha-vantage.p.rapidapi.com", 25, 5, 400, None, True, False),
+    Source(FMP, "FMP", "financial-modeling-prep.p.rapidapi.com", 15, 5, 200, None, False, False),
+    Source(YH, "YH Finance", "yahoo-finance15.p.rapidapi.com", 3, 5, None, 80, False, True),
 )
 BY_NAME = {s.name: s for s in SOURCES}
 
@@ -53,20 +59,95 @@ def limits(src: Source) -> dict[str, int | None]:
     }
 
 
+# ---- What a provider said ----
+
+
+class SlowDown(ProviderError):
+    pass
+
+
+class OutOfCalls(ProviderError):
+    pass
+
+
+class Refused(ProviderError):
+    pass
+
+
+def stops(e: Exception) -> bool:
+    return isinstance(e, (OutOfCalls, Refused)) or "did not answer" in str(e)
+
+
+def answer(res) -> str:
+    try:
+        body = res.json()
+    except (ValueError, AttributeError):
+        body = None
+    if isinstance(body, dict):
+        text = next((str(body[k]) for k in ("message", "Note", "Information", "Error Message", "error") if body.get(k)), "")
+    else:
+        text = ""
+    if not text:
+        text = str(getattr(res, "text", "") or "")
+    return " ".join(text.split())[:ANSWER_CHARS]
+
+
+def limited(src: Source, said: str) -> ProviderError:
+    words = said.lower()
+    if "premium" in words:
+        return Refused(f"{src.title} keeps this for paid plans: {said}")
+    if any(w in words for w in STOP_WORDS) and "minute" not in words and "second" not in words:
+        return OutOfCalls(f"{src.title} is out of calls for now: {said}")
+    return SlowDown(f"{src.title} asked to slow down: {said}")
+
+
 # ---- Calls ----
+
+
+_last: dict[str, float] = {}
+
+
+def _sleep(seconds: float) -> None:
+    time.sleep(seconds)
+
+
+def _pace(src: Source) -> None:
+    gap = 60 / max(1, src.per_minute) + 0.5
+    since = time.monotonic() - _last.get(src.name, float("-inf"))
+    if since < gap:
+        _sleep(gap - since)
+    _last[src.name] = time.monotonic()
 
 
 def _get(http, src: Source, path: str, params: dict, api_key: str, symbol: str):
     res = http.get(f"https://{src.host}{path}", params=params, headers={"X-RapidAPI-Key": api_key, "X-RapidAPI-Host": src.host}, timeout=60)
     if res.status_code == 429:
-        raise ProviderError(f"{src.title} rate limit")
+        raise limited(src, answer(res) or "429 Too Many Requests")
     if res.status_code in (401, 403):
-        raise ProviderError(f"{src.title} refused the key ({res.status_code})")
+        raise Refused(f"{src.title} refused the key ({res.status_code}): {answer(res)}")
     if res.status_code == 404:
         raise ProviderError(f"{src.title} has no daily prices for {symbol}")
     if res.status_code != 200:
-        raise ProviderError(f"{src.title} {res.status_code} for {symbol}")
-    return res.json()
+        raise ProviderError(f"{src.title} {res.status_code} for {symbol}: {answer(res)}")
+    body = res.json()
+    if isinstance(body, dict) and src.name == AV:
+        for k in ("Note", "Information"):
+            if body.get(k):
+                raise limited(src, " ".join(str(body[k]).split())[:ANSWER_CHARS])
+    return body
+
+
+def ask(http, src: Source, path: str, params: dict, api_key: str, symbol: str):
+    said = ""
+    for attempt in range(TRIES):
+        _pace(src)
+        try:
+            return _get(http, src, path, params, api_key, symbol)
+        except SlowDown as e:
+            said = str(e).split(": ", 1)[-1]
+            if attempt + 1 < TRIES:
+                _sleep(WAIT_S)
+    raise OutOfCalls(f"{src.title} still asked to slow down after {TRIES} tries: {said}")
 
 
 def _num(value) -> float | None:
@@ -98,11 +179,9 @@ def av_daily(http, symbol: str, api_key: str, start: str, today: date | None = N
     today = today or datetime.now(UTC).date()
     size = "compact" if date.fromisoformat(start) >= today - timedelta(days=COMPACT_DAYS - 10) else "full"
     params = {"function": "TIME_SERIES_DAILY_ADJUSTED", "symbol": symbol, "outputsize": size, "datatype": "json"}
-    body = _get(http, src, "/query", params, api_key, symbol) or {}
+    body = ask(http, src, "/query", params, api_key, symbol) or {}
     if "Error Message" in body:
         raise ProviderError(f"{src.title} has no daily prices for {symbol}")
-    if "Note" in body or "Information" in body:
-        raise ProviderError(f"{src.title} rate limit")
     series = body.get("Time Series (Daily)") or {}
     out = []
     for day, r in sorted(series.items()):
@@ -125,7 +204,7 @@ def av_daily(http, symbol: str, api_key: str, start: str, today: date | None = N
 
 
 def fmp_daily(http, symbol: str, api_key: str, start: str) -> list[dict]:
-    body = _get(http, BY_NAME[FMP], f"/v3/historical-price-full/{symbol}", {"from": start}, api_key, symbol) or {}
+    body = ask(http, BY_NAME[FMP], f"/v3/historical-price-full/{symbol}", {"from": start}, api_key, symbol) or {}
     rows = body.get("historical") or [] if isinstance(body, dict) else []
     out = [_bar(str(r.get("date"))[:10], r.get("open"), r.get("high"), r.get("low"), r.get("close"), r.get("adjClose"), r.get("volume")) for r in rows]
     return sorted((b for b in out if b and b["date"] >= start), key=lambda b: b["date"])
@@ -133,7 +212,7 @@ def fmp_daily(http, symbol: str, api_key: str, start: str) -> list[dict]:
 
 def yh_daily(http, symbol: str, api_key: str, start: str) -> list[dict]:
     params = {"symbol": symbol, "interval": "1d", "diffandsplits": "false"}
-    body = _get(http, BY_NAME[YH], "/api/v1/markets/stock/history", params, api_key, symbol) or {}
+    body = ask(http, BY_NAME[YH], "/api/v1/markets/stock/history", params, api_key, symbol) or {}
     rows = body.get("body") or {} if isinstance(body, dict) else {}
     out = []
     for stamp, r in rows.items() if isinstance(rows, dict) else []:
@@ -152,6 +231,14 @@ FETCH = {AV: av_daily, FMP: fmp_daily, YH: yh_daily}
 
 
 # ---- Who can still be asked ----
+
+
+def note_error(conn: sqlite3.Connection, src: Source, at: str, symbol: str | None, error: str) -> None:
+    with conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO provider_errors (provider, at, symbol, error) VALUES (?, ?, ?, ?)",
+            (src.name, at, symbol, error[: ANSWER_CHARS + 80]),
+        )
 
 
 def used(conn: sqlite3.Connection, src: Source, now: datetime) -> dict[str, int]:
@@ -191,14 +278,18 @@ class Backups:
             try:
                 bars, error = FETCH[src.name](self.http, symbol, self.key, start), None
             except ProviderError as e:
-                bars, error = [], str(e)
+                bars, error, stop = [], str(e), stops(e)
             except (OSError, ValueError):
-                bars, error = [], f"{src.title} did not answer for {symbol}"
+                bars, error, stop = [], f"{src.title} did not answer for {symbol}", True
+            else:
+                stop = False
             with self.conn:
                 self.conn.execute("INSERT INTO api_calls (provider, at, symbol, ok) VALUES (?, ?, ?, ?)", (src.name, stamp, symbol, int(error is None)))
             for k in ("run", "day", "month"):
                 self.used[src.name][k] += 1
-            if error and ("rate limit" in error or "refused" in error or "did not answer" in error):
+            if error:
+                note_error(self.conn, src, stamp, symbol, error)
+            if stop:
                 self.stopped.add(src.name)
             if bars:
                 self.filled.setdefault(src.title, []).append(symbol)
@@ -207,3 +298,17 @@ class Backups:
 
     def usage(self) -> dict:
         return {s.name: {"used": self.used.get(s.name), "limits": self.caps[s.name]} for s in SOURCES} if self.key else {}
+
+
+def state(conn: sqlite3.Connection | None, now: datetime | None = None) -> dict:
+    now = now or datetime.now(UTC)
+    ready = conn is not None and conn.execute("SELECT 1 FROM sqlite_master WHERE name='provider_errors'").fetchone() is not None
+    out = {"key_set": bool(key()), "providers": []}
+    for src in SOURCES:
+        row = {"name": src.name, "title": src.title, "per_minute": src.per_minute, "limits": limits(src), "used": None, "last_error": None}
+        if ready:
+            row["used"] = {k: v for k, v in used(conn, src, now).items() if k != "run"}
+            last = conn.execute("SELECT at, symbol, error FROM provider_errors WHERE provider=?", (src.name,)).fetchone()
+            row["last_error"] = {"at": last[0], "symbol": last[1], "error": last[2]} if last else None
+        out["providers"].append(row)
+    return out

@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from desk.api.deps import get_cfg
 from desk.config import Config
 from desk.db import connect
-from desk.engine import asof, backfill, discounts, heal, lab, lane, leaderboard, paper_exec, planfacts, public, review, schema, watchlist
+from desk.engine import asof, avhistory, backfill, discounts, heal, lab, lane, leaderboard, paper_exec, planfacts, public, rapid, review, schema, watchlist
 from desk.engine.compare import CompareError, compare
 from desk.engine.lab import shelf
 from desk.engine.live import live_view
@@ -596,7 +596,7 @@ def discounts_view(request: Request) -> JSONResponse:
 def backfill_view(request: Request) -> JSONResponse:
     conn = _open(get_cfg(request))
     try:
-        return _json(backfill.view(conn))
+        return _json(backfill.view(conn) | {"backups": rapid.state(conn), "earnings": avhistory.state(conn)})
     finally:
         if conn is not None:
             conn.close()
