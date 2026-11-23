@@ -274,7 +274,7 @@ def test_auto_still_checks_in_and_runs_box_work_when_the_deploy_stops(tmp_path):
     env = {"DESK_ROOT": str(root), "DESK_SELF": str(stub), "DESK_PINNED": str(tmp_path / "none"), "PATH": "/usr/local/bin:/usr/bin:/bin"}
     res = subprocess.run(["bash", str(DEPLOY), "auto"], capture_output=True, text=True, env=env, timeout=60)
     assert res.returncode == 1
-    assert (tmp_path / "calls").read_text().split() == ["auto-deploy"]
+    assert (tmp_path / "calls").read_text().split() == ["auto-deploy", "nightly"]
     assert (root / "data" / "run" / "box" / "host.alive").read_text().strip().endswith("Z")
     assert not (root / "data" / "run" / "logs" / "eval-debug.log").exists()
 
@@ -685,3 +685,81 @@ def test_auto_lets_main_settle_so_commits_that_land_together_become_one_deploy(t
     now.env["DESK_SETTLE"] = "0"
     (now.dir / "head").write_text("ddd")
     assert now.run("auto").returncode == 0 and now.running() == "ddd"
+
+
+# ---- Nightly backup and restore drill ----
+
+
+DRILL_OK = 'restore_test() { echo drill >>"$S/calls"; log "Restore drill passed: backup.tar.gz"; }\nnightly'
+DRILL_BAD = 'restore_test() { echo drill >>"$S/calls"; die "the restore drill failed for backup.tar.gz; see the problems above"; }\nnightly'
+
+
+def night_box(tmp_path: Path, open_window: bool = True) -> Box:
+    box = Box(tmp_path, running="aaa", local="aaa", head="aaa")
+    box.env |= {"DESK_NIGHTLY_FROM": "0000" if open_window else "2400", "DESK_NIGHTLY_TO": "0000"}
+    (tmp_path / "root" / "data" / "run").mkdir(parents=True)
+    return box
+
+
+def nightly_state(tmp_path: Path) -> dict:
+    return json.loads((tmp_path / "root" / "backup-nightly.json").read_text())
+
+
+def test_the_desk_backs_itself_up_once_a_night_then_runs_the_restore_drill(tmp_path):
+    box = night_box(tmp_path)
+    assert box.run(DRILL_OK).returncode == 0
+    assert box.calls() == ["backup", "drill"] and "Nightly backup: backup.tar.gz" in box.log()
+    state = nightly_state(tmp_path)
+    assert state["complete"] and state["tries"] == 1 and state["backup"]["ok"] and state["backup"]["file"] == "backup.tar.gz"
+    assert state["drill"]["ok"] and state["drill"]["why"] is None
+    assert json.loads((tmp_path / "root" / "data" / "run" / "box" / "nightly.json").read_text()) == state
+    assert box.run(DRILL_OK).returncode == 0 and box.calls() == ["backup", "drill"]
+
+
+def test_outside_the_night_window_nothing_happens(tmp_path):
+    box = night_box(tmp_path, open_window=False)
+    assert box.run(DRILL_OK).returncode == 0 and box.calls() == [] and not (tmp_path / "root" / "backup-nightly.json").exists()
+
+
+def test_a_failing_nightly_backup_tries_three_times_then_alerts_once(tmp_path):
+    box = night_box(tmp_path)
+    (box.dir / "backup-fails").touch()
+    assert [box.run(DRILL_OK).returncode for _ in range(4)] == [1, 1, 1, 0]
+    alerts = (box.dir / "alerts").read_text().splitlines()
+    assert alerts == [f"Nightly backup failed: The nightly backup failed 3 times tonight: {WHY}. Settings, Box, Back up now tries again."]
+    state = nightly_state(tmp_path)
+    assert not state["complete"] and state["tries"] == 3 and state["backup"] == state["backup"] | {"ok": False, "why": WHY}
+
+
+def test_a_failed_restore_drill_is_recorded_and_alerted(tmp_path):
+    box = night_box(tmp_path)
+    assert box.run(DRILL_BAD).returncode == 0
+    state = nightly_state(tmp_path)
+    assert state["complete"] and state["backup"]["ok"] and not state["drill"]["ok"] and "restore drill failed for backup.tar.gz" in state["drill"]["why"]
+    assert (box.dir / "alerts").read_text().startswith("Nightly restore drill failed: the restore drill failed")
+
+
+def test_nightly_copies_are_kept_apart_from_deploy_copies(tmp_path):
+    backups, src = tmp_path / "backups", tmp_path / "src"
+    backups.mkdir()
+    src.mkdir()
+    (src / "desk.db").write_text("x")
+    names = ["nightly-20261101-223000", "nightly-20261102-223000", "nightly-20261103-223000", "20261101-120000", "20261102-120000"]
+    for i, name in enumerate(names):
+        path = backups / f"vektor-desk-{name}.tar.gz"
+        path.write_text("old")
+        os.utime(path, (1_700_000_000 + i, 1_700_000_000 + i))
+    env = {
+        "DESK_ROOT": str(tmp_path / "root"),
+        "DESK_BACKUPS": str(backups),
+        "DESK_NIGHTLY_KEEP": "2",
+        "DESK_BACKUP_KEEP": "2",
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+    }
+    script = f'source "{DEPLOY}"; BACKUP_KIND=nightly; tarball -C "{src}" .'
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env, timeout=30)
+    assert res.returncode == 0, res.stderr
+    kept = sorted(p.name for p in backups.iterdir())
+    nightly = [n for n in kept if "-nightly-" in n]
+    assert len(nightly) == 2 and "vektor-desk-nightly-20261103-223000.tar.gz" in nightly and Path(res.stdout.strip()).name in nightly
+    assert [n for n in kept if "-nightly-" not in n] == ["vektor-desk-20261101-120000.tar.gz", "vektor-desk-20261102-120000.tar.gz"]
