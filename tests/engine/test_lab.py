@@ -1,8 +1,10 @@
+import gc
 import gzip
 import json
 import os
 import random
 import sqlite3
+import weakref
 from array import array
 from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -719,6 +721,24 @@ def test_workers_share_the_loaded_data_and_match_one_worker(cfg, monkeypatch):
     monkeypatch.setenv("DESK_LAB_WORKERS", "3")
     monkeypatch.setattr(runner, "load", lambda path: pytest.fail("a worker reloaded the lab data"))
     assert runner._run_many(cfg, data, spec, jobs) == alone
+
+
+def test_the_lab_lets_go_of_a_night_s_data_so_the_next_night_never_loads_beside_it(cfg, monkeypatch):
+    write_lab_db(cfg)
+    jobs = [({"top_n": n, "lookback": k}, "2015-01-02", "2017-12-29", 1.0) for n in (1, 2, 3) for k in (63, 126)]
+    for workers in ("1", "3"):
+        monkeypatch.setenv("DESK_LAB_WORKERS", workers)
+        data = load(data_path(cfg))
+        seen = weakref.ref(data)
+        assert len(runner._run_many(cfg, data, parse(SPEC, data), jobs)) == 6
+        assert runner._DATA is None and runner._SPEC is None
+        del data
+        gc.collect()
+        assert seen() is None
+    data = load(data_path(cfg))
+    with pytest.raises(KeyError):
+        runner._compute(data, parse(SPEC, data), [({"top_n": 1}, "2015-01-02", "2017-12-29", 1.0)])
+    assert runner._DATA is None and runner._SPEC is None
 
 
 def test_export_keeps_the_first_source_for_a_bar(cfg):
