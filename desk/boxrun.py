@@ -146,6 +146,7 @@ def describe(cfg: Config, now: datetime | None = None) -> dict:
         "pickup_seconds": PICKUP_SECONDS,
         "script": _read(box_dir(cfg) / "script.json"),
         "compose": compose_state(cfg),
+        "nightly": _read(box_dir(cfg) / "nightly.json"),
         "memory": memory.status(cfg, now),
         "build": build.status(cfg, now),
         "actions": rows,

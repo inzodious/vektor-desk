@@ -50,11 +50,10 @@ Joshua's checklist for putting Vektor Desk on the TrueNAS box. All of it is free
 
 6. **Install the app.** Go to Apps → Discover Apps → ⋮ → **Install via YAML**. Name it `vektor-desk` and paste `deploy/compose.yaml` as it is, for example from `cat /mnt/Manifest/apps/vektor-desk-src/deploy/compose.yaml`. If the install fails with "env file … not found", the setup script didn't finish: run it again (the last line says where it stopped), delete the failed app in Apps, and install again. When deleting the app, leave **Remove images** unticked: `vektor-desk:local` and `vektor-desk/caddy:local` are built on the box, not pulled, so a removed image fails the next install with "No such image" until `deploy.sh now` rebuilds it.
 7. **DNS record.** `docker exec vektor-desk-tailscale tailscale ip -4` prints the node's address. At Porkbun, add an A record with host `desk`, that address, and TTL 600.
-8. **Cron jobs.** Go to System → Advanced Settings → Cron Jobs → **Add** and create each job below as user `root`. Tick Hide Standard Output and Hide Standard Error on the auto-deploy job.
+8. **Cron job.** Go to System → Advanced Settings → Cron Jobs → **Add** and create the job below as user `root`. Tick Hide Standard Output and Hide Standard Error. It also takes the nightly backup and runs the restore drill (22:30 to 01:00 ET), so no backup job is needed; an older "Vektor Desk backup" job can stay or go.
 
    | Description | Command | Schedule |
    |---|---|---|
-   | Vektor Desk backup | `bash /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh backup` | Daily at 03:45 |
    | Vektor Desk auto-deploy | `bash /mnt/Manifest/apps/.vektor-desk-deploy/deploy.sh auto` | Custom: minutes `*/5` |
 
 9. **Phone alerts.** With Tailscale on, install the ntfy app. Set Settings → Default server to `https://desk.escape-vektor.com:8443`. Then subscribe to `desk-alerts`, `desk-research` and `desk-ops`.
@@ -161,6 +160,5 @@ Open the desk at home without Tailscale, the way Hemline has its own address. Ca
 |---|---|
 | RAM goes to 32 GB (done 2026-11-15) | Nothing to raise. The desk stays inside the NAS's shared rules: 2.5 GiB for all its containers, limits in `compose.yaml` ([Shared NAS rules](architecture.md#shared-nas-rules)). The lab keeps 3 workers in 512m; a wider night is one compose change, only if the NAS-only night runs long |
 | 30 days before the Claude token expires | Settings and a `desk-ops` alert flag it. Run `claude setup-token`, then paste it in Settings → Keys → `CLAUDE_CODE_OAUTH_TOKEN` and set `DESK_CLAUDE_TOKEN_EXPIRES` (or `setup-truenas.sh set` each) |
-| The morning after the first nightly backup | Settings → Box → Restore drill (or `deploy.sh restore-test`): it should end with "Restore drill passed" |
 | A market key arrives | Settings → Keys, or `setup-truenas.sh set TIINGO_API_KEY` (or `FINNHUB_API_KEY`, `FRED_API_KEY`, `RAPIDAPI_KEY`; Alpaca paper: `ALPACA_API_KEY_ID` and `ALPACA_API_SECRET_KEY`) |
 | Any one setting changes | Settings → Keys (saved and redeployed within 5 minutes; values are never shown back), or `bash /mnt/Manifest/apps/vektor-desk-src/deploy/setup-truenas.sh set KEY`, e.g. `DESK_SEC_USER_AGENT` or `DESK_MARGIN_RATE_PCT`. It asks for the value (spaces kept; keys hidden), changes that one line in the right `*.env` file and redeploys. After editing an env file by hand, run `deploy.sh redeploy`: a `docker restart` or `deploy.sh now` with nothing new to build doesn't re-read env files |
