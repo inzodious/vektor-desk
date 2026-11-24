@@ -51,7 +51,7 @@ A held symbol is fetched from Tiingo unless the mirror already has a close for t
 | Result | `fetched`, `advanced` (a new bar landed), `behind` (answered with nothing new for `target`), `unpriced`, `errors`, `left`, and `detail`, one sentence the jobs page keeps |
 | Lock | `engine-backfill` only, never `engine-daily`; each name is its own short write, the request itself holds nothing |
 
-**`GET /api/engine/backfill`.** `{target, asks, limits, used, last_run, symbols, backups, earnings}`. `backups`: `{key_set, providers: [{name, title, per_minute, limits, used: {day, month}, last_error: {at, symbol, error}}]}`. `earnings`: `{asked, with_quarters, errors: [{symbol, at, error}] (newest 50), last_run}`. Each symbol: `symbol, role, priority, daily, first_bar, last_bar, fetched_at, error, parked_until, behind, due`. `last_run` is the newest run's `finished_at, ok, detail` and name lists. Read-only; no account data.
+**`GET /api/engine/backfill`.** `{target, asks, limits, used, last_run, symbols, backups, earnings}`. `backups`: `{key_set (from the last earnings run: false when it was skipped for no key, null before any run; the API service can't see the key itself), providers: [{name, title, per_minute, limits, used: {day, month}, last_error: {at, symbol, error}}]}`. `earnings`: `{asked, with_quarters, errors: [{symbol, at, error}] (newest 50), last_run}`. Each symbol: `symbol, role, priority, daily, first_bar, last_bar, fetched_at, error, parked_until, behind, due`. `last_run` is the newest run's `finished_at, ok, detail` and name lists. Read-only; no account data.
 
 **Gaps, stated plainly.**
 
@@ -882,15 +882,16 @@ Bars land in `price_bars` in Tiingo's shape; each call is a row in `api_calls` u
 
 | Provider says | The desk does |
 |---|---|
-| Nothing yet | Waits so each provider gets at most 5 calls a minute (the free plans' per-minute limit) |
+| Nothing yet | Waits so Alpha Vantage gets at most 4 calls a minute and FMP and YH Finance 5 (under the free plans' per-minute limit) |
 | Slow down (429 per minute, Alpha Vantage `Note`) | Waits 65 s and asks again, up to 3 tries; then treats it as out of calls |
+| Burst pattern (Alpha Vantage) | Waits 5 minutes and asks again, up to 3 tries |
 | Out of calls (daily or monthly quota) | Stops that provider for the run |
 | Refused key, paid-only endpoint, no answer | Stops that provider for the run |
-| No data for one name | Records it and moves on |
+| No data for one name | Records it and moves on; that provider isn't asked for that name's prices again for 7 days |
 
 Every error, with the provider's own words (never the key), is kept per provider in `provider_errors` (newest only) and shown on `GET /api/engine/backfill`.
 
-**Earnings history** (`desk/engine/avhistory.py`, job `av-history`, 21:10 ET). Alpha Vantage `EARNINGS` and `INCOME_STATEMENT` for the public list in rank order, then held, plan, watched and past names: two calls a company, at most 100 calls a night (`DESK_AV_HISTORY_CALLS`) and never past 490 Alpha Vantage calls in the last 24 hours. Calls are paced to 5 a minute, so a full night takes about 20 minutes. Each company is refreshed after 80 days, so the 200 names load in about four nights. One company's error never stops the night: it is recorded and asked again after 14 days (no data) or the next night (anything else). Only running out of calls, a refused key or no answer stops it early. The run fails only when the key is refused, or when nothing loaded and something failed.
+**Earnings history** (`desk/engine/avhistory.py`, job `av-history`, 21:10 ET). Alpha Vantage `EARNINGS` and `INCOME_STATEMENT` for the public list in rank order, then held, plan, watched and past names: two calls a company, at most 100 calls a night (`DESK_AV_HISTORY_CALLS`) and never past 490 Alpha Vantage calls in the last 24 hours. Calls are paced to 4 a minute, so a full night takes about 26 minutes. Each company is refreshed after 80 days, so the 200 names load in about four nights. One company's error never stops the night: it is recorded and asked again after 14 days (no data) or the next night, 20 hours on (anything else). Only running out of calls, a refused key or no answer stops it early. The run fails only when the key is refused, or when nothing loaded and something failed.
 
 | Table | Row | What it holds |
 |---|---|---|

@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 import time
@@ -11,7 +12,10 @@ AV, FMP, YH = "alphavantage", "fmp", "yhfinance"
 COMPACT_DAYS = 100
 FMP_YEARS = 5
 WAIT_S = 65
+BURST_WAIT_S = 300
 TRIES = 3
+NO_DATA_DAYS = 7
+NO_DATA = -1
 ANSWER_CHARS = 240
 STOP_WORDS = ("quota", "daily", "per day", "monthly", "per month")
 
@@ -30,7 +34,7 @@ class Source:
 
 
 SOURCES = (
-    Source(AV, "Alpha Vantage", "alpha-vantage.p.rapidapi.com", 25, 5, 400, None, True, False),
+    Source(AV, "Alpha Vantage", "alpha-vantage.p.rapidapi.com", 25, 4, 400, None, True, False),
     Source(FMP, "FMP", "financial-modeling-prep.p.rapidapi.com", 15, 5, 200, None, False, False),
     Source(YH, "YH Finance", "yahoo-finance15.p.rapidapi.com", 3, 5, None, 80, False, True),
 )
@@ -66,6 +70,10 @@ class SlowDown(ProviderError):
     pass
 
 
+class Burst(SlowDown):
+    pass
+
+
 class OutOfCalls(ProviderError):
     pass
 
@@ -96,6 +104,8 @@ def limited(src: Source, said: str) -> ProviderError:
     words = said.lower()
     if "premium" in words:
         return Refused(f"{src.title} keeps this for paid plans: {said}")
+    if "burst" in words:
+        return Burst(f"{src.title} asked to slow down: {said}")
     if any(w in words for w in STOP_WORDS) and "minute" not in words and "second" not in words:
         return OutOfCalls(f"{src.title} is out of calls for now: {said}")
     return SlowDown(f"{src.title} asked to slow down: {said}")
@@ -146,7 +156,7 @@ def ask(http, src: Source, path: str, params: dict, api_key: str, symbol: str):
         except SlowDown as e:
             said = str(e).split(": ", 1)[-1]
             if attempt + 1 < TRIES:
-                _sleep(WAIT_S)
+                _sleep(BURST_WAIT_S if isinstance(e, Burst) else WAIT_S)
     raise OutOfCalls(f"{src.title} still asked to slow down after {TRIES} tries: {said}")
 
 
@@ -270,9 +280,14 @@ class Backups:
             return False
         return src.full_history or date.fromisoformat(start) >= self.now.date() - timedelta(days=365 * FMP_YEARS - 30)
 
+    def said_no_data(self, src: Source, symbol: str) -> bool:
+        since = (self.now - timedelta(days=NO_DATA_DAYS)).isoformat(timespec="seconds")
+        q = "SELECT 1 FROM api_calls WHERE provider=? AND symbol=? AND ok=? AND at >= ? LIMIT 1"
+        return self.conn.execute(q, (src.name, symbol, NO_DATA, since)).fetchone() is not None
+
     def fetch(self, symbol: str, start: str, *, held: bool, new: bool) -> tuple[list[dict], str | None]:
         for src in SOURCES:
-            if not self.fits(src, start, held, new) or not self.open(src):
+            if not self.fits(src, start, held, new) or not self.open(src) or self.said_no_data(src, symbol):
                 continue
             stamp = self.now.isoformat(timespec="seconds")
             try:
@@ -284,7 +299,8 @@ class Backups:
             else:
                 stop = False
             with self.conn:
-                self.conn.execute("INSERT INTO api_calls (provider, at, symbol, ok) VALUES (?, ?, ?, ?)", (src.name, stamp, symbol, int(error is None)))
+                ok = 1 if error is None else NO_DATA if " has no " in error and not stop else 0
+                self.conn.execute("INSERT INTO api_calls (provider, at, symbol, ok) VALUES (?, ?, ?, ?)", (src.name, stamp, symbol, ok))
             for k in ("run", "day", "month"):
                 self.used[src.name][k] += 1
             if error:
@@ -300,10 +316,23 @@ class Backups:
         return {s.name: {"used": self.used.get(s.name), "limits": self.caps[s.name]} for s in SOURCES} if self.key else {}
 
 
+def key_seen(conn: sqlite3.Connection | None) -> bool | None:
+    if conn is None or conn.execute("SELECT 1 FROM sqlite_master WHERE name='engine_runs'").fetchone() is None:
+        return None
+    last = conn.execute("SELECT detail FROM engine_runs WHERE job='av-history' ORDER BY id DESC LIMIT 1").fetchone()
+    if last is None:
+        return None
+    try:
+        skipped = str(json.loads(last[0] or "{}").get("skipped") or "")
+    except ValueError:
+        return None
+    return not skipped.startswith("The RapidAPI key is not set")
+
+
 def state(conn: sqlite3.Connection | None, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     ready = conn is not None and conn.execute("SELECT 1 FROM sqlite_master WHERE name='provider_errors'").fetchone() is not None
-    out = {"key_set": bool(key()), "providers": []}
+    out = {"key_set": key_seen(conn), "providers": []}
     for src in SOURCES:
         row = {"name": src.name, "title": src.title, "per_minute": src.per_minute, "limits": limits(src), "used": None, "last_error": None}
         if ready:
