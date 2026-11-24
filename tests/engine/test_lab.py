@@ -604,7 +604,12 @@ def test_nothing_about_what_is_held_or_planned_is_in_the_file_a_worker_downloads
     }
     assert out.execute("SELECT * FROM fundamentals").fetchall() == [("BIGCO", "2026-11-03", 0.04, 0.2)] and result["public_figures"] == 1
     figures = json.loads(out.execute("SELECT value FROM settings WHERE key=?", (fund.COVERAGE,)).fetchone()[0])
-    assert (figures["listed"], figures["asked"], figures["loading"]) == (2, 1, 0) and figures[fund.MARGIN] == {"have": 1, "from": None}
+    assert (figures["listed"], figures["asked"], figures["loading"]) == (2, 1, 0) and figures[fund.MARGIN] == {
+        "have": 1,
+        "from": None,
+        "earliest": "2026-11-03",
+        "median": "2026-11-03",
+    }
     sizes = json.loads(out.execute("SELECT value FROM settings WHERE key='public_sizes'").fetchone()[0])
     assert sizes == {"BIGCO": [5e10, "2011-06-30"], "OTHERCO": [5e10, "2011-06-30"]}
     words = " ".join(str(v) for t in tables if t != "bars" for r in out.execute(f"SELECT * FROM {t}") for v in r)
