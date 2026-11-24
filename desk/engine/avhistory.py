@@ -10,7 +10,7 @@ from desk.engine.market import ProviderError
 CALLS = 100
 DAY_CEILING = 490
 REFRESH_DAYS = 80
-RETRY_DAYS = 1
+RETRY_HOURS = 20
 NO_DATA_DAYS = 14
 ROLES = ("held", "plan", "watch", "past")
 INCOME = {"revenue": "totalRevenue", "gross_profit": "grossProfit", "operating_income": "operatingIncome", "net_income": "netIncome"}
@@ -35,7 +35,7 @@ def wanted(conn: sqlite3.Connection, now: datetime) -> list[str]:
     marks = ",".join("?" * len(ROLES))
     names += [r[0] for r in conn.execute(f"SELECT symbol FROM market_symbols WHERE role IN ({marks}) ORDER BY priority, symbol", ROLES)]
     fresh = (now - timedelta(days=REFRESH_DAYS)).isoformat(timespec="seconds")
-    retry = (now - timedelta(days=RETRY_DAYS)).isoformat(timespec="seconds")
+    retry = (now - timedelta(hours=RETRY_HOURS)).isoformat(timespec="seconds")
     later = (now - timedelta(days=NO_DATA_DAYS)).isoformat(timespec="seconds")
     done = set()
     for symbol, at, error in conn.execute("SELECT symbol, fetched_at, error FROM av_fetches"):

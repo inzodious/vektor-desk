@@ -255,11 +255,15 @@ from desk.engine import avhistory  # noqa: E402
 
 
 class Choppy(Earnings):
-    def __init__(self, slow=(), missing=()):
+    def __init__(self, slow=(), missing=(), burst=()):
         super().__init__()
-        self.slow, self.missing = list(slow), set(missing)
+        self.slow, self.missing, self.burst = list(slow), set(missing), list(burst)
 
     def get(self, url, params=None, headers=None, timeout=None):
+        if len(self.calls) in self.burst:
+            self.burst.remove(len(self.calls))
+            self.calls.append((url, params))
+            return Res(200, {"Information": "Burst pattern detected for this API key. Please spread out your requests: no more than 5 requests per second."})
         if len(self.calls) in self.slow:
             self.slow.remove(len(self.calls))
             self.calls.append((url, params))
@@ -270,7 +274,7 @@ class Choppy(Earnings):
         return super().get(url, params, headers, timeout)
 
 
-def test_a_slow_down_answer_waits_a_minute_and_carries_on_and_calls_are_paced_to_five_a_minute(cfg, monkeypatch, naps):
+def test_a_slow_down_answer_waits_a_minute_and_carries_on_and_calls_are_paced_to_four_a_minute(cfg, monkeypatch, naps):
     from desk.engine.__main__ import run_av_history
 
     ledger(cfg, [(s, "held", "2026-11-10", None, None) for s in ("HELDA", "HELDB", "HELDC")]).close()
@@ -278,7 +282,50 @@ def test_a_slow_down_answer_waits_a_minute_and_carries_on_and_calls_are_paced_to
     out = run_av_history(cfg, Choppy(slow=[1, 3]))
     assert out["ok"] and out["loaded"] == ["HELDA", "HELDB", "HELDC"] and out["errors"] == [] and out["stopped"] is None
     assert naps.count(rapid.WAIT_S) == 2
-    assert len([s for s in naps if 11.5 < s <= 60 / 5 + 0.5]) >= 6
+    assert len([s for s in naps if 14.5 < s <= 60 / 4 + 0.5]) >= 6
+
+
+def test_a_burst_answer_waits_five_minutes_and_the_night_goes_on(cfg, monkeypatch, naps):
+    from desk.engine.__main__ import run_av_history
+
+    ledger(cfg, [(s, "held", "2026-11-10", None, None) for s in ("HELDA", "HELDB")]).close()
+    monkeypatch.setenv("RAPIDAPI_KEY", "rk")
+    out = run_av_history(cfg, Choppy(burst=[2, 3]))
+    assert out["ok"] and out["loaded"] == ["HELDA", "HELDB"] and out["stopped"] is None
+    assert naps.count(rapid.BURST_WAIT_S) == 2
+
+
+def test_a_name_a_backup_has_no_prices_for_is_not_asked_again_for_a_week(cfg, monkeypatch):
+    conn = ledger(cfg, [("GONE", "held", "2026-11-10", None, None)])
+    monkeypatch.setenv("TIINGO_API_KEY", "k")
+    monkeypatch.setenv("RAPIDAPI_KEY", "rk")
+    at(monkeypatch, NOV_12)
+    monkeypatch.setenv("DESK_TIINGO_DAILY", "0")
+    monkeypatch.setenv("DESK_FMP_DAILY", "0")
+    monkeypatch.setenv("DESK_YHFINANCE_MONTHLY", "0")
+    first = Providers()
+    run_market_backfill(cfg, first)
+    assert [c[1]["symbol"] for c in first.calls if "rapidapi" in c[0]].count("GONE") == 1
+    assert conn.execute("SELECT ok FROM api_calls WHERE provider='alphavantage' AND symbol='GONE'").fetchone()[0] == rapid.NO_DATA
+    again = Providers()
+    run_market_backfill(cfg, again)
+    assert all(c[1]["symbol"] != "GONE" for c in again.calls if "rapidapi" in c[0])
+    conn.close()
+
+
+def test_the_key_is_read_from_what_the_earnings_job_saw(cfg, monkeypatch):
+    from desk.engine.__main__ import run_av_history
+
+    conn = ledger(cfg, [("HELDA", "held", "2026-11-10", None, None)])
+    assert rapid.key_seen(conn) is None
+    monkeypatch.delenv("RAPIDAPI_KEY", raising=False)
+    run_av_history(cfg, Earnings())
+    assert rapid.state(conn)["key_set"] is False
+    monkeypatch.setenv("RAPIDAPI_KEY", "rk")
+    run_av_history(cfg, Earnings())
+    monkeypatch.delenv("RAPIDAPI_KEY")
+    assert rapid.state(conn)["key_set"] is True
+    conn.close()
 
 
 def test_one_companys_error_is_recorded_and_the_night_goes_on(cfg, monkeypatch):
@@ -307,4 +354,5 @@ def test_rapidapi_answers_sort_into_slow_down_out_of_calls_and_refused():
     assert isinstance(rapid.limited(av, "Our standard API call frequency is 5 calls per minute and 500 calls per day."), rapid.SlowDown)
     assert isinstance(rapid.limited(av, "You have exceeded the DAILY quota for Requests on your current plan, BASIC."), rapid.OutOfCalls)
     assert isinstance(rapid.limited(av, "Thank you for using Alpha Vantage! This is a premium endpoint."), rapid.Refused)
+    assert isinstance(rapid.limited(av, "Burst pattern detected for this API key: no more than 5 requests per second."), rapid.Burst)
     assert rapid.stops(rapid.OutOfCalls("x")) and rapid.stops(rapid.Refused("x")) and not rapid.stops(ProviderError("ZZZ has no data"))
