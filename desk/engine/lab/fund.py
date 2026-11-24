@@ -193,5 +193,7 @@ def build(desk: sqlite3.Connection, public, spans: dict[str, tuple[str, str]], t
         "split_votes": [today, first],
     }
     for key in FEATURES:
-        cover[key] = {"have": len(firsts[key]), "from": first_covered(firsts[key], listed, start, end)}
+        days = sorted(firsts[key].values())
+        depth = {"earliest": days[0] if days else None, "median": days[(len(days) - 1) // 2] if days else None}
+        cover[key] = {"have": len(days), "from": first_covered(firsts[key], listed, start, end)} | depth
     return rows, cover

@@ -102,14 +102,22 @@ def test_only_public_list_names_are_exported_and_coverage_says_what_is_still_to_
         "odd": 2,
         "eps_basis": fund.TODAYS_SHARES,
         "split_votes": [0, 0],
-        fund.YIELD: {"have": 1, "from": None},
-        fund.MARGIN: {"have": 2, "from": None},
+        fund.YIELD: {"have": 1, "from": None, "earliest": "2024-01-30", "median": "2024-01-30"},
+        fund.MARGIN: {"have": 2, "from": None, "earliest": "2024-01-30", "median": "2024-01-30"},
     }
     quarters(desk, "BBB", rows)
     quarters(desk, "CCC", [])
     out, cover = fund.build(desk, {"AAA", "BBB", "CCC", "ODD"}, {s: spans[s] for s in ("AAA", "BBB", "CCC", "ODD")}, "2023-01-02")
-    assert cover["loading"] == 0 and cover["asked"] == 4 and cover[fund.YIELD] == {"have": 2, "from": None}
-    assert fund.build(desk, {"AAA", "BBB"}, {s: spans[s] for s in ("AAA", "BBB")}, "2023-01-02")[1][fund.YIELD] == {"have": 2, "from": "2024-04-01"}
+    assert cover["loading"] == 0 and cover["asked"] == 4 and (cover[fund.YIELD]["have"], cover[fund.YIELD]["from"]) == (2, None)
+    both = fund.build(desk, {"AAA", "BBB"}, {s: spans[s] for s in ("AAA", "BBB")}, "2023-01-02")[1][fund.YIELD]
+    assert both == {"have": 2, "from": "2024-04-01", "earliest": "2024-01-30", "median": "2024-01-30"}
+    for sym in ("LATE", "LATER"):
+        bars(desk, sym, days, lambda d: 50.0)
+        quarters(desk, sym, [q | {"operating_income": None} for q in rows[:1]] + rows[1:])
+    late = fund.build(desk, {"AAA", "LATE", "LATER", "CCC"}, {s: spans["AAA"] for s in ("AAA", "LATE", "LATER", "CCC")}, "2023-01-02")[1]
+    assert late[fund.MARGIN] == {"have": 3, "from": None, "earliest": "2024-01-30", "median": "2024-04-23"}
+    assert late[fund.YIELD] == {"have": 3, "from": None, "earliest": "2024-01-30", "median": "2024-01-30"}
+    assert fund.build(desk, {"CCC"}, {"CCC": spans["CCC"]}, "2023-01-02")[1][fund.MARGIN] == {"have": 0, "from": None, "earliest": None, "median": None}
     assert fund.build(desk, set(), spans, None) == ([], None)
 
 
